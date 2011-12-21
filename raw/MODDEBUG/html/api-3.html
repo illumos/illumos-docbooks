@@ -1,0 +1,181 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Walker Definitions - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="api-2.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-4.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level2"><a href="api-1.html">Debugger Module Linkage</a></p>
+<p class="toc level2"><a href="api-2.html">Dcmd Definitions</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Walker Definitions</a></p>
+</div>
+<p class="toc level2"><a href="api-4.html">API Functions</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="api-3"></a><h3>Walker Definitions</h3>
+<pre>int walk_init(mdb_walk_state_t *wsp);
+int walk_step(mdb_walk_state_t *wsp);
+void walk_fini(mdb_walk_state_t *wsp);</pre><p>A walker is composed of three functions, <tt>init</tt>, <tt>step</tt>, and <tt>fini</tt>, which
+are defined according to the example prototypes above.  A walker is invoked
+by the debugger when one of the walk functions (such as <tt>mdb_walk()</tt>) is
+called, or when the user executes the <tt>::walk</tt> built-in dcmd.  When the walk
+begins, MDB calls the walker's init function, passing it the address of a
+new <tt>mdb_walk_state_t</tt> structure, as defined in <tt>&lt;sys/mdb_modapi.h&gt;</tt>:</p><pre>typedef struct mdb_walk_state {
+            mdb_walk_cb_t walk_callback;    /* Callback to issue */
+            void *walk_cbdata;              /* Callback private data */
+            uintptr_t walk_addr;            /* Current address */
+            void *walk_data;                /* Walk private data */
+            void *walk_arg;                 /* Walk private argument */
+            void *walk_layer;               /* Data from underlying layer */
+} mdb_walk_state_t;</pre><p><a name="indexterm-503"></a>A separate <tt>mdb_walk_state_t</tt> is created for each walk, so that multiple instances of
+the same walker can be active simultaneously. The state structure contains the callback
+the walker should invoke at each step (<i>walk_callback</i>), and the private data for the
+callback (<i>walk_cbdata</i>), as specified to <tt>mdb_walk()</tt>, for example.  The <i>walk_cbdata</i> pointer is opaque
+to the walker: it must not modify or dereference this value, nor can
+it assume it is a pointer to valid memory.</p><p>The starting address for the walk is stored in <i>walk_addr</i>. This is either
+NULL if <tt>mdb_walk()</tt> was called, or the address parameter specified to <tt>mdb_pwalk()</tt>. If
+the <tt>::walk</tt> built-in was used, <i>walk_addr</i> will be non-NULL if an explicit address was
+specified on the left-hand side of <tt>::walk</tt>. A walk with a starting address
+of NULL is referred to as <b>global</b>. A walk with an explicit non-NULL
+starting address is referred to as <b>local</b>. </p><p>The <i>walk_data</i> and <i>walk_arg</i> fields are provided for use as private storage for
+the walker.  Complex walkers might need to allocate an auxiliary state structure
+and set <i>walk_data</i> to point to this structure.  Each time a walk
+is initiated, <i>walk_arg</i> is initialized to the value of the <tt>walk_init_arg</tt> member of the
+corresponding walker's <tt>mdb_walker_t</tt> structure.  </p><p>In some cases, it is useful to have several walkers share the
+same init, step, and fini routines.  For example, the MDB <tt>genunix</tt> module provides
+walkers for each kernel memory cache.  These share the same init, step,
+and fini functions, and use the <tt>walk_init_arg</tt> member of the <tt>mdb_walker_t</tt> to specify
+the address of the appropriate cache as the <i>walk_arg</i>.</p><p>If the walker calls <tt>mdb_layered_walk()</tt> to instantiate an underlying layer, then the underlying
+layer will reset <i>walk_addr</i> and <i>walk_layer</i> prior to each call to the
+walker's step function.  The underlying layer sets <i>walk_addr</i> to the target virtual address
+of the underlying object, and set <i>walk_layer</i> to point to the walker's local
+copy of the underlying object.  For more information on layered walks, refer
+to the discussion of <tt>mdb_layered_walk()</tt> below. </p><p>The walker init and step functions are expected to return one of
+the following status values:</p><dl><dt><tt>WALK_NEXT</tt></dt>
+<dd><p><a name="indexterm-504"></a>Proceed to the next step. When the walk init function returns <tt>WALK_NEXT</tt>, MDB invokes the walk step function. When the walk step function returns <tt>WALK_NEXT</tt>, this indicates that MDB should call the step function again.</p></dd>
+<dt><tt>WALK_DONE</tt></dt>
+<dd><p><a name="indexterm-505"></a>The walk has completed successfully. <tt>WALK_DONE</tt> can be returned by either the step function to indicate that the walk is complete, or by the init function to indicate that no steps are needed (for example, if the given data structure is empty).</p></dd>
+<dt><tt>WALK_ERR</tt></dt>
+<dd><p><a name="indexterm-506"></a>The walk has terminated due to an error. If <tt>WALK_ERR</tt> is returned by the init function, <tt>mdb_walk()</tt> (or any of its counterparts) returns &ndash;1 to indicate that the walker failed to initialize.  If <tt>WALK_ERR</tt> is returned by the step function, the walk terminates but <tt>mdb_walk()</tt> returns success.</p></dd>
+</dl>
+<p>The <i>walk_callback</i> is also expected to return one of the values above. Therefore,
+the walk step function's job is to determine the address of the next
+object, read in a local copy of this object, call the <i>walk_callback</i> function,
+then return its status.  The step function can also return <tt>WALK_DONE</tt> or
+<tt>WALK_ERR</tt> without invoking the callback if the walk is complete or if
+an error occurred.</p><p>The walker itself is defined using the <tt>mdb_walker_t</tt> structure, defined in :</p><pre>typedef struct mdb_walker {
+        const char *walk_name;                 /* Walk type name */
+        const char *walk_descr;                /* Walk description */
+        int (*walk_init)(mdb_walk_state_t *);  /* Walk constructor */
+        int (*walk_step)(mdb_walk_state_t *);  /* Walk iterator */
+        void (*walk_fini)(mdb_walk_state_t *); /* Walk destructor */
+        void *walk_init_arg;                   /* Constructor argument */
+} mdb_walker_t;</pre><p><a name="indexterm-507"></a>The <tt>walk_name</tt> and <tt>walk_descr</tt> fields should be initialized to point to strings containing
+the name and a brief description of the walker, respectively. A walker is
+required to have a non-NULL name and description, and the name cannot contain
+any of the MDB meta-characters.  The description string is printed by the
+<tt>::walkers</tt> and <tt>::dmods</tt> built-in dcmds.</p><p>The <tt>walk_init</tt>, <tt>walk_step</tt>, and <tt>walk_fini</tt> members refer to the walk functions themselves,
+as described earlier. The <tt>walk_init</tt> and <tt>walk_fini</tt> members can be set to NULL to
+indicate that no special initialization or cleanup actions need to be taken. The
+<tt>walk_step</tt> member cannot be set to NULL. The <tt>walk_init_arg</tt> member is used to
+initialize the <tt>walk_arg</tt> member of each new <tt>mdb_walk_state_t</tt> created for the given walker,
+as described earlier. <a href="#api-fig-54">Figure&nbsp;10-1</a> shows a flowchart for the algorithm of a
+typical walker.</p><a name="api-fig-54"></a><h6>Figure&nbsp;10-1 Sample Walker</h6><img src="figures/proc-t.gif" alt="Graphic is described by context."></img><p>The walker is designed to iterate over the list of <tt>proc_t</tt> structures in
+the kernel. The head of the list is stored in the global
+<tt>practive</tt> variable, and each element's <tt>p_next</tt> pointer points to the next <tt>proc_t</tt> in
+the list. The list is terminated with a NULL pointer. In the walker's
+<tt>init</tt> routine, the <tt>practive</tt> symbol is located using <tt>mdb_lookup_by_name()</tt> step (1), and its value
+is copied into the <tt>mdb_walk_state_t</tt> pointed to by <i>wsp</i>. </p><p>In the walker's step function, the next <tt>proc_t</tt> structure in the list is
+copied into the debugger's address space using <tt>mdb_vread()</tt> step (2), the callback
+function is invoked with a pointer to this local copy, step (3), and
+then the <tt>mdb_walk_state_t</tt> is updated with the address of the <tt>proc_t</tt> structure for the
+next iteration. This update corresponds to following the pointer, step (4), to the
+next element in the list. </p><p>These steps demonstrate the structure of a typical walker: the init routine locates
+the global information for a particular data structure, the step function reads in
+a local copy of the next data item and passes it to the
+callback function, and the address of the next element is read. Finally, when
+the walk terminates, the fini function frees any private storage.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="api-2.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-4.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

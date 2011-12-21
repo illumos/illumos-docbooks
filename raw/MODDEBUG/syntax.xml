@@ -1,0 +1,521 @@
+<?Pub CX solbook(?><chapter id="syntax-7"><?Pub Tag atict:info tracking="off" ref="4"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>MDB Language Syntax</title><highlights><para>This chapter describes the MDB language syntax, operators, and rules
+for command and symbol name resolution.</para>
+</highlights><sect1 id="syntax-17"><title>Syntax</title><para>MDB processes commands from standard input. If standard input is a terminal,
+MDB provides terminal editing capabilities. MDB can also process commands
+from macro files and from dcmd pipelines, as described below.</para><itemizedlist><para>The MDB language syntax defines the following behavior:</para><listitem><para><indexterm><primary>dot address</primary><secondary>definition</secondary></indexterm>Compute the value of an expression. This value typically is a
+memory address in the target. The current address location is referred to
+as <emphasis role="strong">dot</emphasis>. Use the dot or period character
+(<literal>.</literal>) to reference the value of the current address.</para>
+</listitem><listitem><para>Apply a dcmd to the computed address.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>metacharacter</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">metacharacter</emphasis> is a newline,
+space, or tab character, or one of the following characters:</para><programlisting>[   ]   |   !   /   \   ?   =   &gt;   $   :   ;</programlisting><para><indexterm><primary>blank</primary><secondary>definition</secondary></indexterm><indexterm><primary>word</primary><secondary>definition</secondary></indexterm><indexterm><primary>identifier</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">blank</emphasis> is a <symbol>TAB</symbol> or
+a <symbol>SPACE</symbol>. A <emphasis role="strong">word</emphasis> is a sequence
+of characters separated by one or more non-quoted metacharacters. . An <emphasis role="strong">identifier</emphasis> is a sequence of letters, digits, underscores,
+periods, or back quotes beginning with a letter, underscore, or period. Identifiers
+are used as the names of symbols, variables, dcmds, and walkers. Commands
+are delimited by a <symbol>NEWLINE</symbol> or semicolon ( <literal>;</literal> ).</para><para><indexterm><primary>dcmd</primary><secondary>metacharacters</secondary></indexterm><indexterm><primary>metacharacters</primary><secondary>dcmds</secondary></indexterm>A dcmd is denoted by one of the following words or metacharacters:</para><para><literal>/   \   ?   =   &gt;   $<replaceable>character</replaceable> 
+ :<replaceable>character</replaceable>  ::<replaceable>identifier</replaceable></literal></para><para>Dcmds named by metacharacters or prefixed by a single dollar sign (<literal>$</literal>) or colon character (<literal>:</literal>) are provided as built-in
+operators. These dcmds implement complete compatibility with the command set
+of the legacy <olink targetdoc="refman1" targetptr="adb-1" remap="external"><citerefentry><refentrytitle>adb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility.
+After a dcmd has been parsed, the <literal>/</literal>, <literal>\</literal>, <literal>?</literal>, <literal>=</literal>, <literal>&gt;</literal>, <literal>$</literal>,
+and <literal>:</literal> characters are no longer recognized as metacharacters
+until the termination of the argument list.</para><para><indexterm><primary>simple-command</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">simple-command</emphasis> is a dcmd
+followed by a sequence of zero or more blank-separated words. The words are
+passed as arguments to the invoked dcmd, except as specified under <olink targetptr="syntax-1" remap="internal">Arithmetic Expansion</olink> and <olink targetptr="syntax-2" remap="internal">Quoting</olink>.</para><itemizedlist><para>Each dcmd returns an exit status value that indicates one of the following
+occurred:</para><listitem><para>The dcmd succeeded.</para>
+</listitem><listitem><para>The dcmd failed.</para>
+</listitem><listitem><para>The dcmd was invoked with invalid arguments.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>pipeline</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">pipeline</emphasis> is a sequence of
+one or more simple-commands, each separated by the vertical bar or pipe character
+(<literal>|</literal>). After the pipeline has been parsed, each dcmd is invoked
+in order from left to right. Each dcmd's output is processed and stored as
+described in <olink targetptr="syntax-14" remap="internal">Dcmd Pipelines</olink>. After the
+first dcmd in the pipeline is complete, its processed output is used as input
+for the second dcmd in the pipeline. When the second dcmd is complete, its
+output is used as input for the third dcmd in the pipeline, and so on. If
+any dcmd does not return a successful exit status, the pipeline is aborted.</para><para><indexterm><primary>expression</primary><secondary>definition</secondary></indexterm>An <emphasis role="strong">expression</emphasis> is a sequence
+of words that is evaluated to compute a 64-bit unsigned integer value. The
+words are evaluated using the rules described in <olink targetptr="syntax-1" remap="internal">Arithmetic
+Expansion</olink>.</para>
+</sect1><sect1 id="syntax-11"><title>Commands</title><para><indexterm><primary>command</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">command</emphasis> is one of the following:</para><variablelist termlength="wholeline"><varlistentry><term>pipeline [ ! word ... ] [ ; ]</term><listitem><para>A simple-command or pipeline can be optionally followed by
+the exclamation point or bang character (<literal>!</literal>), indicating
+that the debugger should open a <olink targetdoc="refman2" targetptr="pipe-2" remap="external"><citerefentry><refentrytitle>pipe</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.
+The standard output of the last dcmd in the MDB pipeline is sent to an external
+process created by executing <command>$SHELL</command> <option>c</option> followed
+by the string formed by concatenating the words after the <literal>!</literal> character.
+For more details, refer to <olink targetptr="syntax-3" remap="internal">Shell Escapes</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term>expression pipeline [ ! word ... ] [ ; ]</term><listitem><para>A simple-command or pipeline can be prefixed with an expression.
+Before execution of the pipeline, any occurrence of the dot or period character
+(<literal>.</literal>) in the pipeline is set to the value of the expression.</para>
+</listitem>
+</varlistentry><varlistentry><term>expression1 , expression2 pipeline [ ! word ... ] [ ;
+]</term><listitem><para>A simple-command or pipeline can be prefixed with two expressions.
+The value of the first expression is the new value of dot. The value of the
+second expression is a repeat count for the first dcmd in the pipeline. The
+first dcmd in the pipeline is executed <replaceable>expression2</replaceable> times
+before the next dcmd in the pipeline is executed. The repeat count applies
+only to the first dcmd in the pipeline.</para>
+</listitem>
+</varlistentry><varlistentry><term>, expression pipeline [ ! word ... ] [ ; ]</term><listitem><para>If the first expression is omitted, dot is not modified. The
+value of the second expression (the expression after the comma character)
+is used exactly the same way as <replaceable>expression2</replaceable> above.</para>
+</listitem>
+</varlistentry><varlistentry><term>expression [ ! word ... ] [ ; ]</term><listitem><para>A command can consist of only an arithmetic expression. The
+value of the expression is the new value of dot. The previous dcmd pipeline
+is re-executed using the new value of dot.</para>
+</listitem>
+</varlistentry><varlistentry><term>expression1 , expression2 [ ! word ... ] [ ; ]</term><listitem><para>A command can consist of only a dot expression and repeat
+count expression. The value of <replaceable>expression1</replaceable> is the
+new value of dot. The previous dcmd pipeline is re-executed <replaceable>expression2</replaceable> times using the new value of dot.</para>
+</listitem>
+</varlistentry><varlistentry><term>, expression [ ! word ... ] [ ; ]</term><listitem><para>If the first expression is omitted, dot is not modified. The
+value of the second expression (the expression after the comma character)
+is used exactly the same way as <replaceable>expression2</replaceable> above.</para>
+</listitem>
+</varlistentry><varlistentry><term>! word ... [ ; ]</term><listitem><para>If the command begins with the <literal>!</literal> character,
+no dcmds are executed. The debugger executes <command>$SHELL</command> <option>c</option> followed
+by the string formed by concatenating the words after the <literal>!</literal> character.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="syntax-5"><title>Comments</title><para><indexterm><primary>comment</primary><secondary>definition</secondary></indexterm>A word that begins with two forward slash characters (<literal>//</literal>)
+causes that word and all the subsequent characters up to a <symbol>NEWLINE</symbol> to
+be ignored.</para>
+</sect1><sect1 id="syntax-1"><title>Arithmetic Expansion</title><indexterm><primary>arithmetic expansion</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>expression</primary><secondary>evaluation</secondary>
+</indexterm><para>Arithmetic expansion is performed to determine the value of an expression.
+MDB commands can be preceded by expressions that represent a start address
+or a repeat count. Arithmetic expansion can also be performed to compute a
+numeric argument for a dcmd. An expression can appear in an argument list
+enclosed in square brackets preceded by a dollar sign (<literal>$[ <replaceable>expression</replaceable> ]</literal>). In this case, the expression is replaced by its
+arithmetic value.</para><para><indexterm><primary>expression</primary><secondary>components</secondary></indexterm>Expressions can contain any of the following special words:</para><variablelist><varlistentry><term><replaceable>integer</replaceable></term><listitem><para>The specified integer value. Integer values can be prefixed
+with <literal>0i</literal> or <literal>0I</literal> to indicate binary values, <literal>0o</literal> or <literal>0O</literal> to indicate octal values, <literal>0t</literal> or <literal>0T</literal> to indicate decimal values, and <literal>0x</literal> or <literal>0X</literal> to indicate hexadecimal values (the default).</para>
+</listitem>
+</varlistentry><varlistentry><term>0[tT][0-9]+.[0-9]+</term><listitem><para>The specified decimal floating point value, converted to its <acronym>IEEE</acronym> double-precision floating point representation.</para>
+</listitem>
+</varlistentry><varlistentry><term>'<replaceable>cccccccc</replaceable>'</term><listitem><para>The integer value computed by converting each character to
+a byte equal to its <acronym>ASCII</acronym> value. Up to eight characters
+can be specified in a character constant. Characters are packed into the integer
+in reverse order (right-to-left), beginning at the least significant byte.</para>
+</listitem>
+</varlistentry><varlistentry><term>&lt;<replaceable>identifier</replaceable></term><listitem><para>The value of the variable named by <replaceable>identifier</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>identifier</replaceable></term><listitem><para>The value of the symbol named by <replaceable>identifier</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term>(<replaceable>expression</replaceable>)</term><listitem><para>The value of <replaceable>expression</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term>.</term><listitem><para>The value of dot.</para>
+</listitem>
+</varlistentry><varlistentry><term>&amp;</term><listitem><para>The most recent value of dot used to execute a dcmd.</para>
+</listitem>
+</varlistentry><varlistentry><term>+</term><listitem><para>The value of dot incremented by the current increment.</para>
+</listitem>
+</varlistentry><varlistentry><term>^</term><listitem><para>The value of dot decremented by the current increment.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The increment is a global variable that stores the total bytes read
+by the last formatting dcmd. For more information on the increment, refer
+to the discussion of <olink targetptr="syntax-15" remap="internal">Formatting Dcmds</olink>.</para><sect2 id="syntax-18"><title>Unary Operators</title><para><indexterm><primary>operators</primary><secondary>unary</secondary></indexterm>Unary operators are right associative and have higher precedence
+than binary operators. The unary operators are:</para><variablelist><varlistentry><term>#<replaceable>expression</replaceable></term><listitem><para>Logical negation</para>
+</listitem>
+</varlistentry><varlistentry><term>~<replaceable>expression</replaceable></term><listitem><para>Bitwise complement</para>
+</listitem>
+</varlistentry><varlistentry><term>-<replaceable>expression</replaceable></term><listitem><para>Integer negation</para>
+</listitem>
+</varlistentry><varlistentry><term>%<replaceable>expression</replaceable></term><listitem><para>Value of a pointer-sized quantity at the object file location
+corresponding to virtual address <replaceable>expression</replaceable> in
+the target's virtual address space</para>
+</listitem>
+</varlistentry><varlistentry><term>%/[csil]/<replaceable>expression</replaceable></term><listitem><para>Value of a char-sized, short-sized, int-sized, or long-sized
+quantity at the object file location corresponding to virtual address <replaceable>expression</replaceable> in the target's virtual address space</para>
+</listitem>
+</varlistentry><varlistentry><term>%/[1248]/<replaceable>expression</replaceable></term><listitem><para>Value of a one-byte, two-byte, four-byte, or eight-byte quantity
+at the object file location corresponding to virtual address <replaceable>expression</replaceable> in the target's virtual address space</para>
+</listitem>
+</varlistentry><varlistentry><term>*<replaceable>expression</replaceable></term><listitem><para>Value of a pointer-sized quantity at virtual address <replaceable>expression</replaceable> in the target's virtual address space</para>
+</listitem>
+</varlistentry><varlistentry><term>*/[csil]/<replaceable>expression</replaceable></term><listitem><para>Value of a char-sized, short-sized, int-sized, or long-sized
+quantity at virtual address <replaceable>expression</replaceable> in the target's
+virtual address space</para>
+</listitem>
+</varlistentry><varlistentry><term>*/[1248]/<replaceable>expression</replaceable></term><listitem><para>Value of a one-byte, two-byte, four-byte, or eight-byte quantity
+at virtual address <replaceable>expression</replaceable> in the target's virtual
+address space</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="syntax-19"><title>Binary Operators</title><para><indexterm><primary>operators</primary><secondary>binary</secondary></indexterm>Binary operators are left associative and have lower precedence
+than unary operators. The binary operators, in order of precedence from highest
+to lowest, are:</para><variablelist><varlistentry><term><literal>*</literal></term><listitem><para>Integer multiplication</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%</literal></term><listitem><para>Integer division</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>#</literal></term><listitem><para>Left-hand side rounded up to next multiple of right-hand side</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>+</literal></term><listitem><para>Integer addition</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>-</literal></term><listitem><para>Integer subtraction</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>&lt;&lt;</literal></term><listitem><para>Bitwise shift left</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>&gt;&gt;</literal></term><listitem><para>Bitwise shift right</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>==</literal></term><listitem><para>Logical equality</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>!=</literal></term><listitem><para>Logical inequality</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>&amp;</literal></term><listitem><para>Bitwise AND</para>
+</listitem>
+</varlistentry><varlistentry><term><literal></literal>^</term><listitem><para>Bitwise exclusive OR</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>|</literal></term><listitem><para>Bitwise inclusive OR</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="syntax-2"><title>Quoting</title><indexterm><primary>quoting characters</primary>
+</indexterm><indexterm><primary>metacharacters</primary><secondary>quoting</secondary>
+</indexterm><para>Each metacharacter described in <olink targetptr="syntax-17" remap="internal">Syntax</olink> terminates
+a word unless the metacharacter is quoted. Characters can be quoted by enclosing
+them in a pair of single quotation marks (<literal>'</literal>) or double
+quotation marks (<literal>"</literal>).. Quoting characters forces MDB to
+interpret each character as itself without any special significance. A single
+quotation mark cannot appear inside single quotation marks. Inside double
+quotation marks, MDB recognizes the C programming language character escape
+sequences.</para>
+</sect1><sect1 id="syntax-3"><title>Shell Escapes</title><indexterm><primary>shell escapes</primary>
+</indexterm><indexterm><primary>command</primary><secondary>shell escapes</secondary>
+</indexterm><para>The <literal>!</literal> character can be used to create a pipeline
+between an MDB command and the user's shell. Shell escapes are available only
+when using <command>mdb</command> and not when using <command>kmdb</command>.
+If the <envar>$SHELL</envar> environment variable is set, MDB will <command>fork</command> and <command>exec</command> this <envar>$SHELL</envar> program for shell escapes. If <envar>$SHELL</envar> is not set, <command>/bin/sh</command> is used. The shell is invoked
+with the <option>c</option> option followed by a string formed by concatenating
+the words after the <literal>!</literal> character.</para><para>The <literal>!</literal> character takes precedence over all other metacharacters,
+except semicolon (<literal>;</literal>) and <symbol>NEWLINE</symbol>. After
+a shell escape is detected, the remaining characters up to the next semicolon
+or <symbol>NEWLINE</symbol> are passed &ldquo;as is&rdquo; to the shell. The
+output of shell commands cannot be piped to MDB dcmds. The output of commands
+executed by a shell escape is sent directly to the terminal, not to MDB.</para>
+</sect1><sect1 id="syntax-4"><title>Variables</title><indexterm><primary>variable</primary><secondary>definition</secondary>
+</indexterm><para>A <emphasis role="strong">variable</emphasis> is a variable name, a
+corresponding integer value, and a set of attributes. A variable name is a
+sequence of letters, digits, underscores, or periods. Use the <literal>&gt;</literal> dcmd
+or <literal>::typeset</literal> dcmd to assign a value to a variable.. Use
+the <literal>::typeset</literal> dcmd to manipulate the attributes of a variable.
+Each variable's value is represented as a 64-bit unsigned integer. A variable
+can have one or more of the following attributes: read-only (cannot be modified
+by the user), persistent (cannot be unset by the user), and tagged (user-defined
+indicator).</para><para>The following variables are defined as persistent:</para><variablelist><varlistentry><term>0</term><listitem><para>Most recent value printed using the <literal>/</literal>, <literal>\</literal>, <literal>?</literal>, or <literal>=</literal> dcmd.</para>
+</listitem>
+</varlistentry><varlistentry><term>9</term><listitem><para>Most recent count used with the <literal>$&lt;</literal> dcmd.</para>
+</listitem>
+</varlistentry><varlistentry><term>b</term><listitem><para>Virtual address of the base of the data section.</para>
+</listitem>
+</varlistentry><varlistentry><term>cpuid</term><listitem><para>The CPU identifier corresponding to the CPU on which <command>kmdb</command> is currently executing.</para>
+</listitem>
+</varlistentry><varlistentry><term>d</term><listitem><para>Size of the data section in bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term>e</term><listitem><para>Virtual address of the entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term>hits</term><listitem><para>The count of the number of times the matched software event
+specifier has been matched. See <olink targetptr="exec-ctrl-10" remap="internal">Event Callbacks</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term>m</term><listitem><para>Initial bytes (magic number) of the target's primary object
+file, or zero if no object file has been read yet.</para>
+</listitem>
+</varlistentry><varlistentry><term>t</term><listitem><para>Size of the text section in bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term>thread</term><listitem><para>The thread identifier of the current representative thread.
+The value of the identifier depends on the threading model used by the current
+target. See <olink targetptr="exec-ctrl-11" remap="internal">Thread Support</olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>In addition, the MDB kernel and process targets export the current values
+of the representative thread's register set as named variables. The names
+of these variables depend on the target's platform and instruction set architecture.</para>
+</sect1><sect1 id="syntax-16"><title>Symbol Name Resolution</title><indexterm><primary>symbol</primary><secondary>name resolution</secondary>
+</indexterm><indexterm><primary>symbol</primary><secondary>tables</secondary>
+</indexterm><para>As explained in <olink targetptr="syntax-17" remap="internal">Syntax</olink>, a symbol
+identifier present in an expression context evaluates to the value of this
+symbol. The value typically denotes the virtual address of the storage associated
+with the symbol in the target's virtual address space. A target can support
+multiple symbol tables including, but not limited to, the following symbol
+tables:</para><itemizedlist><listitem><para>Primary executable symbol table</para>
+</listitem><listitem><para>Primary dynamic symbol table</para>
+</listitem><listitem><para>Runtime link-editor symbol table</para>
+</listitem><listitem><para>Standard and dynamic symbol tables for each of a number of
+load objects (such as shared libraries in a user process, or kernel modules
+in the Solaris kernel)</para>
+</listitem>
+</itemizedlist><para>The target typically searches the symbol tables of the primary executable
+first, then one or more of the other symbol tables. Note that <acronym>ELF</acronym> symbol
+tables contain only entries for external, global, and static symbols. Automatic
+symbols do not appear in the symbol tables processed by MDB.</para><para>Additionally, MDB provides a private user-defined symbol table that
+is searched prior to any of the target symbol tables. The private symbol table
+is initially empty. Use the <command>::nmadd</command> and <command>::nmdel</command> dcmds
+to manipulate the private symbol table.</para><para>Use the <command>::nm</command> <option>P</option> dcmd to display the
+contents of the private symbol table. The private symbol table enables you
+to create symbol definitions for program functions or data that were either
+missing from the original program or stripped out. These definitions are then
+used whenever MDB converts a symbolic name to an address, or converts an address
+to the nearest symbol.</para><para>Because targets contain multiple symbol tables, and each symbol table
+can include symbols from multiple object files, different symbols with the
+same name can exist. MDB uses the backquote character (<literal>`</literal>)
+as a symbol-name scoping operator to enable you to obtain the value of the
+desired symbol in this situation.</para><para>You can specify the scope used to resolve a symbol name as either: <replaceable>object</replaceable><literal>`</literal><replaceable>name</replaceable>, or <replaceable>file</replaceable><literal>`</literal><replaceable>name</replaceable>, or <replaceable>object</replaceable><literal>`</literal><replaceable>file</replaceable><literal>`</literal><replaceable>name</replaceable>. The object identifier refers to
+the name of a load object. The file identifier refers to the basename of a
+source file that has a symbol of type <literal>STT_FILE</literal> in the symbol
+table of the specified object. The object identifier's interpretation depends
+on the target type.</para><para>The MDB kernel target expects <replaceable>object</replaceable> to specify
+the basename of a loaded kernel module. For example, the symbol name <literal>specfs`_init</literal> evaluates to the value of the <literal>_init</literal> symbol in
+the <literal>specfs</literal> kernel module.</para><para>The <command>mdb</command> process target expects <replaceable>object</replaceable> to
+specify the name of the executable or of a loaded shared library. The value
+of <replaceable>object</replaceable> can take any of the following forms:</para><itemizedlist><listitem><para>Exact match (that is, a full path name): <filename>/usr/lib/libc.so.1</filename></para>
+</listitem><listitem><para>Exact basename match: <literal>libc.so.1</literal></para>
+</listitem><listitem><para>Initial basename match up to a period or dot character (<literal>.</literal>) suffix: <literal>libc.so</literal> or <literal>libc</literal></para>
+</listitem><listitem><para>Literal string <literal>a.out</literal>, which is accepted
+as an alias for the executable</para>
+</listitem>
+</itemizedlist><para>The process target will also accept any of these four forms preceded
+by an optional link-map ID (<literal>lmid</literal>).  The <literal>lmid</literal> prefix
+is specified by an initial <literal>LM</literal> followed by the link-map
+id in hexadecimal followed by an additional backquote character (<literal>`</literal>).
+ For example, the symbol name <literal>LM0`libc.so.1`_init</literal> evaluates
+to the value of the <literal>_init</literal> symbol in the <filename>libc.so.1</filename> library
+that is loaded on link-map 0 (<literal>LM_ID_BASE</literal>).  The link-map
+specifier might be necessary to resolve symbol naming conflicts if the same
+library is loaded on more than one link map.  For more information on link
+maps, refer to the <olink targetdoc="llm" remap="external"><citetitle remap="book">Linker and Libraries Guide</citetitle></olink>  and the <olink targetdoc="refman3a" targetptr="dlopen-3c" remap="external"><citerefentry><refentrytitle>dlopen</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> man page. Link-map identifiers
+are displayed when symbols are printed according to the setting of the <literal>showlmid</literal> option, as described in <olink targetptr="options-2" remap="internal">Summary of
+Command-line Options</olink>.</para><para>In the case of a naming conflict between symbols and hexadecimal integer
+values, MDB attempts to evaluate an ambiguous token as a symbol first, before
+evaluating it as an integer value. For example, the token <literal>f</literal> can
+refer either to the decimal integer value <literal>15</literal> specified
+in hexadecimal (the default base), or to a global variable named <literal>f</literal> in
+the target's symbol table. If a symbol can have an ambiguous name, use an
+explicit <literal>0x</literal> or <literal>0X</literal> prefix to specify
+the integer value.</para>
+</sect1><sect1 id="syntax-13"><title>Dcmd and Walker Name Resolution</title><indexterm><primary>dcmd</primary><secondary>name resolution</secondary>
+</indexterm><indexterm><primary>walker</primary><secondary>name resolution</secondary>
+</indexterm><para>As described earlier, each MDB dmod provides a set of dcmds and walkers.
+Dcmds and walkers are tracked in two distinct, global namespaces. MDB also
+keeps track of a dcmd and walker namespace associated with each dmod. Identically
+named dcmds or walkers within a given dmod are not allowed. A dmod with this
+type of naming conflict will fail to load.</para><para>Name conflicts between dcmds or walkers from different dmods are allowed
+in the global namespace.  In the case of a conflict, the first dcmd or walker
+with that particular name to be loaded is given precedence in the global namespace.
+Alternate definitions are kept in a list in load order.</para><para><indexterm><primary>scoping operator</primary></indexterm>Use the backquote
+character (<literal>`</literal>) in a dcmd or walker name as a scoping operator
+to select an alternate definition. For example, if dmods <literal>m1</literal> and <literal>m2</literal> each provide a dcmd <literal>d</literal>, and <literal>m1</literal> is
+loaded prior to <literal>m2</literal>, then you can use the scoping operator
+as shown below to specify the dcmd you want:</para><variablelist><varlistentry><term><literal>::d</literal></term><listitem><para>Executes <literal>m1</literal>'s definition of <literal>d</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>::m1`d</literal></term><listitem><para>Executes <literal>m1</literal>'s definition of <literal>d</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>::m2`d</literal></term><listitem><para>Executes <literal>m2'</literal>s definition of <literal>d</literal></para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary><literal>which</literal> dcmd</primary></indexterm><indexterm><primary>dcmds</primary><secondary>which</secondary></indexterm>If module <literal>m1</literal> is unloaded, the next dcmd on the global definition list (<literal>m2`d</literal>) is promoted to global visibility. Use the <command>::which</command> dcmd
+to determine the current definition of a dcmd or walker. Use the <command>::which</command> <option>v</option> dcmd to display the global definition list.</para>
+</sect1><sect1 id="syntax-14"><title>Dcmd Pipelines</title><indexterm><primary>pipelines</primary>
+</indexterm><para>Use the vertical bar (<literal>|</literal>) operator to pipeline dcmds.
+The purpose of a pipeline is to pass values from one dcmd or walker to another.
+The values passed usually are virtual addresses. Pipeline stages might be
+used to map a pointer from one type of data structure to a pointer to a corresponding
+data structure, to sort a list of addresses, or to select the addresses of
+structures with certain properties.</para><para>MDB executes each dcmd in the pipeline in order from left to right.
+The left-most dcmd is executed using the current value of dot, or using the
+value specified by an explicit expression at the start of the command. A pipe
+operator (<literal>|</literal>) causes MDB to create a shared buffer between
+the output of the dcmd to its left and the MDB parser, and an empty list of
+values.</para><para>As the dcmd executes, its standard output is placed in the pipe and
+then consumed and evaluated by the parser, as if MDB were reading this data
+from standard input. Each line must consist of an arithmetic expression terminated
+by a <symbol>NEWLINE</symbol> or semicolon (<literal>;</literal>). The value
+of the expression is appended to the list of values associated with the pipe.
+If a syntax error is detected, the pipeline is aborted.</para><para>When the dcmd to the left of a <literal>|</literal> operator completes,
+the list of values associated with the pipe is then used to invoke the dcmd
+to the right of the <literal>|</literal> operator. For each value in the list,
+dot is set to this value, and the right-hand dcmd is executed. Only the output
+of the right-most dcmd in the pipeline is written to standard output. If any
+dcmd in the pipeline produces output to standard error, these messages are
+written directly to standard error and are not processed as part of the pipeline.</para>
+</sect1><sect1 id="syntax-15"><title>Formatting Dcmds</title><indexterm><primary>dcmds</primary><secondary>formatting</secondary>
+</indexterm><para>The <literal>/</literal>, <literal>\</literal>, <literal>?</literal>,
+and <literal>=</literal> metacharacters are used to denote the special output
+formatting dcmds. Each of these dcmds accepts an argument list consisting
+of one or more format characters, repeat counts, or quoted strings. A format
+character is one of the <acronym>ASCII</acronym> characters described below.</para><para>Format characters are used to read and format data from the target.
+A repeat count is a positive integer preceding the format character that is
+always interpreted in base 10 (decimal). A repeat count can also be specified
+as an expression enclosed in square brackets preceded by a dollar sign (<literal>$[&nbsp;]</literal>). A string argument must be enclosed in double quotation
+marks (<literal>"&nbsp;"</literal>). No blanks are necessary between format
+arguments.</para><para>The formatting dcmds are:</para><variablelist><varlistentry><term><literal>/</literal></term><listitem><para>Display data from the target's virtual address space starting
+at the virtual address specified by dot.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>\</literal></term><listitem><para>Display data from the target's physical address space starting
+at the physical address specified by dot.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>?</literal></term><listitem><para>Display data from the target's primary object file starting
+at the object file location corresponding to the virtual address specified
+by dot.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>=</literal></term><listitem><para>Display the value of dot in each of the specified data formats.
+The <literal>=</literal> dcmd is useful for converting between bases and performing
+arithmetic.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>increment</primary><secondary>definition</secondary></indexterm>In addition to dot, MDB keeps track of another global value called
+the <emphasis role="strong">increment</emphasis>. The increment represents
+the distance between dot and the address following all the data read by the
+last formatting dcmd.</para><para>For example, let dot equal address <replaceable>addr</replaceable>,
+where <replaceable>addr</replaceable> displays as a 4-byte integer. After
+a formatting dcmd is executed with dot equal to <replaceable>addr</replaceable>,
+the increment is set to <literal>4</literal>. The plus (<literal>+</literal>)
+operator, described in <olink targetptr="syntax-1" remap="internal">Arithmetic Expansion</olink>,
+would now evaluate to the value <literal>A+4</literal>, and could be used
+to reset dot to the address of the next data object for a subsequent dcmd.</para><para><indexterm><primary><literal>formats</literal> dcmd</primary></indexterm><indexterm><primary>dcmds</primary><secondary>formats</secondary></indexterm><indexterm><primary>format characters</primary></indexterm>Most format characters increase
+the value of the increment by the number of bytes corresponding to the size
+of the data format. The number of bytes in various data formats are shown
+below. Use the <command>::formats</command> dcmd to display the list of format
+characters from within MDB.</para><para>The format characters are:</para><variablelist><varlistentry><term>+</term><listitem><para>Increment dot by the count (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>-</term><listitem><para>Decrement dot by the count (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>B</term><listitem><para>Hexadecimal int (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>C</term><listitem><para>Character using C character notation (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>D</term><listitem><para>Decimal signed int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>E</term><listitem><para>Decimal unsigned long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>F</term><listitem><para>Double (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>G</term><listitem><para>Octal unsigned long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>H</term><listitem><para>Swap bytes and shorts (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>I</term><listitem><para>Address and disassembled instruction (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>J</term><listitem><para>Hexadecimal long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>K</term><listitem><para>Hexadecimal uintptr_t (4 or 8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>N</term><listitem><para>Newline</para>
+</listitem>
+</varlistentry><varlistentry><term>O</term><listitem><para>Octal unsigned int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>P</term><listitem><para>Symbol (4 or 8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>Q</term><listitem><para>Octal signed int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>R</term><listitem><para>Binary int (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>S</term><listitem><para>String using C string notation (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>T</term><listitem><para>Horizontal tab</para>
+</listitem>
+</varlistentry><varlistentry><term>U</term><listitem><para>Decimal unsigned int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>V</term><listitem><para>Decimal unsigned int (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>W</term><listitem><para>Default radix unsigned int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>X</term><listitem><para>Hexadecimal int (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>Y</term><listitem><para>Decoded time32_t (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>Z</term><listitem><para>Hexadecimal long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>^</term><listitem><para>Decrement dot by increment * count (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>a</term><listitem><para>Dot as symbol+offset</para>
+</listitem>
+</varlistentry><varlistentry><term>b</term><listitem><para>Octal unsigned int (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>c</term><listitem><para>Character (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>d</term><listitem><para>Decimal signed short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>e</term><listitem><para>Decimal signed long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>f</term><listitem><para>Float (4 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>g</term><listitem><para>Octal signed long long (8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>h</term><listitem><para>Swap bytes (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>i</term><listitem><para>Disassembled instruction (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>n</term><listitem><para>Newline</para>
+</listitem>
+</varlistentry><varlistentry><term>o</term><listitem><para>Octal unsigned short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>p</term><listitem><para>Symbol (4 or 8 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>q</term><listitem><para>Octal signed short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>r</term><listitem><para>Whitespace</para>
+</listitem>
+</varlistentry><varlistentry><term>s</term><listitem><para>Raw string (variable size)</para>
+</listitem>
+</varlistentry><varlistentry><term>t</term><listitem><para>Horizontal tab</para>
+</listitem>
+</varlistentry><varlistentry><term>u</term><listitem><para>Decimal unsigned short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>v</term><listitem><para>Decimal signed int (1 byte)</para>
+</listitem>
+</varlistentry><varlistentry><term>w</term><listitem><para>Default radix unsigned short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>x</term><listitem><para>Hexadecimal short (2 bytes)</para>
+</listitem>
+</varlistentry><varlistentry><term>y</term><listitem><para>Decoded time64_t (8 bytes)</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>format characters</primary><secondary>write modifiers</secondary></indexterm>You can also use the <literal>/</literal>, <literal>\</literal>,
+and <literal>?</literal> formatting dcmds to write to the target's virtual
+address space, physical address space, or object file. First specify one of
+the following modifiers as the first format character, and then specify a
+list of words. The words in the list are either immediate values or expressions
+enclosed in square brackets preceded by a dollar sign (<literal>$[&nbsp;]</literal>).</para><para>The write modifiers are:</para><variablelist><varlistentry><term>v</term><listitem><para>Write the lowest byte of the value of each expression to the
+target beginning at the location specified by dot</para>
+</listitem>
+</varlistentry><varlistentry><term>w</term><listitem><para>Write the lowest 2 bytes of the value of each expression to
+the target beginning at the location specified by dot</para>
+</listitem>
+</varlistentry><varlistentry><term>W</term><listitem><para>Write the lowest 4 bytes of the value of each expression to
+the target beginning at the location specified by dot</para>
+</listitem>
+</varlistentry><varlistentry><term>Z</term><listitem><para>Write the complete 8 bytes of the value of each expression
+to the target beginning at the location specified by dot</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>format characters</primary><secondary>search modifiers</secondary></indexterm>You can also use the <literal>/</literal>, <literal>\</literal>,
+and <literal>?</literal> formatting dcmds to search for a particular integer
+value in the target's virtual address space, physical address space, and object
+file, respectively. First specify one of the following modifiers as the first
+format character, and then specify a value and optional mask. The value and
+mask are each either immediate values or expressions enclosed in square brackets
+preceded by a dollar sign.</para><para>If only a value is specified, MDB reads integers of the appropriate
+size and stops at the address that contains the matching value. If a value <literal>V</literal> and mask <literal>M</literal> are specified, MDB reads integers
+of the appropriate size and stops at the address that contains a value <literal>X</literal> where <literal>(X &amp; M) == V</literal>. At the completion of
+the dcmd, dot is updated to the address of the match. If no match is found,
+dot is left at the last address that was read.</para><para>The search modifiers are:</para><variablelist><varlistentry><term>l</term><listitem><para>Search for the specified 2-byte value</para>
+</listitem>
+</varlistentry><varlistentry><term>L</term><listitem><para>Search for the specified 4-byte value</para>
+</listitem>
+</varlistentry><varlistentry><term>M</term><listitem><para>Search for the specified 8-byte value</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For both user and kernel targets, an address space is typically composed
+of a set of discontiguous segments. It is not legal to read from an address
+that does not have a corresponding segment. If a search reaches a segment
+boundary without finding a match, the search aborts when the read
+past the end of the segment boundary fails.</para>
+</sect1>
+</chapter><?Pub *0000044311 0?>

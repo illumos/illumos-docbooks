@@ -1,0 +1,901 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part()part(title()partintro()chapter()?><chapter id="gld-1"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag
+atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Drivers for Network Devices</title><indexterm><primary>device drivers</primary><secondary>network drivers</secondary>
+</indexterm><indexterm><primary>GLD</primary><secondary>drivers</secondary>
+</indexterm><indexterm><primary>network drivers</primary><secondary>using GLD</secondary>
+</indexterm><highlights><para>Solaris network drivers are STREAMS-based. These types of drivers are
+covered in depth in the <olink targetdoc="streams" remap="external"><citetitle remap="book">STREAMS Programming Guide</citetitle></olink>. This chapter discusses the Generic <acronym>LAN</acronym> driver (GLD), which is a kernel module encapsulating features
+common to most network drivers. The GLD implements much of the <acronym>STREAMS</acronym> and
+Data Link Provider Interface (DLPI) functionality for a Solaris network driver.</para><para>The GLD module is available for Solaris network drivers for the SPARC
+platform and for both 32-bit and 64-bit x86 platforms.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="gld-overview" remap="internal">Generic LAN Driver Overview</olink></para>
+</listitem><listitem><para><olink targetptr="gld-decdata" remap="internal">Declarations and Data Structures</olink></para>
+</listitem><listitem><para><olink targetptr="gld-args" remap="internal">GLD Arguments</olink></para>
+</listitem><listitem><para><olink targetptr="gld-ep" remap="internal">GLD Entry Points</olink></para>
+</listitem><listitem><para><olink targetptr="gld-13" remap="internal">GLD Service Routines</olink></para>
+</listitem>
+</itemizedlist><para>For more information on GLDs, see the <olink targetdoc="group-refman" targetptr="gld-7d" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="dlpi-7p" remap="external"><citerefentry><refentrytitle>dlpi</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="gld-9e" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="gld-9f" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="gld-mac-info-9s" remap="external"><citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="gld-stats-9s" remap="external"><citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man pages.</para>
+</highlights><sect1 id="gld-overview"><title>Generic LAN Driver Overview</title><para><indexterm><primary>STREAMS</primary><secondary>support for network driver</secondary></indexterm>GLD is a multi-threaded, clonable, loadable
+kernel module providing support to device drivers for local area networks.
+Local area network (LAN) device drivers in the Solaris OS are <acronym>STREAMS</acronym>-based
+drivers that use DLPI to communicate with network protocol stacks. These protocol
+stacks use the network drivers to send and receive packets on a local area
+network.</para><para>A network device driver must implement and conform to these requirements:</para><itemizedlist><listitem><para>DDI/DKI specification</para>
+</listitem><listitem><para><acronym>STREAMS</acronym> specification</para>
+</listitem><listitem><para>DLPI specification</para>
+</listitem><listitem><para>programmatic interface for the device</para>
+</listitem>
+</itemizedlist><para>GLD implements most <acronym>STREAMS</acronym> and DLPI functionality
+required of a Solaris LAN driver. Several Solaris network drivers are implemented
+using GLD.</para><para><indexterm><primary><function>attach</function> entry point</primary><secondary>network drivers</secondary></indexterm><indexterm><primary><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point</primary><secondary>network driver</secondary></indexterm><indexterm><primary><structname>gld_mac_info</structname> structure</primary><secondary>network drivers</secondary></indexterm><indexterm><primary><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function</primary></indexterm>A Solaris network driver that is implemented using GLD is made
+up of two distinct parts: a generic component that deals with <acronym>STREAMS</acronym> and
+DLPI interfaces, and a device-specific component that deals with the particular
+hardware device. The device-specific module indicates its dependency on the
+GLD module, which is found at <filename>/kernel/misc/gld</filename>. The device-specific
+module then registers with GLD from within the driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function.
+After the device-specific module is successfully loaded, the driver is DLPI-compliant.
+ The device-specific part of the driver calls <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9F</manvolnum></citerefentry> functions when that part receives
+data or needs some service from GLD. When the device-specific driver registers
+with the GLD, the driver provides pointers to the entry points for later use
+by GLD. GLD makes calls into the <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry> using these pointers.  The <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure is the main data interface between GLD and the device-specific
+driver.</para><para>The GLD facility currently supports the following types of devices:</para><itemizedlist><listitem><para><literal>DL_ETHER</literal>, that is, ISO 8802-3, IEEE 802.3
+protocol</para>
+</listitem><listitem><para><literal>DL_TPR</literal>, that is, IEEE 802.5, Token Passing
+Ring</para>
+</listitem><listitem><para><literal>DL_FDDI</literal>, that is, ISO 9314-2, Fibre Distributed
+Data Interface</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>GLD</primary><secondary>device types supported by</secondary></indexterm><indexterm><primary><literal>DL_ETHER</literal></primary><secondary>GLD support</secondary></indexterm><indexterm><primary><literal>DL_TPR</literal></primary><secondary>GLD support</secondary></indexterm><indexterm><primary><literal>DL_FDDI</literal></primary><secondary>GLD support</secondary></indexterm><indexterm><primary>IEEE 802.3</primary><see><literal>DL_ETHER</literal></see></indexterm><indexterm><primary>IEEE 802.5</primary><see><literal>DL_TPR</literal></see></indexterm><indexterm><primary>ISO 8802-3</primary><see><literal>DL_ETHER</literal></see></indexterm><indexterm><primary>ISO 9314-2</primary><see><literal>DL_TPR</literal></see></indexterm>GLD
+drivers are expected to process fully formed <acronym>MAC</acronym>-layer
+packets and should not perform logical link control (LLC) handling.</para><para>In some cases, a full DLPI-compliant driver can be implemented without
+using the GLD facility. One case would be devices that are not ISO 8802-style,
+that is, IEEE 802, LAN devices. Another case would be devices or services
+that are not supported by GLD.</para><sect2 id="gld-dlether"><title>Type <literal>DL_ETHER</literal>: Ethernet
+V2 and ISO 8802-3 (IEEE 802.3)</title><indexterm><primary><literal>DL_ETHER</literal></primary><secondary>GLD support</secondary>
+</indexterm><indexterm><primary><literal>DL_ETHER</literal></primary><secondary>Ethernet V2 packet processing</secondary>
+</indexterm><indexterm><primary>packet processing</primary><secondary>Ethernet V2</secondary>
+</indexterm><indexterm><primary><literal>DL_ETHER</literal></primary><secondary>ISO 8802-3 (IEEE 802.3) packet processing</secondary>
+</indexterm><indexterm><primary>packet processing</primary><secondary>ISO 8802-3 (IEEE 802.3)</secondary>
+</indexterm><para><indexterm><primary>SAP</primary><secondary>definition of</secondary></indexterm>For devices designated type <literal>DL_ETHER</literal>, GLD provides
+support for both Ethernet V2 and ISO 8802-3 (IEEE 802.3) packet processing.
+Ethernet V2 enables a user to access a conforming provider of data link services
+without special knowledge of the provider's protocol. A service access point
+(<acronym>SAP</acronym>) is the point through which the user communicates
+with the service provider.</para><para>Streams bound to <acronym>SAP</acronym> values in the range [0-255]
+are treated as equivalent and denote that the user wants to use 8802-3 mode.
+If the <acronym>SAP</acronym> value of the <literal>DL_BIND_REQ</literal> is
+within this range, GLD computes the length of each subsequent <literal>DL_UNITDATA_REQ</literal> message on that stream. The length does not include the 14-byte
+media access control (<acronym>MAC</acronym>) header. GLD then transmits 8802-3
+frames that have those lengths in the <acronym>MAC</acronym> frame header <command>type</command> fields. Such lengths never exceed 1500.</para><para>All frames that are received from the media that have a <command>type</command> field
+in the range [0-1500] are assumed to be 8802-3 frames. These frames are routed
+up all open streams in 8802-3 mode. Those streams with <acronym>SAP</acronym> values
+in the [0-255] range are considered to be in 8802-3 mode. If more than one
+stream is in 8802-3 mode, the incoming frame is duplicated and routed up these
+streams.</para><para>Those streams that are bound to <acronym>SAP</acronym> values that are
+greater than 1500 are assumed to be in Ethernet V2 mode. These streams receive
+incoming packets whose Ethernet <acronym>MAC</acronym> header <command>type</command> value
+exactly matches the value of the <acronym>SAP</acronym> to which the stream
+is bound.</para>
+</sect2><sect2 id="gld-snap"><title>Types <literal>DL_TPR</literal> and <literal>DL_FDDI</literal>:
+SNAP Processing</title><indexterm><primary><literal>DL_TPR</literal></primary><secondary>GLD support</secondary>
+</indexterm><indexterm><primary><literal>DL_FDDI</literal></primary><secondary>GLD support</secondary>
+</indexterm><indexterm><primary><literal>DL_TPR</literal></primary><secondary>SNAP processing</secondary>
+</indexterm><indexterm><primary><literal>DL_FDDI</literal></primary><secondary>SNAP processing</secondary>
+</indexterm><para><indexterm><primary>SNAP</primary><secondary>definition of</secondary></indexterm><indexterm><primary>SNAP</primary><secondary><literal>DL_TPR</literal></secondary></indexterm><indexterm><primary>SNAP</primary><secondary><literal>DL_FDDI</literal></secondary></indexterm>For media types <literal>DL_TPR</literal> and <literal>DL_FDDI</literal>,
+GLD implements minimal <acronym>SNAP</acronym> (Sub-Net Access Protocol) processing.
+This processing is for any stream that is bound to a <acronym>SAP</acronym> value
+that is greater than 255. <acronym>SAP</acronym> values in the range [0-255]
+are LLC <acronym>SAP</acronym> values. Such values are carried naturally by
+the media packet format. <acronym>SAP</acronym> values that are greater than
+255 require a <acronym>SNAP</acronym> header, subordinate to the LLC header,
+to carry the 16-bit Ethernet V2-style <acronym>SAP</acronym> value.</para><para><acronym>SNAP</acronym> headers are carried under LLC headers with destination <acronym>SAP</acronym> 0xAA. Outbound packets with <acronym>SAP</acronym> values that
+are greater than 255 require an LLC+<acronym>SNAP</acronym> header take the
+following form:</para><programlisting role="fragment">AA AA 03 00 00 00 XX XX</programlisting><para>``XX XX'' represents the 16-bit <acronym>SAP</acronym>, corresponding
+to the Ethernet V2 style ``type.'' This header is unique in supporting non-zero
+ organizational unique identifier fields. LLC control fields other than 03
+are considered to be LLC packets with <acronym>SAP</acronym> 0xAA. Clients
+wanting to use <acronym>SNAP</acronym> formats other than this format must
+use LLC and bind to <acronym>SAP</acronym> 0xAA.</para><para>Incoming packets are checked for conformance with the above format.
+Packets that conform are matched to any streams that have been bound to the
+packet's 16-bit <acronym>SNAP</acronym> type. In addition, these packets are
+ considered to match the LLC <acronym>SNAP</acronym>  <acronym>SAP</acronym> 0xAA.</para><para>Packets received for any LLC <acronym>SAP</acronym> are passed up all
+streams that are bound to an LLC <acronym>SAP</acronym>, as described for
+media type <literal>DL_ETHER</literal>.</para>
+</sect2><sect2 id="gld-dltpr"><title>Type <literal>DL_TPR</literal>: Source Routing</title><indexterm><primary><literal>DL_TPR</literal></primary><secondary>GLD support</secondary>
+</indexterm><indexterm><primary><literal>DL_TPR</literal></primary><secondary>source routing</secondary>
+</indexterm><para>For type <literal>DL_TPR</literal> devices, GLD implements minimal support
+for source routing. Source routing support includes the following items:</para><itemizedlist><listitem><para>Specify routing information for a packet to be sent across
+a bridged medium. The routing information is stored in the MAC header. This
+information is used to determine the route.</para>
+</listitem><listitem><para>Learn routes.</para>
+</listitem><listitem><para>Solicit and respond to requests for information about possible
+multiple routes</para>
+</listitem><listitem><para>Select among available routes.</para>
+</listitem>
+</itemizedlist><para>Source routing adds routing information fields to the <acronym>MAC</acronym> headers
+of outgoing packets. In addition, this support recognizes such fields in incoming
+packets.</para><para>GLD's source routing support does not implement the full route determination
+entity (RDE) specified in Section 9 of <citetitle>ISO 8802-2 (IEEE 802.2)</citetitle>.
+However, this support can interoperate with any RDE implementations that might
+exist in the same or a bridged network.</para>
+</sect2><sect2 id="gld-style"><title>Style 1 and Style 2 DLPI Providers</title><indexterm><primary>DLPI providers</primary>
+</indexterm><indexterm><primary>Style 1 DLPI provider</primary>
+</indexterm><indexterm><primary>Style 2 DLPI provider</primary>
+</indexterm><para><indexterm><primary><function>open</function> entry point</primary><secondary>network drivers</secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_ATTACH_REQ</literal></secondary></indexterm>GLD implements both Style 1 and Style 2 DLPI providers. A physical
+point of attachment (<acronym>PPA</acronym>) is the point at which a system
+attaches itself to a physical communication medium. All communication on that
+physical medium funnels through the <acronym>PPA</acronym>. The Style 1 provider
+attaches the streams to a particular <acronym>PPA</acronym> based on the major
+or minor device that has been opened. The Style 2 provider requires the <acronym>DLS</acronym>, that is, the data link service, user to explicitly identify
+the desired <acronym>PPA</acronym> using <literal>DL_ATTACH_REQ</literal>.
+In this case, <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> creates
+a stream between the user and GLD, and <literal>DL_ATTACH_REQ</literal> subsequently
+associates a particular <acronym>PPA</acronym> with that stream. Style 2 is
+denoted by a minor number of zero. If a device node whose minor number is
+not zero is opened, Style 1 is indicated and the associated <acronym>PPA</acronym> is
+the minor number minus 1. In both Style 1 and Style 2 <literal>open</literal>s,
+the device is cloned.</para>
+</sect2><sect2 id="gld-dlpi"><title>Implemented DLPI Primitives</title><indexterm><primary>DLPI primitives</primary>
+</indexterm><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_INFO_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_INFO_ACK</literal></secondary></indexterm>GLD implements
+several DLPI primitives. The <literal>DL_INFO_REQ</literal> primitive requests
+information about the DLPI streams. The message consists of one <literal>M_PROTO</literal> message
+block. GLD returns device-dependent values in the <literal>DL_INFO_ACK</literal> response
+to this request. These values are based on information that  the GLD-based
+driver specified in the <citerefentry><refentrytitle>gldm_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure that was passed to <function>gld_register</function>.</para><para>GLD returns the following values on behalf of all GLD-based drivers:</para><itemizedlist><listitem><para><indexterm><primary>DLPI symbols</primary><secondary><literal>DL_VERSION_2</literal></secondary></indexterm><indexterm><primary><literal>DL_VERSION_2</literal></primary><secondary>DLPI symbols</secondary></indexterm>Version is <literal>DL_VERSION_2</literal></para>
+</listitem><listitem><para><indexterm><primary>DLPI symbols</primary><secondary><literal>DL_CLDLS</literal></secondary></indexterm><indexterm><primary><literal>DL_CLDLS</literal></primary><secondary>DLPI symbols</secondary></indexterm>Service mode is <literal>DL_CLDLS</literal>,
+GLD implements connectionless-mode service.</para>
+</listitem><listitem><para><indexterm><primary>DLPI symbols</primary><secondary><literal>DL_STYLE1</literal></secondary></indexterm><indexterm><primary><literal>DL_STYLE1</literal></primary><secondary>DLPI symbols</secondary></indexterm><indexterm><primary>DLPI symbols</primary><secondary><literal>DL_STYLE2</literal></secondary></indexterm><indexterm><primary><literal>DL_STYLE2</literal></primary><secondary>DLPI symbols</secondary></indexterm>Provider style is <literal>DL_STYLE1</literal> or <literal>DL_STYLE2</literal>,
+depending on how the stream was opened.</para>
+</listitem><listitem><para>No optional Quality of Service (<acronym>QOS</acronym>) support
+is present. The <acronym>QOS</acronym> fields are zero.</para>
+</listitem>
+</itemizedlist><note><para>Contrary to the DLPI specification, GLD returns the device's correct
+address length and broadcast address in <literal>DL_INFO_ACK</literal> even
+before the stream has been attached to a <acronym>PPA</acronym>.</para>
+</note><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_ATTACH_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_UNATTACHED_REQ</literal></secondary></indexterm>The <literal>DL_ATTACH_REQ</literal> primitive is used to associate a <acronym>PPA</acronym> with
+a stream. This request is needed for Style 2 DLS providers to identify the
+physical medium over which the communication is sent. Upon completion, the
+state changes from <literal>DL_UNATTACHED</literal> to <literal>DL_UNBOUND</literal>.
+The message consists of one <literal>M_PROTO</literal> message block. This
+request is not allowed when Style 1 mode is used. Streams that are opened
+using Style 1 are already attached to a <acronym>PPA</acronym> by the time
+the open completes.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_DETACH_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_DETACH_REQ</literal></secondary></indexterm>The <literal>DL_DETACH_REQ</literal> primitive requests to detach the <acronym>PPA</acronym> from the
+stream. This detachment is allowed only if the stream was opened using Style
+2.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_BIND_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_UNBIND_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_BIND_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_UNBIND_REQ</literal></secondary></indexterm>The <literal>DL_BIND_REQ</literal> and <literal>DL_UNBIND_REQ</literal> primitives bind and unbind a <acronym>DLSAP</acronym> (data
+link service access point) to the stream. The <acronym>PPA</acronym> that
+is associated with a stream completes initialization before the completion
+of the processing of the <literal>DL_BIND_REQ</literal> on that stream. You
+can bind multiple streams to the same <acronym>SAP</acronym>. Each stream
+in this case receives a copy of any packets that were received for that <acronym>SAP</acronym>.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_ENABMULTI_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_DISABMULTI_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_ENABMULTI_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_DISABMULTI_REQ</literal></secondary></indexterm>The <literal>DL_ENABMULTI_REQ</literal> and <literal>DL_DISABMULTI_REQ</literal> primitives enable and disable reception of individual
+multicast group addresses. Through iterative use of these primitives, an application
+or other DLS user can create or modify a set of multicast addresses. The streams
+must be attached to a <acronym>PPA</acronym> for these primitives to be accepted.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PROMISCON_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PROMISCOFF_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PROMISCON_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PROMISCOFF_REQ</literal></secondary></indexterm>The <literal>DL_PROMISCON_REQ</literal> and <literal>DL_PROMISCOFF_REQ</literal> primitives turn promiscuous mode on or off on
+a per-stream basis. These controls operate at either at a physical level or
+at the <acronym>SAP</acronym> level. The DL Provider routes all received messages
+on the media to the DLS user. Routing continues until a <literal>DL_DETACH_REQ</literal> is
+received, a <literal>DL_PROMISCOFF_REQ</literal> is received, or the stream
+is closed. You can specify physical level promiscuous reception of all packets
+on the medium or of multicast packets only.</para><note><para>The streams must be attached to a <acronym>PPA</acronym> for these
+promiscuous mode primitives to be accepted.</para>
+</note><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_UNITDATA_REQ</literal></secondary></indexterm>The <literal>DL_UNITDATA_REQ</literal> primitive
+is used to send data in a connectionless transfer. Because this service is
+not acknowledged, delivery is not guaranteed. The message consists of one <literal>M_PROTO</literal> message block followed by one or more <literal>M_DATA</literal> blocks
+containing at least one byte of data.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_UNITDATA_IND</literal></secondary></indexterm>The <literal>DL_UNITDATA_IND</literal> type
+is used when a packet is to be passed on upstream. The packet is put into
+an <literal>M_PROTO</literal> message with the primitive set to <literal>DL_UNITDATA_IND</literal>.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PHYS_ADDR_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_PHYS_ADDR_ACK</literal></secondary></indexterm>The <literal>DL_PHYS_ADDR_REQ</literal> primitive requests the <acronym>MAC</acronym> address
+currently associated with the <acronym>PPA</acronym> attached to the streams.
+The address is returned by the <literal>DL_PHYS_ADDR_ACK</literal> primitive.
+When using Style 2, this primitive is only valid following a successful <literal>DL_ATTACH_REQ</literal>.</para><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_SET_PHYS_ADDR_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_SET_PHYS_ADDR_REQ</literal></secondary></indexterm>The <literal>DL_SET_PHYS_ADDR_REQ</literal> primitive changes the <acronym>MAC</acronym> address
+currently associated with the <acronym>PPA</acronym> attached to the streams.
+This primitive affects all other current and future streams attached to this
+device. Once changed, all streams currently or subsequently opened and attached
+to this device  obtain this new physical address. The new physical address
+remains in effect until this primitive changes the physical address again
+or the driver is reloaded.</para><note><para>The superuser is allowed to change the physical address of a <acronym>PPA</acronym> while other streams are bound to the same PPA.</para>
+</note><para><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_GET_STATISTICS_REQ</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_GET_STATISTICS_ACK</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_GET_STATISTICS_ACK</literal></secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_GET_STATISTICS_REQ</literal></secondary></indexterm>The <literal>DL_GET_STATISTICS_REQ</literal> primitive
+requests a <literal>DL_GET_STATISTICS_ACK</literal> response containing statistics
+information associated with the PPA attached to the stream. Style 2 Streams
+must be attached to a particular <acronym>PPA</acronym> using <literal>DL_ATTACH_REQ</literal> before this primitive can succeed.</para>
+</sect2><sect2 id="gld-ioctl"><title>Implemented <literal>ioctl</literal> Functions</title><indexterm><primary>GLD <literal>ioctl</literal> functions</primary>
+</indexterm><para>GLD implements the <literal>ioctl</literal> <replaceable>ioc_cmd</replaceable> function
+described below. If GLD receives an unrecognizable <literal>ioctl</literal> command,
+GLD passes the command to the device-specific driver's <function>gldm_ioctl</function> routine,
+as described in <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry>.</para><para><indexterm><primary><command>snoop</command> command</primary><secondary>network drivers</secondary></indexterm><indexterm><primary><literal>DLIOCRAW</literal></primary><secondary><function>ioctl</function> function</secondary></indexterm><indexterm><primary><function>ioctl</function> function</primary><secondary><literal>DLIOCRAW</literal></secondary></indexterm>The <literal>DLIOCRAW</literal> <literal>ioctl</literal> function
+is used by some DLPI applications, most notably the <citerefentry><refentrytitle>snoop</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command.
+The <literal>DLIOCRAW</literal> command puts the stream into a raw mode. In
+raw mode, the driver passes full <acronym>MAC</acronym>-level incoming packets
+upstream in <literal>M_DATA</literal> messages instead of transforming the
+packets into the <literal>DL_UNITDATA_IND</literal> form. The <literal>DL_UNITDATA_IND</literal> form is normally used for reporting incoming packets. Packet <acronym>SAP</acronym> filtering is still performed on streams that are in raw mode.
+If a stream user wants to receive all incoming packets, the user must also
+select the appropriate promiscuous modes. After successfully selecting raw
+mode, the application is also allowed to send fully formatted packets to the
+driver as <literal>M_DATA</literal> messages for transmission. <literal>DLIOCRAW</literal> takes
+no arguments. Once enabled, the stream remains in this mode until closed.</para>
+</sect2><sect2 id="gld-reqts"><title>GLD Driver Requirements</title><para>GLD-based drivers must include the header file <filename>&lt;sys/gld.h&gt;</filename>.</para><para>GLD-based drivers must be linked with the <option>N</option><parameter>&ldquo;misc/gld&rdquo;</parameter> option:</para><programlisting role="fragment">%ld -r -N"misc/gld" xx.o -o xx</programlisting><para>GLD implements the following functions on behalf of the device-specific
+driver:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="put-9e" remap="external"><citerefentry><refentrytitle>put</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+required for <acronym>STREAMS</acronym></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="srv-9e" remap="external"><citerefentry><refentrytitle>srv</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+required for <acronym>STREAMS</acronym></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><para><indexterm><primary><structname>module_info</structname> structure</primary><secondary>network drivers</secondary></indexterm>The <structfield>mi_idname</structfield> element
+of the <olink targetdoc="group-refman" targetptr="module-info-9s" remap="external"><citerefentry><refentrytitle>module_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure is a string that specifies the name of the
+driver. This string must exactly match the name of the driver module as defined
+in the file system.</para><para>The read-side <olink targetdoc="group-refman" targetptr="qinit-9s" remap="external"><citerefentry><refentrytitle>qinit</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+should specify the following elements:</para><variablelist><varlistentry><term remap="10"><structfield>qi_putp</structfield></term><listitem><para><literal>NULL</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_srvp</structfield></term><listitem><para><literal>gld_rsrv</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_qopen</structfield></term><listitem><para><literal>gld_open</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_qclose</structfield></term><listitem><para><literal>gld_close</literal></para>
+</listitem>
+</varlistentry>
+</variablelist><para>The write-side <citerefentry><refentrytitle>qinit</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure should specify these elements:</para><variablelist><varlistentry><term remap="10"><structfield>qi_putp</structfield></term><listitem><para><literal>gld_wput</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_srvp</structfield></term><listitem><para><literal>gld_wsrv</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_qopen</structfield></term><listitem><para><literal>NULL</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>qi_qclose</structfield></term><listitem><para><literal>NULL</literal></para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <structfield>devo_getinfo</structfield> element of the <olink targetdoc="group-refman" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+should specify <structfield>gld_getinfo</structfield> as the <olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.</para><para>The driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function
+associates the hardware-specific device driver with the GLD facility. <function>attach</function> then prepares the device and driver for use.</para><para><indexterm><primary><structname>gld_mac_info</structname> structure</primary><secondary>network drivers</secondary></indexterm><indexterm><primary>interrupts</primary><secondary>network drivers</secondary></indexterm>The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> function
+allocates a <olink targetdoc="group-refman" targetptr="gld-mac-info-9s" remap="external"><citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure using <function>gld_mac_alloc</function>.
+The driver usually needs to save more information per device than is defined
+in the <structname>macinfo</structname> structure. The driver should allocate
+the additional required data structure and save a pointer to the structure
+in the <literal>gldm_private</literal> member of the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.</para><para>The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine must initialize the <structname>macinfo</structname> structure
+as described in the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> man page. The <function>attach</function> routine
+should then call <function>gld_register</function> to link the driver with
+the GLD module. The driver should map registers if necessary and be fully
+initialized and prepared to accept interrupts before calling <function>gld_register</function>. The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> function should add interrupts but should not
+enable the device to generate these interrupts. The driver should reset the
+hardware before calling <function>gld_register</function> to ensure the hardware
+is quiescent. A device must not be put into a state where the device might
+generate an interrupt before <function>gld_register</function> is called.
+The device is started  later when GLD calls the driver's <function>gldm_start</function> entry
+point, which is described in the <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry> man page. After <function>gld_register</function> succeeds,
+the <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points might be called by GLD at any time.</para><para>The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine should return <literal>DDI_SUCCESS</literal> if <function>gld_register</function> succeeds. If <function>gld_register</function> fails, <literal>DDI_FAILURE</literal> is returned. If a failure occurs, the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+should deallocate any resources that were allocated before  <function>gld_register</function> was called. The attach routine should then also return <literal>DDI_FAILURE</literal>. A failed <structname>macinfo</structname> structure should never
+be reused. Such a structure should be deallocated using <function>gld_mac_free</function>.</para><para><indexterm><primary><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function</primary><secondary>network driver</secondary></indexterm><indexterm><primary><function>ddi_get_driver_private</function> function</primary></indexterm>The <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>function should attempt to
+unregister the driver from GLD by calling <function>gld_unregister</function>.
+For more information about <function>gld_unregister</function>, see the <olink targetdoc="group-refman" targetptr="gld-9f" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page. The <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+can get a pointer to the needed <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure from the device's private
+data using <olink targetdoc="group-refman" targetptr="ddi-get-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_get_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <function>gld_unregister</function> checks certain
+conditions that could require that the driver not be detached. If the checks
+fail, <function>gld_unregister</function> returns <literal>DDI_FAILURE</literal>,
+in which case the driver's <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine must leave the device operational
+and return <literal>DDI_FAILURE</literal>.</para><para>If the checks succeed, <function>gld_unregister</function> ensures that
+the device interrupts are stopped. The driver's <function>gldm_stop</function> routine
+is called if necessary. The driver is unlinked from the GLD framework. <function>gld_unregister</function> then returns <literal>DDI_SUCCESS</literal>. In
+this case, the <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine should remove interrupts and use <function>gld_mac_free</function> to
+deallocate any <structname>macinfo</structname> data structures that were
+allocated in the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine. The <function>detach</function> routine
+should then return <literal>DDI_SUCCESS</literal>. The routine must remove
+the interrupt <replaceable>before</replaceable> calling <function>gld_mac_free</function>.</para>
+</sect2><sect2 id="gld-netstats"><title>Network Statistics</title><indexterm><primary>GLD network statistics</primary>
+</indexterm><para><indexterm><primary>kstats</primary><seealso>network statistics</seealso></indexterm><indexterm><primary>network statistics</primary><secondary>kstat structures</secondary></indexterm><indexterm><primary>DLPI primitives</primary><secondary><literal>DL_GET_STATISTICS_REQ</literal></secondary></indexterm>Solaris
+network drivers must implement statistics variables. GLD tallies some network
+statistics, but other statistics must be counted by each GLD-based driver.
+GLD provides support for GLD-based drivers to report a standard set of network
+driver statistics. Statistics are reported by GLD using the <olink targetdoc="group-refman" targetptr="kstat-7d" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> mechanisms. The <literal>DL_GET_STATISTICS_REQ</literal> DLPI command can also be used to retrieve the current statistics
+counters. All statistics are maintained as unsigned. The statistics are 32
+bits unless otherwise noted.</para><para>GLD maintains and reports the following statistics.</para><variablelist><varlistentry><term remap="22"><literal>rbytes64</literal></term><listitem><para>Total bytes successfully received on the interface. Stores
+64-bit statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>rbytes</literal></term><listitem><para>Total bytes successfully received on the interface</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>obytes64</literal></term><listitem><para>Total bytes that have requested transmission on the interface.
+Stores 64-bit statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>obytes</literal></term><listitem><para>Total bytes that have requested transmission on the interface.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ipackets64</literal></term><listitem><para>Total packets successfully received on the interface. Stores
+64-bit statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ipackets</literal></term><listitem><para>Total packets successfully received on the interface.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>opackets64</literal></term><listitem><para>Total packets that have requested transmission on the interface.
+Stores 64-bit statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>opackets</literal></term><listitem><para>Total packets that have requested transmission on the interface.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>multircv</literal></term><listitem><para>Multicast packets successfully received, including group and
+functional addresses (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>multixmt</literal></term><listitem><para>Multicast packets requested to be transmitted, including group
+and functional addresses (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>brdcstrcv</literal></term><listitem><para>Broadcast packets successfully received (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>brdcstxmt</literal></term><listitem><para>Broadcast packets that have requested transmission (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>unknowns</literal></term><listitem><para>Valid received packets not accepted by any stream (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>noxmtbuf</literal></term><listitem><para>Packets discarded on output because transmit buffer was busy,
+or no buffer could be allocated for transmit (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>blocked</literal></term><listitem><para>Number of times a received packet could not be put up a stream
+because the queue was flow-controlled (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>xmtretry</literal></term><listitem><para>Times transmit was retried after having been delayed due to
+lack of resources (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>promisc</literal></term><listitem><para>Current &ldquo;promiscuous&rdquo; state of the interface (string).</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>network statistics</primary><secondary><function>gldm_get_stats</function></secondary></indexterm><indexterm><primary><function>gldm_get_stats</function></primary><secondary>description of</secondary></indexterm><indexterm><primary><structname>gld_stats</structname> structure</primary><secondary>network driver</secondary></indexterm><indexterm><primary>network statistics</primary><secondary><structname>gld_stats</structname></secondary></indexterm>The device-dependent driver
+tracks the following statistics in a private per-instance structure. To report
+statistics, GLD calls the driver's <function>gldm_get_stats</function> entry
+point. <function>gldm_get_stats</function> then updates device-specific statistics
+in the <citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure. See the <olink targetdoc="group-refman" targetptr="gldm-get-stats-9e" remap="external"><citerefentry><refentrytitle>gldm_get_stats</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man page for more information.
+GLD then reports the updated statistics using the named statistics variables
+that are shown below.</para><variablelist><varlistentry><term remap="22"><literal>ifspeed</literal></term><listitem><para>Current estimated bandwidth of the interface in bits per second.
+Stores 64-bit statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>media</literal></term><listitem><para>Current media type in use by the device (string).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>intr</literal></term><listitem><para>Number of times that the interrupt handler was called, causing
+an interrupt (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>norcvbuf</literal></term><listitem><para>Number of times a valid incoming packet was known to have
+been discarded because no buffer could be allocated for receive (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ierrors</literal></term><listitem><para>Total number of packets that were received but could not be
+processed due to errors (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>oerrors</literal></term><listitem><para>Total packets that were not successfully transmitted because
+of errors (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>missed</literal></term><listitem><para>Packets known to have been dropped by the hardware on receive
+(<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>uflo</literal></term><listitem><para>Times FIFO underflowed on transmit (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>oflo</literal></term><listitem><para>Times receiver overflowed during receive (<type>long</type>).</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>network statistics</primary><secondary><literal>DL_ETHER</literal></secondary></indexterm><indexterm><primary><literal>DL_ETHER</literal></primary><secondary>network statistics</secondary></indexterm><indexterm><primary>Ethernet V2</primary><see>DL_ETHER</see></indexterm><indexterm><primary>fibre distributed data interface</primary><see>DL_FDDI</see></indexterm>The following group
+of statistics applies to networks of type <literal>DL_ETHER</literal>. These
+statistics are maintained by device-specific drivers of that type, as shown
+previously.</para><variablelist><varlistentry><term remap="22"><literal>align_errors</literal></term><listitem><para>Packets that were received with framing errors, that is, the
+packets did not contain an integral number of octets (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fcs_errors</literal></term><listitem><para>Packets received with CRC errors (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>duplex</literal></term><listitem><para>Current duplex mode of the interface (string).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>carrier_errors</literal></term><listitem><para>Number of times carrier was lost or never detected on a transmission
+attempt (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>collisions</literal></term><listitem><para>Ethernet collisions during transmit (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ex_collisions</literal></term><listitem><para>Frames where excess collisions occurred on transmit, causing
+transmit failure (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>tx_late_collisions</literal></term><listitem><para>Number of times a transmit collision occurred late, that is,
+after 512 bit times (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>defer_xmts</literal></term><listitem><para>Packets without collisions where first transmit attempt was
+delayed because the medium was busy (<type>long</type>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>first_collisions</literal></term><listitem><para>Packets successfully transmitted with exactly one collision.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>multi_collisions</literal></term><listitem><para>Packets successfully transmitted with multiple collisions.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>sqe_errors</literal></term><listitem><para>Number of times that SQE test error was reported.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>macxmt_errors</literal></term><listitem><para>Packets encountering transmit <acronym>MAC</acronym> failures,
+except carrier and collision failures.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>macrcv_errors</literal></term><listitem><para>Packets received with <acronym>MAC</acronym> errors, except <literal>align_errors</literal>, <literal>fcs_errors</literal>, and <literal>toolong_errors</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>toolong_errors</literal></term><listitem><para>Packets received larger than the maximum allowed length.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>runt_errors</literal></term><listitem><para>Packets received smaller than the minimum allowed length (<type>long</type>).</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following group of statistics applies to networks of type <literal>DL_TPR</literal>. These statistics are maintained by device-specific drivers of
+that type, as shown above.</para><variablelist><varlistentry><term remap="22"><literal>line_errors</literal></term><listitem><para>Packets received with non-data bits or FCS errors.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>burst_errors</literal></term><listitem><para>Number of times an absence of transitions for five half-bit
+timers was detected.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>signal_losses</literal></term><listitem><para>Number of times loss of signal condition on the ring was detected.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ace_errors</literal></term><listitem><para>Number of times that an AMP or SMP frame, in which A is equal
+to C is equal to 0, is followed by another SMP frame without an intervening
+AMP frame.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>internal_errors</literal></term><listitem><para>Number of times the station recognized an internal error.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>lost_frame_errors</literal></term><listitem><para>Number of times the TRR timer expired during transmit.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>frame_copied_errors</literal></term><listitem><para>Number of times a frame addressed to this station was received
+with the FS field `A' bit set to <literal>1</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>token_errors</literal></term><listitem><para>Number of times the station acting as the active monitor recognized
+an error condition that needed a token transmitted.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>freq_errors</literal></term><listitem><para>Number of times the frequency of the incoming signal differed
+from the expected frequency.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following group of statistics applies to networks of type <literal>DL_FDDI</literal>. These statistics are maintained by device-specific drivers of
+that type, as shown above.</para><variablelist><varlistentry><term remap="22"><literal>mac_errors</literal></term><listitem><para>Frames detected in error by this <acronym>MAC</acronym> that
+had not been detected in error by another <acronym>MAC</acronym>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mac_lost_errors</literal></term><listitem><para>Frames received with format errors such that the frame was
+stripped.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mac_tokens</literal></term><listitem><para>Number of tokens that were received, that is, the total of
+non-restricted and restricted tokens.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mac_tvx_expired</literal></term><listitem><para>Number of times that TVX has expired.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mac_late</literal></term><listitem><para>Number of TRT expirations since either this <acronym>MAC</acronym> was
+reset or a token was received.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mac_ring_ops</literal></term><listitem><para>Number of times the ring has entered the &ldquo;Ring Operational&rdquo;
+state from the &ldquo;Ring Not Operational&rdquo; state.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="gld-decdata"><title>Declarations and Data Structures</title><para><indexterm><primary>data structures</primary><secondary>GLD</secondary></indexterm>This section describes the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> and <structname>gld_stats</structname> structures.</para><sect2 id="gld-macinfo"><title><structname>gld_mac_info</structname> Structure</title><indexterm><primary>GLD data structures</primary><secondary><structname>gld_mac_info</structname></secondary>
+</indexterm><indexterm><primary><structname>gld_mac_info</structname> structure</primary><secondary>description of</secondary>
+</indexterm><para>The GLD <acronym>MAC</acronym> information (<structname>gld_mac_info</structname>)
+structure is the main data interface that links the device-specific driver
+with GLD. This structure contains data required by GLD and a pointer to an
+optional additional driver-specific information structure.</para><para>Allocate the <literal>gld_mac_info</literal> structure using <function>gld_mac_alloc</function>. Deallocate the structure using <function>gld_mac_free</function>.
+Drivers must not make any assumptions about the length of this structure,
+which might vary in different releases of the Solaris OS, GLD, or both. Structure
+members private to GLD, not documented here, should neither be set nor be
+read by the device-specific driver.</para><para>The <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure contains the following fields.</para><programlisting>caddr_t              gldm_private;              /* Driver private data */
+int                  (*gldm_reset)();           /* Reset device */
+int                  (*gldm_start)();           /* Start device */
+int                  (*gldm_stop)();            /* Stop device */
+int                  (*gldm_set_mac_addr)();    /* Set device phys addr */
+int                  (*gldm_set_multicast)();   /* Set/delete multicast addr */
+int                  (*gldm_set_promiscuous)(); /* Set/reset promiscuous mode */
+int                  (*gldm_send)();            /* Transmit routine */
+uint_t               (*gldm_intr)();            /* Interrupt handler */
+int                  (*gldm_get_stats)();       /* Get device statistics */
+int                  (*gldm_ioctl)();           /* Driver-specific ioctls */
+char                 *gldm_ident;               /* Driver identity string */
+uint32_t             gldm_type;                 /* Device type */
+uint32_t             gldm_minpkt;               /* Minimum packet size */
+                                                /* accepted by driver */
+uint32_t             gldm_maxpkt;               /* Maximum packet size */
+                                                /* accepted by driver */
+uint32_t             gldm_addrlen;              /* Physical address length */
+int32_t              gldm_saplen;               /* SAP length for DL_INFO_ACK */
+unsigned char        *gldm_broadcast_addr;      /* Physical broadcast addr */
+unsigned char        *gldm_vendor_addr;         /* Factory MAC address */
+t_uscalar_t          gldm_ppa;                  /* Physical Point of */
+                                                /* Attachment (PPA) number */
+dev_info_t           *gldm_devinfo;             /* Pointer to device's */
+                                                /* dev_info node */
+ddi_iblock_cookie_t  gldm_cookie;               /* Device's interrupt */
+                                                /* block cookie */</programlisting><para>The <structfield>gldm_private</structfield> structure member is visible
+to the device driver. <structfield>gldm_private</structfield> is also private
+to the device-specific driver. <structfield>gldm_private</structfield> is
+not used or modified by GLD. Conventionally, <structfield>gldm_private</structfield> is
+used as a pointer to private data, pointing to a per-instance data structure
+that is both defined and allocated by the driver.</para><para><indexterm><primary><structname>gldm_private</structname> structure</primary></indexterm>The following group of structure members must be set by the driver
+before calling <function>gld_register</function>, and should not thereafter
+be modified by the driver. Because <function>gld_register</function> might
+use or cache the values of structure members, changes made by the driver after
+calling <function>gld_register</function> might cause unpredictable results.
+For more information on these structures, see the <olink targetdoc="group-refman" targetptr="gld-9e" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man page.</para><variablelist><varlistentry><term remap="22"><literal>gldm_reset</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_start</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_stop</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_set_mac_addr</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_set_multicast</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_set_promiscuous</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_send</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_intr</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_get_stats</literal></term><listitem><para>Pointer to driver entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_ioctl</literal></term><listitem><para>Pointer to driver entry point. This pointer is allowed to
+be null.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_ident</literal></term><listitem><para>Pointer to a string that contains a short description of the
+device. This pointer is used to identify the device in system messages.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_type</literal></term><listitem><para>Type of device the driver handles. GLD currently supports
+the following values:</para><itemizedlist><listitem><para><literal>DL_ETHER</literal> (ISO 8802-3 (IEEE 802.3) and Ethernet
+Bus)</para>
+</listitem><listitem><para><literal>DL_TPR</literal> (IEEE 802.5 Token Passing Ring)</para>
+</listitem><listitem><para><literal>DL_FDDI</literal> (ISO 9314-2 Fibre Distributed Data
+Interface)</para>
+</listitem>
+</itemizedlist><para>This structure member must be correctly set for GLD to function properly.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_minpkt</literal></term><listitem><para>Minimum <replaceable>Service</replaceable> <replaceable>Data</replaceable> <replaceable>Unit</replaceable> size: the minimum packet size, not including the <acronym>MAC</acronym> header,
+that the device can transmit. This size is allowed to be zero if the device-specific
+driver handles any required padding.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_maxpkt</literal></term><listitem><para>Maximum <replaceable>Service</replaceable> <replaceable>Data</replaceable> <replaceable>Unit</replaceable> size: the maximum size of packet, not including the <acronym>MAC</acronym> header, that can be transmitted by the device. For Ethernet, this
+number is 1500.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_addrlen</literal></term><listitem><para>The length in bytes of physical addresses handled by the device.
+For Ethernet, Token Ring, and FDDI, the value of this structure member should
+be 6.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_saplen</literal></term><listitem><para>The length in bytes of the <acronym>SAP</acronym> address
+used by the driver. For GLD-based drivers, the length should always be set
+to <literal>-2</literal>. A length of <literal>-2</literal> indicates that
+2-byte <acronym>SAP</acronym> values are supported and that the <acronym>SAP</acronym> appears <replaceable>after</replaceable> the physical address in a DL<acronym>SAP</acronym> address.
+See Appendix A.2, &ldquo;Message DL_INFO_ACK,&rdquo; in the DLPI specification
+for more details.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_broadcast_addr</literal></term><listitem><para>Pointer to an array of bytes of length <literal>gldm_addrlen</literal> containing
+the broadcast address to be used for transmit. The driver must provide space
+to hold the broadcast address, fill the space with the appropriate value,
+and set <literal>gldm_broadcast_addr</literal> to point to the address. For
+Ethernet, Token Ring, and FDDI, the broadcast address is normally <literal>0xFF-FF-FF-FF-FF-FF</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_vendor_addr</literal></term><listitem><para>Pointer to an array of bytes of length <literal>gldm_addrlen</literal> that
+contains  the vendor-provided network physical address of the device. The
+driver must provide space to hold the address, fill the space with information
+ from the device, and set <literal>gldm_vendor_addr</literal> to point to
+the address.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_ppa</literal></term><listitem><para><indexterm><primary><function>ddi_get_instance</function> function</primary></indexterm><acronym>PPA</acronym> number for this instance of the
+device. The PPA number should always be set to the instance number that is
+returned from <olink targetdoc="group-refman" targetptr="ddi-get-instance-9f" remap="external"><citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_devinfo</literal></term><listitem><para>Pointer to the <literal>dev_info</literal> node for this device.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>gldm_cookie</literal></term><listitem><para>Interrupt block cookie returned by one of the following routines:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="ddi-get-iblock-cookie-9f" remap="external"><citerefentry><refentrytitle>ddi_get_iblock_cookie</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="ddi-add-intr-9f" remap="external"><citerefentry><refentrytitle>ddi_add_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="ddi-get-soft-iblock-cookie-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_iblock_cookie</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="ddi-add-softintr-9f" remap="external"><citerefentry><refentrytitle>ddi_add_softintr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><para>This cookie must correspond to the device's receive-interrupt, from
+which <function>gld_recv</function> is called.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="gld-stats"><title><structname>gld_stats</structname> Structure</title><indexterm><primary>data structures</primary><secondary>GLD</secondary>
+</indexterm><indexterm><primary>GLD data structures</primary><secondary><structname>gld_stats</structname></secondary>
+</indexterm><para>After calling <function>gldm_get_stats</function>, a GLD-based driver
+uses the (<structname>gld_stats</structname>) structure to communicate statistics
+and state information to GLD. See the <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry> and <citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry> man pages. The members of this structure,
+having been filled in by the GLD-based driver, are used when GLD reports the
+statistics. In the tables below, the name of the statistics variable reported
+by GLD is noted in the comments. See the <olink targetdoc="group-refman" targetptr="gld-7d" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> man page for a more detailed description of the meaning
+of each statistic.</para><para>Drivers must not make any assumptions about the length of this structure.
+The structure length might vary in different releases of the Solaris OS, GLD,
+or both. Structure members private to GLD, which are not documented here,
+should not be set or be read by the device-specific driver.</para><para>The following structure members are defined for all media types:</para><programlisting>uint64_t    glds_speed;                   /* ifspeed */
+uint32_t    glds_media;                   /* media */
+uint32_t    glds_intr;                    /* intr */
+uint32_t    glds_norcvbuf;                /* norcvbuf */
+uint32_t    glds_errrcv;                  /* ierrors */
+uint32_t    glds_errxmt;                  /* oerrors */
+uint32_t    glds_missed;                  /* missed */
+uint32_t    glds_underflow;               /* uflo */
+uint32_t    glds_overflow;                /* oflo */</programlisting><para>The following structure members are defined for media type <literal>DL_ETHER</literal>:</para><programlisting>uint32_t    glds_frame;                   /* align_errors */
+uint32_t    glds_crc;                     /* fcs_errors */
+uint32_t    glds_duplex;                  /* duplex */
+uint32_t    glds_nocarrier;               /* carrier_errors */
+uint32_t    glds_collisions;              /* collisions */
+uint32_t    glds_excoll;                  /* ex_collisions */
+uint32_t    glds_xmtlatecoll;             /* tx_late_collisions */
+uint32_t    glds_defer;                   /* defer_xmts */
+uint32_t    glds_dot3_first_coll;         /* first_collisions */
+uint32_t    glds_dot3_multi_coll;         /* multi_collisions */
+uint32_t    glds_dot3_sqe_error;          /* sqe_errors */
+uint32_t    glds_dot3_mac_xmt_error;      /* macxmt_errors */
+uint32_t    glds_dot3_mac_rcv_error;      /* macrcv_errors */
+uint32_t    glds_dot3_frame_too_long;     /* toolong_errors */
+uint32_t    glds_short;                   /* runt_errors */</programlisting><para>The following structure members are defined for media type <literal>DL_TPR</literal>:</para><programlisting>uint32_t    glds_dot5_line_error          /* line_errors */
+uint32_t    glds_dot5_burst_error         /* burst_errors */
+uint32_t    glds_dot5_signal_loss         /* signal_losses */
+uint32_t    glds_dot5_ace_error           /* ace_errors */
+uint32_t    glds_dot5_internal_error      /* internal_errors */
+uint32_t    glds_dot5_lost_frame_error    /* lost_frame_errors */
+uint32_t    glds_dot5_frame_copied_error  /* frame_copied_errors */
+uint32_t    glds_dot5_token_error         /* token_errors */
+uint32_t    glds_dot5_freq_error          /* freq_errors */</programlisting><para>The following structure members are defined for media type <literal>DL_FDDI</literal>:</para><programlisting>uint32_t    glds_fddi_mac_error;          /* mac_errors */
+uint32_t    glds_fddi_mac_lost;           /* mac_lost_errors */
+uint32_t    glds_fddi_mac_token;          /* mac_tokens */
+uint32_t    glds_fddi_mac_tvx_expired;    /* mac_tvx_expired */
+uint32_t    glds_fddi_mac_late;           /* mac_late */
+uint32_t    glds_fddi_mac_ring_op;        /* mac_ring_ops */</programlisting><para>Most of the above statistics variables are counters that denote the
+number of times that the particular event was observed. The following statistics
+do not represent the number of times:</para><variablelist><varlistentry><term remap="22"><literal>glds_speed</literal></term><listitem><para>Estimate of the interface's current bandwidth in bits per
+second. This object should contain the nominal bandwidth for those interfaces
+that do not vary in bandwidth or where an accurate estimate cannot be made.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>glds_media</literal></term><listitem><para>Type of media (wiring) or connector used by the hardware.
+The following media names are supported:</para><itemizedlist><listitem><para><literal>GLDM_AUI</literal></para>
+</listitem><listitem><para><literal>GLDM_BNC</literal></para>
+</listitem><listitem><para><literal>GLDM_TP</literal></para>
+</listitem><listitem><para><literal>GLDM_10BT</literal></para>
+</listitem><listitem><para><literal>GLDM_100BT</literal></para>
+</listitem><listitem><para><literal>GLDM_100BTX</literal></para>
+</listitem><listitem><para><literal>GLDM_100BT4</literal></para>
+</listitem><listitem><para><literal>GLDM_RING4</literal></para>
+</listitem><listitem><para><literal>GLDM_RING16</literal></para>
+</listitem><listitem><para><literal>GLDM_FIBER</literal></para>
+</listitem><listitem><para><literal>GLDM_PHYMII</literal></para>
+</listitem><listitem><para><literal>GLDM_UNKNOWN</literal></para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term><literal>glds_duplex</literal></term><listitem><para>Current duplex state of the interface. Supported values are <literal>GLD_DUPLEX_HALF</literal> and <literal>GLD_DUPLEX_FULL</literal>. <literal>GLD_DUPLEX_UNKNOWN</literal> is also allowed.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="gld-args"><title>GLD Arguments</title><para>The following arguments are used by the GLD routines.</para><variablelist><varlistentry><term remap="14"><replaceable>macinfo</replaceable></term><listitem><para><indexterm><primary><structname>gld_mac_info</structname> structure</primary><secondary>GLD arguments</secondary></indexterm>Pointer to a <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>macaddr</replaceable></term><listitem><para>Pointer to the beginning of a character array that contains
+a valid <acronym>MAC</acronym> address. The array is of the length specified
+by the driver in the <literal>gldm_addrlen</literal> element of the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>multicastaddr</replaceable></term><listitem><para>Pointer to the beginning of a character array that contains
+a multicast, group, or functional address. The array is of the length specified
+by the driver in the <literal>gldm_addrlen</literal> element of the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>multiflag</replaceable></term><listitem><para>Flag indicating whether to enable or disable reception of
+the multicast address. This argument is specified as <literal>GLD_MULTI_ENABLE</literal> or <literal>GLD_MULTI_DISABLE</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>promiscflag</replaceable></term><listitem><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_MAC_PROMISC_PHYS</literal></secondary></indexterm><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_MAC_PROMISC_MULTI</literal></secondary></indexterm><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_MAC_PROMISC_NONE</literal></secondary></indexterm>Flag indicating what type of promiscuous mode, if any, is to be
+enabled. This argument is specified as <literal>GLD_MAC_PROMISC_PHYS</literal>, <literal>GLD_MAC_PROMISC_MULTI</literal>, or <literal>GLD_MAC_PROMISC_NONE</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>mp</replaceable></term><listitem><para><function>gld_ioctl</function> uses <replaceable>mp</replaceable> as
+a pointer to a <acronym>STREAMS</acronym> message block containing the <literal>ioctl</literal> to be executed. <function>gldm_send</function> uses <replaceable>mp</replaceable> as
+a pointer to a <acronym>STREAMS</acronym> message block containing the packet
+to be transmitted. <function>gld_recv</function> uses <replaceable>mp</replaceable> as
+a pointer to a message block containing a received packet.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>stats</replaceable></term><listitem><para>Pointer to a <citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure to be filled in with the
+current values of statistics counters.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>q</replaceable></term><listitem><para>Pointer to the <olink targetdoc="group-refman" targetptr="queue-9s" remap="external"><citerefentry><refentrytitle>queue</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure to be used in the
+reply to the <literal>ioctl</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>dip</replaceable></term><listitem><para>Pointer to the device's <literal>dev_info</literal> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>name</replaceable></term><listitem><para>Device interface name.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="gld-ep"><title>GLD Entry Points</title><indexterm><primary>entry points</primary><secondary>for network drivers</secondary>
+</indexterm><para>Entry points must be implemented by a device-specific network driver
+that has been designed to interface with GLD.</para><para>The <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure is the main structure for communication between
+the device-specific driver and the GLD module. See the <olink targetdoc="group-refman" targetptr="gld-7d" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> man page. Some elements in
+that structure are function pointers to the entry points that are described
+here. The device-specific driver must, in its <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine, initialize these
+function pointers before calling <function>gld_register</function>.</para><sect2 id="gld-1a"><title><function>gldm_reset</function> Entry Point</title><programlisting role="fragment">int <replaceable>prefix</replaceable>_reset(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><indexterm><primary>GLD entry points</primary><secondary><function>gldm_reset</function></secondary></indexterm><function>gldm_reset</function> resets
+the hardware to its initial state.</para>
+</sect2><sect2 id="gld-2"><title><function>gldm_start</function> Entry Point</title><programlisting role="fragment">int <replaceable>prefix</replaceable>_start(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><indexterm><primary>GLD entry points</primary><secondary><function>gldm_start</function></secondary></indexterm><function>gldm_start</function> enables
+the device to generate interrupts. <function>gldm_start</function> also prepares
+the driver to call <function>gld_recv</function> to deliver received data
+packets to GLD.</para>
+</sect2><sect2 id="gld-3"><title><function>gldm_stop</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_stop</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_stop(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><function>gldm_stop</function> disables the device from generating any
+interrupts and stops the driver from calling <function>gld_recv</function> for
+delivering data packets to GLD. GLD depends on the <function>gldm_stop</function> routine
+to ensure that the device will no longer interrupt. <function>gldm_stop</function> must
+do so without fail. This function should always return <literal>GLD_SUCCESS</literal>.</para>
+</sect2><sect2 id="gld-4"><title><function>gldm_set_mac_addr</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_set_mac_addr</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_set_mac_addr(gld_mac_info_t <replaceable>*macinfo</replaceable>, unsigned char <replaceable>*macaddr</replaceable>);</programlisting><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_NOTSUPPORTED</literal></secondary></indexterm><function>gldm_set_mac_addr</function> sets
+the physical address that the hardware is to use for receiving data. This
+function enables the device to be programmed through the passed <acronym>MAC</acronym> address <replaceable>macaddr</replaceable>. If sufficient resources are currently not available
+to carry out the request, <function>gldm_set_mac_add</function> should return <returnvalue>GLD_NORESOURCES</returnvalue>. If the requested function is not supported, <function>gldm_set_mac_add</function> should return <returnvalue>GLD_NOTSUPPORTED</returnvalue>.</para>
+</sect2><sect2 id="gld-5"><title><function>gldm_set_multicast</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_set_multicast</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_set_multicast(gld_mac_info_t *macinfo, 
+     unsigned char *<replaceable>multicastaddr</replaceable>, int <replaceable>multiflag</replaceable>);</programlisting><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_MULTI_ENABLE</literal></secondary></indexterm><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_MULTI_DISABLE</literal></secondary></indexterm><function>gldm_set_multicast</function> enables and disables device-level reception
+of specific multicast addresses. If the third argument <replaceable>multiflag</replaceable> is
+set to <literal>GLD_MULTI_ENABLE</literal>, then <function>gldm_set_multicast</function> sets
+the interface to receive packets with the multicast address. <function>gldm_set_multicast</function> uses the multicast address that is pointed to by the second argument.
+If <replaceable>multiflag</replaceable> is set to <literal>GLD_MULTI_DISABLE</literal>,
+the driver is allowed to disable reception of the specified multicast address.</para><para>This function is called whenever GLD wants to enable or disable reception
+of a multicast, group, or functional address. GLD makes no assumptions about
+how the device does multicast support and calls this function to enable or
+disable a specific multicast address. Some devices might use a hash algorithm
+and a bitmask to enable collections of multicast addresses. This procedure
+is allowed, and GLD filters out any superfluous packets. If disabling an address
+could result in disabling more than one address at the device level, the device
+driver should keep any necessary information. This approach avoids disabling
+an address that GLD has enabled but not disabled.</para><para><function>gldm_set_multicast</function> is not called to enable a particular
+multicast address that is already enabled. Similarly, <function>gldm_set_multicast</function>  is not called to disable an address that is not currently enabled.
+GLD keeps track of multiple requests for the same multicast address. GLD only
+calls the driver's entry point when the first request to enable, or the last
+request to disable, a particular multicast address is made. If sufficient
+resources are currently not available to carry out the request, the function
+should return <literal>GLD_NORESOURCES</literal>. The function should return <returnvalue>GLD_NOTSUPPORTED</returnvalue> if the requested function is not supported.</para>
+</sect2><sect2 id="gld-6"><title><function>gldm_set_promiscuous</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_set_promiscuous</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_set_promiscuous(gld_mac_info_t <replaceable>*macinfo</replaceable>, int <replaceable>promiscflag</replaceable>);</programlisting><para><function>gldm_set_promiscuous</function> enables and disables promiscuous
+mode. This function is called whenever GLD wants to enable or disable the
+reception of all packets on the medium. The function can also be limited to
+multicast packets on the medium. If the second argument <replaceable>promiscflag</replaceable> is
+set to the value of <literal>GLD_MAC_PROMISC_PHYS</literal>, then the function
+enables physical-level promiscuous mode.  Physical-level promiscuous mode
+causes the reception of all packets on the medium. If <replaceable>promiscflag</replaceable> is
+set to <literal>GLD_MAC_PROMISC_MULTI</literal>, then reception of all multicast
+packets are enabled. If <replaceable>promiscflag</replaceable> is set to <literal>GLD_MAC_PROMISC_NONE</literal>, then promiscuous mode is disabled.</para><para>In promiscuous multicast mode, drivers for devices without multicast-only
+promiscuous mode must set the device to physical promiscuous mode. This approach
+ensures that all multicast packets are received. In this case, the routine
+should return <literal>GLD_SUCCESS</literal>. The GLD software filters out
+any superfluous packets. If sufficient resources are currently not available
+to carry out the request, the function should return <literal>GLD_NORESOURCES</literal>. <function>gld_set_promiscuous</function> should return <literal>GLD_NOTSUPPORTED</literal> if
+the requested function is not supported.</para><para>For forward compatibility, <function>gldm_set_promiscuous</function> routines
+should treat any unrecognized values for <replaceable>promiscflag</replaceable> as
+though these values were <literal>GLD_MAC_PROMISC_PHYS</literal>.</para>
+</sect2><sect2 id="gld-7"><title><function>gldm_send</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_send</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_send(gld_mac_info_t <replaceable>*macinfo</replaceable>, mblk_t <replaceable>*mp</replaceable>);</programlisting><para><function>gldm_send</function> queues a packet to the device for transmission.
+This routine is passed a <acronym>STREAMS</acronym> message containing the
+packet to be sent. The message might include multiple message blocks. The <function>send</function> routine must traverse all the message blocks in the message
+to access the entire packet to be sent. The driver should be prepared to handle
+and skip over any zero-length message continuation blocks in the chain. The
+driver should also check that the packet does not exceed the maximum allowable
+packet size. The driver must pad the packet, if necessary, to the minimum
+allowable packet size. If the send routine successfully transmits or queues
+the packet, <literal>GLD_SUCCESS</literal> should be returned.</para><para>The send routine should return <literal>GLD_NORESOURCES</literal> if
+the packet for transmission cannot be immediately accepted. In this case,
+GLD retries later. If <function>gldm_send</function> ever returns <literal>GLD_NORESOURCES</literal>, the driver must call <function>gld_sched</function> at a later
+time when resources have become available. This call to <function>gld_sched</function> informs
+GLD to retry packets that the driver previously failed to queue for transmission.
+(If the driver's <function>gldm_stop</function> routine is called, the driver
+is absolved from this obligation until the driver returns <literal>GLD_NORESOURCES</literal> from the <function>gldm_send</function> routine. However, extra
+calls to <function>gld_sched</function> do not cause incorrect operation.)</para><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_NOLINK</literal></secondary></indexterm>If the driver's send routine returns <literal>GLD_SUCCESS</literal>,
+then the driver is responsible for freeing the message when the message is
+no longer needed. If the hardware uses DMA to read the data directly, the
+driver must not free the message until the hardware has completely read the
+data. In this case, the driver can free the message in the interrupt routine.
+Alternatively, the driver can reclaim the buffer at the start of a future
+send operation. If the send routine returns anything other than <literal>GLD_SUCCESS</literal>, then the driver must not free the message. Return <literal>GLD_NOLINK</literal> if <function>gldm_send</function> is called when there is no physical
+connection to the network or link partner.</para>
+</sect2><sect2 id="gld-8"><title><function>gldm_intr</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_intr</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_intr(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><function>gldm_intr</function> is called when the device might have
+interrupted. Because interrupts can be shared with other devices, the driver
+must check the device status to determine whether that device actually caused
+the interrupt. If the device that the driver controls did not cause the interrupt,
+then this routine must return <literal>DDI_INTR_UNCLAIMED</literal>. Otherwise,
+the driver must service the interrupt and return <literal>DDI_INTR_CLAIMED</literal>.
+If the interrupt was caused by successful receipt of a packet, this routine
+should put the received packet into a <acronym>STREAMS</acronym> message of
+type <literal>M_DATA</literal> and pass that message to <function>gld_recv</function>.</para><para><function>gld_recv</function> passes the inbound packet upstream to
+the appropriate next layer of the network protocol stack. The routine must
+correctly set the <literal>b_rptr</literal> and <literal>b_wptr</literal> members
+of the <acronym>STREAMS</acronym> message before calling <function>gld_recv</function>.</para><para>The driver should avoid holding mutex or other locks during the call
+to <function>gld_recv</function>. In particular, locks that could be taken
+by a transmit thread must not be held during a call to <function>gld_recv</function>.
+ In some cases, the interrupt thread that calls <function>gld_recv</function> 
+sends an outgoing packet, which results in a call to the driver's <function>gldm_send</function> routine. If <function>gldm_send</function>  tries to acquire a
+mutex that is held by <function>gldm_intr</function> when <function>gld_recv</function> is
+called, a panic occurs due to recursive mutex entry. If other driver entry
+points attempt to acquire a mutex that the driver holds across a call to <function>gld_recv</function>, deadlock can result.</para><para>The interrupt code should increment statistics counters for any errors.
+Errors include the failure to allocate a buffer that is needed for the received
+data and any hardware-specific errors, such as CRC errors or framing errors.</para>
+</sect2><sect2 id="gld-10"><title><function>gldm_get_stats</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_get_stats</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_get_stats(gld_mac_info_t <replaceable>*macinfo</replaceable>, struct gld_stats <replaceable>*stats</replaceable>);</programlisting><para><function>gldm_get_stats</function> gathers statistics from the hardware,
+driver private counters, or both, and updates the <citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure pointed
+to by <replaceable>stats</replaceable>. This routine is called by GLD for
+statistics requests.  GLD uses the <function>gldm_get_stats</function> mechanism
+to acquire device-dependent statistics from the driver before GLD composes
+the reply to the statistics request. See the <olink targetdoc="group-refman" targetptr="gld-stats-9s" remap="external"><citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="gld-7d" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="qreply-9f" remap="external"><citerefentry><refentrytitle>qreply</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man pages for more information
+about defined statistics counters.</para>
+</sect2><sect2 id="gld-11"><title><function>gldm_ioctl</function> Entry Point</title><indexterm><primary>GLD entry points</primary><secondary><function>gldm_ioctl</function></secondary>
+</indexterm><programlisting role="fragment">int <replaceable>prefix</replaceable>_ioctl(gld_mac_info_t <replaceable>*macinfo</replaceable>, queue_t <replaceable>*q</replaceable>, mblk_t <replaceable>*mp</replaceable>);</programlisting><para><function>gldm_ioctl</function> implements any device-specific <literal>ioctl</literal> commands. This element is allowed to be null if the driver does
+not implement any <literal>ioctl</literal> functions. The driver is responsible
+for converting the message block into an <literal>ioctl</literal> reply message
+and calling the <olink targetdoc="group-refman" targetptr="qreply-9f" remap="external"><citerefentry><refentrytitle>qreply</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+before returning <literal>GLD_SUCCESS</literal>. This function should always
+return <literal>GLD_SUCCESS</literal>. The driver should report any errors
+as needed in a message to be passed to <citerefentry><refentrytitle>qreply</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. If the <literal>gldm_ioctl</literal> element
+is specified as <literal>NULL</literal>, GLD returns a message of type <literal>M_IOCNAK</literal> with an error of <errorcode>EINVAL</errorcode>.</para>
+</sect2><sect2 id="gld-returnep"><title>GLD Return Values</title><para>Some entry point functions in GLD can return the following values, subject
+to the restrictions above:</para><variablelist><varlistentry><term><literal>GLD_BADARG</literal></term><listitem><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_BADARG</literal></secondary></indexterm>If the function detected an unsuitable argument,
+for example, a bad multicast address, a bad <acronym>MAC</acronym> address,
+or a bad packet</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>GLD_FAILURE</literal></term><listitem><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_FAILURE</literal></secondary></indexterm>On hardware failure</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>GLD_SUCCESS</literal></term><listitem><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_SUCCESS</literal></secondary></indexterm>On success</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="gld-13"><title>GLD Service Routines</title><para>This section provides the syntax and description for the GLD service
+routines.</para><sect2 id="gld-14"><title><function>gld_mac_alloc</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_mac_alloc</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_mac_alloc</function> function</primary>
+</indexterm><programlisting role="fragment">gld_mac_info_t *gld_mac_alloc(dev_info_t <replaceable>*dip</replaceable>);</programlisting><para><function>gld_mac_alloc</function> allocates a new <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure and returns a pointer to the structure. Some of
+the GLD-private elements of the structure might be initialized before <function>gld_mac_alloc</function> returns. All other elements are initialized to zero. The device
+driver must initialize some structure members, as described in the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> man page, before passing the pointer to the <literal>gld_mac_info</literal> structure to <function>gld_register</function>.</para>
+</sect2><sect2 id="gld-15"><title><function>gld_mac_free</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_mac_free</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_mac_free</function> function</primary>
+</indexterm><programlisting role="fragment">void gld_mac_free(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><function>gld_mac_free</function> frees a <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure previously
+allocated by <function>gld_mac_alloc</function>.</para>
+</sect2><sect2 id="gld-16"><title><function>gld_register</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_register</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_register</function> function</primary>
+</indexterm><programlisting role="fragment">int gld_register(dev_info_t <replaceable>*dip</replaceable>, char <replaceable>*name</replaceable>, gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><function>gld_register</function> is called from the device driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine. <function>gld_register</function> links the GLD-based device driver with the GLD framework.
+Before calling <function>gld_register</function>, the device driver's <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+uses <function>gld_mac_alloc</function> to allocate a <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure, and then initializes several structure elements.
+See <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> for more information. A successful call to <function>gld_register</function> performs the following actions:</para><itemizedlist><listitem><para>Links the device-specific driver with the GLD system</para>
+</listitem><listitem><para>Sets the device-specific driver's private data pointer, using <olink targetdoc="group-refman" targetptr="ddi-set-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_set_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to point to the <structname>macinfo</structname> structure</para>
+</listitem><listitem><para>Creates the minor device node</para>
+</listitem><listitem><para>Returns <literal>DDI_SUCCESS</literal></para>
+</listitem>
+</itemizedlist><para>The device interface name passed to <function>gld_register</function> must
+exactly match the name of the driver module as that name exists in the file
+system.</para><para>The driver's <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine should return <literal>DDI_SUCCESS</literal> if <function>gld_register</function> succeeds. If <function>gld_register</function> does not return <literal>DDI_SUCCESS</literal>, the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+should deallocate any allocated resources before calling <function>gld_register</function>,
+and then return <literal>DDI_FAILURE</literal>.</para>
+</sect2><sect2 id="gld-17"><title><function>gld_unregister</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_unregister</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_unregister</function> function</primary>
+</indexterm><programlisting role="fragment">int gld_unregister(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><function>gld_unregister</function> is called by the device driver's <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function,
+and if successful, performs the following tasks:</para><itemizedlist><listitem><para>Ensures that the device's interrupts are stopped, calling
+the driver's <function>gldm_stop</function> routine if necessary</para>
+</listitem><listitem><para>Removes the minor device node</para>
+</listitem><listitem><para>Unlinks the device-specific driver from the GLD system</para>
+</listitem><listitem><para>Returns <literal>DDI_SUCCESS</literal></para>
+</listitem>
+</itemizedlist><para>If <function>gld_unregister</function> returns <literal>DDI_SUCCESS</literal>,
+the <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine should deallocate any data structures allocated in
+the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine, using <function>gld_mac_free</function> to deallocate
+the <structname>macinfo</structname> structure, and return <literal>DDI_SUCCESS</literal>.
+If <function>gld_unregister</function> does not return <literal>DDI_SUCCESS</literal>,
+the driver's <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine must leave the device operational and return <literal>DDI_FAILURE</literal>.</para>
+</sect2><sect2 id="gld-18"><title><function>gld_recv</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_recv</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_recv</function> function</primary>
+</indexterm><programlisting role="fragment">void gld_recv(gld_mac_info_t <replaceable>*macinfo</replaceable>, mblk_t <replaceable>*mp</replaceable>);</programlisting><para><function>gld_recv</function> is called by the driver's interrupt handler
+to pass a received packet upstream. The driver must construct and pass a <acronym>STREAMS</acronym> <literal>M_DATA</literal> message containing the raw packet. <function>gld_recv</function> determines which <acronym>STREAMS</acronym> queues should
+receive a copy of the packet, duplicating the packet if necessary. <function>gld_recv</function> then formats a <literal>DL_UNITDATA_IND</literal> message, if
+required, and passes the data up all appropriate streams.</para><para>The driver should avoid holding mutex or other locks during the call
+to <function>gld_recv</function>. In particular, locks that could be taken
+by a transmit thread must not be held during a call to <function>gld_recv</function>.
+The interrupt thread that calls <function>gld_recv</function> in some cases
+carries out processing that includes sending an outgoing packet. Transmission
+of the packet results in a call to the driver's <function>gldm_send</function> routine.
+If <function>gldm_send</function> tries to acquire a mutex that is held by
+ <function>gldm_intr</function> when <function>gld_recv</function> is called,
+a panic occurs due to  a recursive mutex entry. If other driver entry points
+attempt to acquire a mutex that the driver holds across a call to <function>gld_recv</function>, deadlock can result.</para>
+</sect2><sect2 id="gld-19"><title><function>gld_sched</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_sched</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_sched</function> function</primary>
+</indexterm><programlisting role="fragment">void gld_sched(gld_mac_info_t <replaceable>*macinfo</replaceable>);</programlisting><para><indexterm><primary>GLD symbols</primary><secondary><literal>GLD_NORESOURCES</literal></secondary></indexterm><function>gld_sched</function> is called
+by the device driver to reschedule stalled outbound packets. Whenever the
+driver's <function>gldm_send</function> routine  returns <literal>GLD_NORESOURCES</literal>, the driver must call <function>gld_sched</function> to inform
+the GLD framework to retry previously unsendable packets. <function>gld_sched</function> should
+be called as soon as possible after resources become available so that GLD
+resumes passing outbound packets to the driver's <function>gldm_send</function> routine.
+(If the driver's <function>gldm_stop</function> routine is called, the driver
+need not retry  until <literal>GLD_NORESOURCES</literal> is returned from
+ <function>gldm_send</function>. However, extra calls to <function>gld_sched</function> do
+not cause incorrect operation.)</para>
+</sect2><sect2 id="gld-20"><title><function>gld_intr</function> Function</title><indexterm><primary>GLD service routines</primary><secondary><function>gld_intr</function> function</secondary>
+</indexterm><indexterm><primary><function>gld_intr</function> function</primary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary><function>gld_intr</function> function</secondary>
+</indexterm><programlisting role="fragment">uint_t gld_intr(caddr_t);</programlisting><para><indexterm><primary><structname>gld_mac_info</structname> structure</primary><secondary>used in <function>gld_intr</function> function</secondary></indexterm><function>gld_intr</function> is GLD's main interrupt handler.
+Normally, <function>gld_intr</function> is specified as the interrupt routine
+in the device driver's call to <olink targetdoc="group-refman" targetptr="ddi-add-intr-9f" remap="external"><citerefentry><refentrytitle>ddi_add_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The argument to the interrupt
+handler is specified as <replaceable>int_handler_arg</replaceable> in the
+call to <citerefentry><refentrytitle>ddi_add_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. This argument must be a pointer to the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure. <function>gld_intr</function>, when appropriate,
+calls the device driver's <function>gldm_intr</function> function, passing
+that pointer to the <citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure. However, to use a high-level
+interrupt, the driver must provide its own high-level interrupt handler and
+trigger a soft interrupt from within the handler. In this case, <function>gld_intr</function> would normally be specified as the soft interrupt handler in the
+call to <function>ddi_add_softintr</function>. <function>gld_intr</function> returns
+a value that is appropriate for an interrupt handler.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000104216 0?>

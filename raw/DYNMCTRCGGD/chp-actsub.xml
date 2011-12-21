@@ -1,0 +1,657 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-actsub"><title>Actions and Subroutines</title><highlights><para>You can use D function calls such as <function>trace</function> and <function>printf</function> to invoke two different kinds of services provided by DTrace: <firstterm>actions</firstterm> that trace data or modify state external to DTrace, and <firstterm>subroutines</firstterm> that affect only internal DTrace state. This chapter
+defines the actions and subroutines and describes their syntax and semantics.</para>
+</highlights><sect1 id="chp-actsub-1"><title>Actions</title><para>Actions enable your DTrace programs to interact with the system outside
+of DTrace. The most common actions record data to a DTrace buffer. Other actions
+are available, such as stopping the current process, raising a specific signal
+on the current process, or ceasing tracing altogether. Some of these actions
+are <firstterm>destructive</firstterm> in that they change the system, albeit
+in a well-defined way. These actions may only be used if destructive actions
+have been explicitly enabled. By default, data recording actions record data
+to the <firstterm>principal buffer</firstterm>. For more details on the principal
+buffer and buffer policies, see <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11,
+Buffers and Buffering</olink>.</para>
+</sect1><sect1 id="chp-actsub-2"><title>Default Action</title><para><indexterm><primary>actions</primary><secondary>default</secondary></indexterm>A clause can contain any number of actions and variable manipulations.
+If a clause is left empty, the <firstterm>default action</firstterm> is taken.
+The default action is to trace the enabled probe identifier (<acronym>EPID</acronym>)
+to the principal buffer. The <acronym>EPID</acronym> identifies a particular
+enabling of a particular probe with a particular predicate and actions. From
+the <acronym>EPID</acronym>, DTrace consumers can determine the probe that
+induced the action. Indeed, whenever any data is traced, it must be accompanied
+by the <acronym>EPID</acronym> to enable the consumer to make sense of the
+data. Therefore, the default action is to trace the <acronym>EPID</acronym> and
+nothing else.</para><para>Using the default action allows for simple use of <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. For example, the following
+example command enables all probes in the <literal>TS</literal> timeshare
+scheduling module with the default action:</para><screen><userinput># dtrace -m TS</userinput></screen><para>The preceding command might produce output similar to the following
+example:</para><screen><userinput># dtrace -m TS</userinput>
+dtrace: description 'TS' matched 80 probes
+CPU     ID                    FUNCTION:NAME
+  0  12077                 ts_trapret:entry 
+  0  12078                ts_trapret:return 
+  0  12069                   ts_sleep:entry 
+  0  12070                  ts_sleep:return 
+  0  12033                  ts_setrun:entry 
+  0  12034                 ts_setrun:return 
+  0  12081                  ts_wakeup:entry 
+  0  12082                 ts_wakeup:return 
+  0  12069                   ts_sleep:entry 
+  0  12070                  ts_sleep:return 
+  0  12033                  ts_setrun:entry 
+  0  12034                 ts_setrun:return 
+  0  12069                   ts_sleep:entry 
+  0  12070                  ts_sleep:return 
+  0  12033                  ts_setrun:entry 
+  0  12034                 ts_setrun:return 
+  0  12069                   ts_sleep:entry 
+  0  12070                  ts_sleep:return 
+  0  12023                  ts_update:entry 
+  0  12079             ts_update_list:entry 
+  0  12080            ts_update_list:return 
+  0  12079             ts_update_list:entry 
+...</screen>
+</sect1><sect1 id="chp-actsub-3"><title>Data Recording Actions</title><para><indexterm><primary>data recording actions</primary></indexterm><indexterm><primary>actions</primary><secondary>data recording</secondary></indexterm>The
+data recording actions comprise the core DTrace actions. Each of these actions
+records data to the principal buffer by default, but each action may also
+be used to record data to speculative buffers. See <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11,
+Buffers and Buffering</olink> for more details on the principal buffer. See <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13, Speculative Tracing</olink> for more
+details on speculative buffers. The descriptions in this section refer only
+to the <firstterm>directed buffer</firstterm>, indicating that data is recorded
+either to the principal buffer or to a speculative buffer if the action follows
+a <function>speculate</function>.</para><sect2 id="chp-actsub-trace"><title><function>trace</function></title><programlisting>void trace(<replaceable>expression</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>trace</literal></secondary></indexterm>The most basic action is the <function>trace</function> action,
+which takes a D expression as its argument and traces the result to the directed
+buffer. The following statements are examples of <function>trace</function> actions:</para><programlisting>trace(execname);
+trace(curlwpsinfo-&gt;pr_pri);
+trace(timestamp / 1000);
+trace(`lbolt);
+trace("somehow managed to get here");</programlisting>
+</sect2><sect2 id="chp-actsub-tracemem"><title><function>tracemem</function></title><programlisting>void tracemem(<replaceable>address</replaceable>, size_t <replaceable>nbytes</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>tracemem</literal></secondary></indexterm>The <function>tracemem</function> action takes a D expression
+as its first argument, <replaceable>address</replaceable>, and a constant
+as its second argument, <replaceable>nbytes</replaceable>. <function>tracemem</function> copies
+the memory from the address specified by <replaceable>addr</replaceable> into
+the directed buffer for the length specified by <replaceable>nbytes</replaceable>.</para>
+</sect2><sect2 id="chp-actsub-printf"><title><function>printf</function></title><programlisting>void printf(string <replaceable>format</replaceable>, ...) </programlisting><para><indexterm><primary>actions</primary><secondary><literal>printf</literal></secondary></indexterm>Like <function>trace</function>, the <function>printf</function> action
+traces D expressions. However, <function>printf</function> allows for elaborate <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>-style formatting. Like <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, the parameters consists
+of a <replaceable>format</replaceable> string followed by a variable number
+of arguments. By default, the arguments are traced to the directed buffer.
+The arguments are later formatted for output by <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> according to the specified
+format string. For example, the first two examples of <function>trace</function> from <olink targetptr="chp-actsub-trace" remap="internal">trace()</olink> could be combined in a single <function>printf</function>:</para><programlisting>printf("execname is %s; priority is %d", execname, curlwpsinfo-&gt;pr_pri);</programlisting><para>For more information on <function>printf</function>, see <olink targetptr="chp-fmt" remap="internal">Chapter&nbsp;12, Output Formatting</olink>.</para>
+</sect2><sect2 id="chp-actsub-printa"><title><function>printa</function></title><programlisting>void printa(<replaceable>aggregation</replaceable>)
+void printa(string <replaceable>format</replaceable>, <replaceable>aggregation</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>printa</literal></secondary></indexterm>The <function>printa</function> action enables you to display
+and format aggregations. See <olink targetptr="chp-aggs" remap="internal">Chapter&nbsp;9, Aggregations</olink> for more detail on aggregations. If a <replaceable>format</replaceable> is
+not provided, <function>printa</function> only traces a directive to the DTrace
+consumer that the specified aggregation should be processed and displayed
+using the default format. If a <replaceable>format</replaceable> is provided,
+the aggregation will be formatted as specified. See <olink targetptr="chp-fmt" remap="internal">Chapter&nbsp;12,
+Output Formatting</olink> for a more detailed description of the <function>printa</function> format string.</para><para><function>printa</function> only traces a <emphasis>directive</emphasis> that
+the aggregation should be processed by the DTrace consumer. It does not process
+the aggregation in the kernel. Therefore, the time between the tracing of
+the <function>printa</function> directive and the actual processing of the
+directive depends on the factors that affect buffer processing. These factors
+include the aggregation rate, the buffering policy and, if the buffering policy
+is <literal>switching</literal>, the rate at which buffers are switched. See <olink targetptr="chp-aggs" remap="internal">Chapter&nbsp;9, Aggregations</olink> and <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11, Buffers and Buffering</olink> for detailed
+descriptions of these factors.</para>
+</sect2><sect2 id="chp-actsub-stack"><title><function>stack</function></title><programlisting>void stack(int <replaceable>nframes</replaceable>)
+void stack(void)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>stack</literal></secondary></indexterm>The <function>stack</function> action records a kernel stack trace
+to the directed buffer. The kernel stack will be <replaceable>nframes</replaceable> in
+depth. If <replaceable>nframes</replaceable> is not provided, the number of
+stack frames recorded is the number specified by the <literal>stackframes</literal> option.
+For example:</para><screen><userinput># dtrace -n uiomove:entry'{stack()}'</userinput>
+  CPU     ID                    FUNCTION:NAME
+    0   9153                    uiomove:entry 
+                genunix`fop_write+0x1b
+                namefs`nm_write+0x1d
+                genunix`fop_write+0x1b
+                genunix`write+0x1f7
+
+    0   9153                    uiomove:entry 
+                genunix`fop_read+0x1b
+                genunix`read+0x1d4
+
+    0   9153                    uiomove:entry 
+                genunix`strread+0x394
+                specfs`spec_read+0x65
+                genunix`fop_read+0x1b
+                genunix`read+0x1d4
+   ...</screen><para><indexterm><primary>actions</primary><secondary><literal>stack</literal></secondary><tertiary>and aggregators</tertiary></indexterm>The <function>stack</function> action
+is a little different from other actions in that it may also be used as the
+key to an aggregation:</para><screen><userinput># dtrace -n kmem_alloc:entry'{@[stack()] = count()}'</userinput>
+dtrace: description 'kmem_alloc:entry' matched 1 probe
+<userinput>^C</userinput>
+
+                rpcmod`endpnt_get+0x47c
+                rpcmod`clnt_clts_kcallit_addr+0x26f
+                rpcmod`clnt_clts_kcallit+0x22
+                nfs`rfscall+0x350
+                nfs`rfs2call+0x60
+                nfs`nfs_getattr_otw+0x9e
+                nfs`nfsgetattr+0x26
+                nfs`nfs_getattr+0xb8
+                genunix`fop_getattr+0x18
+                genunix`cstat64+0x30
+                genunix`cstatat64+0x4a
+                genunix`lstat64+0x1c
+                  1
+
+                genunix`vfs_rlock_wait+0xc
+                genunix`lookuppnvp+0x19d
+                genunix`lookuppnat+0xe7
+                genunix`lookupnameat+0x87
+                genunix`lookupname+0x19
+                genunix`chdir+0x18
+                  1
+
+                rpcmod`endpnt_get+0x6b1
+                rpcmod`clnt_clts_kcallit_addr+0x26f
+                rpcmod`clnt_clts_kcallit+0x22
+                nfs`rfscall+0x350
+                nfs`rfs2call+0x60
+                nfs`nfs_getattr_otw+0x9e
+                nfs`nfsgetattr+0x26
+                nfs`nfs_getattr+0xb8
+                genunix`fop_getattr+0x18
+                genunix`cstat64+0x30
+                genunix`cstatat64+0x4a
+                genunix`lstat64+0x1c
+                  1
+    ...</screen>
+</sect2><sect2 id="chp-actsub-ustack"><title><function>ustack</function></title><programlisting>void ustack(int <replaceable>nframes</replaceable>, int <replaceable>strsize</replaceable>)
+void ustack(int <replaceable>nframes</replaceable>)
+void ustack(void)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>ustack</literal></secondary></indexterm>The <function>ustack</function> action records a <emphasis>user</emphasis> stack
+trace to the directed buffer. The user stack will be <replaceable>nframes</replaceable> in
+depth. If <replaceable>nframes</replaceable> is not provided, the number of
+stack frames recorded is the number specified by the <literal>ustackframes</literal> option.
+While <function>ustack</function> is able to determine the address of the
+calling frames when the probe fires, the stack frames will not be translated
+into symbols until the <function>ustack</function> action is processed at
+user-level by the DTrace consumer. If <replaceable>strsize</replaceable> is
+specified and non-zero, <function>ustack</function> will allocate the specified
+amount of string space, and use it to perform address-to-symbol translation
+directly from the kernel. This direct user symbol translation is currently
+available only for Java virtual machines, version 1.5 and higher. Java address-to-symbol
+translation annotates user stacks that contain Java frames with the Java class
+and method name. If such frames cannot be translated, the frames will appear
+only as hexadecimal addresses.</para><para>The following example traces a stack with no string space, and therefore
+no Java address-to-symbol translation:</para><screen><userinput># dtrace -n syscall::write:entry'/pid == $target/{ustack(50, 0);</userinput> 
+    <userinput>exit(0)}' -c "java -version"</userinput>
+dtrace: description 'syscall::write:entry' matched 1 probe
+java version "1.5.0-beta3"
+Java(TM) 2 Runtime Environment, Standard Edition (build 1.5.0-beta3-b58)
+Java HotSpot(TM) Client VM (build 1.5.0-beta3-b58, mixed mode)
+dtrace: pid 5312 has exited
+CPU     ID                    FUNCTION:NAME
+  0     35                      write:entry 
+              libc.so.1`_write+0x15
+              libjvm.so`__1cDhpiFwrite6FipkvI_I_+0xa8
+              libjvm.so`JVM_Write+0x2f
+              d0c5c946
+              libjava.so`Java_java_io_FileOutputStream_writeBytes+0x2c
+              cb007fcd
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb002a7b
+              cb000152
+              libjvm.so`__1cJJavaCallsLcall_helper6FpnJJavaValue_
+                          pnMmethodHandle_pnRJavaCallArguments_
+                          pnGThread__v_+0x187
+              libjvm.so`__1cCosUos_exception_wrapper6FpFpnJJavaValue_
+                          pnMmethodHandle_pnRJavaCallArguments_
+                          pnGThread__v2468_v_+0x14
+              libjvm.so`__1cJJavaCallsEcall6FpnJJavaValue_nMmethodHandle_
+                          pnRJavaCallArguments_pnGThread __v_+0x28
+              libjvm.so`__1cRjni_invoke_static6FpnHJNIEnv__pnJJavaValue_
+                          pnI_jobject_nLJNICallType_pnK_jmethodID_pnSJNI_
+                          ArgumentPusher_pnGThread__v_+0x180
+              libjvm.so`jni_CallStaticVoidMethod+0x10f
+              java`main+0x53d</screen><para>Notice that the C and C++ stack frames from the Java virtual machine
+are presented symbolically using C++ &ldquo;mangled&rdquo; symbol names, and
+the Java stack frames are presented only as hexadecimal addresses. The following
+example shows a call to <function>ustack</function> with a non-zero string
+space:</para><screen><userinput># dtrace -n syscall::write:entry'/pid == $target/{ustack(50, 500); exit(0)}'</userinput>
+      <userinput>-c "java -version"</userinput>
+dtrace: description 'syscall::write:entry' matched 1 probe
+java version "1.5.0-beta3"
+Java(TM) 2 Runtime Environment, Standard Edition (build 1.5.0-beta3-b58)
+Java HotSpot(TM) Client VM (build 1.5.0-beta3-b58, mixed mode)
+dtrace: pid 5308 has exited
+CPU     ID                    FUNCTION:NAME
+  0     35                      write:entry 
+              libc.so.1`_write+0x15
+              libjvm.so`__1cDhpiFwrite6FipkvI_I_+0xa8
+              libjvm.so`JVM_Write+0x2f
+              d0c5c946
+              libjava.so`Java_java_io_FileOutputStream_writeBytes+0x2c
+              java/io/FileOutputStream.writeBytes
+              java/io/FileOutputStream.write
+              java/io/BufferedOutputStream.flushBuffer
+              java/io/BufferedOutputStream.flush
+              java/io/PrintStream.write
+              sun/nio/cs/StreamEncoder$CharsetSE.writeBytes
+              sun/nio/cs/StreamEncoder$CharsetSE.implFlushBuffer
+              sun/nio/cs/StreamEncoder.flushBuffer
+              java/io/OutputStreamWriter.flushBuffer
+              java/io/PrintStream.write
+              java/io/PrintStream.print
+              java/io/PrintStream.println
+              sun/misc/Version.print
+              sun/misc/Version.print
+              StubRoutines (1)
+              libjvm.so`__1cJJavaCallsLcall_helper6FpnJJavaValue_
+                          pnMmethodHandle_pnRJavaCallArguments_pnGThread
+                          __v_+0x187
+              libjvm.so`__1cCosUos_exception_wrapper6FpFpnJJavaValue_
+                          pnMmethodHandle_pnRJavaCallArguments_pnGThread
+                          __v2468_v_+0x14
+              libjvm.so`__1cJJavaCallsEcall6FpnJJavaValue_nMmethodHandle
+                          _pnRJavaCallArguments_pnGThread__v_+0x28
+              libjvm.so`__1cRjni_invoke_static6FpnHJNIEnv__pnJJavaValue_pnI
+                          _jobject_nLJNICallType_pnK_jmethodID_pnSJNI
+                          _ArgumentPusher_pnGThread__v_+0x180
+              libjvm.so`jni_CallStaticVoidMethod+0x10f
+              java`main+0x53d
+              8051b9a</screen><para>The above example output demonstrates symbolic stack frame information
+for Java stack frames. There are still some hexadecimal frames in this output
+because some functions are static and do not have entries in the application
+symbol table. Translation is not possible for these frames.</para><para>The <function>ustack</function> symbol translation for non-Java frames
+occurs <emphasis>after</emphasis> the stack data is recorded. Therefore, the
+corresponding user process might exit before symbol translation can be performed,
+making stack frame translation impossible. If the user process exits before
+symbol translation is performed, <command>dtrace</command> will emit a warning
+message, followed by the hexadecimal stack frames, as shown in the following
+example:</para><screen>  dtrace: failed to grab process 100941: no such process
+                c7b834d4
+                c7bca85d
+                c7bca1a4
+                c7bd4374
+                c7bc2628
+                8047efc</screen><para>Techniques for mitigating this problem are described in <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33, User Process Tracing</olink>.</para><para>Finally, because the postmortem DTrace debugger commands cannot perform
+the frame translation, using <function>ustack</function> with a <literal>ring</literal> buffer
+policy always results in raw <function>ustack</function> data.</para><para>The following D program shows an example of <function>ustack</function> that
+leaves <replaceable>strsize</replaceable> unspecified:</para><programlisting>syscall::brk:entry
+/execname == $$1/
+{
+	@[ustack(40)] = count();
+}</programlisting><para>To run this example for the Netscape web browser, <filename>.netscape.bin</filename> in
+default Solaris installations, use the following command:</para><screen><userinput># dtrace -s brk.d .netscape.bin</userinput>
+dtrace: description 'syscall::brk:entry' matched 1 probe
+<userinput>^C</userinput>
+                libc.so.1`_brk_unlocked+0xc
+                88143f6
+                88146cd
+                .netscape.bin`unlocked_malloc+0x3e
+                .netscape.bin`unlocked_calloc+0x22
+                .netscape.bin`calloc+0x26
+                .netscape.bin`_IMGCB_NewPixmap+0x149
+                .netscape.bin`il_size+0x2f7
+                .netscape.bin`il_jpeg_write+0xde
+                8440c19
+                .netscape.bin`il_first_write+0x16b
+                8394670
+                83928e5
+                .netscape.bin`NET_ProcessHTTP+0xa6
+                .netscape.bin`NET_ProcessNet+0x49a
+                827b323
+                libXt.so.4`XtAppProcessEvent+0x38f
+                .netscape.bin`fe_EventLoop+0x190
+                .netscape.bin`main+0x1875
+                   1
+
+                libc.so.1`_brk_unlocked+0xc
+                libc.so.1`sbrk+0x29
+                88143df
+                88146cd
+                .netscape.bin`unlocked_malloc+0x3e
+                .netscape.bin`unlocked_calloc+0x22
+                .netscape.bin`calloc+0x26
+                .netscape.bin`_IMGCB_NewPixmap+0x149
+                .netscape.bin`il_size+0x2f7
+                .netscape.bin`il_jpeg_write+0xde
+                8440c19
+                .netscape.bin`il_first_write+0x16b
+                8394670
+                83928e5
+                .netscape.bin`NET_ProcessHTTP+0xa6
+                .netscape.bin`NET_ProcessNet+0x49a
+                827b323
+                libXt.so.4`XtAppProcessEvent+0x38f
+                .netscape.bin`fe_EventLoop+0x190
+                .netscape.bin`main+0x1875
+                  1
+    ...</screen>
+</sect2><sect2 id="chp-actsub-39"><title><function>jstack</function></title><programlisting>void jstack(int <replaceable>nframes</replaceable>, int <replaceable>strsize</replaceable>)
+void jstack(int <replaceable>nframes</replaceable>)
+void jstack(void)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>jstack</literal></secondary></indexterm><function>jstack</function> is an alias for <function>ustack</function> that
+uses the <literal>jstackframes</literal> option for the number of stack frames
+the value specified by , and for the string space size the value specified
+by the <literal>jstackstrsize</literal> option. By default, <literal>jstacksize</literal> defaults
+to a non-zero value. This means that use of <function>jstack</function> results
+in a stack with Java frame translation in place.</para>
+</sect2>
+</sect1><sect1 id="chp-actsub-4"><title>Destructive Actions</title><para><indexterm><primary>destructive actions</primary></indexterm><indexterm><primary>actions</primary><secondary>destructive</secondary></indexterm>Some
+DTrace actions are destructive in that they change the state of the system
+in some well-defined way. Destructive actions may not be used unless they
+have been explicitly enabled. When using <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, you can enable destructive
+actions using the <option>w</option> option. If an attempt is made to enable
+destructive actions in <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> without
+explicitly enabling them, <command>dtrace</command> will fail with a message
+similar to the following example:</para><screen>dtrace: failed to enable 'syscall': destructive actions not allowed</screen><sect2 id="chp-actsub-4.1"><title>Process Destructive Actions</title><para><indexterm><primary>destructive actions</primary><secondary>process</secondary></indexterm>Some destructive actions are destructive only to a particular
+process. These actions are available to users with the <literal>dtrace_proc</literal> or <literal>dtrace_user</literal> privileges. See <olink targetptr="chp-sec" remap="internal">Chapter&nbsp;35,
+Security</olink> for details on DTrace security privileges.</para><sect3 id="chp-actsub-stop"><title><function>stop</function></title><programlisting>void stop(void)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>stop</literal></tertiary></indexterm>The <function>stop</function> action
+forces the process that fires the enabled probe to stop when it next leaves
+the kernel, as if stopped by a <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> action.
+The <olink targetdoc="refman1" targetptr="prun-1" remap="external"><citerefentry><refentrytitle>prun</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility may
+be used to resume a process that has been stopped by the <function>stop</function> action.
+The <function>stop</function> action can be used to stop a process at any
+DTrace probe point. This action can be used to capture a program in a particular
+state that would be difficult to achieve with a simple breakpoint, and then
+attach a traditional debugger like <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to
+the process. You can also use the <olink targetdoc="refman1" targetptr="gcore-1" remap="external"><citerefentry><refentrytitle>gcore</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility
+to save the state of a stopped process in a core file for later analysis.</para>
+</sect3><sect3 id="chp-actsub-raise"><title><function>raise</function></title><programlisting>void raise(int <replaceable>signal</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>raise</literal></tertiary></indexterm>The <function>raise</function> action
+sends the specified signal to the currently running process. This action is
+similar to using the <olink targetdoc="refman1" targetptr="kill-1" remap="external"><citerefentry><refentrytitle>kill</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+to send a process a signal. The <function>raise</function> action can be used
+to send a signal at a precise point in a process's execution.</para>
+</sect3><sect3 id="chp-actsub-copyout"><title><function>copyout</function></title><programlisting>void copyout(void *<replaceable>buf</replaceable>, uintptr_t <replaceable>addr</replaceable>, size_t <replaceable>nbytes</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>copyout</literal></tertiary></indexterm>The <function>copyout</function> action
+copies <replaceable>nbytes</replaceable> from the buffer specified by <replaceable>buf</replaceable> to the address specified by <replaceable>addr</replaceable> in
+the address space of the process associated with the current thread. If the
+user-space address does not correspond to a valid, faulted-in page in the
+current address space, an error will be generated.</para>
+</sect3><sect3 id="chp-actsub-copyoutstr"><title><function>copyoutstr</function></title><programlisting>void copyoutstr(string <replaceable>str</replaceable>, uintptr_t <replaceable>addr</replaceable>, size_t <replaceable>maxlen</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>copyoutstr</literal></tertiary></indexterm>The <function>copyoutstr</function> action copies the string specified by <replaceable>str</replaceable> to
+the address specified by <replaceable>addr</replaceable> in the address space
+of the process associated with the current thread. If the user-space address
+does not correspond to a valid, faulted-in page in the current address space,
+an error will be generated. The string length is limited to the value set
+by the <literal>strsize</literal> option. See <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16,
+Options and Tunables</olink> for details.</para>
+</sect3><sect3 id="chp-actsub-38"><title><function>system</function></title><programlisting>void system(string <replaceable>program</replaceable>, ...) </programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>system</literal></tertiary></indexterm>The <function>system</function> action
+causes the program specified by <replaceable>program</replaceable> to be executed
+as if it were given to the shell as input. The <replaceable>program</replaceable> string
+may contain any of the <function>printf</function>/<function>printa</function> format
+conversions. Arguments must be specified that match the format conversions.
+Refer to <olink targetptr="chp-fmt" remap="internal">Chapter&nbsp;12, Output Formatting</olink> for
+details on valid format conversions.</para><para>The following example runs the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command once per second:</para><screen><userinput># dtrace -wqn tick-1sec'{system("date")}'</userinput>
+ Tue Jul 20 11:56:26 CDT 2004
+ Tue Jul 20 11:56:27 CDT 2004
+ Tue Jul 20 11:56:28 CDT 2004
+ Tue Jul 20 11:56:29 CDT 2004
+ Tue Jul 20 11:56:30 CDT 2004</screen><para>The following example shows a more elaborate use of the action, using <function>printf</function> conversions in the <replaceable>program</replaceable> string
+along with traditional filtering tools like pipes:</para><programlisting>#pragma D option destructive
+#pragma D option quiet
+
+proc:::signal-send
+/args[2] == SIGINT/
+{
+	printf("SIGINT sent to %s by ", args[1]-&gt;pr_fname);
+	system("getent passwd %d | cut -d: -f5", uid);
+}</programlisting><para>Running the above script results in output similar to the following
+example:</para><screen><userinput># ./whosend.d</userinput>
+SIGINT sent to MozillaFirebird- by Bryan Cantrill
+SIGINT sent to run-mozilla.sh by Bryan Cantrill
+^C
+SIGINT sent to dtrace by Bryan Cantrill</screen><para>The execution of the specified command does <emphasis>not</emphasis> occur
+in the context of the firing probe &ndash; it occurs when the buffer containing
+the details of the <function>system</function> action are processed at user-level.
+How and when this processing occurs depends on the buffering policy, described
+in <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11, Buffers and Buffering</olink>.
+With the default buffering policy, the buffer processing rate is specified
+by the <literal>switchrate</literal> option. You can see the delay inherent
+in <function>system</function> if you explicitly tune the <literal>switchrate</literal> higher
+than its one-second default, as shown in the following example:</para><programlisting>#pragma D option quiet
+#pragma D option destructive
+#pragma D option switchrate=5sec
+
+tick-1sec
+/n++ &lt; 5/
+{
+	printf("walltime  : %Y\n", walltimestamp);
+	printf("date      : ");
+	system("date");
+	printf("\n");
+}
+
+tick-1sec
+/n == 5/
+{
+	exit(0);
+}</programlisting><para>Running the above script results in output similar to the following
+example:</para><screen><userinput># dtrace -s ./time.d</userinput>
+ walltime  : 2004 Jul 20 13:26:30
+date      : Tue Jul 20 13:26:35 CDT 2004
+
+walltime  : 2004 Jul 20 13:26:31
+date      : Tue Jul 20 13:26:35 CDT 2004
+
+walltime  : 2004 Jul 20 13:26:32
+date      : Tue Jul 20 13:26:35 CDT 2004
+
+walltime  : 2004 Jul 20 13:26:33
+date      : Tue Jul 20 13:26:35 CDT 2004
+
+walltime  : 2004 Jul 20 13:26:34
+date      : Tue Jul 20 13:26:35 CDT 2004</screen><para>Notice that the <literal>walltime</literal> values differ, but the <literal>date</literal> values are identical. This result reflects the fact that the
+execution of the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+occured only when the buffer was processed, not when the <function>system</function> action
+was recorded.</para>
+</sect3>
+</sect2><sect2 id="chp-actsub-4.2"><title>Kernel Destructive Actions</title><para><indexterm><primary>destructive actions</primary><secondary>kernel</secondary></indexterm>Some destructive actions are destructive to the entire system.
+These actions must obviously be used extremely carefully, as they will affect
+every process on the system and any other system implicitly or explicitly
+depending upon the affected system's network services.</para><sect3 id="chp-actsub-breakpoint"><title><function>breakpoint</function></title><programlisting>void breakpoint(void)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>breakpoint</literal></tertiary></indexterm>The <function>breakpoint</function> action induces a kernel breakpoint, causing the system to stop
+and transfer control to the kernel debugger. The kernel debugger will emit
+a string denoting the DTrace probe that triggered the action. For example,
+if one were to do the following:</para><screen><userinput># dtrace -w -n clock:entry'{breakpoint()}'</userinput>
+dtrace: allowing destructive actions
+dtrace: description 'clock:entry' matched 1 probe</screen><para>On Solaris running on SPARC, the following message might appear on the
+console:</para><screen>dtrace: breakpoint action at probe fbt:genunix:clock:entry (ecb 30002765700)
+Type  'go' to resume
+ok</screen><para>On Solaris running on x86, the following message might appear on the
+console:</para><screen>dtrace: breakpoint action at probe fbt:genunix:clock:entry (ecb d2b97060)
+stopped at      int20+0xb:      ret
+kmdb[0]:</screen><para>The address following the probe description is the address of the enabling
+control block (<acronym>ECB</acronym>) within DTrace. You can use this address
+to determine more details about the probe enabling that induced the breakpoint
+action.</para><para>A mistake with the <function>breakpoint</function> action may cause
+it to be called far more often than intended. This behavior might in turn
+prevent you from even terminating the DTrace consumer that is triggering the
+breakpoint actions. In this situation, set the kernel integer variable <literal>dtrace_destructive_disallow</literal> to 1. This setting will disallow <emphasis>all</emphasis> destructive
+actions on the machine. Apply this setting <emphasis>only</emphasis> in this
+particular situation.</para><para>The exact method for setting <literal>dtrace_destructive_disallow</literal> will
+depend on the kernel debugger that you are using. If using the OpenBoot PROM
+on a SPARC system, use <command>w!</command>:</para><screen>ok <userinput>1 dtrace_destructive_disallow w!</userinput>
+ok</screen><para>Confirm that the variable has been set using <command>w?</command>:</para><screen>ok <userinput>dtrace_destructive_disallow w?</userinput>
+1
+ok</screen><para>Continue by typing <command>go</command>:</para><screen>ok <userinput>go</userinput></screen><para>If using <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> on
+x86 or SPARC systems, use the 4&ndash;byte write modifier (<literal>W</literal>)
+with the <literal>/</literal> formatting dcmd:</para><screen>kmdb[0]: <userinput>dtrace_destructive_disallow/W 1</userinput>
+dtrace_destructive_disallow:    0x0             =       0x1
+kmdb[0]:</screen><para>Continue using <command>:c</command>:</para><screen>kadb[0]: <userinput>:c</userinput></screen><para>To re-enable destructive actions after continuing, you will need to
+explicitly reset <literal>dtrace_destructive_disallow</literal> back to 0
+using <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>:</para><screen><userinput># echo "dtrace_destructive_disallow/W 0" | mdb -kw</userinput>
+dtrace_destructive_disallow:    0x1             =       0x0
+#</screen>
+</sect3><sect3 id="chp-actsub-panic"><title><function>panic</function></title><programlisting>void panic(void)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>panic</literal></tertiary></indexterm>The <function>panic</function> action
+causes a kernel panic when triggered. This action should be used to force
+a system crash dump at a time of interest. You can use this action together
+with ring buffering and postmortem analysis to understand a problem. For more
+information, see <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11, Buffers and Buffering</olink> and <olink targetptr="chp-post" remap="internal">Chapter&nbsp;37, Postmortem Tracing</olink> respectively.
+When the panic action is used, a panic message appears that denotes the probe
+causing the panic. For example:</para><screen>  panic[cpu0]/thread=30001830b80: dtrace: panic action at probe
+  syscall::mmap:entry (ecb 300000acfc8)
+
+  000002a10050b840 dtrace:dtrace_probe+518 (fffe, 0, 1830f88, 1830f88,
+    30002fb8040, 300000acfc8)
+    %l0-3: 0000000000000000 00000300030e4d80 0000030003418000 00000300018c0800
+    %l4-7: 000002a10050b980 0000000000000500 0000000000000000 0000000000000502
+  000002a10050ba30 genunix:dtrace_systrace_syscall32+44 (0, 2000, 5,
+    80000002, 3, 1898400)
+    %l0-3: 00000300030de730 0000000002200008 00000000000000e0 000000000184d928
+    %l4-7: 00000300030de000 0000000000000730 0000000000000073 0000000000000010
+
+  syncing file systems... 2 done
+  dumping to /dev/dsk/c0t0d0s1, offset 214827008, content: kernel
+  100% done: 11837 pages dumped, compression ratio 4.66, dump
+  succeeded
+  rebooting...</screen><para><olink targetdoc="refman1m" targetptr="syslogd-1m" remap="external"><citerefentry><refentrytitle>syslogd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> will
+also emit a message upon reboot:</para><screen>  Jun 10 16:56:31 machine1 savecore: [ID 570001 auth.error] reboot after panic:
+  dtrace: panic action at probe syscall::mmap:entry (ecb 300000acfc8)</screen><para>The message buffer of the crash dump also contains the probe and <acronym>ECB</acronym> responsible for the <function>panic</function> action.</para>
+</sect3><sect3 id="chp-actsub-chill"><title><function>chill</function></title><programlisting>void chill(int <replaceable>nanoseconds</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary>destructive</secondary><tertiary><literal>chill</literal></tertiary></indexterm>The <function>chill</function> action
+causes DTrace to spin for the specified number of nanoseconds. <function>chill</function> is
+primarily useful for exploring problems that might be timing related. For
+example, you can use this action to open race condition windows, or to bring
+periodic events into or out of phase with one another. Because interrupts
+are disabled while in DTrace probe context, any use of <function>chill</function> will
+induce interrupt latency, scheduling latency, and dispatch latency.
+Therefore, <function>chill</function> can cause unexpected systemic effects
+and it should not used indiscriminately. Because system activity relies on
+periodic interrupt handling, DTrace will refuse to execute the <function>chill</function> action
+for more than 500 milliseconds out of each one-second interval on any given
+CPU. If the maximum <function>chill</function> interval is exceeded, DTrace
+will report an illegal operation error, as shown in the following example:</para><screen><userinput># dtrace -w -n syscall::open:entry'{chill(500000001)}'</userinput>
+dtrace: allowing destructive actions
+dtrace: description 'syscall::open:entry' matched 1 probe
+dtrace: 57 errors
+CPU     ID                    FUNCTION:NAME
+dtrace: error on enabled probe ID 1 (ID 14: syscall::open:entry): \
+  illegal operation in action #1</screen><para>This limit is enforced even if the time is spread across multiple calls
+to <function>chill</function>, or multiple DTrace consumers of a single probe.
+For example, the same error would be generated by the following command:</para><screen><userinput># dtrace -w -n syscall::open:entry'{chill(250000000); chill(250000001);}'</userinput></screen>
+</sect3>
+</sect2>
+</sect1><sect1 id="chp-actsub-5"><title>Special Actions</title><para><indexterm><primary>actions</primary><secondary>special</secondary></indexterm>This section describes actions that are neither data recording
+actions nor destructive actions.</para><sect2 id="chp-actsub-5.1"><title>Speculative Actions</title><para>The actions associated with speculative tracing are <function>speculate</function>, <function>commit</function>, and <function>discard</function>. These actions are discussed
+in <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13, Speculative Tracing</olink>.</para>
+</sect2><sect2 id="chp-actsub-exit"><title><function>exit</function></title><programlisting>void exit(int <replaceable>status</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>exit</literal></secondary></indexterm>The <function>exit</function> action is used to immediately stop
+tracing, and to inform the DTrace consumer that it should cease tracing, perform
+any final processing, and call <olink targetdoc="refman3a" targetptr="exit-3c" remap="external"><citerefentry><refentrytitle>exit</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> with
+the status specified. Because <function>exit</function> returns a status to
+user-level, it is a data recording action, However, unlike other data storing
+actions, <function>exit</function> cannot be speculatively traced. <function>exit</function> will cause the DTrace consumer to exit regardless of buffer policy.
+Because <function>exit</function> is a data recording action, it <emphasis>can</emphasis> be
+dropped.</para><para>When <function>exit</function> is called, only DTrace actions already
+in progress on other CPUs will be completed. No new actions will occur on
+any CPU. The only exception to this rule is the processing of the <literal>END</literal> probe,
+which will be called after the DTrace consumer has processed the <function>exit</function> action
+and indicated that tracing should stop.</para>
+</sect2>
+</sect1><sect1 id="chp-actsub-6"><title>Subroutines</title><para><indexterm><primary>subroutines</primary></indexterm>Subroutines differ
+from actions because they generally only affect internal DTrace state. Therefore,
+there are no destructive subroutines, and subroutines never trace data into
+buffers. Many subroutines have analogs in the Section 9F or Section 3C interfaces.
+See <olink targetdoc="refman9f" targetptr="intro-9f" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman3f" targetptr="intro-3" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>3</manvolnum></citerefentry></olink> for more information on the
+corresponding subroutines.</para><sect2 id="gelrf"><title><function>alloca</function></title><programlisting>void *alloca(size_t <replaceable>size</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>alloca</literal></secondary></indexterm><function>alloca</function> allocates <replaceable>size</replaceable> bytes
+out of scratch space, and returns a pointer to the allocated memory. The returned
+pointer is guaranteed to have 8&ndash;byte alignment. Scratch space is only
+valid for the duration of a clause. Memory allocated with <function>alloca</function> will
+be deallocated when the clause completes. If insufficient scratch space is
+available, no memory is allocated and an error is generated.</para>
+</sect2><sect2 id="gelsa"><title><function>basename</function></title><programlisting>string basename(char *<replaceable>str</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>basename</literal></secondary></indexterm><function>basename</function> is a D analogue for <olink targetdoc="refman1" targetptr="basename-1" remap="external"><citerefentry><refentrytitle>basename</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>. This subroutine creates a
+string that consists of a copy of the specified string, but without any prefix
+that ends in <literal>/</literal>. The returned string is allocated out of
+scratch memory, and is therefore valid only for the duration of the clause.
+If insufficient scratch space is available, <literal>basename</literal> does
+not execute and an error is generated.</para>
+</sect2><sect2 id="gelsq"><title><function>bcopy</function></title><programlisting>void bcopy(void *<replaceable>src</replaceable>, void *<replaceable>dest</replaceable>, size_t <replaceable>size</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>bcopy</literal></secondary></indexterm><function>bcopy</function> copies <replaceable>size</replaceable> bytes
+from the memory pointed to by <replaceable>src</replaceable> to the memory
+pointed to by <replaceable>dest</replaceable>. All of the source memory must
+lie outside of scratch memory and all of the destination memory must lie within
+it. If these conditions are not met, no copying takes place and an error is
+generated.</para>
+</sect2><sect2 id="gelsc"><title><function>cleanpath</function></title><programlisting>string cleanpath(char *<replaceable>str</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>cleanpath</literal></secondary></indexterm><function>cleanpath</function> creates a string that consists
+of a copy of the path indicated by <replaceable>str</replaceable>, but with
+certain redundant elements eliminated. In particular &ldquo;<literal>/./</literal>&rdquo;
+elements in the path are removed, and &ldquo;<literal>/../</literal>&rdquo;
+elements are collapsed. The collapsing of <literal>/../</literal> elements
+in the path occurs without regard to symbolic links. Therefore, it is possible
+that <function>cleanpath</function> could take a valid path and return a shorter,
+invalid one.</para><para>For example, if <replaceable>str</replaceable> were &ldquo;<literal>/foo/../bar</literal>&rdquo; and <literal>/foo</literal> were a symbolic link to <literal>/net/foo/export</literal>, <function>cleanpath</function> would return the string &ldquo;<literal>/bar</literal>&rdquo; even though <literal>bar</literal> might only be in <literal>/net/foo</literal> not <literal>/</literal>. This limitation is due to the
+fact that <function>cleanpath</function> is called in the context of a firing
+probe, where full symbolic link resolution or arbitrary names is not possible.
+The returned string is allocated out of scratch memory, and is therefore valid
+only for the duration of the clause. If insufficient scratch space is available, <literal>cleanpath</literal> does not execute and an error is generated.</para>
+</sect2><sect2 id="chp-actsub-copyin"><title><function>copyin</function></title><programlisting>void *copyin(uintptr_t <replaceable>addr</replaceable>, size_t <replaceable>size</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>copyin</literal></secondary></indexterm><function>copyin</function>copies the specified size in bytes
+from the specified user address into a DTrace scratch buffer, and returns
+the address of this buffer. The user address is interpreted as an address
+in the space of the process associated with the current thread. The resulting
+buffer pointer is guaranteed to have 8-byte alignment. The address in question <emphasis>must</emphasis> correspond to a faulted-in page in the current process. If
+the address does not correspond to a faulted-in page, or if insufficient scratch
+space is available, <literal>NULL</literal> is returned, and an error is generated.
+See <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33, User Process Tracing</olink> for
+techniques to reduce the likelihood of <literal>copyin</literal> errors.</para>
+</sect2><sect2 id="chp-actsub-copyinstr"><title><function>copyinstr</function></title><programlisting>string copyinstr(uintptr_t <replaceable>addr</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>copyinstr</literal></secondary></indexterm><function>copyinstr</function> copies a null-terminated C string
+from the specified user address into a DTrace scratch buffer, and returns
+the address of this buffer. The user address is interpreted as an address
+in the space of the process associated with the current thread. The string
+length is limited to the value set by the <literal>strsize</literal> option;
+see <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink> for
+details. As with <literal>copyin</literal>, the specified address <emphasis>must</emphasis> correspond
+to a faulted-in page in the current process. If the address does not correspond
+to a faulted-in page, or if insufficient scratch space is available, <literal>NULL</literal> is returned, and an error is generated. See <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33, User Process Tracing</olink> for techniques
+to reduce the likelihood of <literal>copyinstr</literal> errors.</para>
+</sect2><sect2 id="gelrx"><title><function>copyinto</function></title><programlisting>void copyinto(uintptr_t <replaceable>addr</replaceable>, size_t <replaceable>size</replaceable>, void *<replaceable>dest</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>copyinto</literal></secondary></indexterm><function>copyinto</function>copies the specified size in bytes
+from the specified user address into the DTrace scratch buffer specified by <replaceable>dest</replaceable>. The user address is interpreted as an address in the space
+of the process associated with the current thread. The address in question <emphasis>must</emphasis> correspond to a faulted-in page in the current process. If
+the address does not correspond to a faulted-in page, or if any of the destination
+memory lies outside scratch space, no copying takes place, and an error is
+generated. See <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33, User Process Tracing</olink> for
+techniques to reduce the likelihood of <literal>copyinto</literal> errors.</para>
+</sect2><sect2 id="gelrv"><title><function>dirname</function></title><programlisting>string dirname(char *<replaceable>str</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>dirname</literal></secondary></indexterm><function>dirname</function> is a D analogue for <olink targetdoc="refman1" targetptr="dirname-1" remap="external"><citerefentry><refentrytitle>dirname</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>. This subroutine creates a
+string that consists of all but the last level of the pathname specified by <replaceable>str</replaceable>. The returned string is allocated out of scratch memory,
+and is therefore valid only for the duration of the clause. If insufficient
+scratch space is available, <literal>dirname</literal> does not execute and
+an error is generated.</para>
+</sect2><sect2 id="gelsp"><title><function>msgdsize</function></title><programlisting>size_t msgdsize(mblk_t *<replaceable>mp</replaceable>)</programlisting><para><function>msgdsize</function> returns the number of bytes in the data
+message pointed to by <replaceable>mp</replaceable>. See <olink targetdoc="refman9f" targetptr="msgdsize-9f" remap="external"><citerefentry><refentrytitle>msgdsize</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for details. <function>msgdsize</function> only includes data blocks of type <literal>M_DATA</literal> in
+the count.</para>
+</sect2><sect2 id="gelsh"><title><function>msgsize</function></title><programlisting>size_t msgsize(mblk_t *<replaceable>mp</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>msgsize</literal></secondary></indexterm><function>msgsize</function> returns the number of bytes in the
+message pointed to by <replaceable>mp</replaceable>. Unlike <function>msgdsize</function>,
+which returns only the number of <emphasis>data</emphasis> bytes, <function>msgsize</function> returns the <emphasis>total</emphasis> number of bytes in the
+message.</para>
+</sect2><sect2 id="chp-actsub-owned"><title><function>mutex_owned</function></title><programlisting>int mutex_owned(kmutex_t *<replaceable>mutex</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>mutex_owned</literal></secondary></indexterm><function>mutex_owned</function> is an implementation of <olink targetdoc="refman9f" targetptr="mutex-owned-9f" remap="external"><citerefentry><refentrytitle>mutex_owned</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <function>mutex_owned</function> returns non-zero if the calling thread currently holds the specified
+kernel mutex, or zero if the specified adaptive mutex is currently unowned.</para>
+</sect2><sect2 id="chp-actsub-owner"><title><function>mutex_owner</function></title><programlisting>kthread_t *mutex_owner(kmutex_t *<replaceable>mutex</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>mutex_owner</literal></secondary></indexterm><function>mutex_owner</function> returns the thread pointer of
+the current owner of the specified adaptive kernel mutex. <function>mutex_owner</function> returns <literal>NULL</literal> if the specified adaptive mutex is currently unowned, or if
+the specified mutex is a spin mutex. See <olink targetdoc="refman9f" targetptr="mutex-owned-9f" remap="external"><citerefentry><refentrytitle>mutex_owned</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="chp-actsub-adapt"><title><function>mutex_type_adaptive</function></title><programlisting>int mutex_type_adaptive(kmutex_t *<replaceable>mutex</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>mutex_type_adaptive</literal></secondary></indexterm><function>mutex_type_adaptive</function> returns
+non-zero if the specified kernel mutex is of type <literal>MUTEX_ADAPTIVE</literal>,
+or zero if it is not. Mutexes are adaptive if they meet one or more of the
+following conditions:</para><itemizedlist><listitem><para>The mutex is declared statically</para>
+</listitem><listitem><para>The mutex is created with an interrupt block cookie of NULL</para>
+</listitem><listitem><para>The mutex is created with an interrupt block cookie that does
+not correspond to a high-level interrupt</para>
+</listitem>
+</itemizedlist><para>See <olink targetdoc="refman9f" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for more details on mutexes. The majority of mutexes
+in the Solaris kernel are adaptive.</para>
+</sect2><sect2 id="chp-actsub-progenyof"><title><function>progenyof</function></title><programlisting>int progenyof(pid_t <replaceable>pid</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>progenyof</literal></secondary></indexterm><function>progenyof</function> returns non-zero if the calling
+process (the process associated with the thread that is currently triggering
+the matched probe) is among the progeny of the specified process ID.</para>
+</sect2><sect2 id="chp-actsub-rand"><title><function>rand</function></title><programlisting>int rand(void)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>rand</literal></secondary></indexterm><function>rand</function> returns a pseudo-random integer. The
+number returned is a weak pseudo-random number, and should not be used for
+any cryptographic application.</para>
+</sect2><sect2 id="chp-actsub-rw1"><title><function>rw_iswriter</function></title><programlisting>int rw_iswriter(krwlock_t *<replaceable>rwlock</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>rw_iswriter</literal></secondary></indexterm><function>rw_iswriter</function> returns non-zero if the specified
+reader-writer lock is either held or desired by a writer. If the lock is held
+only by readers and no writer is blocked, or if the lock is not held at all, <function>rw_iswriter</function> returns zero. See <olink targetdoc="refman9f" targetptr="rw-init-9f" remap="external"><citerefentry><refentrytitle>rw_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="chp-actsub-rw2"><title><function>rw_write_held</function></title><programlisting>int rw_write_held(krwlock_t *<replaceable>rwlock</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>rw_write_held</literal></secondary></indexterm><function>rw_write_held</function> returns non-zero if the specified
+reader-writer lock is currently held by a writer. If the lock is held only
+by readers or not held at all, <function>rw_write_held</function> returns
+zero. See <olink targetdoc="refman9f" targetptr="rw-init-9f" remap="external"><citerefentry><refentrytitle>rw_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="chp-actsub-speculation"><title><function>speculation</function></title><programlisting>int speculation(void)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>speculation</literal></secondary></indexterm><function>speculation</function> reserves a speculative trace
+buffer for use with <function>speculate</function> and returns an identifier
+for this buffer. See <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13, Speculative
+Tracing</olink> for details.</para>
+</sect2><sect2 id="gelrb"><title><function>strjoin</function></title><programlisting>string strjoin(char *<replaceable>str1</replaceable>, char *<replaceable>str2</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>strjoin</literal></secondary></indexterm><function>strjoin</function> creates a string that consists of <replaceable>str1</replaceable> concatenated with <replaceable>str2</replaceable>. The
+returned string is allocated out of scratch memory, and is therefore valid
+only for the duration of the clause. If insufficient scratch space is available, <literal>strjoin</literal> does not execute and an error is generated.</para>
+</sect2><sect2 id="chp-actsub-strlen"><title><function>strlen</function></title><programlisting>size_t strlen(string <replaceable>str</replaceable>)</programlisting><para><indexterm><primary>actions</primary><secondary><literal>strlen</literal></secondary></indexterm><function>strlen</function> returns the length of the specified
+string in bytes, excluding the terminating null byte.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000059528 0?>

@@ -1,0 +1,799 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()?><chapter id="eqbqn"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag
+atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Overview of Solaris Device Drivers</title><highlights><para>This chapter gives an overview of Solaris device drivers. The chapter
+provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="eqbqp" remap="internal">Device Driver Basics</olink></para>
+</listitem><listitem><para><olink targetptr="eqbqy" remap="internal">Device Driver Entry Points</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-41" remap="internal">Considerations in Device Driver
+Design</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="eqbqp"><title>Device Driver Basics</title><para>This section introduces you to device drivers and their entry points
+on the Solaris platform.</para><sect2 id="eqbqt"><title>What Is a Device Driver?</title><para><indexterm id="eqbqq"><primary>device drivers</primary><secondary>definition</secondary></indexterm><indexterm id="eqbqr"><primary>pseudo device driver</primary></indexterm>A <emphasis>device driver</emphasis> is a kernel module that is
+responsible for managing the low-level I/O operations of a hardware device.
+Device drivers are written with standard interfaces that the kernel can call
+to interface with a device. Device drivers can also be software-only, emulating
+a device that exists only in software, such as RAM disks, buses, and pseudo-terminals.</para><para>A device driver contains all the device-specific code necessary to communicate
+with a device. This code includes a standard set of interfaces to the rest
+of the system. This interface shields the kernel from device specifics just
+as the system call interface protects application programs from platform specifics.
+Application programs and the rest of the kernel need little, if any, device-specific
+code to address the device. In this way, device drivers make the system more
+portable and easier to maintain.</para><para>When the Solaris operating system (Solaris OS) is initialized, devices
+identify themselves and are organized into the  <emphasis>device tree</emphasis>,
+a hierarchy of devices. In effect, the device tree is a hardware model for
+the kernel. An individual device driver is represented as a node in the tree
+with no children. This type of node is referred to as a <emphasis>leaf driver</emphasis>.
+A driver that provides services to other drivers is called a <emphasis>bus
+nexus driver</emphasis> and is shown as a node with children. As part of the
+boot process, physical devices are mapped to drivers in the tree so that the
+drivers can be located when needed. For more information on how the Solaris
+OS accommodates devices, see <olink targetptr="kernelovr-77198" remap="internal">Chapter&nbsp;2,
+Solaris Kernel and Device Tree</olink>.</para><para>Device drivers are classified by how they handle I/O. Device drivers
+fall into three broad categories:</para><itemizedlist><listitem><para><emphasis role="strong">Block device drivers</emphasis> &ndash;
+For cases where handling I/O data as asynchronous chunks is appropriate. Typically,
+block drivers are used to manage devices with physically addressable storage
+media, such as disks.</para>
+</listitem><listitem><para><emphasis role="strong">Character device drivers</emphasis> &ndash;
+For devices that perform I/O on a continuous flow of bytes.</para><note><para>A driver can be both block and character at the same time if you
+set up two different interfaces to the file system. See <olink targetptr="kernelovr-4" remap="internal">Devices as Special Files</olink>.</para>
+</note><para>Included in the character category are drivers that use the STREAMS
+model (see below), programmed I/O, direct memory access, SCSI buses, USB,
+and other network I/O.</para>
+</listitem><listitem><para><emphasis role="strong">STREAMS device drivers</emphasis> &ndash;
+Subset of character drivers that uses the <olink targetdoc="group-refman" targetptr="streamio-7i" remap="external"><citerefentry><refentrytitle>streamio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> set of routines for character
+I/O within the kernel.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="eqbqu"><title>What Is a Device Driver Entry Point?</title><para><indexterm><primary>driver module entry points</primary><see>entry points</see></indexterm><indexterm><primary>entry points</primary><secondary>definition</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>entry points</secondary></indexterm>An <emphasis>entry point</emphasis> is a function within a device
+driver that can be called by an external entity to get access to some driver
+functionality or to operate a device. Each device driver provides a standard
+set of functions as entry points. For the complete list of entry points for
+all driver types, see the <olink targetdoc="group-refman" targetptr="intro-9e" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man
+page. The Solaris kernel uses entry points for these general task areas:</para><itemizedlist><listitem><para><emphasis role="strong">Loading and unloading the driver</emphasis></para>
+</listitem><listitem><para><emphasis role="strong">Autoconfiguring the device</emphasis> &ndash;
+Autoconfiguration is the process of loading a device driver's code and static
+data into memory so that the driver is registered with the system.</para>
+</listitem><listitem><para><emphasis role="strong">Providing I/O services for the driver</emphasis></para>
+</listitem>
+</itemizedlist><para>Drivers for different types of devices have different sets of entry
+points according to the kinds of operations the devices perform. A driver
+for a memory-mapped character-oriented device, for example, supports a <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point,
+while a block driver does not support this entry.</para><para><indexterm><primary>naming</primary><secondary>unique prefix for driver symbols</secondary></indexterm><indexterm><primary>prefix</primary><secondary>unique prefix for driver symbols</secondary></indexterm>Use a prefix based on the
+name of your driver to give driver functions unique names. Typically, this
+prefix is the name of the driver, such as <function>xx_open</function> for
+the <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine of driver <literal>xx</literal>. See <olink targetptr="gfhey" remap="internal">Use a Unique Prefix to Avoid Kernel Symbol Collisions</olink> for
+more information. In subsequent examples in this book, <literal>xx</literal> is
+used as the driver prefix.</para>
+</sect2>
+</sect1><sect1 id="eqbqy"><title>Device Driver Entry Points</title><para>This section provides lists of entry points for the following categories:</para><itemizedlist><listitem><para><olink targetptr="eqbwb" remap="internal">Entry Points Common to All Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="eqbrc" remap="internal">Entry Points for Block Device Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="eqbuw" remap="internal">Entry Points for Character Device
+Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="eqbvd" remap="internal">Entry Points for STREAMS Device Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="eqbuf" remap="internal">Entry Points for Memory Mapped Devices</olink></para>
+</listitem><listitem><para><olink targetptr="eqbwc" remap="internal">Entry Points for the Generic LAN
+Device (GLD) Driver</olink></para>
+</listitem><listitem><para><olink targetptr="eqbsr" remap="internal">Entry Points for SCSI HBA Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="eqbwn" remap="internal">Entry Points for PC Card Drivers</olink></para>
+</listitem>
+</itemizedlist><sect2 id="eqbwb"><title>Entry Points Common to All Drivers</title><para>Some operations can be performed by any type of driver, such as the
+functions that are required for module loading and for the required autoconfiguration
+entry points. This section discusses types of entry points that are common
+to all drivers. The common entry points are listed in <olink targetptr="eqbur" remap="internal">Summary
+of Common Entry Points</olink> with links to man pages and other relevant
+discussions.</para><sect3 id="eqbvk"><title>Device Access Entry Points</title><para>Drivers for character and block devices export the <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+which defines the driver entry points for block device access and character
+device access.  Both types of drivers are required to support the <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points.  Block drivers
+are required to support <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+while character drivers can choose to implement whatever mix of <olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="mmap-9e" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, or <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points is appropriate
+for the type of  device. Character drivers can also support a polling interface
+ through <olink targetdoc="group-refman" targetptr="chpoll-9e" remap="external"><citerefentry><refentrytitle>chpoll</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+Asynchronous I/O is supported through  <olink targetdoc="group-refman" targetptr="aread-9e" remap="external"><citerefentry><refentrytitle>aread</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="awrite-9e" remap="external"><citerefentry><refentrytitle>awrite</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> for block
+drivers and those drivers that can use both block and character file systems.</para>
+</sect3><sect3 id="eqbth"><title>Loadable Module Entry Points</title><para><indexterm><primary><function>_init</function> entry point</primary><secondary>required implementation</secondary></indexterm><indexterm><primary><function>_fini</function> entry point</primary><secondary>required implementation</secondary></indexterm><indexterm><primary><function>_info</function> entry point</primary><secondary>required implementation</secondary></indexterm><indexterm><primary>loading modules</primary></indexterm>All drivers are required to implement the loadable
+module entry points <olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to load,
+unload, and report information about the driver module.</para><para>Drivers should allocate and initialize any global resources in <olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. Drivers
+should release their resources in <olink targetdoc="group-refman" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para><note><para>In the Solaris OS, only the loadable module routines must be visible
+outside the driver object module. Other routines can have the storage class <filename>static</filename>.</para>
+</note>
+</sect3><sect3 id="eqbvi"><title>Autoconfiguration Entry Points</title><indexterm><primary>autoconfiguration</primary><secondary>routines</secondary>
+</indexterm><para>Drivers are required to implement the <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points
+for device autoconfiguration.  Drivers can also implement the optional entry
+point <olink targetdoc="group-refman" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> in
+cases where devices do not identify themselves during boot-up, such as SCSI
+target devices. See <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver
+Autoconfiguration</olink> for more information on these routines.</para>
+</sect3><sect3 id="eqbsz"><title>Kernel Statistics Entry Points</title><para>The Solaris platform provides a rich set of interfaces to maintain and
+export kernel-level statistics, also known as <emphasis>kstats</emphasis>.
+Drivers are free to use these interfaces to export driver and device statistics
+that can be used by user applications to observe the internal state of the
+driver.  Two entry points are provided for working with kernel statistics:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="ks-snapshot-9e" remap="external"><citerefentry><refentrytitle>ks_snapshot</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> captures kstats at a specific time.</para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="ks-update-9e" remap="external"><citerefentry><refentrytitle>ks_update</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> can
+be used to update kstat data at will. <function>ks_update</function> is useful
+in situations where a device is set up to track kernel data but extracting
+that data is time-consuming.</para>
+</listitem>
+</itemizedlist><para>For further information, see the <olink targetdoc="group-refman" targetptr="kstat-create-9f" remap="external"><citerefentry><refentrytitle>kstat_create</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man pages. See also <olink targetptr="euqcp" remap="internal">Kernel Statistics</olink>.</para>
+</sect3><sect3 id="eqbut"><title>Power Management Entry Point</title><para>Drivers for hardware devices that provide Power Management functionality
+can support the optional <olink targetdoc="group-refman" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. See <olink targetptr="powermgt-37437" remap="internal">Chapter&nbsp;12, Power Management</olink> for
+details about this entry point.</para>
+</sect3><sect3 id="eqbur"><title>Summary of Common Entry Points</title><para>The following table lists entry points that can be used by all types
+of drivers.</para><table frame="topbot" pgwide="100" id="eqbqz"><title>Entry Points for All
+Driver Types</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="25.88*"/><colspec colname="colspec2" colwidth="10.66*"/><colspec colname="colspec0" colwidth="54.81*"/><thead><row rowsep="1"><entry><para>Category / Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>cb_ops</literal> <emphasis role="strong">Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Gets access to a device. Additional information:</para><itemizedlist><listitem><para><olink targetptr="character-7" remap="internal">open() Entry Point (Character
+Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="block-7" remap="internal">open() Entry Point (Block Drivers)</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Gives up access to a device. The version of  <function>close</function> for
+STREAMS drivers has a different signature than character and block drivers.
+Additional information:</para><itemizedlist><listitem><para><olink targetptr="character-8" remap="internal">close() Entry Point (Character
+Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="block-8" remap="internal">close() Entry Point (Block Drivers)</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><emphasis role="strong">Loadable Module Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Initializes a loadable module. Additional information: <olink targetptr="autoconf-95548" remap="internal">Loadable Driver Interfaces</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Prepares a loadable module for unloading. Required for all driver types.
+Additional information: <olink targetptr="autoconf-95548" remap="internal">Loadable Driver
+Interfaces</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Returns information about a loadable module. Additional information: <olink targetptr="autoconf-95548" remap="internal">Loadable Driver Interfaces</olink></para>
+</entry>
+</row><row><entry><para><emphasis role="strong">Autoconfiguration Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Adds a device to the system as part of initialization. Also used to
+resume a system that has been suspended. Additional information: <olink targetptr="autoconf-41111" remap="internal">attach() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Detaches a device from the system. Also, used to suspend a device temporarily.
+Additional information: <olink targetptr="autoconf-72235" remap="internal">detach() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Gets device information that is specific to the driver, such as the
+mapping between a device number and the corresponding instance. Additional
+information:</para><itemizedlist><listitem><para><olink targetptr="autoconf-28012" remap="internal">getinfo() Entry Point</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-31824" remap="internal">getinfo() Entry Point (SCSI
+Target Drivers)</olink>.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>See Description</para>
+</entry><entry><para>Determines if a non-self-identifying device is present. Required for
+a device that cannot identify itself. Additional information:</para><itemizedlist><listitem><para><olink targetptr="autoconf-87993" remap="internal">probe() Entry Point</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-65313" remap="internal">probe() Entry Point (SCSI Target
+Drivers)</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><emphasis role="strong">Kernel Statistics Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="ks-snapshot-9e" remap="external"><citerefentry><refentrytitle>ks_snapshot</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Takes a snapshot of <olink targetdoc="group-refman" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> data.
+Additional information: <olink targetptr="euqcp" remap="internal">Kernel Statistics</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="ks-update-9e" remap="external"><citerefentry><refentrytitle>ks_update</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Updates <olink targetdoc="group-refman" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> data
+dynamically. Additional information: <olink targetptr="euqcp" remap="internal">Kernel Statistics</olink></para>
+</entry>
+</row><row><entry><para><emphasis role="strong">Power Management Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Sets the power level of a device. If not used, set to <literal>NULL</literal>.
+Additional information: <olink targetptr="powermgt-129" remap="internal">power() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><emphasis role="strong">Miscellaneous Entry Points</emphasis></para>
+</entry><entry>
+</entry><entry>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="prop-op-9e" remap="external"><citerefentry><refentrytitle>prop_op</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>See Description</para>
+</entry><entry><para>Reports driver property information. Required unless <olink targetdoc="group-refman" targetptr="ddi-prop-op-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_op</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is substituted. Additional information:</para><itemizedlist><listitem><para><olink targetptr="properties-18" remap="internal">Creating and Updating Properties</olink></para>
+</listitem><listitem><para><olink targetptr="properties-20" remap="internal">prop_op() Entry Point</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>See Description</para>
+</entry><entry><para>Dumps memory to a device during system failure. Required for any device
+that is to be used as the dump device during a panic. Additional information:</para><itemizedlist><listitem><para><olink targetptr="block-26" remap="internal">dump() Entry Point (Block Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-1a" remap="internal">Dump Handling</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>identify</literal>(9E)</para>
+</entry><entry><para>Obsolete</para>
+</entry><entry><para>Do not use this entry point. Assign <olink targetdoc="group-refman" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to this entry point in the <structname>dev_ops</structname> structure.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3>
+</sect2><sect2 id="eqbrc"><title>Entry Points for Block Device Drivers</title><para><indexterm id="drvovr-ix95"><primary>block driver</primary><secondary>overview</secondary></indexterm><indexterm id="drvovr-ix96"><primary>device drivers</primary><secondary>block driver</secondary></indexterm>Devices that support a file
+system are known as <emphasis>block devices</emphasis>. Drivers written for
+these devices are known as block device drivers. Block device drivers take
+a file system request, in the form of a <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure, and issue the I/O operations to the disk
+to transfer the specified block. The main interface to the file system is
+the <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.
+See <olink targetptr="block-34861" remap="internal">Chapter&nbsp;16, Drivers for Block Devices</olink> for
+more information.</para><para>A block device driver can also provide a character driver interface
+to enable utility programs to bypass the file system and to access the device
+directly. This device access is commonly referred to as the <emphasis>raw</emphasis> interface
+to a block device.</para><para>The following table lists additional entry points that can be used by
+block device drivers. See also <olink targetptr="eqbwb" remap="internal">Entry Points Common
+to All Drivers</olink>.</para><table frame="topbot" pgwide="100" id="eqbre"><title>Additional Entry Points
+for Block Drivers</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.58*"/><colspec colname="colspec3" colwidth="10.61*"/><colspec colname="colspec0" colwidth="55.79*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="aread-9e" remap="external"><citerefentry><refentrytitle>aread</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Performs an asynchronous read. Drivers that do not support an <function>aread</function> entry point should use the <olink targetdoc="group-refman" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> error return function. Additional
+information:</para><itemizedlist><listitem><para><olink targetptr="character-11" remap="internal">Differences Between Synchronous
+and Asynchronous I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-16" remap="internal">DMA Transfers (Asynchronous)</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="awrite-9e" remap="external"><citerefentry><refentrytitle>awrite</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Performs an asynchronous write. Drivers that do not support an <function>awrite</function> entry point should use the <olink targetdoc="group-refman" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> error return function. Additional
+information:</para><itemizedlist><listitem><para><olink targetptr="character-11" remap="internal">Differences Between Synchronous
+and Asynchronous I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-16" remap="internal">DMA Transfers (Asynchronous)</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="print-9e" remap="external"><citerefentry><refentrytitle>print</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Displays a driver message on the system console. Additional information: <olink targetptr="block-27" remap="internal">print() Entry Point (Block Drivers)</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Perform block I/O. Additional information:</para><itemizedlist><listitem><para><olink targetptr="dma-28600" remap="internal">Canceling DMA Callbacks</olink></para>
+</listitem><listitem><para><olink targetptr="character-35745" remap="internal">DMA Transfers (Synchronous)</olink></para>
+</listitem><listitem><para><olink targetptr="character-64481" remap="internal">strategy() Entry Point</olink></para>
+</listitem><listitem><para><olink targetptr="character-16" remap="internal">DMA Transfers (Asynchronous)</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-5" remap="internal">General Flow of Control</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-94" remap="internal">x86 Target Driver Configuration
+Properties</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbuw"><title>Entry Points for Character Device Drivers</title><indexterm id="drvovr-ix97"><primary>device drivers</primary><secondary>standard character driver</secondary>
+</indexterm><indexterm id="drvovr-ix98"><primary>character device driver</primary><secondary>overview</secondary>
+</indexterm><para>Character device drivers normally perform I/O in a byte stream. Examples
+of devices that use character drivers include tape drives and serial ports.
+Character device drivers can also provide additional interfaces not present
+in block drivers, such as I/O control (<literal>ioctl</literal>) commands,
+memory mapping, and device polling. See <olink targetptr="character-21002" remap="internal">Chapter&nbsp;15,
+Drivers for Character Devices</olink> for more information.</para><para><indexterm><primary>I/O</primary><secondary>byte stream</secondary></indexterm>The main task of any device driver is to perform I/O, and many
+character device drivers do what is called <emphasis>byte-stream</emphasis> or <emphasis>character</emphasis> I/O. The driver transfers data to and from the device
+without using a specific device address. This type of transfer is in contrast
+to block device drivers, where part of the file system request identifies
+a specific location on the device.</para><para>The <olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points handle byte-stream
+I/O for standard character drivers. See <olink targetptr="character-25379" remap="internal">I/O
+Request Handling</olink> for more information.</para><para>The following table lists additional entry points that can be used by
+character device drivers. For other entry points, see <olink targetptr="eqbwb" remap="internal">Entry
+Points Common to All Drivers</olink>.</para><table frame="topbot" pgwide="100" id="eqbrf"><title>Additional Entry Points
+for Character Drivers</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.05*"/><colspec colname="colspec4" colwidth="10.65*"/><colspec colname="colspec0" colwidth="54.75*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="chpoll-9e" remap="external"><citerefentry><refentrytitle>chpoll</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Polls events for a non-STREAMS character driver. Additional information: <olink targetptr="character-11313" remap="internal">Multiplexing I/O on File Descriptors</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Performs a range of I/O commands for character drivers. <function>ioctl</function> routines
+must make sure that user data is copied into or out of the kernel address
+space explicitly using <olink targetdoc="group-refman" targetptr="copyin-9f" remap="external"><citerefentry><refentrytitle>copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="copyout-9f" remap="external"><citerefentry><refentrytitle>copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, as appropriate. Additional information:</para><itemizedlist><listitem><para><olink targetptr="character-22" remap="internal">ioctl() Entry Point (Character
+Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="gld-ioctl" remap="internal">Implemented ioctl Functions</olink></para>
+</listitem><listitem><para><olink targetptr="lp64-79" remap="internal">Well Known ioctl Interfaces</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Reads data from a device. Additional information:</para><itemizedlist><listitem><para><olink targetptr="character-15613" remap="internal">Vectored I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-11" remap="internal">Differences Between Synchronous
+and Asynchronous I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-12" remap="internal">Programmed I/O Transfers</olink></para>
+</listitem><listitem><para><olink targetptr="character-35745" remap="internal">DMA Transfers (Synchronous)</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-5" remap="internal">General Flow of Control</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Maps device memory into user space. Additional information:</para><itemizedlist><listitem><para><olink targetptr="devmap-1" remap="internal">Exporting the Mapping</olink></para>
+</listitem><listitem><para><olink targetptr="devmap-6" remap="internal">Allocating Kernel Memory for User
+Access</olink></para>
+</listitem><listitem><para><olink targetptr="devcnmgt-9" remap="internal">Associating User Mappings With
+Driver Notifications</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Writes data to a device. Additional information:</para><itemizedlist><listitem><para><olink targetptr="devaccess-23" remap="internal">Device Access Functions</olink></para>
+</listitem><listitem><para><olink targetptr="character-15613" remap="internal">Vectored I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-11" remap="internal">Differences Between Synchronous
+and Asynchronous I/O</olink></para>
+</listitem><listitem><para><olink targetptr="character-12" remap="internal">Programmed I/O Transfers</olink></para>
+</listitem><listitem><para><olink targetptr="character-35745" remap="internal">DMA Transfers (Synchronous)</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-5" remap="internal">General Flow of Control</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbvd"><title>Entry Points for STREAMS Device Drivers</title><para><indexterm id="drvovr-ix107"><primary>STREAMS</primary><secondary>drivers</secondary></indexterm>STREAMS is a separate programming model for writing a character
+driver. Devices that receive data asynchronously, such as terminal and network
+devices, are suited to a STREAMS implementation. STREAMS device drivers must
+provide the loading and autoconfiguration support described in <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink>.
+See the <olink targetdoc="streams" remap="external"><citetitle remap="book">STREAMS Programming Guide</citetitle></olink> for additional information on how to write STREAMS
+drivers.</para><para>The following table lists additional entry points that can be used by
+STREAMS device drivers. For other entry points, see <olink targetptr="eqbwb" remap="internal">Entry
+Points Common to All Drivers</olink> and <olink targetptr="eqbuw" remap="internal">Entry Points
+for Character Device Drivers</olink>.</para><table frame="topbot" pgwide="100" id="eqbrm"><title>Entry Points for STREAMS
+Drivers</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.15*"/><colspec colname="colspec6" colwidth="10.52*"/><colspec colname="colspec0" colwidth="54.70*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="put-9e" remap="external"><citerefentry><refentrytitle>put</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>See Description</para>
+</entry><entry><para>Coordinates the passing of messages from one queue to the next queue
+in a stream. Required, except for the side of the driver that reads data.
+Additional information: <olink targetdoc="streams" remap="external"><citetitle remap="book">STREAMS Programming Guide</citetitle></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="srv-9e" remap="external"><citerefentry><refentrytitle>srv</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Manipulate messages in a queue. Additional information: <olink targetdoc="streams" remap="external"><citetitle remap="book">STREAMS Programming Guide</citetitle></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbuf"><title>Entry Points for Memory Mapped Devices</title><para><indexterm id="drvovr-ix101"><primary>device memory</primary><secondary>mapping</secondary></indexterm><indexterm id="drvovr-ix102"><primary>memory mapping</primary><secondary>device memory management</secondary></indexterm>For certain devices,
+such as frame buffers, providing application programs with direct access to
+device memory is more efficient than byte-stream I/O. Applications can map
+device memory into their address spaces using the <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. To support memory mapping, device drivers
+implement <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points.
+For information on <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+see <olink targetptr="devmap-24338" remap="internal">Chapter&nbsp;10, Mapping Device and Kernel
+Memory</olink>. For information on <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, see <olink targetptr="character-21002" remap="internal">Chapter&nbsp;15, Drivers for Character Devices</olink>.</para><para>Drivers that define the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point usually do not
+define <olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points, because application
+programs perform I/O directly to the devices after calling <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>The following table lists additional entry points that can be used by
+character device drivers that use the <literal>devmap</literal> framework
+to perform memory mapping. For other entry points, see <olink targetptr="eqbwb" remap="internal">Entry
+Points Common to All Drivers</olink> and <olink targetptr="eqbuw" remap="internal">Entry Points
+for Character Device Drivers</olink>.</para><table frame="topbot" pgwide="100" id="eptyo"><title>Entry Points for Character
+Drivers That Use <literal>devmap</literal> for Memory Mapping</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.06*"/><colspec colname="colspec5" colwidth="10.65*"/><colspec colname="colspec0" colwidth="54.76*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Validates and translates virtual mapping for a memory-mapped device.
+Additional information: <olink targetptr="devmap-1" remap="internal">Exporting the Mapping</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Notifies drivers when an access is made to a mapping with validation
+or protection problems. Additional information: <olink targetptr="devcnmgt-15" remap="internal">devmap_access()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-contextmgt-9e" remap="external"><citerefentry><refentrytitle>devmap_contextmgt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Performs device context switching on a mapping. Additional information: <olink targetptr="devcnmgt-16" remap="internal">devmap_contextmgt() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-dup-9e" remap="external"><citerefentry><refentrytitle>devmap_dup</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Duplicates a device mapping. Additional information: <olink targetptr="devcnmgt-17" remap="internal">devmap_dup() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-map-9e" remap="external"><citerefentry><refentrytitle>devmap_map</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Creates a device mapping. Additional information: <olink targetptr="devcnmgt-14" remap="internal">devmap_map() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="devmap-unmap-9e" remap="external"><citerefentry><refentrytitle>devmap_unmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Cancels a device mapping. Additional information: <olink targetptr="devcnmgt-18" remap="internal">devmap_unmap() Entry Point</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbwc"><title>Entry Points for the Generic LAN Device (GLD) Driver</title><para>The following table lists additional entry points that can be used by
+the general LAN driver (GLD). For more information on GLD drivers, see the <olink targetdoc="group-refman" targetptr="gld-9e" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="gld-7d" remap="external"><citerefentry><refentrytitle>gld</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="gld-mac-info-9s" remap="external"><citerefentry><refentrytitle>gld_mac_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man pages. For other entry
+points, see <olink targetptr="eqbwb" remap="internal">Entry Points Common to All Drivers</olink> and <olink targetptr="eqbuw" remap="internal">Entry Points for Character Device Drivers</olink>.</para><table frame="topbot" pgwide="100" id="epubo"><title>Additional Entry Points
+for the Generic LAN Driver</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.11*"/><colspec colname="colspec7" colwidth="10.62*"/><colspec colname="colspec0" colwidth="54.79*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-get-stats-9e" remap="external"><citerefentry><refentrytitle>gldm_get_stats</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Gathers statistics from private counters in a generic LAN driver. Updates
+the <olink targetdoc="group-refman" targetptr="gld-stats-9s" remap="external"><citerefentry><refentrytitle>gld_stats</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+Additional information: <olink targetptr="gld-10" remap="internal">gldm_get_stats() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-intr-9e" remap="external"><citerefentry><refentrytitle>gldm_intr</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>See Description</para>
+</entry><entry><para>Receives calls for potential interrupts to a generic LAN driver (GLD).
+Required if <olink targetdoc="group-refman" targetptr="gld-intr-9f" remap="external"><citerefentry><refentrytitle>gld_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is
+used as interrupt handler. Additional information: <olink targetptr="gld-8" remap="internal">gldm_intr()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-ioctl-9e" remap="external"><citerefentry><refentrytitle>gldm_ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Implements device-specific commands for a generic LAN driver (GLD).
+Additional information: <olink targetptr="gld-11" remap="internal">gldm_ioctl() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-reset-9e" remap="external"><citerefentry><refentrytitle>gldm_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Resets a generic LAN driver (GLD) to the initial state. Additional information: <olink targetptr="gld-1a" remap="internal">gldm_reset() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-send-9e" remap="external"><citerefentry><refentrytitle>gldm_send</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Queues a packet to a generic LAN driver (GLD) for transmission. Additional
+information: <olink targetptr="gld-7" remap="internal">gldm_send() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-set-mac-addr-9e" remap="external"><citerefentry><refentrytitle>gldm_set_mac_addr</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Sets the physical address that the generic LAN driver (GLD) uses to
+receive data. Additional information: <olink targetptr="gld-4" remap="internal">gldm_set_mac_addr()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-set-multicast-9e" remap="external"><citerefentry><refentrytitle>gldm_set_multicast</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Enables and disables device-level reception of specific multicast addresses
+for generic LAN driver (GLD). Additional information: <olink targetptr="gld-5" remap="internal">gldm_set_multicast()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-set-promiscuous-9e" remap="external"><citerefentry><refentrytitle>gldm_set_promiscuous</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Enables and disables promiscuous mode for a generic LAN driver (GLD)
+to receive packets on the medium. Additional information: <olink targetptr="gld-6" remap="internal">gldm_set_promiscuous() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-start-9e" remap="external"><citerefentry><refentrytitle>gldm_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Enables a generic LAN driver (GLD) to generate interrupts. Prepares
+the driver to call <olink targetdoc="group-refman" targetptr="gld-recv-9f" remap="external"><citerefentry><refentrytitle>gld_recv</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to
+deliver received data packets. Additional information: <olink targetptr="gld-2" remap="internal">gldm_start()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="gldm-stop-9e" remap="external"><citerefentry><refentrytitle>gldm_stop</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Disables a generic LAN driver (GLD) from generating interrupts and from
+calling <olink targetdoc="group-refman" targetptr="gld-recv-9f" remap="external"><citerefentry><refentrytitle>gld_recv</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.
+Additional information: <olink targetptr="gld-3" remap="internal">gldm_stop() Entry Point</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbsr"><title>Entry Points for SCSI HBA Drivers</title><para>The following table lists additional entry points that can be used by
+SCSI HBA device drivers. For information on the SCSI HBA transport structure,
+see <olink targetdoc="group-refman" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>. For other entry points, see <olink targetptr="eqbwb" remap="internal">Entry
+Points Common to All Drivers</olink> and <olink targetptr="eqbuw" remap="internal">Entry Points
+for Character Device Drivers</olink>.</para><table frame="topbot" pgwide="100" id="epubx"><title>Additional Entry Points
+for SCSI HBA Drivers</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="17.50*"/><colspec colname="colspec8" colwidth="7.50*"/><colspec colname="colspec0" colwidth="37.28*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="tran-abort-9e" remap="external"><citerefentry><refentrytitle>tran_abort</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Aborts a specified SCSI command that has been transported to a SCSI
+Host Bus Adapter (HBA) driver. Additional information: <olink targetptr="scsihba-84" remap="internal">tran_abort() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-bus-reset-9e" remap="external"><citerefentry><refentrytitle>tran_bus_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Resets a SCSI bus. Additional information: <olink targetptr="scsihba-9" remap="internal">tran_bus_reset()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Frees resources that are allocated for a SCSI packet.  Additional information: <olink targetptr="scsihba-66" remap="internal">tran_destroy_pkt() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-dmafree-9e" remap="external"><citerefentry><refentrytitle>tran_dmafree</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Frees DMA resources that have been allocated for a SCSI packet. Additional
+information: <olink targetptr="scsihba-70" remap="internal">tran_dmafree() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-getcap-9e" remap="external"><citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Gets the current value of a specific capability that is provided by
+the HBA driver. Additional information: <olink targetptr="scsihba-79" remap="internal">tran_getcap()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Allocate and initialize resources for a SCSI packet.  Additional information: <olink targetptr="scsihba-56" remap="internal">Resource Allocation</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-quiesce-9e" remap="external"><citerefentry><refentrytitle>tran_quiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Stop all activity on a SCSI bus, typically for dynamic reconfiguration.
+Additional information: <olink targetptr="scsihba-96" remap="internal">Dynamic Reconfiguration</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-reset-9e" remap="external"><citerefentry><refentrytitle>tran_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Resets a SCSI bus or target device. Additional information: <olink targetptr="scsihba-85" remap="internal">tran_reset() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-reset-notify-9e" remap="external"><citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Requests notification of a SCSI target device for a bus reset. Additional
+information: <olink targetptr="scsihba-86" remap="internal">tran_reset_notify() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-setcap-9e" remap="external"><citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Sets the value of a specific capability that is provided by the SCSI
+HBA driver. Additional information: <olink targetptr="scsihba-81" remap="internal">tran_setcap()
+Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-start-9e" remap="external"><citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Requests the transport of a SCSI command. Additional information: <olink targetptr="scsihba-73" remap="internal">tran_start() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-sync-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_sync_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Synchronizes the view of data by an HBA driver or device. Additional
+information: <olink targetptr="scsihba-68" remap="internal">tran_sync_pkt() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-tgt-free-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_free</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Requests allocated SCSI HBA resources to be freed on behalf of a target
+device. Additional information:</para><itemizedlist><listitem><para><olink targetptr="scsihba-55" remap="internal">tran_tgt_free() Entry Point</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-27" remap="internal">Transport Structure Cloning</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Requests SCSI HBA resources to be initialized on behalf of a target
+device. Additional information:</para><itemizedlist><listitem><para><olink targetptr="scsihba-53" remap="internal">tran_tgt_init() Entry Point</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-22" remap="internal">scsi_device Structure</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-tgt-probe-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Probes a specified target on a SCSI bus. Additional information: <olink targetptr="scsihba-54" remap="internal">tran_tgt_probe() Entry Point</olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="tran-unquiesce-9e" remap="external"><citerefentry><refentrytitle>tran_unquiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Optional</para>
+</entry><entry><para>Resumes I/O activity on a SCSI bus after <olink targetdoc="group-refman" targetptr="tran-quiesce-9e" remap="external"><citerefentry><refentrytitle>tran_quiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has been called, typically
+for dynamic reconfiguration. Additional information: <olink targetptr="scsihba-96" remap="internal">Dynamic Reconfiguration</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="eqbwn"><title>Entry Points for PC Card Drivers</title><para>The following table lists additional entry points that can be used by
+PC Card device drivers. For other entry points, see <olink targetptr="eqbwb" remap="internal">Entry
+Points Common to All Drivers</olink> and <olink targetptr="eqbuw" remap="internal">Entry Points
+for Character Device Drivers</olink>.</para><table frame="topbot" pgwide="100" id="eqbsv"><title>Entry Points for PC Card
+Drivers Only</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.28*"/><colspec colname="colspec10" colwidth="10.39*"/><colspec colname="colspec0" colwidth="54.70*"/><thead><row rowsep="1"><entry><para>Entry Point</para>
+</entry><entry><para>Usage</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="csx-event-handler-9e" remap="external"><citerefentry><refentrytitle>csx_event_handler</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Required</para>
+</entry><entry><para>Handles events for a PC Card driver. The driver must call the <olink targetdoc="group-refman" targetptr="csx-registerclient-9f" remap="external"><citerefentry><refentrytitle>csx_RegisterClient</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function explicitly to set the entry point instead
+of using a structure field like <structname>cb_ops</structname>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="kernelovr-41"><title>Considerations in Device Driver Design</title><para>A device driver must be compatible with the Solaris OS, both as a consumer
+and provider of services. This section discusses the following issues, which
+should be considered in device driver design:</para><itemizedlist><listitem><para><olink targetptr="kernelovr-3a" remap="internal">DDI/DKI Facilities</olink></para>
+</listitem><listitem><para><olink targetptr="drvovr-28" remap="internal">Driver Context</olink></para>
+</listitem><listitem><para><olink targetptr="drvovr-29" remap="internal">Returning Errors</olink></para>
+</listitem><listitem><para><olink targetptr="drvovr-30" remap="internal">Dynamic Memory Allocation</olink></para>
+</listitem><listitem><para><olink targetptr="drvovr-31" remap="internal">Hotplugging</olink></para>
+</listitem>
+</itemizedlist><sect2 id="kernelovr-3a"><title>DDI/DKI Facilities</title><para><indexterm id="eqiuq"><primary>DDI/DKI</primary><secondary>design considerations</secondary></indexterm>The Solaris DDI/DKI interfaces are provided for driver
+portability. With DDI/DKI, developers can write driver code in a standard
+fashion without having to worry about hardware or platform differences. This
+section describes aspects of the DDI/DKI interfaces.</para><sect3 id="kernelovr-52"><title>Device IDs</title><para>The DDI interfaces enable drivers to provide a persistent, unique identifier
+for a device. The device ID can be used to identify or locate a device. The
+ID is independent of the device's name or number (<literal>dev_t</literal>).
+Applications can use the functions defined in <olink targetdoc="group-refman" targetptr="libdevid-3lib" remap="external"><citerefentry><refentrytitle>libdevid</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> to read and manipulate
+the device IDs registered by the drivers.</para>
+</sect3><sect3 id="kernelovr-60"><title>Device Properties</title><indexterm id="drvovr-ix157"><primary>properties</primary><secondary>overview</secondary>
+</indexterm><para>The attributes of a device or device driver are specified by <emphasis>properties</emphasis>. A property is a name-value pair. The name is a string that identifies
+the property with an associated value. Properties can be defined by the FCode
+of a self-identifying device, by a hardware configuration file (see the <olink targetdoc="group-refman" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page),
+or by the driver itself using the <olink targetdoc="group-refman" targetptr="ddi-prop-update-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> family of routines.</para>
+</sect3><sect3 id="kernelovr-50"><title>Interrupt Handling</title><indexterm id="drvovr-ix130"><primary>interrupt handling</primary><secondary>overview</secondary>
+</indexterm><para>The DDI/DKI addresses the following aspects of device interrupt handling:</para><itemizedlist><listitem><para>Registering device interrupts with the system</para>
+</listitem><listitem><para>Removing device interrupts</para>
+</listitem><listitem><para>Dispatching interrupts to interrupt handlers</para>
+</listitem>
+</itemizedlist><para><indexterm id="drvovr-ix131"><primary>interrupt property</primary><secondary>definition</secondary></indexterm>Device interrupt sources are
+contained in a property called <emphasis>interrupt</emphasis>, which is either
+provided by the PROM of a self-identifying device, in a hardware configuration
+file, or by the booting system on the x86 platform.</para>
+</sect3><sect3 id="kernelovr-51"><title>Callback Functions</title><para>Certain DDI mechanisms provide a <emphasis>callback</emphasis> mechanism.
+DDI functions provide a mechanism for scheduling a callback when a condition
+is met. Callback functions can be used for the following typical conditions:</para><itemizedlist><listitem><para>A transfer has completed</para>
+</listitem><listitem><para>A resource has become available</para>
+</listitem><listitem><para>A time-out period has expired</para>
+</listitem>
+</itemizedlist><para><indexterm id="drvovr-ix129"><primary>callback functions</primary><secondary>description of</secondary></indexterm>Callback functions are somewhat
+similar to entry points, for example, interrupt handlers. DDI functions that
+allow callbacks expect the callback function to perform certain tasks. In
+the case of DMA routines, a callback function must return a value indicating
+whether the callback function needs to be rescheduled in case of a failure.</para><para>Callback functions execute as a separate interrupt thread. Callbacks
+must handle all the usual multithreading issues.</para><note><para>A driver must cancel all scheduled callback functions before detaching
+a device.</para>
+</note>
+</sect3><sect3 id="kernelovr-53"><title>Software State Management</title><para><indexterm><primary>state structure</primary></indexterm>To assist device
+driver writers in allocating state structures, the DDI/DKI provides a set
+of memory management routines called the <emphasis>software state management
+routines</emphasis>, also known as the <emphasis>soft-state routines</emphasis>.
+These routines dynamically allocate, retrieve, and destroy memory items of
+a specified size, and hide the details of list management. An <emphasis>instance
+number</emphasis> is used to identify the desired memory item. This number
+is typically the instance number assigned by the system.</para><para>Routines are provided for the following tasks:</para><itemizedlist><listitem><para>Initialize a driver's soft-state list</para>
+</listitem><listitem><para>Allocate space for an instance of a driver's soft state</para>
+</listitem><listitem><para>Retrieve a pointer to an instance of a driver's soft state</para>
+</listitem><listitem><para>Free the memory for an instance of a driver's soft state</para>
+</listitem><listitem><para>Finish using a driver's soft-state list</para>
+</listitem>
+</itemizedlist><para>See <olink targetptr="autoconf-95548" remap="internal">Loadable Driver Interfaces</olink> for
+an example of how to use these routines.</para>
+</sect3><sect3 id="kernelovr-54"><title>Programmed I/O Device Access</title><para>Programmed I/O device access is the act of reading and writing of device
+registers or device memory by the host CPU. The Solaris DDI provides interfaces
+for mapping a device's registers or memory by the kernel as well as interfaces
+for reading and writing to device memory from the driver. These interfaces
+enable drivers to be developed that are platform and bus independent, by automatically
+managing any difference in device and host endianness as well as by enforcing
+any memory-store sequence requirements imposed by the device.</para>
+</sect3><sect3 id="kernelovr-55"><title>Direct Memory Access (DMA)</title><para>The Solaris platform defines a high-level, architecture-independent
+model for supporting DMA-capable devices.  The Solaris DDI shields drivers
+from platform-specific details. This concept enables a common driver to run
+on multiple platforms and architectures.</para>
+</sect3><sect3 id="eqiup"><title>Layered Driver Interfaces</title><para>The DDI/DKI provides a group of interfaces referred to as layered device
+interfaces (LDI). These interfaces enable a device to be accessed from within
+the Solaris kernel. This capability enables developers to write applications
+that observe kernel device usage. For example, both the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="fuser-1m" remap="external"><citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> commands use LDI to enable
+system administrators to track aspects of device usage. The LDI is covered
+in more detail in <olink targetptr="ldi-1" remap="internal">Chapter&nbsp;14, Layered Driver
+Interface (LDI)</olink>.</para>
+</sect3>
+</sect2><sect2 id="drvovr-28"><title>Driver Context</title><para><indexterm id="drvovr-ix141"><primary>context of device driver</primary></indexterm><indexterm><primary>device drivers</primary><secondary>context</secondary></indexterm>The driver context refers to the condition under which a driver
+is currently operating. The context limits the operations that a driver can
+perform. The driver context depends on the executing code that is invoked.
+Driver code executes in four contexts:</para><itemizedlist><listitem><para><emphasis role="strong">User context</emphasis>. A driver
+entry point has <emphasis>user context</emphasis> when invoked by a user thread
+in a synchronous fashion. That is, the user thread waits for the system to
+return from the entry point that was invoked. For example, the <olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point of the driver
+has user context when invoked by a <olink targetdoc="group-refman" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. In this case, the driver has access to
+the user area for copying data into and out of the user thread.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel context</emphasis>. A driver
+function has <emphasis>kernel context</emphasis> when invoked by some part
+of the kernel. In a block device driver, the <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point can be called
+by the <literal>pageout</literal> daemon to write pages to the device. Because
+the page daemon has no relation to the current user thread, <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has kernel
+context in this case.</para>
+</listitem><listitem><para><emphasis role="strong">Interrupt context</emphasis>.<emphasis>Interrupt
+context</emphasis> is a more restrictive form of kernel context. Interrupt
+context is invoked as a result of the servicing of an interrupt. Driver interrupt
+routines operate in interrupt context with an associated interrupt level.
+Callback routines also operate in an interrupt context. See <olink targetptr="interrupt-15678" remap="internal">Chapter&nbsp;8, Interrupt Handlers</olink> for
+more information.</para>
+</listitem><listitem><para><emphasis role="strong">High-level interrupt context</emphasis>.<emphasis>High-level interrupt context</emphasis> is a more restricted form of interrupt
+context. If <olink targetdoc="group-refman" targetptr="ddi-intr-hilevel-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_hilevel</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> indicates that an interrupt is high level, the driver
+interrupt handler runs in high-level interrupt context. See <olink targetptr="interrupt-15678" remap="internal">Chapter&nbsp;8, Interrupt Handlers</olink> for
+more information.</para>
+</listitem>
+</itemizedlist><para>The manual pages in section 9F document the allowable contexts for each
+function.  For example, in kernel context the driver must not call <olink targetdoc="group-refman" targetptr="copyin-9f" remap="external"><citerefentry><refentrytitle>copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="drvovr-29"><title>Returning Errors</title><para><indexterm id="gfrah"><primary>device drivers</primary><secondary>printing messages</secondary></indexterm><indexterm id="gfram"><primary>error messages, printing</primary></indexterm><indexterm id="gfrau"><primary>printing messages</primary></indexterm><indexterm id="gfrbq"><primary><function>cmn_err</function> function</primary><secondary>description of</secondary></indexterm>Device drivers do not usually
+print messages, except for unexpected errors such as data corruption. Instead,
+the driver entry points should return error codes so that the application
+can determine how to handle the error. Use the <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to write messages
+to a system log that can then be displayed on the console.</para><para>The format string specifier interpreted by <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> is similar to the <citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry> format
+string specifier, with the addition of the format <literal>%b</literal>, which
+prints bit fields. The first character of the format string can have a special
+meaning. Calls to <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> also specify the message <replaceable>level</replaceable>, which indicates the severity label to be printed. See the <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page
+for more details.</para><para>The level <literal>CE_PANIC</literal> has the side effect of crashing
+the system. This level should be used only if the system is in such an unstable
+state that to continue would cause more problems. The level can also be used
+to get a system core dump when debugging. <literal>CE_PANIC</literal> should
+not be used in production device drivers.</para>
+</sect2><sect2 id="drvovr-30"><title>Dynamic Memory Allocation</title><para><indexterm id="drvovr-ix146"><primary>kernel</primary><secondary>memory</secondary><tertiary>allocation</tertiary></indexterm>Device drivers must be prepared
+to simultaneously handle all attached devices that the drivers claim to drive.
+The number of devices that the driver handles should not be limited. All per-device
+information must be dynamically allocated. </para><para><literal>void *kmem_alloc(size_t size, int flag);</literal></para><para><indexterm id="drvovr-ix147"><primary>dynamic memory allocation</primary></indexterm><indexterm id="drvovr-ix148"><primary><function>kmem_alloc</function> function</primary></indexterm><indexterm id="drvovr-ix149"><primary>memory allocation</primary><secondary>description of</secondary></indexterm>The standard kernel memory
+allocation routine is <olink targetdoc="group-refman" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <function>kmem_alloc</function> is similar to the
+C library routine <olink targetdoc="group-refman" targetptr="malloc-3c" remap="external"><citerefentry><refentrytitle>malloc</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>,
+with the addition of the <literal>flag</literal> argument. The <literal>flag</literal> argument
+can be either <literal>KM_SLEEP</literal> or <literal>KM_NOSLEEP</literal>,
+indicating whether the caller is willing to block if the requested size is
+not available. If <literal>KM_NOSLEEP</literal> is set and memory is not available, <olink targetdoc="group-refman" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns <literal>NULL</literal>. </para><para><olink targetdoc="group-refman" targetptr="kmem-zalloc-9f" remap="external"><citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is similar to <olink targetdoc="group-refman" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, but also clears the contents
+of the allocated memory.</para><note><para>Kernel memory is a limited resource, not pageable, and competes
+with user applications and the rest of the kernel for physical memory. Drivers
+that allocate a large amount of kernel memory can cause system performance
+to degrade.</para>
+</note><para><literal>void kmem_free(void *cp, size_t size);</literal></para><para>Memory allocated by <olink targetdoc="group-refman" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or by <olink targetdoc="group-refman" targetptr="kmem-zalloc-9f" remap="external"><citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is returned to the system with <olink targetdoc="group-refman" targetptr="kmem-free-9f" remap="external"><citerefentry><refentrytitle>kmem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <function>kmem_free</function> is similar to the C library routine <olink targetdoc="group-refman" targetptr="free-3c" remap="external"><citerefentry><refentrytitle>free</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, with the addition of the <literal>size</literal> argument.
+Drivers <emphasis>must</emphasis> keep track of the size of each allocated
+object in order to call <olink targetdoc="group-refman" targetptr="kmem-free-9f" remap="external"><citerefentry><refentrytitle>kmem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> later.</para>
+</sect2><sect2 id="drvovr-31"><title>Hotplugging</title><indexterm><primary>hotplugging</primary>
+</indexterm><indexterm><primary>hot-plug</primary><see>hotplugging</see>
+</indexterm><indexterm><primary>hotpluggable drivers</primary><see>hotplugging</see>
+</indexterm><para><indexterm><primary>SCSI HBA driver</primary><secondary sortas="hotplug">and hotplugging</secondary></indexterm><indexterm><primary>hotplugging</primary><secondary>and SCSI HBA driver</secondary></indexterm>This manual does not
+highlight hotplugging information. If you follow the rules and suggestions
+for writing device drivers given in this book, your driver should be able
+to handle hotplugging.  In particular, make sure that both autoconfiguration
+(see <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink>)
+and <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> work
+correctly in your driver.  In addition, if you are designing a driver that
+uses power management, you should follow the information given in <olink targetptr="powermgt-37437" remap="internal">Chapter&nbsp;12, Power Management</olink>. SCSI
+HBA drivers might need to add a <structname>cb_ops</structname> structure
+to their <structname>dev_ops</structname> structure (see <olink targetptr="scsihba-32898" remap="internal">Chapter&nbsp;18, SCSI Host Bus Adapter Drivers</olink>)
+to take advantage of hotplugging capabilities.</para><para>Previous versions of the Solaris OS required hotpluggable drivers to
+include a <property>DT_HOTPLUG</property> property, but this property
+is no longer required. Driver writers are free, however, to include and use
+the <property>DT_HOTPLUG</property> property as they see fit.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000081386 0?>

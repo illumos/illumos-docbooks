@@ -1,0 +1,249 @@
+<?Pub UDT _bookmark _target?><chapter id="chp-profile"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag
+atict:user user="palecur" fullname="Paul Echeverri"?><title><literal>profile</literal> Provider</title><highlights><para>The <literal>profile</literal> provider provides probes associated with
+a time-based interrupt firing every fixed, specified time interval. These <emphasis>unanchored</emphasis> probes that are not associated with any particular point
+of execution, but rather with the asynchronous interrupt event. These probes
+can be used to sample some aspect of system state every unit time and the
+samples can then be used to infer system behavior. If the sampling rate is
+high, or the sampling time is long, an accurate inference is possible. Using
+DTrace actions, the <literal>profile</literal> provider can be used to sample
+practically anything in the system. For example, you could sample the state
+of the current thread, the state of the CPU, or the current machine instruction.</para><note><para>Thread-local variables are inaccessible to probes from the <literal>profile</literal> provider. Using the special identifier <literal>self</literal> to
+reference a thread-local variable with such a probe will produce no output.</para>
+</note>
+</highlights><sect1 id="chp-profile-1"><title><literal>profile-</literal><replaceable>n</replaceable> probes</title><para><indexterm><primary>probes</primary><secondary>profile</secondary></indexterm><indexterm><primary>profile probes</primary></indexterm>A <literal>profile-</literal><replaceable>n</replaceable> probe fires every fixed interval on
+every CPU at high interrupt level. The probe's firing interval is denoted
+by the value of <replaceable>n</replaceable>: the interrupt source will fire <replaceable>n</replaceable> times per second. <replaceable>n</replaceable> may also have
+an optional time suffix, in which case <replaceable>n</replaceable> is interpreted
+to be in the units denoted by the suffix. Valid suffixes and the units they
+denote are listed in <olink targetptr="tbl-timeunits" remap="internal">Table&nbsp;19&ndash;1</olink>.</para><table frame="topbot" id="tbl-timeunits"><title>Valid time suffixes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="50*"/><colspec colname="colspec1" colwidth="50*"/><thead><row rowsep="1"><entry><para>Suffix</para>
+</entry><entry><para>Time Units</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>nsec</literal> or <literal>ns</literal></para>
+</entry><entry><para>nanoseconds</para>
+</entry>
+</row><row><entry><para><literal>usec</literal> or <literal>us</literal></para>
+</entry><entry><para>microseconds</para>
+</entry>
+</row><row><entry><para><literal>msec</literal> or <literal>ms</literal></para>
+</entry><entry><para>milliseconds</para>
+</entry>
+</row><row><entry><para><literal>sec</literal> or <literal>s</literal></para>
+</entry><entry><para>seconds</para>
+</entry>
+</row><row><entry><para><literal>min</literal> or <literal>m</literal></para>
+</entry><entry><para>minutes</para>
+</entry>
+</row><row><entry><para><literal>hour</literal> or <literal>h</literal></para>
+</entry><entry><para>hours</para>
+</entry>
+</row><row><entry><para><literal>day</literal> or <literal>d</literal></para>
+</entry><entry><para>days</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>hz</literal></para>
+</entry><entry colname="colspec1"><para>hertz (frequency per second)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The following example creates a probe to fire at 97 hertz to sample
+the currently running process:</para><programlisting>#pragma D option quiet
+
+profile-97
+/pid != 0/
+{
+	@proc[pid, execname] = count();
+}
+
+END
+{
+	printf("%-8s %-40s %s\n", "PID", "CMD", "COUNT");
+	printa("%-8d %-40s %@d\n", @proc);
+}</programlisting><para>Running the above example for a brief period of time results in output
+similar to the following example:</para><screen><userinput># dtrace -s ./prof.d</userinput>
+<userinput>^C</userinput>
+PID      CMD                                      COUNT
+223887   sh                                       1
+100360   httpd                                    1
+100409   mibiisa                                  1
+223887   uname                                    1
+218848   sh                                       2
+218984   adeptedit                                2
+100224   nscd                                     3
+3        fsflush                                  4
+2        pageout                                  6
+100372   java                                     7
+115279   xterm                                    7
+100460   Xsun                                     7
+100475   perfbar                                  9
+223888   prstat                                   15</screen><para>You can also use the <literal>profile-</literal><replaceable>n</replaceable> provider
+to sample information about the running process. The following example D script
+uses a 1,001 hertz profile probe to sample the current priority of a specified
+process:</para><programlisting>profile-1001
+/pid == $1/
+{
+	@proc[execname] = lquantize(curlwpsinfo-&gt;pr_pri, 0, 100, 10);
+}</programlisting><para>To see this example script in action, type the following commands in
+one window:</para><screen><userinput>$ echo $$</userinput>
+<emphasis>12345</emphasis>
+<userinput>$ while true ; do let i=0 ; done</userinput></screen><para>In another window, run the D script for a brief period of time, replacing <replaceable>12345</replaceable> with the PID that your <command>echo</command> command
+returned:</para><screen><userinput># dtrace -s ./profpri.d 12345</userinput>
+ dtrace: script './profpri.d' matched 1 probe
+<userinput>^C</userinput>
+ksh                                               
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@                    7443     
+              10 |@@@@@@                                   2235     
+              20 |@@@@                                     1679     
+              30 |@@@                                      1119     
+              40 |@                                        560      
+              50 |@                                        554      
+              60 |                                         0 </screen><para>This output shows the bias of the timesharing scheduling class. Because
+the shell process is spinning on the CPU, its priority is constantly being
+lowered by the system. If the shell process were running less frequently,
+its priority would be higher. To see this result, type Control-C in the spinning
+shell and run the script again:</para><screen><userinput># dtrace -s ./profpri.d 494621</userinput>
+ dtrace: script './profpri.d' matched 1 probe</screen><para>Now in the shell, type a few characters. When you terminate the DTrace
+script, output like the following example will appear:</para><screen>ksh                                               
+           value  ------------- Distribution ------------- count    
+              40 |                                         0        
+              50 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 14       
+              60 |                                         0</screen><para>Because the shell process was sleeping awaiting user input instead of
+spinning on the CPU, when it <emphasis>did</emphasis> run it was run at a
+much higher priority.</para>
+</sect1><sect1 id="chp-profile-3"><title><literal>tick-</literal><replaceable>n</replaceable> probes</title><para><indexterm><primary>probes</primary><secondary>tick</secondary></indexterm><indexterm><primary>tick probes</primary></indexterm>Like <literal>profile-</literal><replaceable>n</replaceable> probes, <literal>tick-</literal><replaceable>n</replaceable> probes fire every fixed interval at high interrupt level.
+However, unlike <literal>profile-</literal><replaceable>n</replaceable> probes,
+which fire on <emphasis>every</emphasis> CPU, <literal>tick-</literal><replaceable>n</replaceable> probes fire on only <emphasis>one</emphasis> CPU per interval.
+The actual CPU may change over time. As with <literal>profile-</literal><replaceable>n</replaceable> probes, <replaceable>n</replaceable> defaults to rate-per-second
+but may also have an optional time suffix. <literal>tick-</literal><replaceable>n</replaceable> probes have several uses, such as providing some periodic output
+or taking a periodic action.</para>
+</sect1><sect1 id="chp-profile-4"><title>Arguments</title><para><indexterm><primary>profile probes</primary><secondary>arguments</secondary></indexterm>The arguments to <literal>profile</literal> probes are as follows:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="6.02in"?><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>arg0</literal></para>
+</entry><entry><para>The program counter (PC) in the kernel at the time that the probe fired,
+or 0 if the current process was not executing in the kernel at the time that
+the probe fired</para>
+</entry>
+</row><row><entry><para><literal>arg1</literal></para>
+</entry><entry><para>The PC in the user-level process at the time that the probe fired, or
+0 if the current process was executing at the kernel at the time that the
+probe fired</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>As the descriptions imply, if <literal>arg0</literal> is non-zero then <literal>arg1</literal> is zero; if <literal>arg0</literal> is zero then <literal>arg1</literal> is
+non-zero. Thus, you can use <literal>arg0</literal> and <literal>arg1</literal> to
+differentiate user-level from kernel level, as in this simple example:</para><programlisting>profile-1ms
+{
+	@ticks[arg0 ? "kernel" : "user"] = count();
+}</programlisting>
+</sect1><sect1 id="chp-profile-5"><title>Timer Resolution</title><para><indexterm><primary>profile probes</primary><secondary>timer resolution</secondary></indexterm>The <literal>profile</literal> provider uses arbitrary resolution
+interval timers in the operating system. On architectures that do not support
+truly arbitrary resolution time-based interrupts, the frequency is limited
+by the system clock frequency, which is specified by the <literal>hz</literal> kernel
+variable. Probes of higher frequency than <literal>hz</literal> on such architectures
+will fire some number of times every 1/<literal>hz</literal> seconds. For
+example, a 1000 hertz <literal>profile</literal> probe on such an architecture
+with <literal>hz</literal> set to 100 will fire ten times in rapid succession
+every ten milliseconds. On platforms that support arbitrary resolution, a
+1000 hertz <literal>profile</literal> probe would fire exactly every one millisecond.</para><para>The following example tests a given architecture's resolution:</para><programlisting>profile-5000
+{
+	/*
+	 * We divide by 1,000,000 to convert nanoseconds to milliseconds, and
+	 * then we take the value mod 10 to get the current millisecond within
+	 * a 10 millisecond window.  On platforms that do not support truly
+	 * arbitrary resolution profile probes, all of the profile-5000 probes
+	 * will fire on roughly the same millisecond.  On platforms that
+	 * support a truly arbitrary resolution, the probe firings will be
+	 * evenly distributed across the milliseconds.
+	 */
+	@ms = lquantize((timestamp / 1000000) % 10, 0, 10, 1);
+}
+
+tick-1sec
+/i++ &gt;= 10/
+{
+	exit(0);
+}</programlisting><para>On an architecture that supports arbitrary resolution <literal>profile</literal> probes,
+running the example script will yield an even distribution:</para><screen><userinput># dtrace -s ./restest.d</userinput>
+ dtrace: script './restest.d' matched 2 probes
+CPU     ID                    FUNCTION:NAME
+  0  33631                       :tick-1sec 
+
+
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@@                                      10760    
+               1 |@@@@                                     10842    
+               2 |@@@@                                     10861    
+               3 |@@@                                      10820    
+               4 |@@@                                      10819    
+               5 |@@@                                      10817    
+               6 |@@@@                                     10826    
+               7 |@@@@                                     10847    
+               8 |@@@@                                     10830    
+               9 |@@@@                                     10830</screen><para>On an architecture that does not support arbitrary resolution <literal>profile</literal> probes, running the example script will yield an uneven distribution:</para><screen><userinput># dtrace -s ./restest.d</userinput>
+ dtrace: script './restest.d' matched 2 probes
+ CPU     ID                    FUNCTION:NAME
+  0  28321                       :tick-1sec 
+
+
+           value  ------------- Distribution ------------- count    
+               4 |                                         0        
+               5 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  107864   
+               6 |                                         424      
+               7 |                                         255      
+               8 |                                         496      
+               9 |                                         0</screen><para>On these architectures, <literal>hz</literal> may be manually tuned
+in <literal>/etc/system</literal> to improve the effective profile resolution.</para><para>Currently, all variants of UltraSPARC (<literal>sun4u</literal>) support
+arbitrary resolution <literal>profile</literal> probes. Many variants of the
+x86 architecture (<literal>i86pc</literal>) also support arbitrary resolution <literal>profile</literal> probes, although some older variants do not.</para>
+</sect1><sect1 id="chp-profile-6"><title>Probe Creation</title><para><indexterm><primary>profile probes</primary><secondary>creation</secondary></indexterm>Unlike other providers, the <literal>profile</literal> provider
+creates probes dynamically on an as-needed basis. Thus, the desired profile
+probe might not appear in a listing of all probes (for example, by using <literal>dtrace -l -P profile</literal>) but the probe will be created when it is explicitly
+enabled.</para><para>On architectures that support arbitrary resolution <literal>profile</literal> probes,
+a time interval that is too short would cause the machine to continuously
+field time-based interrupts, thereby denying service on the machine. To prevent
+this situation, the <literal>profile</literal> provider will silently refuse
+to create any probe that would result in an interval of less than two hundred
+microseconds.</para>
+</sect1><sect1 id="chp-profile-stability"><title>Stability</title><para><indexterm><primary>profile probes</primary><secondary>stability</secondary></indexterm>The <literal>profile</literal> provider uses DTrace's stability
+mechanism to describe its stabilities as shown in the following table. For
+more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39,
+Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000017068 0?>

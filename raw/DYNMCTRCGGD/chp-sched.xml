@@ -1,0 +1,1494 @@
+<?Pub EntList bull rArr sect?><chapter id="chp-sched"><title><literal>sched</literal> Provider</title><highlights><para>The <literal>sched</literal> provider makes available probes related
+to CPU scheduling. Because CPUs are the one resource that all threads must
+consume, the <literal>sched</literal> provider is very useful for understanding
+systemic behavior. For example, using the <literal>sched</literal> provider,
+you can understand when and why threads sleep, run, change priority, or wake
+other threads.</para>
+</highlights><sect1 id="gelro"><title>Probes</title><para><indexterm><primary>probes</primary><secondary><literal>sched</literal></secondary></indexterm><indexterm><primary><literal>sched</literal> probe</primary></indexterm>The <literal>sched</literal> probes are described in <olink targetptr="tbl-sched" remap="internal">Table&nbsp;26&ndash;1</olink>.</para><table frame="topbot" id="tbl-sched"><title><literal>sched</literal> Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>change-pri</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires whenever a thread's priority is about to be changed.
+The <literal>lwpsinfo_t</literal> of the thread is pointed to by <literal>args[0]</literal>. The thread's current priority is in the <literal>pr_pri</literal> field
+of this structure. The <literal>psinfo_t</literal> of the process containing
+the thread is pointed to by <literal>args[1]</literal>. The thread's new priority
+is contained in <literal>args[2]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>dequeue</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before a runnable thread is dequeued from
+a run queue. The <literal>lwpsinfo_t</literal> of the thread being dequeued
+is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of
+the process containing the thread is pointed to by <literal>args[1]</literal>.
+The <literal>cpuinfo_t</literal> of the CPU from which the thread is being
+dequeued is pointed to by <literal>args[2]</literal>. If the thread is being
+dequeued from a run queue that is not associated with a particular CPU, the <literal>cpu_id</literal> member of this structure will be <literal>-1</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>enqueue</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before a runnable thread is enqueued to
+a run queue. The <literal>lwpsinfo_t</literal> of the thread being enqueued
+is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of
+the process containing the thread is pointed to by <literal>args[1]</literal>.
+The <literal>cpuinfo_t</literal> of the CPU to which the thread is being enqueued
+is pointed to by <literal>args[2]</literal>. If the thread is being enqueued
+from a run queue that is not associated with a particular CPU, the <literal>cpu_id</literal> member of this structure will be <literal>-1</literal>. The value
+in <literal>args[3]</literal> is a boolean indicating whether the thread will
+be enqueued to the front of the run queue. The value is non-zero if the thread
+will be enqueued at the front of the run queue, and zero if the thread will
+be enqueued at the back of the run queue.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>off-cpu</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when the current CPU is about to end execution of a
+thread. The <literal>curcpu</literal> variable indicates the current CPU.
+The <literal>curlwpsinfo</literal> variable indicates the thread that is ending
+execution. The <literal>curpsinfo</literal> variable describes the process
+containing the current thread. The <literal>lwpsinfo_t</literal> structure
+of the thread that the current CPU will next execute is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of the process containing the
+next thread is pointed to by <literal>args[1]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>on-cpu</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a CPU has just begun execution of a thread. The <literal>curcpu</literal> variable indicates the current CPU. The <literal>curlwpsinfo</literal> variable
+indicates the thread that is beginning execution. The <literal>curpsinfo</literal> variable
+describes the process containing the current thread.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>preempt</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before the current thread is preempted.
+After this probe fires, the current thread will select a thread to run and
+the <literal>off-cpu</literal> probe will fire for the current thread. In
+some cases, a thread on one CPU will be preempted, but the preempting thread
+will run on another CPU in the meantime. In this situation, the <literal>preempt</literal> probe
+will fire, but the dispatcher will be unable to find a higher priority thread
+to run and the <literal>remain-cpu</literal> probe will fire instead of the <literal>off-cpu</literal> probe.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>remain-cpu</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a scheduling decision has been made, but the dispatcher
+has elected to continue to run the current thread. The <literal>curcpu</literal> variable
+indicates the current CPU. The <literal>curlwpsinfo</literal> variable indicates
+the thread that is beginning execution. The <literal>curpsinfo</literal> variable
+describes the process containing the current thread.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>schedctl-nopreempt</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a thread is preempted and then re-enqueued at
+the <emphasis>front</emphasis> of the run queue due to a preemption control
+request. See <olink targetdoc="refman3a" targetptr="schedctl-init-3c" remap="external"><citerefentry><refentrytitle>schedctl_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> for details on preemption control. As with <literal>preempt</literal>, either <literal>off-cpu</literal> or <literal>remain-cpu</literal> will
+fire after <literal>schedctl-nopreempt</literal>. Because <literal>schedctl-nopreempt</literal> denotes a re-enqueuing of the current thread at the front of the
+run queue, <literal>remain-cpu</literal> is more likely to fire after <literal>schedctl-nopreempt</literal> than <literal>off-cpu</literal>. The <literal>lwpsinfo_t</literal> of
+the thread being preempted is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of the process containing the thread is pointed to by <literal>args[1]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>schedctl-preempt</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a thread that is using preemption control is nonetheless
+preempted and re-enqueued at the <emphasis>back</emphasis> of the run queue.
+See <olink targetdoc="refman3a" targetptr="schedctl-init-3c" remap="external"><citerefentry><refentrytitle>schedctl_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> for details on preemption control. As with <literal>preempt</literal>, either <literal>off-cpu</literal> or <literal>remain-cpu</literal> will
+fire after <literal>schedctl-preempt</literal>. Like <literal>preempt</literal> (and
+unlike <literal>schedctl-nopreempt</literal>), <literal>schedctl-preempt</literal> denotes
+a re-enqueuing of the current thread at the back of the run queue. As a result, <literal>off-cpu</literal> is more likely to fire after <literal>schedctl-preempt</literal> than <literal>remain-cpu</literal>. The <literal>lwpsinfo_t</literal> of the thread being
+preempted is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of
+the process containing the thread is pointed to by <literal>args[1]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>schedctl-yield</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a thread that had preemption control enabled and
+its time slice artificially extended executed code to yield the CPU to other
+threads.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>sleep</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before the current thread sleeps on a synchronization
+object. The type of the synchronization object is contained in the <literal>pr_stype</literal> member of the <literal>lwpsinfo_t</literal> pointed to by <literal>curlwpsinfo</literal>. The address of the synchronization object is contained in the <literal>pr_wchan</literal> member of the <literal>lwpsinfo_t</literal> pointed to
+by <literal>curlwpsinfo</literal>. The meaning of this address is a private
+implementation detail, but the address value may be treated as a token unique
+to the synchronization object.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>surrender</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a CPU has been instructed by another CPU to make
+a scheduling decision &ndash; often because a higher-priority thread has become
+runnable.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>tick</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires as a part of clock tick-based accounting. In clock
+tick-based accounting, CPU accounting is performed by examining which threads
+and processes are running when a fixed-interval interrupt fires. The <literal>lwpsinfo_t</literal> that corresponds to the thread that is being assigned CPU time
+is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> that
+corresponds to the process that contains the thread is pointed to by <literal>args[1]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>wakeup</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before the current thread wakes a thread
+sleeping on a synchronization object. The <literal>lwpsinfo_t</literal> of
+the sleeping thread is pointed to by <literal>args[0]</literal>. The <literal>psinfo_t</literal> of the process containing the sleeping thread is pointed to by <literal>args[1]</literal>. The type of the synchronization object is contained in
+the <literal>pr_stype</literal> member of the <literal>lwpsinfo_t</literal> of
+the sleeping thread. The address of the synchronization object is contained
+in the <literal>pr_wchan</literal> member of the <literal>lwpsinfo_t</literal> of
+the sleeping thread. The meaning of this address is a private implementation
+detail, but the address value may be treated as a token unique to the synchronization
+object.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-sched-1"><title>Arguments</title><para>The argument types for the <literal>sched</literal> probes are listed
+in <olink targetptr="tbl-sched-args" remap="internal">Table&nbsp;26&ndash;2</olink>; the arguments
+are described in <olink targetptr="tbl-sched" remap="internal">Table&nbsp;26&ndash;1</olink>.</para><table frame="topbot" id="tbl-sched-args"><title><literal>sched</literal> Probe
+Arguments</title><tgroup cols="5" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec2" colwidth="0.91in" align="center"/><colspec colname="colspec4" colwidth="0.91in" align="center"/><colspec colname="colspec3" colwidth="0.91in" align="center"/><colspec colname="colspec1" colwidth="0.92in" align="center"/><thead><row><entry colname="colspec0" colsep="1" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec2" rowsep="1" valign="top"><para><literal>args[0]</literal></para>
+</entry><entry colname="colspec4" rowsep="1" valign="top"><para><literal>args[1]</literal></para>
+</entry><entry colname="colspec3" rowsep="1" valign="top"><para><literal>args[2]</literal></para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para><literal>args[3]</literal></para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0" colsep="1"><para><literal>change-pri</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>pri_t</literal></para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>dequeue</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>cpuinfo_t *</literal></para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>enqueue</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>cpuinfo_t *</literal></para>
+</entry><entry colname="colspec1"><para><literal>int</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>off-cpu</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>on-cpu</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>preempt</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>remain-cpu</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>schedctl-nopreempt</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>schedctl-preempt</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>schedctl-yield</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>sleep</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>surrender</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>tick</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>wakeup</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry><entry colname="colspec1"><para>&mdash;</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>As <olink targetptr="tbl-sched-args" remap="internal">Table&nbsp;26&ndash;2</olink> indicates,
+many <literal>sched</literal> probes have arguments consisting of a pointer
+to an <literal>lwpsinfo_t</literal> and a pointer to a <literal>psinfo_t</literal>,
+indicating a thread and the process containing the thread, respectively. These
+structures are described in detail in <olink targetptr="chp-proc-lwpsinfo" remap="internal">lwpsinfo_t</olink> and <olink targetptr="chp-proc-psinfo" remap="internal">psinfo_t</olink>, respectively.</para><sect2 id="chp-sched-cpuinfo"><title><literal>cpuinfo_t</literal></title><para>The <literal>cpuinfo_t</literal> structure defines a CPU. As <olink targetptr="tbl-sched-args" remap="internal">Table&nbsp;26&ndash;2</olink> indicates, arguments
+to both the <literal>enqueue</literal> and <literal>dequeue</literal> probes
+include a pointer to a <literal>cpuinfo_t</literal>. Additionally, the <literal>cpuinfo_t</literal> corresponding to the current CPU is pointed to by the <literal>curcpu</literal> variable.
+The definition of the <literal>cpuinfo_t</literal> structure is as follows:</para><programlisting>typedef struct cpuinfo {
+	processorid_t cpu_id;           /* CPU identifier */
+	psetid_t cpu_pset;              /* processor set identifier */
+	chipid_t cpu_chip;              /* chip identifier */
+	lgrp_id_t cpu_lgrp;             /* locality group identifer */
+	processor_info_t cpu_info;      /* CPU information */
+} cpuinfo_t;</programlisting><para>The <literal>cpu_id</literal> member is the processor identifier, as
+returned by <olink targetdoc="refman1m" targetptr="psrinfo-1m" remap="external"><citerefentry><refentrytitle>psrinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="p-online-2" remap="external"><citerefentry><refentrytitle>p_online</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>The <literal>cpu_pset</literal> member is the processor set that contains
+the CPU, if any. See <olink targetdoc="refman1m" targetptr="psrset-1m" remap="external"><citerefentry><refentrytitle>psrset</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> for
+more details on processor sets.</para><para>The <literal>cpu_chip</literal> member is the identifier of the physical
+chip. Physical chips may contain several CPUs. See <olink targetdoc="refman1m" targetptr="psrinfo-1m" remap="external"><citerefentry><refentrytitle>psrinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> for more information.</para><para>The <literal>cpu_lgrp</literal> member is the identifier of the latency
+group associated with the CPU. See <olink targetdoc="refman3f" targetptr="liblgrp-3lib" remap="external"><citerefentry><refentrytitle>liblgrp</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> for details on latency
+groups.</para><para>The <literal>cpu_info</literal> member is the <literal>processor_info_t</literal> structure
+associated with the CPU, as returned by <olink targetdoc="refman2" targetptr="processor-info-2" remap="external"><citerefentry><refentrytitle>processor_info</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="chp-sched-2"><title>Examples</title><sect2 id="chp-sched-5"><title><literal>on-cpu</literal> and <literal>off-cpu</literal></title><para>One common question you might want answered is which CPUs are running
+threads and for how long. You can use the <literal>on-cpu</literal> and <literal>off-cpu</literal> probes to easily answer this question on a system-wide basis
+as shown in the following example:</para><programlisting>sched:::on-cpu
+{
+	self-&gt;ts = timestamp;
+}
+
+sched:::off-cpu
+/self-&gt;ts/
+{
+	@[cpu] = quantize(timestamp - self-&gt;ts);
+	self-&gt;ts = 0;
+}</programlisting><para>Running the above script results in output similar to the following
+example:</para><screen><userinput># dtrace -s ./where.d</userinput>
+dtrace: script './where.d' matched 5 probes
+<userinput>^C</userinput>
+
+        0
+           value  ------------- Distribution ------------- count    
+            2048 |                                         0        
+            4096 |@@                                       37       
+            8192 |@@@@@@@@@@@@@                            212      
+           16384 |@                                        30       
+           32768 |                                         10       
+           65536 |@                                        17       
+          131072 |                                         12       
+          262144 |                                         9        
+          524288 |                                         6        
+         1048576 |                                         5        
+         2097152 |                                         1        
+         4194304 |                                         3        
+         8388608 |@@@@                                     75       
+        16777216 |@@@@@@@@@@@@                             201      
+        33554432 |                                         6        
+        67108864 |                                         0        
+
+        1
+           value  ------------- Distribution ------------- count    
+            2048 |                                         0        
+            4096 |@                                        6        
+            8192 |@@@@                                     23       
+           16384 |@@@                                      18       
+           32768 |@@@@                                     22       
+           65536 |@@@@                                     22       
+          131072 |@                                        7        
+          262144 |                                         5        
+          524288 |                                         2        
+         1048576 |                                         3        
+         2097152 |@                                        9        
+         4194304 |                                         4        
+         8388608 |@@@                                      18       
+        16777216 |@@@                                      19       
+        33554432 |@@@                                      16       
+        67108864 |@@@@                                     21       
+       134217728 |@@                                       14       
+       268435456 |                                         0</screen><para>The above output shows that on CPU 1 threads tend to run for less than
+100 microseconds at a stretch, or for approximately 10 milliseconds. A noticeable
+gap between the two clusters of data shown in the histogram. You also might
+be interested in knowing which CPUs are running a particular process. You
+can use the <literal>on-cpu</literal> and <literal>off-cpu</literal> probes
+for answering this question as well. The following script displays which CPUs
+run a specified application over a period of ten seconds:</para><programlisting>#pragma D option quiet
+
+dtrace:::BEGIN
+{
+	start = timestamp;
+}
+
+sched:::on-cpu
+/execname == $$1/
+{
+	self-&gt;ts = timestamp;
+}
+
+sched:::off-cpu
+/self-&gt;ts/
+{
+	@[cpu] = sum(timestamp - self-&gt;ts);
+	self-&gt;ts = 0;
+}
+
+profile:::tick-1sec
+/++x == 10/
+{
+	exit(0);
+}
+        
+dtrace:::END
+{
+	printf("CPU distribution of imapd over %d seconds:\n\n",
+	    (timestamp - start) / 1000000000);
+	printf("CPU microseconds\n--- ------------\n");
+	normalize(@, 1000);
+	printa("%3d %@d\n", @);
+}</programlisting><para>Running the above script on a large mail server and specifying the IMAP
+daemon results in output similar to the following example:</para><screen><userinput># dtrace -s ./whererun.d imapd</userinput>
+CPU distribution of imapd over 10 seconds:
+
+CPU microseconds
+--- ------------
+ 15 10102
+ 12 16377
+ 21 25317
+ 19 25504
+ 17 35653
+ 13 41539
+ 14 46669
+ 20 57753
+ 22 70088
+ 16 115860
+ 23 127775
+ 18 160517</screen><para>Solaris takes into account the amount of time that a thread has been
+sleeping when selecting a CPU on which to run the thread: a thread that has
+been sleeping for less time tends not to migrate. You can use the <literal>off-cpu</literal> and <literal>on-cpu</literal> probes to observe this behavior:</para><programlisting>sched:::off-cpu
+/curlwpsinfo-&gt;pr_state == SSLEEP/
+{
+	self-&gt;cpu = cpu;
+	self-&gt;ts = timestamp;
+}
+
+sched:::on-cpu
+/self-&gt;ts/
+{
+	@[self-&gt;cpu == cpu ?
+	    "sleep time, no CPU migration" : "sleep time, CPU migration"] =
+	    lquantize((timestamp - self-&gt;ts) / 1000000, 0, 500, 25);
+	self-&gt;ts = 0;
+	self-&gt;cpu = 0;
+}</programlisting><para>Running the above script for approximately 30 seconds results in output
+similar to the following example:</para><screen><userinput># dtrace -s ./howlong.d</userinput>
+dtrace: script './howlong.d' matched 5 probes
+<userinput>^C</userinput>
+ sleep time, CPU migration                         
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@                                  6838     
+              25 |@@@@@                                    4714     
+              50 |@@@                                      3108     
+              75 |@                                        1304     
+             100 |@                                        1557     
+             125 |@                                        1425     
+             150 |                                         894      
+             175 |@                                        1526     
+             200 |@@                                       2010     
+             225 |@@                                       1933     
+             250 |@@                                       1982     
+             275 |@@                                       2051     
+             300 |@@                                       2021     
+             325 |@                                        1708     
+             350 |@                                        1113     
+             375 |                                         502      
+             400 |                                         220      
+             425 |                                         106      
+             450 |                                         54       
+             475 |                                         40       
+          &gt;= 500 |@                                        1716     
+
+  sleep time, no CPU migration                      
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@                             58413    
+              25 |@@@                                      14793    
+              50 |@@                                       10050    
+              75 |                                         3858     
+             100 |@                                        6242     
+             125 |@                                        6555     
+             150 |                                         3980     
+             175 |@                                        5987     
+             200 |@                                        9024     
+             225 |@                                        9070     
+             250 |@@                                       10745    
+             275 |@@                                       11898    
+             300 |@@                                       11704    
+             325 |@@                                       10846    
+             350 |@                                        6962     
+             375 |                                         3292     
+             400 |                                         1713     
+             425 |                                         585      
+             450 |                                         201      
+             475 |                                         96       
+          &gt;= 500 |                                         3946</screen><para>The example output shows that there are many more occurences of non-migration
+than migration. Also, when sleep times are longer, migrations are more likely.
+The distributions are noticeably different in the sub-100 millisecond range,
+but look very similar as the sleep times get longer. This result would seem
+to indicate that sleep time is not factored into the scheduling decision once
+a certain threshold is exceeded.</para><para>The final example using <literal>off-cpu</literal> and <literal>on-cpu</literal> shows
+how to use these probes along with the <literal>pr_stype</literal> field to
+determine why threads sleep and for how long:</para><programlisting>sched:::off-cpu
+/curlwpsinfo-&gt;pr_state == SSLEEP/
+{
+	/*
+	 * We're sleeping.  Track our sobj type.
+	 */
+	self-&gt;sobj = curlwpsinfo-&gt;pr_stype;
+	self-&gt;bedtime = timestamp;
+}
+
+sched:::off-cpu
+/curlwpsinfo-&gt;pr_state == SRUN/
+{
+	self-&gt;bedtime = timestamp;
+}
+
+sched:::on-cpu
+/self-&gt;bedtime &amp;&amp; !self-&gt;sobj/
+{
+	@["preempted"] = quantize(timestamp - self-&gt;bedtime);
+	self-&gt;bedtime = 0;
+}
+
+sched:::on-cpu
+/self-&gt;sobj/
+{
+	@[self-&gt;sobj == SOBJ_MUTEX ? "kernel-level lock" :
+	    self-&gt;sobj == SOBJ_RWLOCK ? "rwlock" :
+	    self-&gt;sobj == SOBJ_CV ? "condition variable" :
+	    self-&gt;sobj == SOBJ_SEMA ? "semaphore" :
+	    self-&gt;sobj == SOBJ_USER ? "user-level lock" :
+	    self-&gt;sobj == SOBJ_USER_PI ? "user-level prio-inheriting lock" :
+	    self-&gt;sobj == SOBJ_SHUTTLE ? "shuttle" : "unknown"] =
+	    quantize(timestamp - self-&gt;bedtime);
+
+	self-&gt;sobj = 0;
+	self-&gt;bedtime = 0;
+}</programlisting><para>Running the above script for several seconds results in output similar
+to the following example:</para><screen><userinput># dtrace -s ./whatfor.d</userinput>
+dtrace: script './whatfor.d' matched 12 probes
+<userinput>^C</userinput>
+ kernel-level lock
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |@@@@@@@@                                 3        
+           65536 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@            11       
+          131072 |@@                                       1        
+          262144 |                                         0        
+
+  preempted
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |                                         4        
+           65536 |@@@@@@@@                                 408      
+          131072 |@@@@@@@@@@@@@@@@@@@@@@                   1031     
+          262144 |@@@                                      156      
+          524288 |@@                                       116      
+         1048576 |@                                        51       
+         2097152 |                                         42       
+         4194304 |                                         16       
+         8388608 |                                         15       
+        16777216 |                                         4        
+        33554432 |                                         8        
+        67108864 |                                         0        
+
+  semaphore
+           value  -------------- Distribution ------------ count    
+           32768 |                                         0        
+           65536 |@@                                       61       
+          131072 |@@@@@@@@@@@@@@@@@@@@@@@@                 553      
+          262144 |@@                                       63       
+          524288 |@                                        36       
+         1048576 |                                         7        
+         2097152 |                                         22       
+         4194304 |@                                        44       
+         8388608 |@@@                                      84       
+        16777216 |@                                        36       
+        33554432 |                                         3        
+        67108864 |                                         6        
+       134217728 |                                         0        
+       268435456 |                                         0        
+       536870912 |                                         0        
+      1073741824 |                                         0        
+      2147483648 |                                         0        
+      4294967296 |                                         0        
+      8589934592 |                                         0        
+     17179869184 |                                         1        
+     34359738368 |                                         0        
+
+  shuttle                                           
+           value  -------------- Distribution ------------ count    
+           32768 |                                         0        
+           65536 |@@@@@                                    2        
+          131072 |@@@@@@@@@@@@@@@@                         6        
+          262144 |@@@@@                                    2        
+          524288 |                                         0        
+         1048576 |                                         0        
+         2097152 |                                         0        
+         4194304 |@@@@@                                    2        
+         8388608 |                                         0        
+        16777216 |                                         0        
+        33554432 |                                         0        
+        67108864 |                                         0        
+       134217728 |                                         0        
+       268435456 |                                         0        
+       536870912 |                                         0        
+      1073741824 |                                         0        
+      2147483648 |                                         0        
+      4294967296 |@@@@@                                    2        
+      8589934592 |                                         0        
+     17179869184 |@@                                       1        
+     34359738368 |                                         0        
+
+  condition variable                                
+           value  -------------- Distribution ------------ count    
+           32768 |                                         0        
+           65536 |                                         122      
+          131072 |@@@@@                                    1579     
+          262144 |@                                        340      
+          524288 |                                         268      
+         1048576 |@@@                                      1028     
+         2097152 |@@@                                      1007     
+         4194304 |@@@                                      1176     
+         8388608 |@@@@                                     1257     
+        16777216 |@@@@@@@@@@@@@@                           4385     
+        33554432 |                                         295      
+        67108864 |                                         157      
+       134217728 |                                         96       
+       268435456 |                                         48       
+       536870912 |                                         144      
+      1073741824 |                                         10       
+      2147483648 |                                         22       
+      4294967296 |                                         18       
+      8589934592 |                                         5        
+     17179869184 |                                         6        
+     34359738368 |                                         4        
+     68719476736 |                                         0</screen>
+</sect2><sect2 id="chp-sched-10"><title><literal>enqueue</literal> and <literal>dequeue</literal></title><para>When a CPU becomes idle, the dispatcher looks for work enqueued on other
+(non-idle) CPUs. The following example uses the <literal>dequeue</literal> probe
+to understand how often applications are transferred and by which CPU:</para><programlisting>#pragma D option quiet
+
+sched:::dequeue
+/args[2]-&gt;cpu_id != --1 &amp;&amp; cpu != args[2]-&gt;cpu_id &amp;&amp;
+    (curlwpsinfo-&gt;pr_flag &amp; PR_IDLE)/
+{
+	@[stringof(args[1]-&gt;pr_fname), args[2]-&gt;cpu_id] =
+	    lquantize(cpu, 0, 100);
+}
+END
+{
+	printa("%s stolen from CPU %d by:\n%@d\n", @);
+}</programlisting><para>The tail of the output from running the above script on a 4 CPU system
+results in output similar to the following example:</para><screen><userinput># dtrace -s ./whosteal.d</userinput>
+<userinput>^C</userinput>
+...
+ nscd stolen from CPU 1 by:
+
+           value  -------------- Distribution ------------ count    
+               1 |                                         0        
+               2 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 28       
+               3 |                                         0        
+
+snmpd stolen from CPU 1 by:
+
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@                                        1        
+               1 |                                         0        
+               2 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@     31       
+               3 |@@                                       2        
+               4 |                                         0        
+
+sched stolen from CPU 1 by:
+
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@@                                       3        
+               1 |                                         0        
+               2 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         36       
+               3 |@@@@                                     5        
+               4 |                                         0</screen><para>Instead of knowing which CPUs took which work, you might want to know
+the CPUs on which processes and threads are waiting to run. You can use the <literal>enqueue</literal> and <literal>dequeue</literal> probes together to answer
+this question:</para><programlisting>sched:::enqueue
+{
+	self-&gt;ts = timestamp;
+}
+
+sched:::dequeue
+/self-&gt;ts/
+{
+	@[args[2]-&gt;cpu_id] = quantize(timestamp - self-&gt;ts);
+	self-&gt;ts = 0;
+}</programlisting><para>Running the above script for several seconds results in output similar
+to the following example:</para><screen><userinput># dtrace -s ./qtime.d</userinput>
+dtrace: script './qtime.d' matched 5 probes
+<userinput>^C</userinput>
+       -1
+           value  -------------- Distribution ------------ count    
+            4096 |                                         0        
+            8192 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 2        
+           16384 |                                         0        
+
+        0
+           value  -------------- Distribution ------------ count    
+            1024 |                                         0        
+            2048 |@@@@@@@@@@@@@@@                          262      
+            4096 |@@@@@@@@@@@@@                            227      
+            8192 |@@@@@                                    87       
+           16384 |@@@                                      54       
+           32768 |                                         7        
+           65536 |                                         9        
+          131072 |                                         1        
+          262144 |                                         5        
+          524288 |                                         4        
+         1048576 |                                         2        
+         2097152 |                                         0        
+         4194304 |                                         0        
+         8388608 |                                         0        
+        16777216 |                                         1        
+        33554432 |                                         2        
+        67108864 |                                         2        
+       134217728 |                                         0        
+       268435456 |                                         0        
+       536870912 |                                         0        
+      1073741824 |                                         1        
+      2147483648 |                                         1        
+      4294967296 |                                         0        
+
+        1
+           value  -------------- Distribution ------------ count    
+            1024 |                                         0        
+            2048 |@@@@                                     49       
+            4096 |@@@@@@@@@@@@@@@@@@@@                     241      
+            8192 |@@@@@@@                                  91       
+           16384 |@@@@                                     55       
+           32768 |                                         7        
+           65536 |                                         3        
+          131072 |                                         2        
+          262144 |                                         1        
+          524288 |                                         0        
+         1048576 |                                         0        
+         2097152 |                                         0        
+         4194304 |                                         0        
+         8388608 |                                         0        
+        16777216 |                                         0        
+        33554432 |                                         3        
+        67108864 |                                         1        
+       134217728 |                                         4        
+       268435456 |                                         2        
+       536870912 |                                         0        
+      1073741824 |                                         3        
+      2147483648 |                                         2        
+      4294967296 |                                         0</screen><para>Notice the non-zero values at the bottom of the example output. These
+data points reveal several instances on both CPUs where a thread was enqueued
+to run for several <emphasis>seconds</emphasis>.</para><para>Instead of looking at wait times, you might want to examine the length
+of the run queue over time. Using the <literal>enqueue</literal> and <literal>dequeue</literal> probes, you can set up an associative array to track the queue
+length:</para><programlisting>sched:::enqueue
+{
+	this-&gt;len = qlen[args[2]-&gt;cpu_id]++;
+	@[args[2]-&gt;cpu_id] = lquantize(this-&gt;len, 0, 100);
+}
+
+sched:::dequeue
+/qlen[args[2]-&gt;cpu_id]/
+{
+	qlen[args[2]-&gt;cpu_id]&mdash;;
+}</programlisting><para>Running the above script for approximately 30 seconds on a largely idle
+uniprocessor laptop system results in output similar to the following example:</para><screen><userinput># dtrace -s ./qlen.d</userinput>
+dtrace: script './qlen.d' matched 5 probes
+<userinput>^C</userinput>
+        0
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@@@@@@@@@@@@@@@@@@@@@@@@@                110626   
+               1 |@@@@@@@@@                                41142    
+               2 |@@                                       12655    
+               3 |@                                        5074     
+               4 |                                         1722     
+               5 |                                         701      
+               6 |                                         302      
+               7 |                                         63       
+               8 |                                         23       
+               9 |                                         12       
+              10 |                                         24       
+              11 |                                         58       
+              12 |                                         14       
+              13 |                                         3        
+              14 |                                         0</screen><para>The output is roughly what you would expect for an idle system: the
+majority of the time that a runnable thread is enqueued, the run queue was
+very short (three or fewer threads in length). However, given that the system
+was largely idle, the exceptional data points at the bottom of the table might
+be unexpected. For example, why was the run queue as long as 13 runnable threads?
+To explore this question, you could write a D script that displays the contents
+of the run queue when the length of the run queue is long. This problem is
+complicated because D enablings cannot iterate over data structures, and therefore
+cannot simply iterate over the entire run queue. Even if D enablings could
+do so, you should avoid dependencies on the kernel's internal data structures.</para><para>For this type of script, you would enable the <literal>enqueue</literal> and <literal>dequeue</literal> probes and use both speculations and associative arrays.
+Whenever a thread is enqueued, the script increments the length of the queue
+and records the timestamp in an associative array keyed by the thread. You
+cannot use a thread-local variable in this case because a thread might be
+enqueued by another thread. The script then checks to see if the queue length
+exceeds the maximum. If it does, the script starts a new speculation, and
+records the timestamp and the new maximum. Then, when a thread is dequeued,
+the script compares the enqueue timestamp to the timestamp of the longest
+length: if the thread was enqueued <emphasis>before</emphasis> the timestamp
+of the longest length, the thread was in the queue when the longest length
+was recorded. In this case, the script speculatively traces the thread's information.
+Once the kernel dequeues the last thread that was enqueued at the timestamp
+of the longest length, the script commits the speculation data. This script
+is shown below:</para><programlisting>#pragma D option quiet
+#pragma D option nspec=4
+#pragma D option specsize=100k
+
+int maxlen;
+int spec[int];
+
+sched:::enqueue
+{
+	this-&gt;len = ++qlen[this-&gt;cpu = args[2]-&gt;cpu_id];
+	in[args[0]-&gt;pr_addr] = timestamp;
+}
+
+sched:::enqueue
+/this-&gt;len &gt; maxlen &amp;&amp; spec[this-&gt;cpu]/
+{
+	/*
+	 * There is already a speculation for this CPU.  We just set a new
+	 * record, so we'll discard the old one.
+	 */
+	discard(spec[this-&gt;cpu]);
+}
+
+sched:::enqueue
+/this-&gt;len &gt; maxlen/
+{
+	/*
+	 * We have a winner.  Set the new maximum length and set the timestamp
+	 * of the longest length.
+	 */
+	maxlen = this-&gt;len;
+	longtime[this-&gt;cpu] = timestamp;	
+
+	/*
+	 * Now start a new speculation, and speculatively trace the length.
+	 */
+	this-&gt;spec = spec[this-&gt;cpu] = speculation();
+	speculate(this-&gt;spec);
+	printf("Run queue of length %d:\n", this-&gt;len);
+}
+
+sched:::dequeue
+/(this-&gt;in = in[args[0]-&gt;pr_addr]) &amp;&amp;
+    this-&gt;in &lt;= longtime[this-&gt;cpu = args[2]-&gt;cpu_id]/
+{
+	speculate(spec[this-&gt;cpu]);
+	printf("  %d/%d (%s)\n", 
+	    args[1]-&gt;pr_pid, args[0]-&gt;pr_lwpid,
+	    stringof(args[1]-&gt;pr_fname));
+}
+
+sched:::dequeue
+/qlen[args[2]-&gt;cpu_id]/
+{
+	in[args[0]-&gt;pr_addr] = 0;
+	this-&gt;len = --qlen[args[2]-&gt;cpu_id];
+}
+
+sched:::dequeue
+/this-&gt;len == 0 &amp;&amp; spec[this-&gt;cpu]/
+{
+	/*
+	 * We just processed the last thread that was enqueued at the time
+	 * of longest length; commit the speculation, which by now contains
+	 * each thread that was enqueued when the queue was longest.
+	 */
+	commit(spec[this-&gt;cpu]);
+	spec[this-&gt;cpu] = 0;
+}</programlisting><para>Running the above script on the same uniprocessor laptop results in
+output similar to the following example:</para><screen><userinput># dtrace -s ./whoqueue.d</userinput>
+Run queue of length 3:
+ 0/0 (sched)
+  0/0 (sched)
+  101170/1 (dtrace)
+Run queue of length 4:
+  0/0 (sched)
+  100356/1 (Xsun)
+  100420/1 (xterm)
+  101170/1 (dtrace)
+Run queue of length 5:
+  0/0 (sched)
+  0/0 (sched)
+  100356/1 (Xsun)
+  100420/1 (xterm)
+  101170/1 (dtrace)
+Run queue of length 7:
+  0/0 (sched)
+  100221/18 (nscd)
+  100221/17 (nscd)
+  100221/16 (nscd)
+  100221/13 (nscd)
+  100221/14 (nscd)
+  100221/15 (nscd)
+Run queue of length 16:
+  100821/1 (xterm)
+  100768/1 (xterm)
+  100365/1 (fvwm2)
+  101118/1 (xterm)
+  100577/1 (xterm)
+  101170/1 (dtrace)
+  101020/1 (xterm)
+  101089/1 (xterm)
+  100795/1 (xterm)
+  100741/1 (xterm)
+  100710/1 (xterm)
+  101048/1 (xterm)
+  100697/1 (MozillaFirebird-)
+  100420/1 (xterm)
+  100394/1 (xterm)
+  100368/1 (xterm)
+<userinput>^C</userinput></screen><para>The output reveals that the long run queues are due to many runnable <literal>xterm</literal> processes. This experiment coincided with a change in virtual
+desktop, and therefore the results are probably due to some sort of X event
+processing.</para>
+</sect2><sect2 id="chp-sched-11"><title><literal>sleep</literal> and <literal>wakeup</literal></title><para>In <olink targetptr="chp-sched-10" remap="internal">enqueue and dequeue</olink>, the
+final example demonstrated that a burst in run queue length was due to runnable <literal>xterm</literal> processes. One hypothesis is that the observations resulted
+from a change in virtual desktop. You can use the <literal>wakeup</literal> probe
+to explore this hypothesis by determining who is waking the <literal>xterm</literal> processes,
+and when, as shown in the following example:</para><programlisting>#pragma D option quiet
+
+dtrace:::BEGIN
+{
+	start = timestamp;
+}
+
+sched:::wakeup
+/stringof(args[1]-&gt;pr_fname) == "xterm"/
+{
+	@[execname] = lquantize((timestamp - start) / 1000000000, 0, 10);
+}
+
+profile:::tick-1sec
+/++x == 10/
+{
+	exit(0);
+}</programlisting><para>To investigate the hypothesis, run the above script, waiting roughly
+five seconds, and switch your virtual desktop exactly once. If the burst of
+runnable <literal>xterm</literal> processes is due to switching the virtual
+desktop, the output should show a burst of wakeup activity at the five second
+mark.</para><screen><userinput># dtrace -s ./xterm.d</userinput>
+
+  Xsun
+
+           value  -------------- Distribution ------------ count    
+               4 |                                         0        
+               5 |@                                        1        
+               6 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   32       
+               7 |                                         0</screen><para>The output does show that the X server is waking xterm processes, clustered
+around the time that you switched virtual desktops. If you wanted to understand
+the interaction between the X server and the <literal>xterm</literal> processes,
+you could aggregate on user stack traces when the X server fires the <literal>wakeup</literal> probe.</para><para>Understanding the performance of client/server systems like the X windowing
+system requires understanding the clients on whose behalf the server is doing
+work. This kind of question is difficult to answer with conventional performance
+analysis tools. However, if you have a model where a client sends a message
+to the server and sleeps pending the server's processing, you can use the <literal>wakeup</literal> probe to determine the client for whom the request is being
+performed, as shown in the following example:</para><programlisting>self int last;
+
+sched:::wakeup
+/self-&gt;last &amp;&amp; args[0]-&gt;pr_stype == SOBJ_CV/
+{
+	@[stringof(args[1]-&gt;pr_fname)] = sum(vtimestamp - self-&gt;last);
+	self-&gt;last = 0;
+}
+
+sched:::wakeup
+/execname == "Xsun" &amp;&amp; self-&gt;last == 0/
+{
+	self-&gt;last = vtimestamp;
+}</programlisting><para>Running the above script results in output similar to the following
+example:</para><screen><userinput>dtrace -s ./xwork.d</userinput>
+dtrace: script './xwork.d' matched 14 probes
+<userinput>^C</userinput>
+  xterm                                                       9522510
+  soffice.bin                                                 9912594
+  fvwm2                                                     100423123
+  MozillaFirebird                                           312227077
+  acroread                                                  345901577</screen><para>This output reveals that much <literal>Xsun</literal> work is being
+done on behalf of the processes <literal>acroread</literal>, <literal>MozillaFirebird</literal> and, to a lesser degree, <literal>fvwm2</literal>. Notice that
+the script only examined wakeups from condition variable synchronization objects
+(<literal>SOBJ_CV</literal>). As described in <olink targetptr="tbl-sched-sobj" remap="internal">Table&nbsp;25&ndash;4</olink>, condition variables are the type of synchronization object typically
+used to synchronize for reasons other than access to a shared data region.
+In the case of the X server, a client will wait for data in a pipe by sleeping
+on a condition variable.</para><para>You can additionally use the <literal>sleep</literal> probe along with
+the <literal>wakeup</literal> probe to understand which applications are blocking
+on which applications, and for how long, as shown in the following example:</para><programlisting>#pragma D option quiet
+
+sched:::sleep
+/!(curlwpsinfo-&gt;pr_flag &amp; PR_ISSYS) &amp;&amp; curlwpsinfo-&gt;pr_stype == SOBJ_CV/
+{
+	bedtime[curlwpsinfo-&gt;pr_addr] = timestamp;
+}
+
+sched:::wakeup
+/bedtime[args[0]-&gt;pr_addr]/
+{
+	@[stringof(args[1]-&gt;pr_fname), execname] =
+	    quantize(timestamp - bedtime[args[0]-&gt;pr_addr]);
+	bedtime[args[0]-&gt;pr_addr] = 0;
+}
+
+END
+{
+	printa("%s sleeping on %s:\n%@d\n", @);
+}</programlisting><para>The tail of the output from running the example script for several seconds
+on a desktop system resembles the following example:</para><screen><userinput># dtrace -s ./whofor.d</userinput>
+<userinput>^C</userinput>
+...
+ xterm sleeping on Xsun:
+
+           value  -------------- Distribution ------------ count    
+          131072 |                                         0        
+          262144 |                                         12       
+          524288 |                                         2        
+         1048576 |                                         0        
+         2097152 |                                         5        
+         4194304 |@@@                                      45       
+         8388608 |                                         1        
+        16777216 |                                         9        
+        33554432 |@@@@@                                    83       
+        67108864 |@@@@@@@@@@@                              164      
+       134217728 |@@@@@@@@@@                               147      
+       268435456 |@@@@                                     56       
+       536870912 |@                                        17       
+      1073741824 |                                         9        
+      2147483648 |                                         1        
+      4294967296 |                                         3        
+      8589934592 |                                         1        
+     17179869184 |                                         0        
+
+fvwm2 sleeping on Xsun:
+
+           value  -------------- Distribution ------------ count    
+           32768 |                                         0        
+           65536 |@@@@@@@@@@@@@@@@@@@@@@                   67       
+          131072 |@@@@@                                    16       
+          262144 |@@                                       6        
+          524288 |@                                        3        
+         1048576 |@@@@@                                    15       
+         2097152 |                                         0        
+         4194304 |                                         0        
+         8388608 |                                         1        
+        16777216 |                                         0        
+        33554432 |                                         0        
+        67108864 |                                         1        
+       134217728 |                                         0        
+       268435456 |                                         0        
+       536870912 |                                         1        
+      1073741824 |                                         1        
+      2147483648 |                                         2        
+      4294967296 |                                         2        
+      8589934592 |                                         2        
+     17179869184 |                                         0        
+     34359738368 |                                         2        
+     68719476736 |                                         0        
+
+syslogd sleeping on syslogd:
+
+           value  -------------- Distribution ------------ count    
+     17179869184 |                                         0        
+     34359738368 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 3        
+     68719476736 |                                         0        
+
+MozillaFirebird sleeping on MozillaFirebird:
+
+           value  -------------- Distribution ------------ count    
+           65536 |                                         0        
+          131072 |                                         3        
+          262144 |@@                                       14       
+          524288 |                                         0        
+         1048576 |@@@                                      18       
+         2097152 |                                         0        
+         4194304 |                                         0        
+         8388608 |                                         1        
+        16777216 |                                         0        
+        33554432 |                                         1        
+        67108864 |                                         3        
+       134217728 |@                                        7        
+       268435456 |@@@@@@@@@@                               53       
+       536870912 |@@@@@@@@@@@@@@                           78       
+      1073741824 |@@@@                                     25       
+      2147483648 |                                         0        
+      4294967296 |                                         0        
+      8589934592 |@                                        7        
+     17179869184 |                                         0</screen><para>You might want to understand how and why <literal>MozillaFirebird</literal> is
+blocking on itself. You could modify the above script as shown in the following
+example to answer this question:</para><programlisting>#pragma D option quiet
+
+sched:::sleep
+/execname == "MozillaFirebird" &amp;&amp; curlwpsinfo-&gt;pr_stype == SOBJ_CV/
+{
+	bedtime[curlwpsinfo-&gt;pr_addr] = timestamp;
+}
+
+sched:::wakeup
+/execname == "MozillaFirebird" &amp;&amp; bedtime[args[0]-&gt;pr_addr]/
+{
+	@[args[1]-&gt;pr_pid, args[0]-&gt;pr_lwpid, pid, curlwpsinfo-&gt;pr_lwpid] = 
+	    quantize(timestamp - bedtime[args[0]-&gt;pr_addr]);
+	bedtime[args[0]-&gt;pr_addr] = 0;
+}
+
+sched:::wakeup
+/bedtime[args[0]-&gt;pr_addr]/
+{
+	bedtime[args[0]-&gt;pr_addr] = 0;
+}
+
+END
+{
+	printa("%d/%d sleeping on %d/%d:\n%@d\n", @);
+}</programlisting><para>Running the modified script for several seconds results in output similar
+to the following example:</para><screen><userinput># dtrace -s ./firebird.d</userinput>
+<userinput>^C</userinput>
+
+ 100459/1 sleeping on 100459/13:
+
+           value  -------------- Distribution ------------ count    
+          262144 |                                         0        
+          524288 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 1        
+         1048576 |                                         0        
+
+100459/13 sleeping on 100459/1:
+
+           value  -------------- Distribution ------------ count    
+        16777216 |                                         0        
+        33554432 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 1        
+        67108864 |                                         0        
+
+100459/1 sleeping on 100459/2:
+
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |@@@@                                     5        
+           65536 |@                                        2        
+          131072 |@@@@@                                    6        
+          262144 |                                         1        
+          524288 |@                                        2        
+         1048576 |                                         0        
+         2097152 |@@                                       3        
+         4194304 |@@@@                                     5        
+         8388608 |@@@@@@@@                                 9        
+        16777216 |@@@@@                                    6        
+        33554432 |@@                                       3        
+        67108864 |                                         0        
+
+100459/1 sleeping on 100459/5:
+
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |@@@@@                                    12       
+           65536 |@@                                       5        
+          131072 |@@@@@@                                   15       
+          262144 |                                         1        
+          524288 |                                         1        
+         1048576 |                                         2        
+         2097152 |@                                        4        
+         4194304 |@@@@@                                    13       
+         8388608 |@@@                                      8        
+        16777216 |@@@@@                                    13       
+        33554432 |@@                                       6        
+        67108864 |@@                                       5        
+       134217728 |@                                        4        
+       268435456 |                                         0        
+       536870912 |                                         1        
+      1073741824 |                                         0        
+
+100459/2 sleeping on 100459/1:
+
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |@@@@@@@@@@@@@@                           11       
+           65536 |                                         0        
+          131072 |@@                                       2        
+          262144 |                                         0        
+          524288 |                                         0        
+         1048576 |@@@@                                     3        
+         2097152 |@                                        1        
+         4194304 |@@                                       2        
+         8388608 |@@                                       2        
+        16777216 |@                                        1        
+        33554432 |@@@@@@                                   5        
+        67108864 |                                         0        
+       134217728 |                                         0        
+       268435456 |                                         0        
+       536870912 |@                                        1        
+      1073741824 |@                                        1        
+      2147483648 |@                                        1        
+      4294967296 |                                         0        
+
+100459/5 sleeping on 100459/1:
+
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |                                         1        
+           65536 |                                         2        
+          131072 |                                         4        
+          262144 |                                         7        
+          524288 |                                         1        
+         1048576 |                                         5        
+         2097152 |                                         10       
+         4194304 |@@@@@@                                   77       
+         8388608 |@@@@@@@@@@@@@@@@@@@@@@@                  270      
+        16777216 |@@@                                      43       
+        33554432 |@                                        20       
+        67108864 |@                                        14       
+       134217728 |                                         5        
+       268435456 |                                         2        
+       536870912 |                                         1        
+      1073741824 |                                         0        </screen><para>You can also use the <literal>sleep</literal> and <literal>wakeup</literal> probes
+to understand the performance of door servers such as the name service cache
+daemon, as shown in the following example:</para><programlisting>sched:::sleep
+/curlwpsinfo-&gt;pr_stype == SOBJ_SHUTTLE/
+{
+	bedtime[curlwpsinfo-&gt;pr_addr] = timestamp;
+}
+
+sched:::wakeup
+/execname == "nscd" &amp;&amp; bedtime[args[0]-&gt;pr_addr]/
+{
+	@[stringof(curpsinfo-&gt;pr_fname), stringof(args[1]-&gt;pr_fname)] =
+	    quantize(timestamp - bedtime[args[0]-&gt;pr_addr]);
+	bedtime[args[0]-&gt;pr_addr] = 0;
+}
+
+sched:::wakeup
+/bedtime[args[0]-&gt;pr_addr]/
+{
+	bedtime[args[0]-&gt;pr_addr] = 0;
+}</programlisting><para>The tail of the output from running the above script on a large mail
+server resembles the following example:</para><screen>imapd
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |                                         2        
+           65536 |@@@@@@@@@@@@@@@@@                        57       
+          131072 |@@@@@@@@@@@                              37       
+          262144 |                                         3        
+          524288 |@@@                                      11       
+         1048576 |@@@                                      10       
+         2097152 |@@                                       9        
+         4194304 |                                         1        
+         8388608 |                                         0        
+
+  mountd                                            
+           value  -------------- Distribution ------------ count    
+           65536 |                                         0        
+          131072 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@            49       
+          262144 |@@@                                      6        
+          524288 |                                         1        
+         1048576 |                                         0        
+         2097152 |                                         0        
+         4194304 |@@@@                                     7        
+         8388608 |@                                        3        
+        16777216 |                                         0        
+
+  sendmail
+           value  -------------- Distribution ------------ count    
+           16384 |                                         0        
+           32768 |@                                        18       
+           65536 |@@@@@@@@@@@@@@@@@                        205      
+          131072 |@@@@@@@@@@@@@                            154      
+          262144 |@                                        23       
+          524288 |                                         5        
+         1048576 |@@@@                                     50       
+         2097152 |                                         7        
+         4194304 |                                         5        
+         8388608 |                                         2        
+        16777216 |                                         0        
+
+  automountd                                        
+           value  -------------- Distribution ------------ count    
+           32768 |                                         0        
+           65536 |@@@@@@@@@@                               22       
+          131072 |@@@@@@@@@@@@@@@@@@@@@@@                  51       
+          262144 |@@                                       6        
+          524288 |                                         1        
+         1048576 |                                         0        
+         2097152 |                                         2        
+         4194304 |                                         2        
+         8388608 |                                         1        
+        16777216 |                                         1        
+        33554432 |                                         1        
+        67108864 |                                         0        
+       134217728 |                                         0        
+       268435456 |                                         1        
+       536870912 |                                         0</screen><para>You might be interested in the unusual data points for <literal>automountd</literal> or
+the persistent data point at over one millisecond for <literal>sendmail</literal>.
+You can add additional predicates to the above script to hone in on the causes
+of any exceptional or anomalous results.</para>
+</sect2><sect2 id="chp-sched-12"><title><literal>preempt</literal>, <literal>remain-cpu</literal></title><para>Because Solaris is a preemptive system, higher priority threads preempt
+lower priority ones. Preemption can induce a significant latency bubble in
+the lower priority thread, so you might want to know which threads are being
+preempted by which other threads. The following example shows how to use the <literal>preempt</literal> and <literal>remain-cpu</literal> probes to display this
+information:</para><programlisting>#pragma D option quiet
+
+sched:::preempt
+{
+	self-&gt;preempt = 1;
+}
+
+sched:::remain-cpu
+/self-&gt;preempt/
+{
+	self-&gt;preempt = 0;
+}
+
+sched:::off-cpu
+/self-&gt;preempt/
+{
+	/*
+	 * If we were told to preempt ourselves, see who we ended up giving
+	 * the CPU to.
+	 */
+	@[stringof(args[1]-&gt;pr_fname), args[0]-&gt;pr_pri, execname,
+	    curlwpsinfo-&gt;pr_pri] = count();
+	self-&gt;preempt = 0;
+}
+
+END
+{
+	printf("%30s %3s %30s %3s %5s\n", "PREEMPTOR", "PRI",
+	    "PREEMPTED", "PRI", "#");
+	printa("%30s %3d %30s %3d %5@d\n", @);
+}</programlisting><para>Running the above script for several seconds on a desktop system results
+in output similar to the following example:</para><screen><userinput># dtrace -s ./whopreempt.d</userinput>
+<userinput>^C</userinput>
+                     PREEMPTOR PRI                      PREEMPTED PRI     #
+                         sched  60                           Xsun  53     1
+                         xterm  59                           Xsun  53     1
+               MozillaFirebird  57                           Xsun  53     1
+                        mpstat 100                          fvwm2  59     1
+                         sched  99                MozillaFirebird  57     1
+                         sched  60                         dtrace  30     1
+                        mpstat 100                           Xsun  59     2
+                         sched  60                           Xsun  54     2
+                         sched  99                          sched  60     2
+                         fvwm2  59                           Xsun  44     2
+                         sched  99                           Xsun  44     2
+                         sched  60                          xterm  59     2
+                         sched  99                           Xsun  53     2
+                         sched  99                           Xsun  54     3
+                         sched  60                          fvwm2  59     3
+                         sched  60                           Xsun  59     3
+                         sched  99                           Xsun  59     4
+                         fvwm2  59                           Xsun  54     8
+                         fvwm2  59                           Xsun  53     9
+                          Xsun  59                MozillaFirebird  57    10
+                         sched  60                MozillaFirebird  57    14
+               MozillaFirebird  57                           Xsun  44    16
+               MozillaFirebird  57                           Xsun  54    18</screen>
+</sect2><sect2 id="chp-sched-13"><title><literal>change-pri</literal></title><para>Preemption is based on priorities, so you might want to observe changes
+in priority over time. The following example uses the <literal>change-pri</literal> probe
+to display this information:</para><programlisting>sched:::change-pri
+{
+	@[stringof(args[0]-&gt;pr_clname)] =
+	    lquantize(args[2] - args[0]-&gt;pr_pri, -50, 50, 5);
+}</programlisting><para>The example script captures the degree to which priority is raised or
+lowered, and aggregates by scheduling class. Running the above script results
+in output similar to the following example:</para><screen><userinput># dtrace -s ./pri.d</userinput>
+dtrace: script './pri.d' matched 10 probes
+<userinput>^C</userinput>
+ IA                                                
+           value  -------------- Distribution ------------ count    
+           &lt; -50 |                                         20       
+             -50 |@                                        38       
+             -45 |                                         4        
+             -40 |                                         13       
+             -35 |                                         12       
+             -30 |                                         18       
+             -25 |                                         18       
+             -20 |                                         23       
+             -15 |                                         6        
+             -10 |@@@@@@@@                                 201      
+              -5 |@@@@@@                                   160      
+               0 |@@@@@                                    138      
+               5 |@                                        47       
+              10 |@@                                       66       
+              15 |@                                        36       
+              20 |@                                        26       
+              25 |@                                        28       
+              30 |                                         18       
+              35 |                                         22       
+              40 |                                         8        
+              45 |                                         11       
+           &gt;= 50 |@                                        34       
+
+  TS                                                
+           value  -------------- Distribution ------------ count    
+             -15 |                                         0        
+             -10 |@                                        1        
+              -5 |@@@@@@@@@@@@                             7        
+               0 |@@@@@@@@@@@@@@@@@@@@                     12       
+               5 |                                         0        
+              10 |@@@@@                                    3        
+              15 |                                         0</screen><para>The output shows the priority manipulation of the Interactive (IA) scheduling
+class. Instead of seeing priority <emphasis>manipulation</emphasis>, you might
+want to see the priority <emphasis>values</emphasis> of a particular process
+and thread over time. The following script uses the <literal>change-pri</literal> probe
+to display this information:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	start = timestamp;
+}
+
+sched:::change-pri
+/args[1]-&gt;pr_pid == $1 &amp;&amp; args[0]-&gt;pr_lwpid == $2/
+{
+	printf("%d %d\n", timestamp - start, args[2]);
+}
+
+tick-1sec
+/++n == 5/
+{
+	exit(0);
+}</programlisting><para>To see the change in priorities over time, type the following command
+in one window:</para><screen><userinput>$ echo $$</userinput>
+139208
+<userinput>$ while true ; do let i=0 ; done</userinput></screen><para>In another window, run the script and redirect the output to a file:</para><screen><userinput># dtrace -s ./pritime.d 139208 1 &gt; /tmp/pritime.out</userinput>
+#</screen><para>You can use the file <literal>/tmp/pritime.out</literal> that is generated
+above as input to plotting software to graphically display priority over time. <literal>gnuplot</literal> is a freely available plotting package that is included
+in the Solaris Freeware Companion CD. By default, <literal>gnuplot</literal> is
+installed in <literal>/opt/sfw/bin</literal>.</para>
+</sect2><sect2 id="chp-sched-15"><title><literal>tick</literal></title><para>Solaris uses <emphasis>tick-based CPU accounting</emphasis>, in which
+a system clock interrupt fires at a fixed interval and attributes CPU utilization
+to the threads and processes running at the time of the tick. The following
+example shows how to use the <literal>tick</literal> probe to observe this
+attribution:</para><screen><userinput># dtrace -n sched:::tick'{@[stringof(args[1]-&gt;pr_fname)] = count()}'</userinput>
+<userinput>^C</userinput>
+  arch                                                              1
+  sh                                                                1
+  sed                                                               1
+  echo                                                              1
+  ls                                                                1
+  FvwmAuto                                                          1
+  pwd                                                               1
+  awk                                                               2
+  basename                                                          2
+  expr                                                              2
+  resize                                                            2
+  tput                                                              2
+  uname                                                             2
+  fsflush                                                           2
+  dirname                                                           4
+  vim                                                               9
+  fvwm2                                                            10
+  ksh                                                              19
+  xterm                                                            21
+  Xsun                                                             93
+  MozillaFirebird                                                 260</screen><para>The system clock frequency varies from operating system to operating
+system, but generally ranges from 25 hertz to 1024 hertz. The Solaris system
+clock frequency is adjustable, but defaults to 100 hertz.</para><para>The <literal>tick</literal> probe only fires if the system clock detects
+a runnable thread. To use the <literal>tick</literal> probe to observe the
+system clock's frequency, you must have a thread that is always runnable.
+In one window, create a looping shell as shown in the following example:</para><screen><userinput>$ while true ; do let i=0 ; done</userinput></screen><para>In another window, run the following script:</para><programlisting>uint64_t last[int];
+
+sched:::tick
+/last[cpu]/
+{
+	@[cpu] = min(timestamp - last[cpu]);
+}
+
+sched:::tick
+{
+	last[cpu] = timestamp;
+}</programlisting><screen><userinput># dtrace -s ./ticktime.d</userinput>
+dtrace: script './ticktime.d' matched 2 probes
+<userinput>^C</userinput>
+
+  0          9883789</screen><para>The minimum interval is 9.8 millisecond, which indicates that the default
+clock tick frequency is 10 milliseconds (100 hertz). The observed minimum
+is somewhat less than 10 milliseconds due to jitter.</para><para>One deficiency of tick-based accounting is that the system clock that
+performs accounting is often also responsible for dispatching any time-related
+scheduling activity. As a result, if a thread is to perform some amount of
+work every clock tick (that is, every 10 milliseconds), the system will either
+over-account for the thread or under-account for the thread, depending on
+whether the accounting is done before or after time-related dispatching scheduling
+activity. In Solaris, accounting is performed before time-related dispatching.
+As a result, the system will under-account for threads running at regular
+interval. If such threads run for less than the clock tick interval, they
+can effectively &ldquo;hide&rdquo; behind the clock tick. The following example
+shows the degree to which the system has such threads:</para><programlisting>sched:::tick,
+sched:::enqueue
+{
+	@[probename] = lquantize((timestamp / 1000000) % 10, 0, 10);
+}</programlisting><para>The output of the example script is two distributions of the millisecond
+offset within a ten millisecond interval, one for the <literal>tick</literal> probe
+and another for <literal>enqueue</literal>:</para><screen><userinput># dtrace -s ./tick.d</userinput>
+dtrace: script './tick.d' matched 4 probes
+<userinput>^C</userinput>
+  tick                                              
+           value  -------------- Distribution ------------ count    
+               6 |                                         0        
+               7 |@                                        3        
+               8 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   79       
+               9 |                                         0        
+
+  enqueue                                           
+           value  -------------- Distribution ------------ count    
+             &lt; 0 |                                         0        
+               0 |@@                                       267      
+               1 |@@                                       300      
+               2 |@@                                       259      
+               3 |@@                                       291      
+               4 |@@@                                      360      
+               5 |@@                                       305      
+               6 |@@                                       295      
+               7 |@@@@                                     522      
+               8 |@@@@@@@@@@@@                             1315     
+               9 |@@@                                      337</screen><para>The output histogram named <literal>tick</literal> shows that the clock
+tick is firing at an 8 millisecond offset. If scheduling were not at all associated
+with the clock tick, the output for <literal>enqueue</literal> would be evenly
+spread across the ten millisecond interval. However, the output shows a spike
+at the same 8 millisecond offset, indicating that at least some threads in
+the system <emphasis>are</emphasis> being scheduled on a time basis.</para>
+</sect2>
+</sect1><sect1 id="chp-sched-stability"><title>Stability</title><para><indexterm><primary>stability</primary><secondary><literal>sched</literal></secondary></indexterm><indexterm><primary><literal>sched</literal> probe</primary><secondary>stability</secondary></indexterm>The <literal>sched</literal> provider
+uses DTrace's stability mechanism to describe its stabilities, as shown in
+the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000087721 0?>

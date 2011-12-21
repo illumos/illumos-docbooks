@@ -1,0 +1,682 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="powermgt-37437"><title>Power Management</title><highlights><para>Power management provides the ability to control and manage the electrical
+power usage of a computer system or device. Power management enables systems
+to conserve energy by using less power when idle and by shutting down completely
+when not in use. For example, desktop computer systems can use a significant
+amount of power and often are left idle, particularly at night. Power management
+software can detect that the system is not being used. Accordingly, power
+management can power down the system or some of its components.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="powermgt-69" remap="internal">Power Management Framework</olink></para>
+</listitem><listitem><para><olink targetptr="powermgt-112" remap="internal">Device Power Management Model</olink></para>
+</listitem><listitem><para><olink targetptr="powermgt-133" remap="internal">System Power Management Model</olink></para>
+</listitem><listitem><para><olink targetptr="powermgt-109" remap="internal">Power Management Device Access
+Example</olink></para>
+</listitem><listitem><para><olink targetptr="powermgt-144" remap="internal">Power Management Flow of Control</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="powermgt-69"><title>Power Management Framework</title><indexterm><primary>device power management</primary><secondary>definition of</secondary>
+</indexterm><para>The Solaris Power Management framework depends on device drivers to
+implement device-specific power management functions. The framework is implemented
+in two parts:</para><itemizedlist><listitem><para>Device power management &ndash; Automatically turns off unused
+devices to reduce power consumption</para>
+</listitem><listitem><para>System power management &ndash; Automatically turns off the
+computer when the entire system is idle</para>
+</listitem>
+</itemizedlist><sect2 id="powermgt-110"><title>Device Power Management</title><para><indexterm><primary>power management</primary><seealso>device power management</seealso></indexterm><indexterm><primary>power management</primary><seealso>system power management</seealso></indexterm>The framework enables
+devices to reduce their energy consumption after a specified idle time interval.
+As part of power management, system software checks for idle devices. The
+Power Management framework exports interfaces that enable communication between
+the system software and the device driver.</para><para>The Solaris Power Management framework provides the following features
+for device power management:</para><itemizedlist><listitem><para>A device-independent model for power-manageable devices.</para>
+</listitem><listitem><para><citerefentry><refentrytitle>dtpower</refentrytitle><manvolnum>1M</manvolnum></citerefentry>, a tool for configuring workstation power management.
+Power management can also be implemented through the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <filename>/etc/default/power</filename> files.</para>
+</listitem><listitem><para>A set of DDI interfaces for notifying the framework about
+power management compatibility and idleness state.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="powermgt-111"><title>System Power Management</title><para><indexterm><primary>system power management</primary><secondary>description of</secondary></indexterm>System power management involves saving the state
+of the system prior to powering the system down. Thus, the system can be returned
+to the same state immediately when the system is turned back on.</para><para>To shut down an entire system with return to the state prior to the
+shutdown, take the following steps:</para><itemizedlist><listitem><para>Stop kernel threads and user processes. Restart these threads
+and processes later.</para>
+</listitem><listitem><para>Save the hardware state of all devices on the system to disk.
+Restore the state later.</para>
+</listitem>
+</itemizedlist><note arch="sparc"><para>System power management is currently implemented
+only on some SPARC systems supported by the Solaris OS. See the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page for
+more information.</para>
+</note><para>The System Power Management framework in the Solaris OS provides the
+following features for system power management:</para><itemizedlist><listitem><para>A platform-independent model of system idleness.</para>
+</listitem><listitem><para><olink targetdoc="refman1m" targetptr="pmconfig-1m" remap="external"><citerefentry><refentrytitle>pmconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>,
+a tool for configuring workstation power management. Power management can
+also be implemented through the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <filename>/etc/default/power</filename> files.</para>
+</listitem><listitem><para>A set of interfaces for the device driver to override the
+method for determining which drivers have hardware state.</para>
+</listitem><listitem><para>A set of interfaces to enable the framework to call into the
+driver to save and restore the device state.</para>
+</listitem><listitem><para>A mechanism for notifying processes that a resume operation
+has occurred.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="powermgt-112"><title>Device Power Management Model</title><para><indexterm><primary>device power management</primary><secondary>model</secondary></indexterm>The following sections describe the details of the device power
+management model. This model includes the following elements:</para><itemizedlist><listitem><para>Components</para>
+</listitem><listitem><para>Idleness</para>
+</listitem><listitem><para>Power levels</para>
+</listitem><listitem><para>Dependency</para>
+</listitem><listitem><para>Policy</para>
+</listitem><listitem><para>Device power management interfaces</para>
+</listitem><listitem><para>Power management entry points</para>
+</listitem>
+</itemizedlist><sect2 id="powermgt-113"><title>Power Management Components</title><para><indexterm><primary>device power management</primary><secondary>components</secondary></indexterm>A device is power manageable if the power consumption of the device
+can be reduced when the device is idle. Conceptually, a power-manageable device
+consists of a number of power-manageable hardware units that are called <emphasis>components</emphasis>.</para><para>The device driver notifies the system about device components and their
+associated  power levels. Accordingly, the driver creates a <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> property
+in the driver's  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point as part of driver initialization.</para><para>Most devices that are power manageable implement only a single component.
+An example of a single-component, power-manageable device is  a disk whose
+spindle motor can be stopped to save power when the disk is idle.</para><para>If a device has multiple power-manageable units that are separately
+controllable, the device should implement multiple components.</para><para>An example of a two-component, power-manageable device is a frame buffer
+card with a monitor. Frame buffer electronics is the first component [component
+0]. The frame buffer's power consumption can be reduced when not in use. The
+monitor is the second component [component 1]. The monitor can also enter
+a lower power mode when the monitor is not in use. The frame buffer electronics
+and monitor are considered by the system as one device with two components.</para><sect3 id="powermgt-114"><title>Multiple Power Management Components</title><indexterm><primary>device power management</primary><secondary><function>pm_raise_power</function> function</secondary>
+</indexterm><para>To the power management framework, all components are considered equal
+and completely independent of each other. If the component states are not
+completely compatible, the device driver must ensure that undesirable state
+combinations do not occur.  For example, a frame buffer/monitor card  has
+the following possible states: <literal>D0</literal>, <literal>D1</literal>, <literal>D2</literal>, and <literal>D3</literal>. The monitor attached to the card
+has the following potential states: <literal>On</literal>, <literal>Standby</literal>, <literal>Suspend</literal>, and  <literal>Off</literal>.  These states are not necessarily
+compatible with each other. For example, if the monitor is <literal>On</literal>,
+then the frame buffer must be at <literal>D0</literal>, that is, full on.
+If the frame buffer driver gets a request to power up the monitor to <literal>On</literal> while
+the frame buffer is at  <literal>D3</literal>, the driver must call <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to bring
+the frame buffer up before setting the monitor <literal>On</literal>. System
+requests to lower the power of the frame buffer while the monitor is <literal>On</literal> must
+be refused by the driver.</para>
+</sect3>
+</sect2><sect2 id="powermgt-115"><title>Power Management States</title><indexterm><primary>device power management</primary><secondary><function>pm_busy_component</function> function</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>pm_idle_component</function> function</secondary>
+</indexterm><para>Each component of a device can be in one of two states: <emphasis>busy</emphasis> or <emphasis>idle</emphasis>. The device driver notifies the framework of changes in the
+device state by calling  <olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and  <olink targetdoc="refman9f" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. When components are initially
+created, the components are considered idle.</para>
+</sect2><sect2 id="powermgt-116"><title>Power Levels</title><indexterm><primary>device power management</primary><secondary>power levels</secondary>
+</indexterm><para>From the <literal>pm-components</literal> property exported by the device,
+the Device Power Management framework knows what power levels the device supports.
+Power-level values must be positive integers.  The interpretation of power
+levels is determined by the device driver writer. Power levels must be listed
+in monotonically increasing order in the <literal>pm-components</literal> property.
+A power level of 0 is interpreted by the framework to mean off.  When the
+framework must power up a device due to a dependency, the framework sets each
+component at its highest power level.</para><para>The following example shows a <literal>pm-components</literal> entry
+from the <literal>.conf</literal> file of a driver that implements a single
+power-managed component consisting of a disk spindle motor. The disk spindle
+motor is component 0. The spindle motor supports two power levels. These levels
+represent &ldquo;stopped&rdquo; and &ldquo;spinning at full speed.&rdquo;</para><example id="powermgt-ex-117"><title>Sample <literal>pm-component</literal> Entry</title><programlisting>pm-components="NAME=Spindle Motor", "0=Stopped", "1=Full Speed";</programlisting>
+</example><para>The following example shows how <olink targetptr="powermgt-ex-117" remap="internal">Example&nbsp;12&ndash;1</olink> could be implemented in the <function>attach</function> routine of
+the driver.</para><example id="powermgt-ex-118"><title><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine With <literal>pm-components</literal> Property</title><programlisting>static char *pmcomps[] = {
+    "NAME=Spindle Motor",
+    "0=Stopped",
+    "1=Full Speed"
+};
+/* ... */
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    /* ... */
+    if (ddi_prop_update_string_array(DDI_DEV_T_NONE, dip,
+        "pm-components", &amp;pmcomp[0],
+        sizeof (pmcomps) / sizeof (char *)) != DDI_PROP_SUCCESS)
+        goto failed;
+    /* ... */</programlisting>
+</example><para>The following example shows a frame buffer that implements two components.
+Component 0 is the frame buffer electronics that support four different power
+levels. Component 1 represents the state of power management of the attached
+monitor.</para><example id="powermgt-ex-119"><title>Multiple Component <literal>pm-components</literal> Entry</title><programlisting>pm-components="NAME=Frame Buffer", "0=Off", "1=Suspend", \
+    "2=Standby", "3=On",
+    "NAME=Monitor", "0=Off", "1=Suspend", "2=Standby", "3=On";</programlisting>
+</example><para><indexterm><primary>device power management</primary><secondary><function>pm_raise_power</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_lower_power</function> function</secondary></indexterm>When a device driver is first attached, the framework does not
+know the power level of the device. A power transition can occur when:</para><itemizedlist><listitem><para>The driver calls <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>The framework has lowered the power level of a component because
+a time threshold has been exceeded.</para>
+</listitem><listitem><para>Another device has changed power and a dependency exists between
+the two devices. See <olink targetptr="powermgt-120" remap="internal">Power Management Dependencies</olink>.</para>
+</listitem>
+</itemizedlist><para>After a power transition, the framework begins tracking the power level
+of each component of the device. Tracking also occurs if the driver has informed
+the framework of the power level. The driver informs the framework of a power
+level change by calling <olink targetdoc="refman9f" targetptr="pm-power-has-changed-9f" remap="external"><citerefentry><refentrytitle>pm_power_has_changed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The system calculates a default threshold for each potential power transition.
+These thresholds are based on the system idleness threshold. The default thresholds
+can be overridden using <command>pmconfig</command> or <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. Another default threshold
+based on the system idleness threshold is used when the component power level
+is unknown.</para>
+</sect2><sect2 id="powermgt-120"><title>Power Management Dependencies</title><indexterm><primary>device power management</primary><secondary>dependency</secondary>
+</indexterm><indexterm><primary>dependency</primary>
+</indexterm><para>Some devices should be powered down only when other devices are also
+powered down. For example, if a CD-ROM drive is allowed to power down, necessary
+functions, such as the ability to eject a CD, might be lost.</para><para>To prevent a device from powering down independently, you can make that
+device dependent on another device that is likely to remain powered on. Typically,
+a device is made dependent upon a frame buffer, because a monitor is generally
+on whenever a user is utilizing a system.</para><para><indexterm><primary sortas="etc/power.conf"><filename>/etc/power.conf</filename> file</primary><secondary>device dependencies</secondary></indexterm><indexterm><primary><filename>power.conf</filename> file</primary><see><filename>/etc/power.conf</filename> file</see></indexterm>The <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>file specifies the dependencies
+among devices. (A parent node in the device tree implicitly depends upon its
+children. This dependency is handled automatically by the power management
+framework.) You can specify a particular dependency with a <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> entry of this
+form:</para><programlisting>device-dependency <replaceable>dependent-phys-path</replaceable> <replaceable>phys-path</replaceable></programlisting><para><indexterm><primary>device-dependency</primary><secondary><filename>power.conf</filename> entry</secondary></indexterm>Where <replaceable>dependent-phys-path</replaceable> is
+the device that is kept powered up, such as the CD-ROM drive. <replaceable>phys-path</replaceable> represents the device whose power state is to be depended on,
+such as the frame buffer.</para><para><indexterm><primary>device-dependency-property</primary><secondary><filename>power.conf</filename> entry</secondary></indexterm>Adding an entry to <filename>power.conf</filename> for every new device that is plugged into the system would be
+burdensome. The following syntax enables you to indicate dependency in a more
+general fashion:</para><programlisting>device-dependency-property <replaceable>property</replaceable> <replaceable>phys-path</replaceable></programlisting><para><indexterm><primary>removable-media</primary></indexterm><indexterm><primary>properties</primary><secondary>removable-media</secondary></indexterm>Such
+an entry mandates that any device that exports the property <replaceable>property</replaceable> must be dependent upon the device named by <replaceable>phys-path</replaceable>.
+Because this dependency applies especially to removable-media devices, <filename>/etc/power.conf</filename> includes the following line by default:</para><programlisting>device_dependent-property  removable-media  /dev/fb</programlisting><para>With this syntax, no device that exports the <property>removable-media</property> 
+property can be powered down unless the console frame buffer is also powered
+down.</para><para>For more information, see the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <olink targetdoc="refman9s" targetptr="removable-media-9p" remap="external"><citerefentry><refentrytitle>removable-media</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> man pages.</para>
+</sect2><sect2 id="powermgt-121"><title>Automatic Power Management for Devices</title><para>If automatic power management is enabled by <command>pmconfig</command> or <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>, then all
+devices with a <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> property automatically will use power management.
+ After a component has been idle for a default period, the component is automatically
+lowered to the next lowest power level. The default period is calculated by
+the power management framework to set the entire device to its lowest power
+state within the system idleness threshold.</para><note><para>By default, automatic power management is enabled on all SPARC
+desktop systems first shipped after July 1, 1999. This feature is disabled
+by default for all other systems. To determine whether automatic power management
+is enabled on your machine, refer to the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page for instructions.</para>
+</note><para><olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> can
+be used to override the defaults calculated by the framework.</para>
+</sect2><sect2 id="powermgt-122"><title>Device Power Management Interfaces</title><para><indexterm><primary>device power management</primary><secondary>interfaces</secondary></indexterm>A device driver that supports a device with power-manageable components
+must create a <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> property.  This property indicates to the system that
+the device has power-manageable components. <literal>pm-components</literal> also
+tells the system which power levels are available. The driver typically informs
+the system by calling <olink targetdoc="refman9f" targetptr="ddi-prop-update-string-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_string_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> from the
+driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. An alternative means of informing the system is from a <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file.  See
+the <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> man page for details.</para><sect3 id="powermgt-123"><title>Busy-Idle State Transitions</title><para><indexterm><primary>device power management</primary><secondary>state transitions</secondary></indexterm>The driver must keep the framework informed
+of device state transitions from idle to busy or busy to idle. Where these
+transitions happen is entirely device-specific. The transitions between the
+busy and idle states depend on the nature of the device and the abstraction
+represented by the specific component. For example, SCSI disk target drivers
+typically export a single component, which represents whether the SCSI target
+disk drive is spun up or not. The component is marked busy whenever an outstanding
+request to the drive exists. The component is marked idle when the last queued
+request finishes. Some components are created and never marked busy. For example,
+components created by <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> are created in an idle state.</para><para>The <olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> interfaces notify the power
+management framework of busy-idle state transitions. The <olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> call has the following syntax:</para><programlisting>int pm_busy_component(dev_info_t *<replaceable>dip</replaceable>, int <replaceable>component</replaceable>);</programlisting><para><indexterm><primary>device power management</primary><secondary><function>pm_raise_power</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_busy_component</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_idle_component</function> function</secondary></indexterm><indexterm><primary>functions</primary><seealso>device power management</seealso></indexterm><olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> marks <replaceable>component</replaceable> as busy.
+While the component is busy, that component should not be powered off. If
+the component is already powered off, then marking that component busy does
+not change the power level. The driver needs to call  <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for this purpose. Calls to
+ <olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> are cumulative and require a corresponding number
+of calls to <command>pm_idle_component</command>(9F) to idle the component.</para><para>The  <olink targetdoc="refman9f" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine has the following syntax:</para><programlisting>int pm_idle_component(dev_info_t *<replaceable>dip</replaceable>, int <replaceable>component</replaceable>);</programlisting><para><indexterm><primary>device power management</primary><secondary><function>pm_idle_component</function> function</secondary></indexterm><olink targetdoc="refman9f" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> marks <replaceable>component</replaceable> as
+idle. An idle component is subject to being powered off. <literal>pm_idle_component(9F)</literal> must be called once for each call to <literal>pm_busy_component(9F)</literal> in
+order to idle the component.</para>
+</sect3><sect3 id="powermgt-126"><title>Device Power State Transitions</title><para><indexterm><primary>no-involuntary-power-cycles property</primary></indexterm><indexterm><primary>properties</primary><secondary>no-involuntary-power-cycles</secondary></indexterm><indexterm><primary>power cycle</primary></indexterm>A
+device driver can call <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to request that a component be set to at least a given
+power level. Setting the power level in this manner is necessary before using
+a component that has been powered off. For example, the <olink targetdoc="refman9e" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine of a SCSI disk target
+driver might need to spin up the disk, if the disk has been powered off. The <citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function requests the power management framework to initiate
+a device power state transition to a higher power level. Normally, reductions
+in component power levels are initiated by the framework. However, a device
+driver should call <olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when detaching, in order to reduce the power consumption
+of unused devices as much as possible.</para><para>Powering down can pose risks for some devices. For example, some tape
+drives damage tapes when power is removed. Similarly, some disk drives have
+a limited tolerance for power cycles, because each cycle results in a head
+landing. Use the <olink targetdoc="refman9s" targetptr="no-involuntary-power-cycles-9p" remap="external"><citerefentry><refentrytitle>no-involuntary-power-cycles</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> property
+to notify the system that the device driver should control all power cycles
+for the device. This approach prevents power from being removed from a device
+while the device driver is detached unless the device was powered off by a
+driver's call to <citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry> from its <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para>The <citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is called when the driver discovers that
+a component needed for some operation is at an insufficient power level. This
+interface causes the driver to raise the current power level of the component
+to the needed level. All the devices that depend on this device are also brought
+back to full power by this call.</para><para>Call the <olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function when the device is detaching once access
+to the device is no longer needed. Call <citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to set each component
+at the lowest power so that the device uses as little power as possible while
+not in use. The <function>pm_lower_power</function> function must be called
+from the <function>detach</function> entry point. The <function>pm_lower_power</function> function
+has no effect if it is called from any other part of the driver.</para><para>The <olink targetdoc="refman9f" targetptr="pm-power-has-changed-9f" remap="external"><citerefentry><refentrytitle>pm_power_has_changed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function is called to notify the framework about a
+power transition. The transition might be due to the device changing its own
+power level. The transition might also be due to an operation such as suspend-resume.
+The syntax for <olink targetdoc="refman9f" targetptr="pm-power-has-changed-9f" remap="external"><citerefentry><refentrytitle>pm_power_has_changed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is the same as the syntax for <citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para>
+</sect3>
+</sect2><sect2 id="powermgt-129"><title><function>power</function> Entry Point</title><indexterm><primary>entry points</primary><secondary><function>power</function> function</secondary>
+</indexterm><para><indexterm><primary>device power management</primary><secondary><function>power</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary>entry points</secondary></indexterm><indexterm><primary>entry points</primary><secondary sortas="device">for device power management</secondary></indexterm>The power management framework uses the <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para><function>power</function> uses the following syntax:</para><programlisting>int power(dev_info_t *<replaceable>dip</replaceable>, int <replaceable>component</replaceable>, int <replaceable>level</replaceable>);</programlisting><para>When a component's power level needs to be changed, the system calls
+the <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. The action taken by this entry point is device driver-specific. In
+the example of the SCSI target disk driver mentioned previously, setting the
+power level to 0 results in sending a SCSI command to spin down the disk,
+while setting the power level to the full power level results in sending a
+SCSI command to spin up the disk.</para><para>If a power transition can cause the device to lose state, the driver
+must save any necessary state in memory for later restoration. If a power
+transition requires the saved state to be restored before the device can be
+used again, then the driver must restore that state. The framework makes no
+assumptions about what power transactions cause the loss of state or require
+the restoration of state for automatically power-managed devices. The following
+example shows a sample <function>power</function> routine.</para><example id="powermgt-ex-131"><title>Using the <function>power</function> Routine
+for a Single-Component Device</title><programlisting>int
+xxpower(dev_info_t *dip, int component, int level)
+{
+    struct xxstate *xsp;
+    int instance;
+
+    instance = ddi_get_instance(dip);
+    xsp = ddi_get_soft_state(statep, instance);
+    /*
+     * Make sure the request is valid
+     */
+    if (!xx_valid_power_level(component, level))
+        return (DDI_FAILURE);
+    mutex_enter(&amp;xsp-&gt;mu);
+    /*
+     * If the device is busy, don't lower its power level
+     */
+    if (xsp-&gt;xx_busy[component] &amp;&amp;
+        xsp-&gt;xx_power_level[component] &gt; level) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_FAILURE);
+    }
+
+    if (xsp-&gt;xx_power_level[component] != level) {
+        /*
+         * device- and component-specific setting of power level
+         * goes here
+         */
+        xsp-&gt;xx_power_level[component] = level;
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    return (DDI_SUCCESS);
+}</programlisting>
+</example><para>The following example is a <function>power</function> routine for a
+device with two components, where component 0 must be on when component 1
+is on.</para><example id="powermgt-ex-132"><title><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine for Multiple-Component Device</title><programlisting>int
+xxpower(dev_info_t *dip, int component, int level)
+{
+    struct xxstate *xsp;
+    int instance;
+
+    instance = ddi_get_instance(dip);
+    xsp = ddi_get_soft_state(statep, instance);
+    /*
+     * Make sure the request is valid
+     */
+    if (!xx_valid_power_level(component, level))
+        return (DDI_FAILURE);
+    mutex_enter(&amp;xsp-&gt;mu);
+    /*
+     * If the device is busy, don't lower its power level
+     */
+    if (xsp-&gt;xx_busy[component] &amp;&amp;
+        xsp-&gt;xx_power_level[component] &gt; level) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_FAILURE);
+    }
+    /*
+     * This code implements inter-component dependencies:
+     * If we are bringing up component 1 and component 0 
+     * is off, we must bring component 0 up first, and if
+     * we are asked to shut down component 0 while component
+     * 1 is up we must refuse
+     */
+    if (component == 1 &amp;&amp; level &gt; 0 &amp;&amp; xsp-&gt;xx_power_level[0] == 0) {
+        xsp-&gt;xx_busy[0]++;
+        if (pm_busy_component(dip, 0) != DDI_SUCCESS) {
+            /*
+             * This can only happen if the args to 
+             * pm_busy_component()
+             * are wrong, or pm-components property was not
+             * exported by the driver.
+             */
+            xsp-&gt;xx_busy[0]--;
+            mutex_exit(&amp;xsp-&gt;mu);
+            cmn_err(CE_WARN, "xxpower pm_busy_component() 
+                failed");
+            return (DDI_FAILURE);
+        }
+        mutex_exit(&amp;xsp-&gt;mu);
+        if (pm_raise_power(dip, 0, XX_FULL_POWER_0) != DDI_SUCCESS)
+            return (DDI_FAILURE);
+        mutex_enter(&amp;xsp-&gt;mu);
+    }
+    if (component == 0 &amp;&amp; level == 0 &amp;&amp; xsp-&gt;xx_power_level[1] != 0) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_FAILURE);
+    }
+    if (xsp-&gt;xx_power_level[component] != level) {
+        /*
+         * device- and component-specific setting of power level
+         * goes here
+         */
+        xsp-&gt;xx_power_level[component] = level;
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    return (DDI_SUCCESS);
+}</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="powermgt-133"><title>System Power Management Model</title><para><indexterm><primary>system power management</primary><secondary>model</secondary></indexterm>This section describes the details of the System Power Management
+model. The model includes the following components:</para><itemizedlist><listitem><para>Autoshutdown threshold</para>
+</listitem><listitem><para>Busy state</para>
+</listitem><listitem><para>Hardware state</para>
+</listitem><listitem><para>Policy</para>
+</listitem><listitem><para>Power management entry points</para>
+</listitem>
+</itemizedlist><sect2 id="powermgt-134"><title>Autoshutdown Threshold</title><para><indexterm><primary>autoshutdown threshold</primary></indexterm>The
+system can be shut down, that is, powered off, automatically after a configurable
+period of idleness. This period is known as the <emphasis>autoshutdown threshold</emphasis>.
+This behavior is enabled by default for SPARC desktop systems first shipped
+after October 1, 1995 and before July 1, 1999. See the <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>man page for more information.
+Autoshutdown can be overridden using <citerefentry><refentrytitle>dtpower</refentrytitle><manvolnum>1M</manvolnum></citerefentry> or <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="powermgt-135"><title>Busy State</title><para>The busy state of the system can be measured in several ways. The currently
+supported built-in metric items are keyboard characters, mouse activity, <literal>tty</literal> characters, load average, disk reads, and NFS requests. Any
+one of these items can make the system busy. In addition to the built-in metrics,
+an interface is defined for running a user-specified process that can indicate
+that the system is busy.</para>
+</sect2><sect2 id="powermgt-136"><title>Hardware State</title><para><indexterm><primary>system power management</primary><secondary>saving hardware state</secondary></indexterm><indexterm><primary>properties</primary><secondary><literal>reg</literal> property</secondary></indexterm>Devices
+that export a <literal>reg</literal> property are considered to have hardware
+state that must be saved prior to shutting down the system. A device without
+the  <literal>reg</literal> property is considered to be stateless. However,
+this consideration can be overridden by the device driver.</para><para><indexterm><primary>hardware state in power management</primary></indexterm><indexterm><primary>device state in power management</primary></indexterm><indexterm><primary>properties</primary><secondary><literal>pm-hardware-state</literal> property</secondary></indexterm>A device with hardware state but
+no <literal>reg</literal> property, such as a SCSI driver, must be called
+to save and restore the state if the driver exports a <literal>pm-hardware-state</literal> property
+with the value <literal>needs-suspend-resume</literal>. Otherwise, the lack
+of a <literal>reg</literal> property is taken to mean that the device has
+no hardware state. For information on device properties, see <olink targetptr="properties-1" remap="internal">Chapter&nbsp;4, Properties</olink>.</para><para>A device with a <literal>reg</literal> property and no hardware state
+can export a <literal>pm-hardware-state</literal> property with the value <literal>no-suspend-resume</literal>. Using <literal>no-suspend-resume</literal> with
+the <literal>pm-hardware-state</literal> property keeps the framework from
+calling the driver to save and restore that state. For more information on
+power management properties, see the <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> man page.</para>
+</sect2><sect2 id="powermgt-137"><title>Automatic Power Management for Systems</title><para><indexterm><primary>system power management</primary><secondary>policy</secondary></indexterm>The system is shut down if the following conditions apply:</para><itemizedlist><listitem><para>Autoshutdown is enabled by <citerefentry><refentrytitle>dtpower</refentrytitle><manvolnum>1M</manvolnum></citerefentry> or <olink targetdoc="refman4" targetptr="power.conf-4" remap="external"><citerefentry><refentrytitle>power.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>The system has been idle for <emphasis>autoshutdown threshold</emphasis> minutes.</para>
+</listitem><listitem><para>All of the metrics that are specified in <filename>power.conf</filename> have
+been satisfied.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="powermgt-138"><title>Entry Points Used by System Power Management</title><para><indexterm><primary>system power management</primary><secondary>entry points</secondary></indexterm><indexterm><primary>entry points</primary><secondary sortas="system">system power management</secondary></indexterm>System
+power management passes the command <command>DDI_SUSPEND</command> to the
+ <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> driver entry
+point to request the driver to save the device hardware state. System power
+management passes the command <command>DDI_RESUME</command> to the  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> driver entry point to request
+the driver to restore the device hardware state.</para><sect3 id="powermgt-139"><title><function>detach</function> Entry Point</title><indexterm><primary>entry points</primary><secondary><function>detach</function> function</secondary>
+</indexterm><para>The syntax for <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is
+as follows:</para><programlisting>int detach(dev_info_t *<replaceable>dip</replaceable>, ddi_detach_cmd_t <replaceable>cmd</replaceable>);</programlisting><para><indexterm><primary><literal>DDI_SUSPEND</literal></primary><secondary><function>detach</function> function</secondary></indexterm>A device with a <property>reg</property> property
+or a <property>pm-hardware-state</property> property set to <literal>needs-suspend-resume</literal> must be able to save the hardware state of the device. The  framework
+calls into the driver's  <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point to enable the driver to save the state for restoration  after the system
+power returns. To process the <command>DDI_SUSPEND</command> command,  <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must perform the following
+tasks:</para><itemizedlist><listitem><para>Block further operations from being initiated until the device
+is resumed, except for <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> requests.</para>
+</listitem><listitem><para>Wait until outstanding operations have completed. If an outstanding
+operation can be restarted, you can abort that operation.</para>
+</listitem><listitem><para>Cancel any timeouts and callbacks that are pending.</para>
+</listitem><listitem><para>Save any volatile hardware state to memory. The state includes
+the contents of device registers, and can also include downloaded firmware.</para>
+</listitem>
+</itemizedlist><para>If  the driver is unable to suspend the device and save its state to
+memory, then the driver must return <command>DDI_FAILURE</command>. The framework
+then aborts the system power management operation.</para><para><indexterm><primary><function>ddi_removing_power</function> function</primary></indexterm><indexterm><primary><literal>DDI_RESUME</literal></primary><secondary><function>detach</function> function</secondary></indexterm>In
+some cases, powering down a device involves certain risks. For example, if
+a tape drive is powered off with a tape inside, the tape can be damaged. In
+such a case, <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> should
+do the following:</para><itemizedlist><listitem><para>Call <olink targetdoc="refman9f" targetptr="ddi-removing-power-9f" remap="external"><citerefentry><refentrytitle>ddi_removing_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+whether a <command>DDI_SUSPEND</command> command can cause power to be removed
+from the device.</para>
+</listitem><listitem><para>Determine whether power removal can cause problems.</para>
+</listitem>
+</itemizedlist><para>If both cases are true, the <command>DDI_SUSPEND</command> request should
+be rejected. <olink targetptr="powermgt-ex-140" remap="internal">Example&nbsp;12&ndash;6</olink> shows
+an <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+using <olink targetdoc="refman9f" targetptr="ddi-removing-power-9f" remap="external"><citerefentry><refentrytitle>ddi_removing_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to check whether the <command>DDI_SUSPEND</command> command
+causes problems.</para><para>Dump requests must be honored. The framework uses the  <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point to write out
+the state file that contains the contents of memory. See  the <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man page for the restrictions
+that are imposed on the device driver when using this entry point.</para><para>Calling the  <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point  of a power-manageable component with the <command>DDI_SUSPEND</command> command
+should save the state when the device is powered off. The driver should cancel
+pending timeouts. The driver should also suppress any calls to  <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> except for <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> requests. When the device
+is resumed by a call to  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> with
+a command of <command>DDI_RESUME</command>, timeouts and calls to <function>pm_raise_power</function> can be resumed. The driver must keep sufficient track of its state
+to be able to deal appropriately with this possibility. The following example
+shows a <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+with the <command>DDI_SUSPEND</command> command implemented.</para><example id="powermgt-ex-140"><title><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine Implementing <command>DDI_SUSPEND</command></title><programlisting>int
+xxdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+    struct xxstate *xsp;
+    int instance;
+
+    instance = ddi_get_instance(dip);
+    xsp = ddi_get_soft_state(statep, instance);
+
+    switch (cmd) {
+    case DDI_DETACH:
+        /* ... */
+    case DDI_SUSPEND:
+        /*
+         * We do not allow DDI_SUSPEND if power will be removed and
+         * we have a device that damages tape when power is removed
+         * We do support DDI_SUSPEND for Device Reconfiguration.
+         */
+        if (ddi_removing_power(dip) &amp;&amp; xxdamages_tape(dip))
+            return (DDI_FAILURE);
+        mutex_enter(&amp;xsp-&gt;mu);
+        xsp-&gt;xx_suspended = 1;  /* stop new operations */
+        /*
+         * Sleep waiting for all the commands to be completed
+         *
+         * If a callback is outstanding which cannot be cancelled
+         * then either wait for the callback to complete or fail the
+         * suspend request
+         *
+         * This section is only needed if the driver maintains a
+         * running timeout
+         */
+        if (xsp-&gt;xx_timeout_id) {
+            timeout_id_t temp_timeout_id = xsp-&gt;xx_timeout_id;
+            xsp-&gt;xx_timeout_id = 0;
+            mutex_exit(&amp;xsp-&gt;mu);
+            untimeout(temp_timeout_id);
+            mutex_enter(&amp;xsp-&gt;mu);
+        }
+        if (!xsp-&gt;xx_state_saved) {
+            /*
+             * Save device register contents into
+             * xsp-&gt;xx_device_state
+             */
+        }
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_SUCCESS);
+    default:
+        return (DDI_FAILURE);
+}</programlisting>
+</example>
+</sect3><sect3 id="powermgt-141"><title><function>attach</function> Entry Point</title><indexterm><primary>entry points</primary><secondary><function>attach</function> function</secondary>
+</indexterm><para>The syntax for <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is
+as follows:</para><programlisting>int attach(dev_info_t *<replaceable>dip</replaceable>, ddi_attach_cmd_t <replaceable>cmd</replaceable>);</programlisting><para><indexterm><primary>properties</primary><secondary><literal>pm-hardware-state</literal> property</secondary></indexterm>When power is restored to the system,
+each device with a <literal>reg</literal> property or with a <literal>pm-hardware-state</literal> property of value <literal>needs-suspend-resume</literal> has its
+ <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+called with a command value of <command>DDI_RESUME</command>. If the system
+shutdown is aborted, each suspended driver is called to resume even though
+the power has not been shut off. Consequently, the resume code in  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must make no assumptions
+about whether the system actually lost power.</para><para>The power management framework considers the power level of the components
+to be unknown at <command>DDI_RESUME</command> time. Depending on the nature
+of the device, the driver writer has two choices:</para><itemizedlist><listitem><para>If the driver can determine the actual power level of the
+components of the device without powering the components up, such as by reading
+a register, then the driver should notify the framework of the power level
+of each component by calling <olink targetdoc="refman9f" targetptr="pm-power-has-changed-9f" remap="external"><citerefentry><refentrytitle>pm_power_has_changed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>If the driver cannot determine the power levels of the components,
+then the driver should mark each component internally as unknown and call <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> before the
+first access to each component.</para>
+</listitem>
+</itemizedlist><para>The following example shows an <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine with the <command>DDI_RESUME</command> command.</para><example id="powermgt-ex-142"><title><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine Implementing <command>DDI_RESUME</command></title><programlisting>int
+xxattach(devinfo_t *dip, ddi_attach_cmd_t cmd)
+{
+    struct xxstate *xsp;
+    int    instance;
+
+    instance = ddi_get_instance(dip);
+    xsp = ddi_get_soft_state(statep, instance);
+
+    switch (cmd) {
+    case DDI_ATTACH:
+    /* ... */
+    case DDI_RESUME:
+        mutex_enter(&amp;xsp-&gt;mu);
+        if (xsp-&gt;xx_pm_state_saved) {
+            /*
+             * Restore device register contents from
+             * xsp-&gt;xx_device_state
+             */
+        }
+        /*
+         * This section is optional and only needed if the
+         * driver maintains a running timeout
+         */
+        xsp-&gt;xx_timeout_id = timeout( /* ... */ );
+
+        xsp-&gt;xx_suspended = 0;        /* allow new operations */
+        cv_broadcast(&amp;xsp-&gt;xx_suspend_cv);
+        /* If it is possible to determine in a device-specific 
+         * way what the power levels of components are without 
+         * powering the components up,
+         * then the following code is recommended
+         */
+        for (i = 0; i &lt; num_components; i++) {
+            xsp-&gt;xx_power_level[i] = xx_get_power_level(dip, i);
+            if (xsp-&gt;xx_power_level[i] != XX_LEVEL_UNKNOWN)
+                (void) pm_power_has_changed(dip, i, 
+                    xsp-&gt;xx_power_level[i]);
+        }
+        mutex_exit(&amp;xsp-&gt;mu);
+        return(DDI_SUCCESS);
+    default:
+        return(DDI_FAILURE);
+    }
+}</programlisting>
+</example><note><para>The  <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and
+ <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> interfaces
+can also be used to resume a system that has been quiesced.</para>
+</note>
+</sect3>
+</sect2>
+</sect1><sect1 id="powermgt-109"><title>Power Management Device Access Example</title><para>If power management is supported, and  <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> are used as in <olink targetptr="powermgt-ex-140" remap="internal">Example&nbsp;12&ndash;6</olink> and <olink targetptr="powermgt-ex-142" remap="internal">Example&nbsp;12&ndash;7</olink>, then access to
+the device can be made from user context, for example, from  <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="ioctl-2" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>The following example demonstrates this approach. The example assumes
+that the operation about to be performed requires a component <literal>component</literal> that
+is operating at power level <literal>level</literal>.</para><example id="powermgt-ex-143"><title>Device Access</title><programlisting>mutex_enter(&amp;xsp-&gt;mu);
+/*
+ * Block command while device is suspended by DDI_SUSPEND
+ */
+while (xsp-&gt;xx_suspended)
+    cv_wait(&amp;xsp-&gt;xx_suspend_cv, &amp;xsp-&gt;mu);
+/*
+ * Mark component busy so xx_power() will reject attempt to lower power
+ */
+xsp-&gt;xx_busy[component]++;
+if (pm_busy_component(dip, component) != DDI_SUCCESS) {
+    xsp-&gt;xx_busy[component]--;
+    /*
+     * Log error and abort
+     */
+}
+if (xsp-&gt;xx_power_level[component] &lt; level) {
+    mutex_exit(&amp;xsp-&gt;mu);
+    if (pm_raise_power(dip, component, level) != DDI_SUCCESS) {
+        /*
+         * Log error and abort
+         */
+    }
+    mutex_enter(&amp;xsp-&gt;mu);
+}</programlisting>
+</example><para>The code fragment in the following example can be used when device operation
+completes, for example, in the device's interrupt handler.</para><example id="powermgt-ex-147"><title>Device Operation Completion</title><programlisting>/*
+ * For each command completion, decrement the busy count and unstack
+ * the pm_busy_component() call by calling pm_idle_component(). This
+ * will allow device power to be lowered when all commands complete
+ * (all pm_busy_component() counts are unstacked)
+ */
+xsp-&gt;xx_busy[component]--;
+if (pm_idle_component(dip, component) != DDI_SUCCESS) {
+    xsp-&gt;xx_busy[component]++;
+    /*
+     * Log error and abort
+     */
+}
+/*
+ * If no more outstanding commands, wake up anyone (like DDI_SUSPEND)
+ * waiting for all commands to  be completed
+ */</programlisting>
+</example>
+</sect1><sect1 id="powermgt-144"><title>Power Management Flow of Control</title><para><indexterm><primary>power management</primary><secondary>flow of control</secondary></indexterm><indexterm><primary>flow of control for power management</primary></indexterm><olink targetptr="powermgt-fig-145" remap="internal">Figure&nbsp;12&ndash;1</olink> illustrates
+the flow of control in the power management framework. </para><para>When a component's activity is complete, a driver can call <olink targetdoc="refman9f" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to mark the component as idle.  When the component
+has been idle for its threshold time, the framework can lower the power of
+the component to its next lower level.  The framework calls the <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function to set the component's
+power to the next lower supported power level, if a lower level exists.  The
+driver's <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function
+should reject any attempt to lower the power level of a component when that
+component is busy.  The  <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function
+should save any state that could be lost in a transition to a lower  level
+prior to making that transition.</para><para>When the component is needed at a higher level, the driver calls <olink targetdoc="refman9f" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. This call keeps the framework from lowering the power
+still further and then calls <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> on the component.  The framework
+next calls <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to
+raise the power of the component before the call to <olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns.  The driver's <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> code must restore any state
+that was lost in the lower level but that is needed in the higher level.</para><para>When a driver is detaching, the driver should call <olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for each
+component to lower its power to its lowest level. The framework can then call
+the driver's <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+to lower the power of the component before the call to <olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns.</para><figure id="powermgt-fig-145"><title>Power Management Conceptual State Diagram</title><mediaobject><imageobject><imagedata entityref="powermgt.concept.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the flow of control through power management
+routines.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="powermgt-148"><title>Changes to Power Management Interfaces</title><para>Prior to the Solaris 8 release, power management of devices was not
+automatic. Developers had to add an entry to <filename>/etc/power.conf</filename> for
+each device that was to be power-managed. The framework assumed that all devices
+supported only two power levels: 0 and standard power.</para><para>Power assumed an implied dependency of all other components on component
+0. When component 0 changed to level 0, a call was made into the driver's <literal>detach</literal>(9E) with the <command>DDI_PM_SUSPEND</command> command to
+save the hardware state. When component 0 changed from level 0, a call was
+made to the  <literal>attach</literal>(9E) routine with the command <literal>DDI_PM_RESUME</literal> to restore hardware state.</para><para>The following interfaces and commands are obsolete, although they are
+still supported for binary purposes:</para><itemizedlist><listitem><para><citerefentry><refentrytitle>ddi_dev_is_needed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></para>
+</listitem><listitem><para><citerefentry><refentrytitle>pm_create_components</refentrytitle><manvolnum>9F</manvolnum></citerefentry></para>
+</listitem><listitem><para><citerefentry><refentrytitle>pm_destroy_components</refentrytitle><manvolnum>9F</manvolnum></citerefentry></para>
+</listitem><listitem><para><citerefentry><refentrytitle>pm_get_normal_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></para>
+</listitem><listitem><para><citerefentry><refentrytitle>pm_set_normal_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></para>
+</listitem><listitem><para><literal>DDI_PM_SUSPEND</literal></para>
+</listitem><listitem><para><literal>DDI_PM_RESUME</literal></para>
+</listitem>
+</itemizedlist><para>Since the Solaris 8 release, devices that export the <literal>pm-components</literal> property automatically use power management if <literal>autopm</literal> is
+enabled.</para><para>The framework now knows from the <literal>pm-components</literal> property
+which power levels are supported by each device.</para><para>The framework makes no assumptions about dependencies among the different
+components of a device.  The device driver is responsible for saving and restoring
+hardware state as needed when changing power levels.</para><para>These changes enable the power management framework to deal with emerging
+device technology. Power management now results in greater power savings.
+The framework can detect automatically which devices can save power. The framework
+can use intermediate power states of the devices. A system can now meet energy
+consumption goals without powering down the entire system and without any
+functions.</para><table frame="topbot" id="powermgt-tbl-151"><title>Power Management Interfaces</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="198*"/><colspec colwidth="198*"/><thead><row rowsep="1"><entry><para>Removed Interfaces</para>
+</entry><entry><para>Equivalent Interfaces</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>pm_create_components</literal>(9F)</para>
+</entry><entry><para><olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><literal>pm_set_normal_power</literal>(9F)</para>
+</entry><entry><para><olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><literal>pm_destroy_components</literal>(9F)</para>
+</entry><entry><para>None</para>
+</entry>
+</row><row><entry><para><literal>pm_get_normal_power</literal>(9F)</para>
+</entry><entry><para>None</para>
+</entry>
+</row><row><entry><para><literal>ddi_dev_is_needed</literal>(9F)</para>
+</entry><entry><para><olink targetdoc="refman9f" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>None</para>
+</entry><entry><para><olink targetdoc="refman9f" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>None</para>
+</entry><entry><para><olink targetdoc="refman9f" targetptr="pm-power-has-changed-9f" remap="external"><citerefentry><refentrytitle>pm_power_has_changed</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>DDI_PM_SUSPEND</para>
+</entry><entry><para>None</para>
+</entry>
+</row><row><entry><para>DDI_PM_RESUME</para>
+</entry><entry><para>None</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1>
+</chapter><?Pub *0000066997 0?>

@@ -1,0 +1,381 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(3)part(title()partintro()appendix()?><appendix id="lp64-35004"><title>Making a Device Driver 64-Bit
+Ready</title><highlights><para>This appendix provides information for device driver writers who are
+converting their device drivers to support the 64-bit kernel. It presents
+the differences between 32-bit and 64-bit device drivers and describes the
+steps to convert 32-bit device drivers to 64-bit. This information is specific
+to regular character and block device drivers only.</para><para>This appendix provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="lp64-51" remap="internal">Introduction to 64-Bit Driver Design</olink></para>
+</listitem><listitem><para><olink targetptr="lp64-54" remap="internal">General Conversion Steps</olink></para>
+</listitem><listitem><para><indexterm id="lp64-ix674"><primary>device drivers</primary><secondary>64-bit drivers</secondary></indexterm><indexterm><primary>64-bit device drivers</primary></indexterm><olink targetptr="lp64-79" remap="internal">Well Known
+ioctl Interfaces</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="lp64-51"><title>Introduction to 64-Bit Driver Design</title><para>For drivers that only need support for the 32-bit kernel, existing 32-bit
+device drivers will continue to work without recompilation. However, most
+device drivers require some changes to run correctly in the 64-bit kernel,
+and all device drivers require recompilation to create a 64-bit driver module.
+The information in this appendix will help you to enable drivers for 32-bit
+and 64-bit environments to be generated from common source code, thus increasing
+code portability and reducing the maintenance effort.</para><para>Before starting to modify a device driver for the 64-bit environment,
+you should understand how the 32-bit environment differs from the 64-bit environment.
+In particular, you must be familiar with the C language data type models ILP32
+and LP64. See the following table.</para><table frame="topbot" id="evemr"><title>Comparison of ILP32 and LP64 Data
+Types</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para>C Type</para>
+</entry><entry><para>ILP32</para>
+</entry><entry><para>LP64</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>char</literal></para>
+</entry><entry><para>8</para>
+</entry><entry><para>8</para>
+</entry>
+</row><row><entry><para><literal>short</literal></para>
+</entry><entry><para>16</para>
+</entry><entry><para>16</para>
+</entry>
+</row><row><entry><para><literal>int</literal></para>
+</entry><entry><para>32</para>
+</entry><entry><para>32</para>
+</entry>
+</row><row><entry><para><literal>long</literal></para>
+</entry><entry><para>32</para>
+</entry><entry><para>64</para>
+</entry>
+</row><row><entry><para><literal>long long</literal></para>
+</entry><entry><para>64</para>
+</entry><entry><para>64</para>
+</entry>
+</row><row><entry><para><literal>float</literal></para>
+</entry><entry><para>32</para>
+</entry><entry><para>32</para>
+</entry>
+</row><row><entry><para><literal>double</literal></para>
+</entry><entry><para>64</para>
+</entry><entry><para>64</para>
+</entry>
+</row><row><entry><para><literal>long double</literal></para>
+</entry><entry><para>96</para>
+</entry><entry><para>128</para>
+</entry>
+</row><row><entry><para><literal>pointer</literal></para>
+</entry><entry><para>32</para>
+</entry><entry><para>64</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The driver-specific issues due to the differences between ILP32 and
+LP64 are the subject of this appendix. More general topics are covered in
+the <olink targetdoc="sol64trans" remap="external"><citetitle remap="book">Solaris 64-bit Developer&rsquo;s Guide</citetitle></olink>.</para><para>In addition to general code cleanup to support the data model changes
+for LP64, driver writers have to provide support for both 32-bit and 64-bit
+applications.</para><para>The <citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, and <citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points enable data structures
+to be shared directly between applications and device drivers. If those data
+structures change size between the 32-bit and 64-bit environments, then the
+entry points must be modified so that the driver can determine whether the
+data model of the application is the same as that of the kernel. When the
+data models differ, data structures can be adjusted. See <olink targetptr="character-24565" remap="internal">I/O Control Support for 64-Bit Capable Device
+Drivers</olink>, <olink targetptr="character-17" remap="internal">32-bit and 64-bit Data Structure
+Macros</olink>, and <olink targetptr="devmap-4" remap="internal">Associating Kernel Memory
+With User Mappings</olink>.</para><para>In many drivers, only a few <literal>ioctls</literal> need this kind
+of handling. The other <literal>ioctls</literal> should work without change
+as long as these <literal>ioctls</literal> pass data structures that do not
+change in size.</para>
+</sect1><sect1 id="lp64-54"><title>General Conversion Steps</title><para>The sections below provide information on converting drivers to run
+in a 64-bit environment. Driver writers might need to perform one or more
+of the following tasks:</para><orderedlist><listitem><para>Use fixed-width types for hardware registers.</para>
+</listitem><listitem><para>Use fixed-width common access functions.</para>
+</listitem><listitem><para>Check and extend use of derived types.</para>
+</listitem><listitem><para>Check changed fields within DDI data structures.</para>
+</listitem><listitem><para>Check changed arguments of DDI functions.</para>
+</listitem><listitem><para>Modify the driver entry points that handle user data, where
+needed.</para>
+</listitem><listitem><para>Check structures that use 64-bit long types on x86 platforms.</para>
+</listitem>
+</orderedlist><para>These steps are explained in detail below.</para><para><indexterm><primary><command>lint</command> command</primary><secondary>64-bit environment</secondary></indexterm>After each step is complete, fix all compiler
+warnings, and use <command>lint</command> to look for other problems. The
+SC5.0 (or newer) version of <command>lint</command> should be used with <option>Xarch=v9</option> and <option>errchk=longptr64</option> specified to find 64-bit problems.
+See the notes on using and interpreting the output of <command>lint</command> in
+the <olink targetdoc="sol64trans" remap="external"><citetitle remap="book">Solaris 64-bit Developer&rsquo;s Guide</citetitle></olink>.</para><note><para>Do not ignore compilation warnings during conversion for LP64.
+Warnings that were safe to ignore previously in the ILP32 environment might
+now indicate a more serious problem.</para>
+</note><para>After all the steps are complete, compile and test the driver as both
+a 32-bit and 64-bit module.</para><sect2 id="lp64-55"><title>Use Fixed-Width Types for Hardware Registers</title><para>Many device drivers that manipulate hardware devices use C data structures
+to describe the layout of the hardware. In the LP64 data model, data structures
+that use <type>long</type> or unsigned long to define hardware registers are
+almost certainly incorrect, because <type>long</type> is now a 64-bit quantity.
+Start by including <literal>&lt;sys/inttypes.h&gt;</literal>, and update this
+class of data structure to use <type>int32_t</type> or <type>uint32_t</type> instead
+of <type>long</type> for 32-bit device data. This approach preserves the binary
+layout of 32-bit data structures. For example, change: </para><programlisting>struct device_regs {
+    ulong_t        addr;
+    uint_t         count;
+};      /* Only works for ILP32 compilation */</programlisting><para>to:</para><programlisting>struct device_regs {
+    uint32_t        addr;
+    uint32_t        count;
+};      /* Works for any data model */</programlisting>
+</sect2><sect2 id="lp64-56"><title>Use Fixed-Width Common Access Functions</title><para>The Solaris DDI allows device registers to be accessed by access functions
+for portability to multiple platforms. Previously, the DDI common access functions
+specified the size of data in terms of bytes, words, and so on. For example, <citerefentry><refentrytitle>ddi_getl</refentrytitle><manvolnum>9F</manvolnum></citerefentry> is
+used to access 32-bit quantities. This function is not available in the 64-bit
+DDI environment, and has been replaced by versions of the function that specify
+the number of bits to be acted on.</para><para>These routines were added to the 32-bit kernel in the Solaris 2.6 operating
+environment, to enable their early adoption by driver writers. For example,
+to be portable to both 32-bit and 64-bit kernels, the driver must use <citerefentry><refentrytitle>ddi_get32</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to
+access 32-bit data rather than <citerefentry><refentrytitle>ddi_getl</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para><para>All common access routines are replaced by their fixed-width equivalents.
+See the <citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <citerefentry><refentrytitle>ddi_rep_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, and <citerefentry><refentrytitle>ddi_rep_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man pages for details.</para>
+</sect2><sect2 id="lp64-57"><title>Check and Extend Use of Derived Types</title><para>System-derived types, such as <type>size_t</type>, should be used where
+possible so that the resulting variables make sense when passed between functions.
+The new derived types <type>uintptr_t</type> or <type>intptr_t</type> should
+be used as the integral type for pointers.</para><para>Fixed-width integer types are useful for representing explicit sizes
+of binary data structures or hardware registers, while fundamental C language
+data types, such as <type>int</type>, can still be used for loop counters
+or file descriptors.</para><para>Some system-derived types represent 32-bit quantities on a 32-bit system
+but represent 64-bit quantities on a 64-bit system. Derived types that change
+size in this way include: <type>clock_t</type>, <type>daddr_t</type>, <type>dev_t</type>, <type>ino_t</type>, <type>intptr_t</type>, <type>off_t</type>, <type>size_t</type>, <type>ssize_t</type>, <type>time_t</type>, <type>uintptr_t</type>,
+and <type>timeout_id_t</type>.</para><para>When designing drivers that use these derived types, pay particular
+attention to the use of these types, particularly if the drivers are assigning
+these values to variables of another derived type, such as a fixed-width type.</para>
+</sect2><sect2 id="lp64-58"><title>Check Changed Fields in DDI Data Structures</title><para>The data types of some of the fields within DDI data structures, such
+as <citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry>, have been changed. Drivers that use these data structures
+should make sure that these fields are being used appropriately. The data
+structures and the fields that were changed in a significant way are listed
+below.</para><sect3 id="lp64-59"><title><structname>buf</structname> Structure Changes</title><indexterm><primary><structname>buf</structname> structure</primary><secondary>changes to</secondary>
+</indexterm><para>The fields listed below pertain to transfer size, which can now exceed
+more than 4 Gbytes.</para><programlisting>size_t        b_bcount;          /* was type unsigned int */
+size_t        b_resid;           /* was type unsigned int */
+size_t        b_bufsize;         /* was type long */</programlisting>
+</sect3><sect3 id="lp64-60"><title><structname>ddi_dma_attr</structname></title><para><indexterm><primary><structname>ddi_dma_attr</structname> structure</primary></indexterm>The <olink targetdoc="group-refman" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure defines attributes of the DMA engine and
+the device. Because these attributes specify register sizes, fixed-width data
+types have been used instead of fundamental types.</para>
+</sect3><sect3 id="lp64-61"><title><structname>ddi_dma_cookie</structname> Structure
+Changes</title><programlisting>uint32_t     dmac_address;    /* was type unsigned long */
+size_t       dmac_size;       /* was type u_int */</programlisting><para><indexterm><primary><structname>ddi_dma_cookie</structname> structure</primary></indexterm>The <olink targetdoc="group-refman" targetptr="ddi-dma-cookie-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_cookie</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure contains a 32-bit DMA address, so a fixed-width
+data type has been used to define the address. The size has been redefined
+as <type>size_t</type>.</para>
+</sect3><sect3 id="lp64-62"><title><structname>csi_arq_status</structname> Structure
+Changes</title><programlisting>uint_t    sts_rqpkt_state;         /* was type u_long */
+uint_t    sts_rqpkt_statistics;    /* was type u_long */</programlisting><para><indexterm><primary><structname>csi_arq_status</structname> structure</primary><secondary>changes to</secondary></indexterm>These fields in the structure
+do not need to grow and have been redefined as 32-bit quantities.</para>
+</sect3><sect3 id="lp64-63"><title><structname>scsi_pkt</structname> Structure Changes</title><programlisting>uint_t      pkt_flags;           /* was type u_long */
+int     pkt_time;        /* was type long */
+ssize_t     pkt_resid;           /* was type long */
+uint_t      pkt_state;           /* was type u_long */
+uint_t      pkt_statistics;      /* was type u_long */</programlisting><para><indexterm><primary><structname>scsi_pkt</structname> structure</primary><secondary>changes to</secondary></indexterm>Because the <type>pkt_flags</type>, <type>pkt_state</type>, and <type>pkt_statistics</type> fields in the <olink targetdoc="group-refman" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+do not need to grow, these fields have been redefined as 32-bit integers.
+The data transfer size <structfield>pkt_resid</structfield> field <emphasis>does</emphasis> grow
+and has been redefined as <type>ssize_t</type>. </para>
+</sect3>
+</sect2><sect2 id="lp64-64"><title>Check Changed Arguments of DDI Functions</title><para>This section describes the DDI function argument data types that have
+been changed.</para><sect3 id="lp64-65"><title><function>getrbuf</function> Argument Changes</title><programlisting>struct buf *getrbuf(int sleepflag);</programlisting><para><indexterm><primary><function>getrbuf</function> function</primary><secondary>changes to</secondary></indexterm>In previous releases, <literal>sleepflag</literal> was defined as a type <type>long</type>.</para>
+</sect3><sect3 id="lp64-66"><title><function>drv_getparm</function> Argument Changes</title><programlisting>int drv_getparm(unsigned int parm, void *value_p);</programlisting><para><indexterm><primary><function>drv_getparm</function> function</primary><secondary>changes to</secondary></indexterm>In previous releases, <literal>value_p</literal> was defined as type <type>unsigned long</type>. In the 64-bit kernel, <literal>drv_getparm(9F)</literal> can fetch both 32-bit and 64-bit quantities. The
+interface does not define data types of these quantities, and simple programming
+errors can occur.</para><para>The following new routines offer a safer alternative:</para><programlisting>clock_t       ddi_get_lbolt(void);
+time_t        ddi_get_time(void);
+cred_t        *ddi_get_cred(void);
+pid_t         ddi_get_pid(void);</programlisting><para><indexterm><primary><function>ddi_get_lbolt</function> function</primary></indexterm><indexterm><primary><function>ddi_get_time</function> function</primary></indexterm><indexterm><primary><function>ddi_get_cred</function> function</primary></indexterm><indexterm><primary><function>ddi_get_pid</function> function</primary></indexterm>Driver writers are strongly urged to use these routines instead
+of <olink targetdoc="group-refman" targetptr="drv-getparm-9f" remap="external"><citerefentry><refentrytitle>drv_getparm</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect3><sect3 id="lp64-67"><title><function>delay</function> and <function>timeout</function> Argument
+Changes</title><programlisting>void delay(clock_t ticks);
+timeout_id_t timeout(void (*func)(void *), void *arg, clock_t ticks);</programlisting><para><indexterm><primary><function>delay</function> function</primary></indexterm><indexterm><primary><function>delay</function> function</primary><secondary>changes to</secondary></indexterm><indexterm><primary><function>timeout</function> function</primary></indexterm><indexterm><primary><function>timeout</function> function</primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>ticks</parameter> argument, <function>delay</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>ticks</parameter> argument, <function>timeout</function></primary><secondary>changes to</secondary></indexterm>The <replaceable>ticks</replaceable> argument to the <olink targetdoc="group-refman" targetptr="delay-9f" remap="external"><citerefentry><refentrytitle>delay</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines
+has been changed from <type>long</type> to <type>clock_t</type>.</para>
+</sect3><sect3 id="lp64-68"><title><function>rmallocmap</function> and <function>rmallocmap_wait</function> Argument Changes</title><programlisting>struct map *rmallocmap(size_t mapsize);
+struct map *rmallocmap_wait(size_t mapsize);</programlisting><para><indexterm><primary><function>rmallocmap</function> function</primary><secondary>changes to</secondary></indexterm><indexterm><primary><function>rmallocmap_wait</function> function</primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>mapsize</parameter> argument, <function>rmallocmap</function></primary><secondary>changes to</secondary></indexterm>The <literal>mapsize</literal> argument
+to the <olink targetdoc="group-refman" targetptr="rmallocmap-9f" remap="external"><citerefentry><refentrytitle>rmallocmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="rmallocmap-wait-9f" remap="external"><citerefentry><refentrytitle>rmallocmap_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines has been changed
+from <type>ulong_t</type> to <type>size_t</type>.</para>
+</sect3><sect3 id="lp64-69"><title><function>scsi_alloc_consistent_buf</function> Argument
+Changes</title><programlisting>struct buf *scsi_alloc_consistent_buf(struct scsi_address *ap,
+    struct buf *bp, size_t datalen, uint_t bflags,
+    int (*callback )(caddr_t), caddr_t arg);</programlisting><para><indexterm><primary><function>scsi_alloc_consistent_buf</function> function</primary><secondary>changes to</secondary></indexterm>In previous releases, <literal>datalen</literal> was defined as an <type>int</type> and <literal>bflags</literal> was
+defined as a <type>ulong</type>.</para>
+</sect3><sect3 id="lp64-70"><title><function>uiomove</function> Argument Changes</title><programlisting>int uiomove(caddr_t address, size_t nbytes,
+    enum uio_rw rwflag, uio_t *uio_p);</programlisting><para><indexterm><primary><function>uiomove</function> function</primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>nbytes</parameter> argument, <function>uiomove</function></primary><secondary>changes to</secondary></indexterm>The <literal>nbytes</literal> argument was defined
+as a type <type>long</type>, but because <literal>nbytes</literal> represents
+a size in bytes, <type>size_t</type> is more appropriate.</para>
+</sect3><sect3 id="lp64-71"><title><function>cv_timedwait</function> and <function>cv_timedwait_sig</function> Argument Changes</title><indexterm><primary><function>cv_timedwait</function> function</primary><secondary>changes to</secondary>
+</indexterm><indexterm><primary><function>cv_timedwait_sig</function> function</primary><secondary>changes to</secondary>
+</indexterm><indexterm><primary><parameter>timeout</parameter> argument, <function>cv_timedwait</function></primary><secondary>changes to</secondary>
+</indexterm><programlisting>int cv_timedwait(kcondvar_t *cvp, kmutex_t *mp, clock_t timeout);
+int cv_timedwait_sig(kcondvar_t *cvp, kmutex_t *mp,    clock_t timeout);</programlisting><para>In previous releases, the <parameter>timeout</parameter> argument to
+the <olink targetdoc="group-refman" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="cv-timedwait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines was defined to be
+of type <type>long</type>. Because these routines represent time in ticks, <type>clock_t</type> is more appropriate.</para>
+</sect3><sect3 id="lp64-72"><title><function>ddi_device_copy</function> Argument Changes</title><programlisting>int ddi_device_copy(ddi_acc_handle_t src_handle,
+    caddr_t src_addr, ssize_t src_advcnt,
+    ddi_acc_handle_t dest_handle, caddr_t dest_addr,
+    ssize_t dest_advcnt, size_t bytecount, uint_t dev_datasz);</programlisting><para><indexterm><primary><function>ddi_device_copy</function> function</primary></indexterm><indexterm><primary><parameter>src_advcnt</parameter> argument, <function>ddi_device_copy</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>dest_adcent</parameter> argument, <function>ddi_device_copy</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>dev_datasz</parameter> argument, <function>ddi_device_copy</function></primary><secondary>changes to</secondary></indexterm>The <parameter>src_advcnt</parameter>, <parameter>dest_advcnt</parameter>, <parameter>dev_datasz</parameter> arguments have changed type. These arguments were previously
+defined as <type>long</type>, <type>long</type>, and <type>ulong_t</type> respectively.</para>
+</sect3><sect3 id="lp64-73"><title><function>ddi_device_zero</function> Argument Changes</title><programlisting>int ddi_device_zero(ddi_acc_handle_t handle,
+    caddr_t dev_addr, size_t bytecount, ssize_t dev_advcnt,
+    uint_t dev_datasz):</programlisting><para><indexterm><primary><function>ddi_device_zero</function> function</primary></indexterm><indexterm><primary><parameter>dev_advcnt</parameter> argument, <function>ddi_device_zero</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>dev_datasz</parameter> argument, <function>ddi_device_zero</function></primary><secondary>changes to</secondary></indexterm>In previous releases, <parameter>dev_advcnt</parameter> was defined
+as a type <type>long</type> and <parameter>dev_datasz</parameter> as a <type>ulong_t</type>.</para>
+</sect3><sect3 id="lp64-74"><title><function>ddi_dma_mem_alloc</function> Argument
+Changes</title><programlisting>int ddi_dma_mem_alloc(ddi_dma_handle_t handle,
+    size_t length, ddi_device_acc_attr_t *accattrp,
+    uint_t flags, int (*waitfp)(caddr_t), caddr_t arg,
+    caddr_t *kaddrp, size_t *real_length,
+    ddi_acc_handle_t *handlep);</programlisting><para><indexterm><primary><function>ddi_dma_mem_alloc</function> function</primary></indexterm><indexterm><primary><parameter>length</parameter> argument, <function>ddi_dma_mem_alloc</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>flags</parameter> argument, <function>ddi_dma_mem_alloc</function></primary><secondary>changes to</secondary></indexterm><indexterm><primary><parameter>real_length</parameter> argument, <function>ddi_dma_mem_alloc</function></primary><secondary>changes to</secondary></indexterm>In previous releases, <parameter>length</parameter>, <parameter>flags</parameter>, and <parameter>real_length</parameter> were defined with types <type>uint_t</type>, <type>ulong_t</type>, and <type>uint_t *</type>.</para>
+</sect3>
+</sect2><sect2 id="lp64-75"><title>Modify Routines That Handle Data Sharing</title><para><indexterm><primary>binary compatibility</primary><secondary>potential problems</secondary></indexterm>If a device driver shares data structures
+that contain <type>long</type>s or pointers with a 32-bit application using <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, or <olink targetdoc="group-refman" targetptr="mmap-9e" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and the driver is recompiled
+for a 64-bit kernel, the binary layout of data structures will be incompatible.
+If a field is currently defined in terms of type <type>long</type> and 64-bit
+data items are not used, change the data structure to use data types that
+remain as 32-bit quantities (<type>int</type> and <type>unsigned</type> <type>int</type>). Otherwise, the driver needs to be aware of the different structure
+shapes for ILP32 and LP64 and determine whether a model mismatch between the
+application and the kernel has occurred.</para><para>To handle potential data model differences, the <function>ioctl</function>, <function>devmap</function>, and <function>mmap</function> driver entry points, which
+interact directly with user applications, need to be written to determine
+whether the argument came from an application using the same data model as
+the kernel.</para><sect3 id="lp64-76"><title>Data Sharing in <function>ioctl</function></title><para><indexterm><primary>data sharing</primary><secondary>using <function>ioctl</function></secondary></indexterm>To determine whether a model mismatch exists between the application
+and the driver, the driver uses the <literal>FMODELS</literal> mask to determine
+the model type from the <function>ioctl</function> <parameter>mode</parameter> argument.
+The following values are OR-ed into mode to identify the application data
+model:</para><itemizedlist><listitem><para><indexterm><primary>LP64</primary><secondary>use in <function>ioctl</function></secondary></indexterm><literal>FLP64</literal> &ndash; Application
+uses the LP64 data model</para>
+</listitem><listitem><para><indexterm><primary>ILP32</primary><secondary>use in <function>ioctl</function></secondary></indexterm><literal>FILP32</literal> &ndash; Application
+uses the ILP32 data model</para>
+</listitem>
+</itemizedlist><para><indexterm><primary><function>ddi_model_convert_from</function> function</primary></indexterm><indexterm><primary><function>ddi_get_cred</function> function</primary></indexterm>The code examples in <olink targetptr="character-24565" remap="internal">I/O Control
+Support for 64-Bit Capable Device Drivers</olink> show how this situation
+can be handled using <citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para>
+</sect3><sect3 id="lp64-77"><title>Data Sharing in <function>devmap</function></title><para><indexterm><primary>data sharing</primary><secondary>using <function>devmap</function></secondary></indexterm>To enable a 64-bit driver and a 32-bit
+application to share memory, the binary layout generated by the 64-bit driver
+must be the same as the layout consumed by the 32-bit application. The mapped
+memory being exported to the application might need to contain data-model-dependent
+data structures.</para><para>Few memory-mapped devices face this problem because the device registers
+do not change size when the kernel data model changes. However, some pseudo-devices
+that export mappings to the user address space might want to export different
+data structures to ILP32 or LP64 applications. To determine whether a data
+model mismatch has occurred, <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> uses the <parameter>model</parameter> parameter
+to describe the data model expected by the application. The <parameter>model</parameter> parameter
+is set to one of the following values:</para><itemizedlist><listitem><para><indexterm><primary>ILP32</primary><secondary>use in <function>devmap</function></secondary></indexterm><literal>DDI_MODEL_ILP32</literal> &ndash;
+The application uses the ILP32 data model</para>
+</listitem><listitem><para><indexterm><primary>LP64</primary><secondary>use in <function>devmap</function></secondary></indexterm><literal>DDI_MODEL_LP64</literal> &ndash;
+The application uses the LP64 data model</para>
+</listitem>
+</itemizedlist><para>The model parameter can be passed untranslated to the <citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry> routine or to <function>STRUCT_INIT</function>. See <olink targetptr="character-17" remap="internal">32-bit and 64-bit Data Structure Macros</olink>.</para>
+</sect3><sect3 id="lp64-78"><title>Data Sharing in <function>mmap</function></title><para><indexterm><primary>data sharing</primary><secondary>using <function>mmap</function></secondary></indexterm>Because <citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> does not have a parameter that can be used to
+pass data model information, the driver's <citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point can be written to use
+the new DDI function <citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. This function returns one of the
+following values to indicate the application's data type model:</para><itemizedlist><listitem><para><indexterm><primary>ILP32</primary><secondary>use in <function>mmap</function></secondary></indexterm><literal>DDI_MODEL_ILP32</literal> &ndash;
+Application expects the ILP32 data model</para>
+</listitem><listitem><para><indexterm><primary>ILP64</primary><secondary>use in <function>mmap</function></secondary></indexterm><literal>DDI_MODEL_ILP64</literal> &ndash;
+Application expects the LP64 data model</para>
+</listitem><listitem><para><literal>DDI_FAILURE</literal> &ndash; Function was not called
+from <citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></para>
+</listitem>
+</itemizedlist><para>As with <function>ioctl</function> and <function>devmap</function>,
+the model bits can be passed to <citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to determine whether
+data conversion is necessary, or the model can be handed to <function>STRUCT_INIT</function>.</para><para>Alternatively, migrate the device driver to support the <citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point.</para>
+</sect3>
+</sect2><sect2 id="fapdl"><title>Check Structures with 64-bit Long Data Types on x86-Based
+Platforms</title><para>You should carefully check structures that use 64-bit long types, such
+as <structname>uint64_t</structname>, on the x86 platforms. The alignment
+and size can differ between compilation in 32-bit mode versus a 64-bit mode.
+Consider the following example.</para><programlisting>#include &amp;lt;studio&gt;
+#include &amp;ltsys&gt;
+
+struct myTestStructure {
+        uint32_t        my1stInteger;
+        uint64_t        my2ndInteger;
+};
+
+main()
+{
+        struct myTestStructure a;
+
+        printf("sizeof myTestStructure is: %d\n", sizeof(a));
+        printf("offset to my2ndInteger is: %d\n", (uintptr_t)&amp;a.bar - (uintptr_t)&amp;a);
+}</programlisting><para>On a 32-bit system, this example displays the following results:</para><screen>sizeof myTestStructure is: 12
+offset to my2ndInteger is: 4</screen><para>Conversely, on a 64-bit system, this example displays the following
+results:</para><screen>sizeof myTestStructure is: 16
+offset to my2ndInteger is: 8</screen><para>Thus, the 32-bit application and the 64-bit application view the structure
+differently. As a result, trying to make the same structure work in both a
+32-bit and 64-bit environment can cause problems. This situation occurs often,
+particularly in situations where structures are passed into and out of the
+kernel through <function>ioctl</function> calls.</para>
+</sect2>
+</sect1><sect1 id="lp64-79"><title>Well Known <literal>ioctl</literal> Interfaces</title><para><indexterm><primary><function>ioctl</function> function</primary><secondary>commands</secondary></indexterm>Many <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> operations are common to
+a class of device drivers. For example, most disk drivers implement many of
+the <olink targetdoc="group-refman" targetptr="dkio-7i" remap="external"><citerefentry><refentrytitle>dkio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> family
+of <literal>ioctls</literal>. Many of these interfaces copy in or copy out
+data structures from the kernel, and some of these data structures have changed
+size in the LP64 data model. The following section lists the <literal>ioctls</literal>that
+now require explicit conversion in 64-bit driver <literal>ioctl</literal> routines
+for the <literal>dkio</literal>, <olink targetdoc="group-refman" targetptr="fdio-7i" remap="external"><citerefentry><refentrytitle>fdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="fbio-7i" remap="external"><citerefentry><refentrytitle>fbio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="cdio-7i" remap="external"><citerefentry><refentrytitle>cdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="mtio-7i" remap="external"><citerefentry><refentrytitle>mtio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> families of <literal>ioctls</literal>.</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="column1" colwidth="115*"/><colspec colname="column2" colwidth="115*"/><colspec colname="column3" colwidth="166*"/><thead><row rowsep="1"><entry><para><literal>ioctl</literal> command</para>
+</entry><entry><para>Affected data structure</para>
+</entry><entry><para>Reference</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><command>DKIOCGAPART</command></para><para><command>DKIOCSAPART</command></para>
+</entry><entry><para><structname>dk_map</structname></para><para><structname>dk_allmap</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="dkio-7i" remap="external"><citerefentry><refentrytitle>dkio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><computeroutput>DKIOGVTOC</computeroutput></para><para><computeroutput>DKIOSVTOC</computeroutput></para>
+</entry><entry><para><structname>partition</structname></para><para><structname>vtoc</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="dkio-7i" remap="external"><citerefentry><refentrytitle>dkio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>FBIOPUTCMAP</command></para><para><command>FBIOGETCMAP</command></para>
+</entry><entry><para><structname>fbcmap</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="fbio-7i" remap="external"><citerefentry><refentrytitle>fbio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>FBIOPUTCMAPI</command></para><para><command>FBIOGETCMAPI</command></para>
+</entry><entry><para><structname>fbcmap_i</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="fbio-7i" remap="external"><citerefentry><refentrytitle>fbio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>FBIOCCURSOR</command></para><para><command>FBIOSCURSOR</command></para>
+</entry><entry><para><structname>fbcursor</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="fbio-7i" remap="external"><citerefentry><refentrytitle>fbio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>CDROMREADMODE1</command></para><para><command>CDROMREADMODE2</command></para>
+</entry><entry><para><structname>cdrom_read</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="cdio-7i" remap="external"><citerefentry><refentrytitle>cdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>CDROMCDDA</command></para>
+</entry><entry><para><structname>cdrom_cdda</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="cdio-7i" remap="external"><citerefentry><refentrytitle>cdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>CDROMCDXA</command></para>
+</entry><entry><para><structname>cdrom_cdxa</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="cdio-7i" remap="external"><citerefentry><refentrytitle>cdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>CDROMSUBCODE</command></para>
+</entry><entry><para><structname>cdrom_subcode</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="cdio-7i" remap="external"><citerefentry><refentrytitle>cdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>FDIOCMD</command></para>
+</entry><entry><para><structname>fd_cmd</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="fdio-7i" remap="external"><citerefentry><refentrytitle>fdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>FDRAW</command></para>
+</entry><entry><para><structname>fd_raw</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="fdio-7i" remap="external"><citerefentry><refentrytitle>fdio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>MTIOCTOP</command></para>
+</entry><entry><para><structname>mtop</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="mtio-7i" remap="external"><citerefentry><refentrytitle>mtio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>MTIOCGET</command></para>
+</entry><entry><para><structname>mtget</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="mtio-7i" remap="external"><citerefentry><refentrytitle>mtio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>MTIOCGETDRIVETYPE</command></para>
+</entry><entry><para><structname>mtdrivetype_request</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="mtio-7i" remap="external"><citerefentry><refentrytitle>mtio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>USCSICMD</command></para>
+</entry><entry><para><structname>uscsi_cmd</structname></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="scsi-free-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_free_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><sect2 id="lp64-80"><title>Device Sizes</title><para><indexterm><primary><property>nblocks</property> property</primary><secondary>deprecated</secondary></indexterm><indexterm><primary><property>Nblocks</property> property</primary><secondary>definition</secondary></indexterm><indexterm><primary>properties</primary><secondary><property>nblocks</property> property</secondary></indexterm><indexterm><primary>properties</primary><secondary><property>Nblocks</property> property</secondary></indexterm><indexterm><primary>device information</primary><secondary><property>nblocks</property> property</secondary></indexterm><indexterm><primary>device information</primary><secondary><property>Nblocks</property> property</secondary></indexterm>The <property>nblocks</property> property is exported
+by each slice of a block device driver. This property contains the number
+of 512-byte blocks that each slice of the device can support. The <property>nblocks</property> property is defined as a signed 32-bit quantity, which limits
+the maximum size of a slice to 1&nbsp;Tbyte.</para><para>Disk devices that provide more than 1 Tbyte of storage per disk must
+define the <property>Nblocks</property> property, which should still contain
+the number of 512 byte blocks that the device can support. However, <property>Nblocks</property> is a signed 64-bit quantity, which removes any practical limit
+on disk space.</para><para>The <property>nblocks</property> property is now deprecated. All disk
+devices should provide the <property>Nblocks</property> property.</para>
+</sect2>
+</sect1>
+</appendix><?Pub *0000042561 0?>

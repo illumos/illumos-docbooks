@@ -1,0 +1,929 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part()part(title()partintro()chapter()?><chapter id="scsi-36812"><title>SCSI Target Drivers</title><highlights><para>The Solaris DDI/DKI divides the software interface to SCSI devices into
+two major parts: <emphasis>target</emphasis> drivers and <emphasis>host bus
+adapter (HBA)</emphasis> drivers. <emphasis>Target</emphasis> refers to a
+driver for a device on a SCSI bus, such as a disk or a tape drive. <emphasis>Host
+bus adapter</emphasis> refers to the driver for the SCSI controller on the
+host machine. SCSA defines the interface between these two components. This
+chapter discusses target drivers only. See <olink targetptr="scsihba-32898" remap="internal">Chapter&nbsp;18,
+SCSI Host Bus Adapter Drivers</olink> for information on host bus adapter
+drivers.</para><note><para>The terms &ldquo;host bus adapter&rdquo; and &ldquo;HBA&rdquo;
+are equivalent to  &ldquo;host adapter,&rdquo; which is defined in SCSI specifications.</para>
+</note><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="scsi-6a" remap="internal">Introduction to Target Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-3" remap="internal">Sun Common SCSI Architecture Overview</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-37210" remap="internal">Hardware Configuration File</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-9" remap="internal">Declarations and Data Structures</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-11" remap="internal">Autoconfiguration for SCSI Target
+Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-12" remap="internal">Resource Allocation</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-15" remap="internal">Building and Transporting a Command</olink></para>
+</listitem><listitem><para><olink targetptr="scsi-100" remap="internal">SCSI Options</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="scsi-6a"><title>Introduction to Target Drivers</title><para><indexterm id="scsi-ix469"><primary>SCSI target driver</primary><secondary>overview</secondary></indexterm><indexterm id="scsi-ix470"><primary>SCSI</primary><secondary>bus</secondary></indexterm><indexterm id="scsi-ix471"><primary>bus</primary><secondary>SCSI</secondary></indexterm>Target drivers
+can be either character or block device drivers, depending on the device.
+Drivers for tape drives are usually character device drivers, while disks
+are handled by block device drivers. This chapter describes how to write a
+SCSI target driver. The chapter discusses the additional requirements that
+SCSA places on block and character drivers for SCSI target devices.</para><para>The following reference documents provide supplemental information needed
+by the designers of target drivers and host bus adapter drivers.</para><para><citetitle>Small Computer System Interface 2 (SCSI-2)</citetitle>, ANSI/NCITS
+X3.131-1994, Global Engineering Documents, 1998. ISBN 1199002488.</para><para><emphasis>The Basics of SCSI</emphasis>, Fourth Edition, ANCOT Corporation,
+1998. ISBN 0963743988.</para><para><indexterm id="scsi-ix468"><primary>SCSA</primary></indexterm>Refer
+also to the SCSI command specification for the target device, provided by
+the hardware vendor.</para>
+</sect1><sect1 id="scsi-3"><title>Sun Common SCSI Architecture Overview</title><para><indexterm id="scsi-ix472"><primary>SCSI</primary><secondary>architecture</secondary></indexterm>The Sun Common SCSI Architecture (SCSA) is the Solaris DDI/DKI
+programming interface for the transmission of SCSI commands from a target
+driver to a host bus adapter driver. This interface is independent of the
+type of host bus adapter hardware, the platform, the processor architecture,
+and the SCSI command being transported across the interface.</para><para>Conforming to the SCSA enables the target driver to pass SCSI commands
+to target devices without knowledge of the hardware implementation of the
+host bus adapter.</para><para>The SCSA conceptually separates building the SCSI command from transporting
+the  command with data across the SCSI bus. The architecture defines the software
+interface between high-level and low-level software components. The higher
+level software component consists of one or more SCSI target drivers, which
+translate I/O requests into SCSI commands appropriate for the peripheral device.
+The following example illustrates the SCSI architecture.</para><figure id="scsi-fig-4"><title id="scsi-33151">SCSA Block Diagram</title><mediaobject><imageobject><imagedata entityref="scsi.scsadiagram.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the role of the Sun Common SCSI Architecture
+in relation to SCSI drivers in the operating system.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The lower-level software component consists of a SCSA interface layer
+and one or more host bus adapter drivers. The target driver is responsible
+for the generation of the proper SCSI commands required to execute the desired
+function and for processing the results.</para><sect2 id="scsi-5"><title>General Flow of Control</title><para>Assuming no transport errors occur, the following steps describe the
+general flow of control for a read or write request.</para><orderedlist><listitem><para>The target driver's <olink targetdoc="refman9e" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or <olink targetdoc="refman9e" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is invoked. <olink targetdoc="refman9f" targetptr="physio-9f" remap="external"><citerefentry><refentrytitle>physio</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is used to lock down memory,
+prepare a <structname>buf</structname> structure, and call the strategy routine.</para>
+</listitem><listitem><para>The target driver's  <olink targetdoc="refman9e" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine checks the request. <function>strategy</function> then allocates a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> by using  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The target
+driver initializes the packet and sets the SCSI command descriptor block (CDB)
+using the <olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. The target driver also specifies a timeout.
+Then, the driver provides a pointer to a callback function. The callback function
+is called by the host bus adapter driver on completion of the command. The <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> pointer should be saved in
+the SCSI packet's target-private space.</para>
+</listitem><listitem><para>The target driver submits the packet to the host bus adapter
+driver by using  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The target driver is then free to accept other requests.
+The target driver should not access the packet while the packet is in transport.
+If either the host bus adapter driver or the target supports queueing, new
+requests can be submitted while the packet is in transport.</para>
+</listitem><listitem><para>As soon as the SCSI bus is free and the target not busy, the
+host bus adapter driver selects the target and passes the CDB. The target
+driver executes the command. The target then performs the requested data transfers.</para>
+</listitem><listitem><para>After the target sends completion status and the command completes,
+the host bus adapter driver notifies the target driver. To perform the notification,
+the host calls the completion function that was specified in the SCSI packet.
+At this time the host bus adapter driver is no longer responsible for the
+packet, and the target driver has regained ownership of the packet.</para>
+</listitem><listitem><para>The SCSI packet's completion routine analyzes the returned
+information. The completion routine then determines whether the SCSI operation
+was successful. If a failure has occurred, the target driver retries the command
+by calling  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> again. If the host bus adapter driver does not support
+auto request sense, the target driver must submit a request sense packet to
+retrieve the sense data in the event of a check condition.</para>
+</listitem><listitem><para>After successful completion or if the command cannot be retried,
+the target driver calls  <olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <function>scsi_destroy_pkt</function> 
+synchronizes the data.  <function>scsi_destroy_pkt</function> then frees the
+packet. If the target driver needs to access the data before freeing the packet, <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is called.</para>
+</listitem><listitem><para>Finally, the target driver notifies the requesting application
+that the read or write transaction is complete. This notification is made
+by returning from the  <olink targetdoc="refman9e" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point in the driver for character devices. Otherwise, notification is made
+indirectly through  <olink targetdoc="refman9f" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</orderedlist><para>SCSA allows the execution of many of such operations, both overlapped
+and queued, at various points in the process. The model places the management
+of system resources on the host bus adapter driver. The software interface
+enables the execution of target driver functions on host bus adapter drivers
+by  using SCSI bus adapters of varying degrees of sophistication.</para>
+</sect2><sect2 id="scsi-6"><title>SCSA Functions</title><para><indexterm id="fblha"><primary><literal>scsi_</literal> functions</primary><secondary>summary</secondary></indexterm><indexterm id="fblgh"><primary>SCSI target driver</primary><secondary>SCSI routines</secondary></indexterm>SCSA
+defines functions to manage the allocation and freeing of resources, the sensing
+and setting of control states, and the transport of SCSI commands. These functions
+are listed in the following table.</para><table frame="topbot" id="scsi-71616"><title>Standard SCSA Functions</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="5*"/><colspec colnum="2" colname="column2" colwidth="4*"/><thead><row rowsep="1"><entry><para>Function Name</para>
+</entry><entry><para>Category</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-abort-9f" remap="external"><citerefentry><refentrytitle>scsi_abort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Error handling</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-dmafree-9f" remap="external"><citerefentry><refentrytitle>scsi_dmafree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-free-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_free_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-ifgetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifgetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Transport information and control</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Resource management</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-poll-9f" remap="external"><citerefentry><refentrytitle>scsi_poll</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Polled I/O</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Probe functions</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-reset-9f" remap="external"><citerefentry><refentrytitle>scsi_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>CDB initialization function</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Command transport</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-unprobe-9f" remap="external"><citerefentry><refentrytitle>scsi_unprobe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><note><para>If your driver needs to work with a SCSI-1 device, use the <olink targetdoc="refman9f" targetptr="makecom-9f" remap="external"><citerefentry><refentrytitle>makecom</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</note>
+</sect2>
+</sect1><sect1 id="scsi-37210"><title>Hardware Configuration File</title><para><indexterm id="scsi-ix479"><primary>hardware configuration files</primary><secondary>SCSI target devices</secondary></indexterm><indexterm><primary>configuration files, hardware</primary><see>hardware configuration files</see></indexterm>Because
+SCSI devices are not self-identifying, a hardware configuration file is required
+for a target driver. See the <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="scsi-free-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_free_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man pages
+for details. The following is a typical configuration file:</para><programlisting>name="xx" class="scsi" target=2 lun=0;</programlisting><para><indexterm id="scsi-ix480"><primary>properties</primary><secondary><literal>class</literal> property</secondary></indexterm><indexterm id="scsi-ix481"><primary>SCSI target driver</primary><secondary>properties</secondary></indexterm>The system reads the file during autoconfiguration. The system
+uses the <replaceable>class</replaceable> property to identify the driver's
+possible parent. Then, the system attempts to attach the driver to any parent
+driver that is of class <emphasis>scsi</emphasis>. All host bus adapter drivers
+are of this class. Using the <replaceable>class</replaceable> property rather
+than the <replaceable>parent</replaceable> property is preferred. This approach
+enables any host bus adapter driver that finds the expected device at the
+specified <replaceable>target</replaceable> and <replaceable>lun</replaceable> IDs
+to attach to the target. The target driver is responsible for verifying the
+class in its <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.</para>
+</sect1><sect1 id="scsi-9"><title>Declarations and Data Structures</title><para><indexterm id="scsi-ix482"><primary>SCSI target driver</primary><secondary>data structures</secondary></indexterm>Target drivers must include
+the header file <filename>&lt;sys/scsi/scsi.h&gt;</filename>.</para><para>SCSI target drivers must use the following command to generate a binary
+module:</para><programlisting>ld -r <replaceable>xx</replaceable> <replaceable>xx</replaceable>.o -N"misc/scsi"</programlisting><sect2 id="scsi-53524"><title><literal>scsi_device</literal> Structure</title><para><indexterm id="scsi-ix483"><primary><structname>scsi_device</structname> structure</primary></indexterm><indexterm><primary><function>ddi_get_driver_private</function> function</primary></indexterm>The host bus adapter driver allocates and initializes
+a <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure for the target driver before either the
+ <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine is called. This structure
+stores information about each SCSI logical unit, including pointers to information
+areas that contain both generic and device-specific information. One <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+exists for each logical unit that is attached to the system. The target driver
+can retrieve a pointer to this structure by calling <olink targetdoc="refman9f" targetptr="ddi-get-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_get_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><caution><para><indexterm><primary><function>ddi_set_driver_private</function> function</primary></indexterm>Because the host bus adapter driver uses the private
+field in the target device's <literal>dev_info</literal> structure, target
+drivers must not use <olink targetdoc="refman9f" targetptr="ddi-set-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_set_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</caution><para>The <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure contains the following fields:</para><programlisting>struct scsi_device {
+    struct scsi_address           sd_address;    /* opaque address */
+    dev_info_t                    *sd_dev;       /* device node */
+    kmutex_t                      sd_mutex;
+    void                          *sd_reserved;
+    struct scsi_inquiry           *sd_inq;
+    struct scsi_extended_sense    *sd_sense;
+    caddr_t                       sd_private;
+};</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>sd_address</structfield></term><listitem><para>Data structure that is passed to the routines for SCSI resource
+allocation.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_dev</structfield></term><listitem><para>Pointer to the target's <structfield>dev_info</structfield> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_mutex</structfield></term><listitem><para>Mutex for use by the target driver. This mutex is initialized
+by the host bus adapter driver and can be used by the target driver as a per-device
+mutex. Do not hold this mutex across a call to <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="scsi-poll-9f" remap="external"><citerefentry><refentrytitle>scsi_poll</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3, Multithreading</olink> for more information on mutexes.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_inq</structfield></term><listitem><para>Pointer for the target device's SCSI inquiry data. The <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine allocates
+a buffer, fills the buffer in with inquiry data, and attaches the buffer to
+this field.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_sense</structfield></term><listitem><para>Pointer to a buffer to contain SCSI request sense data from
+the device. The target driver must allocate and manage this buffer. See <olink targetptr="scsi-38411" remap="internal">attach() Entry Point (SCSI Target Drivers)</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_private</structfield></term><listitem><para>Pointer field for use by the target driver. This field is
+commonly used to store a pointer to a private target driver state structure.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="scsi-39157"><title><structname>scsi_pkt</structname> Structure
+(Target Drivers)</title><para><indexterm id="scsi-ix484"><primary><structname>scsi_pkt</structname> structure</primary></indexterm>The <structname>scsi_pkt</structname> structure contains
+the following fields:</para><programlisting>struct scsi_pkt {
+    opaque_t  pkt_ha_private;         /* private data for host adapter */
+    struct scsi_address pkt_address;  /* destination packet is for */
+    opaque_t  pkt_private;            /* private data for target driver */
+    void     (*pkt_comp)(struct scsi_pkt *);  /* completion routine */
+    uint_t   pkt_flags;               /* flags */
+    int      pkt_time;                /* time allotted to complete command */
+    uchar_t  *pkt_scbp;               /* pointer to status block */
+    uchar_t  *pkt_cdbp;               /* pointer to command block */
+    ssize_t  pkt_resid;               /* data bytes not transferred */
+    uint_t   pkt_state;               /* state of command */
+    uint_t   pkt_statistics;          /* statistics */
+    uchar_t  pkt_reason;              /* reason completion called */
+};</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>pkt_address</structfield></term><listitem><para>Target device's address set by  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_private</structfield></term><listitem><para>Place to store private data for the target driver. <replaceable>pkt_private</replaceable> is commonly used to save the <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> pointer for the command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_comp</structfield></term><listitem><para>Address of the completion routine. The host bus adapter driver
+calls this routine when the driver has transported the command. Transporting
+the command does not mean that the command succeeded. The target might have
+been busy. Another possibility is that the target might not have responded
+before the time out period elapsed. See the description for <structfield>pkt_time</structfield> field. The target driver must supply a valid value in this
+field. This value can be <literal>NULL</literal> if the driver does not want
+to be notified.</para>
+</listitem>
+</varlistentry>
+</variablelist><note><para>Two different SCSI callback routines are provided. The <structfield>pkt_comp</structfield> field identifies a <emphasis>completion callback</emphasis> routine,
+which is called when the host bus adapter completes its processing. A <emphasis>resource
+callback</emphasis> routine is also available, which is called when currently
+unavailable resources are likely to be available. See the <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</note><variablelist><varlistentry><term><structfield>pkt_flags</structfield></term><listitem><para>Provides additional control information, for example, to transport
+the command without disconnect privileges (<literal>FLAG_NODISCON</literal>)
+or to disable callbacks (<literal>FLAG_NOINTR</literal>). See the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page
+for details.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_time</structfield></term><listitem><para>Time out value in seconds. If the command is not completed
+within this time, the host bus adapter calls the completion routine with <structfield>pkt_reason</structfield> set to <literal>CMD_TIMEOUT</literal>. The target
+driver should set this field to longer than the maximum time the command might
+take. If the timeout is zero, no timeout is requested. Timeout starts when
+the command is transmitted on the SCSI bus.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_scbp</structfield></term><listitem><para>Pointer to the block for SCSI status completion. This field
+is filled in by the host bus adapter driver.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_cdbp</structfield></term><listitem><para>Pointer to the SCSI command descriptor block, the actual command
+to be sent to the target device. The host bus adapter driver does not interpret
+this field. The target driver must fill the field in with a command that the
+target device can process.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_resid</structfield></term><listitem><para>Residual of the operation. The <structfield>pkt_resid</structfield> field
+has two different uses depending on how <structfield>pkt_resid</structfield> is
+used. When <structfield>pkt_resid</structfield> is used to allocate DMA resources
+for a command  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <structfield>pkt_resid</structfield> indicates the
+number of unallocable bytes. DMA resources might <emphasis>not</emphasis> be
+allocated due to DMA hardware scatter-gather or other device limitations.
+After command transport, <structfield>pkt_resid</structfield> indicates the
+number of non-transferable data bytes. The field is filled in by the host
+bus adapter driver before the completion routine is called.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_state</structfield></term><listitem><para>Indicates the state of the command. The host bus adapter driver
+fills in this field as the command progresses. One bit is set in this field
+for each of the five following command states:</para><itemizedlist><listitem><para><literal>STATE_GOT_BUS</literal> &ndash; Acquired the bus</para>
+</listitem><listitem><para><literal>STATE_GOT_TARGET</literal> &ndash; Selected the target</para>
+</listitem><listitem><para><literal>STATE_SENT_CMD</literal> &ndash; Sent the command</para>
+</listitem><listitem><para><literal>STATE_XFERRED_DATA</literal> &ndash; Transferred
+data, if appropriate</para>
+</listitem><listitem><para><literal>STATE_GOT_STATUS</literal> &ndash; Received status
+from the device</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_statistics</structfield></term><listitem><para>Contains transport-related statistics set by the host bus
+adapter driver.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_reason</structfield></term><listitem><para>Gives the reason the completion routine was called. The completion
+routine decodes this field. The routine then takes the appropriate action.
+If the command completes, that is, no transport errors occur, this field is
+set to <literal>CMD_CMPLT</literal>. Other values in this field indicate an
+error. After a command is completed, the target driver should examine the <structfield>pkt_scbp</structfield> field for a check condition status. See the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page
+for more information.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="scsi-11"><title>Autoconfiguration for SCSI Target Drivers</title><para><indexterm id="scsi-ix485"><primary>autoconfiguration</primary><secondary sortas="SCSI">of SCSI target drivers</secondary></indexterm><indexterm id="scsi-ix486"><primary>SCSI target driver</primary><secondary>autoconfiguration of</secondary></indexterm>SCSI target drivers must implement the standard
+autoconfiguration routines <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and <olink targetdoc="refman9e" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. See <olink targetptr="autoconf-95548" remap="internal">Loadable Driver Interfaces</olink> for more information.</para><para>The following routines are also required, but these routines must perform
+specific SCSI and SCSA processing:</para><itemizedlist><listitem><para><olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><sect2 id="scsi-65313"><title><function>probe</function> Entry Point (SCSI
+Target Drivers)</title><para><indexterm id="scsi-ix487"><primary><function>probe</function> entry point</primary><secondary>SCSI target drivers</secondary></indexterm>SCSI
+target devices are not self-identifying, so target drivers must have a <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine. This routine must
+determine whether the expected type of device is present and responding.</para><para>The general structure and the return codes of the  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine are the same as the
+structure and return codes for other device drivers. SCSI target drivers must
+use the  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine in their  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> sends a SCSI
+inquiry command to the device and returns a code that indicates the result.
+If the SCSI inquiry command is successful,  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates a <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and fills the structure in with the device's inquiry data. Upon return from
+ <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the <structfield>sd_inq</structfield> field of the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+points to this <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para><para>Because  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must
+be stateless, the target driver must call  <olink targetdoc="refman9f" targetptr="scsi-unprobe-9f" remap="external"><citerefentry><refentrytitle>scsi_unprobe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> before <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> returns, even if <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> fails.</para><para><olink targetptr="scsi-14215" remap="internal">Example&nbsp;17&ndash;1</olink> shows
+a typical <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.
+The routine in the example retrieves the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure from the private
+field of its <literal>dev_info</literal> structure. The routine also retrieves
+the device's SCSI target and logical unit numbers for printing in messages.
+The  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+then calls <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to verify that the expected device, a printer in this
+case, is present.</para><para>If  successful, <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> attaches the device's SCSI inquiry data in a <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+to the <structfield>sd_inq</structfield> field of the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. The driver can
+then determine whether the device type is a printer, which is reported in
+the <structfield>inq_dtype</structfield> field. If the device is a printer,
+the type is reported with <olink targetdoc="refman9f" targetptr="scsi-log-9f" remap="external"><citerefentry><refentrytitle>scsi_log</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>,
+using <olink targetdoc="refman9f" targetptr="scsi-dname-9f" remap="external"><citerefentry><refentrytitle>scsi_dname</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to convert the device type into a string.</para><example id="scsi-14215"><title>SCSI Target Driver <citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxprobe(dev_info_t *dip)
+{
+    struct scsi_device *sdp;
+    int rval, target, lun;
+    /*
+     * Get a pointer to the scsi_device(9S) structure
+     */
+    sdp = (struct scsi_device *)ddi_get_driver_private(dip);
+
+    target = sdp-&gt;sd_address.a_target;
+    lun = sdp-&gt;sd_address.a_lun;
+    /*
+     * Call scsi_probe(9F) to send the Inquiry command. It will
+     * fill in the sd_inq field of the scsi_device structure.
+     */
+    switch (scsi_probe(sdp, NULL_FUNC)) {
+    case SCSIPROBE_FAILURE:
+    case SCSIPROBE_NORESP:
+    case SCSIPROBE_NOMEM:
+        /*
+         * In these cases, device might be powered off,
+         * in which case we might be able to successfully
+         * probe it at some future time - referred to
+         * as `deferred attach'.
+         */
+        rval = DDI_PROBE_PARTIAL;
+        break;
+    case SCSIPROBE_NONCCS:
+    default:
+        /*
+         * Device isn't of the type we can deal with,
+         * and/or it will never be usable.
+         */
+        rval = DDI_PROBE_FAILURE;
+        break;
+    case SCSIPROBE_EXISTS:
+        /*
+         * There is a device at the target/lun address. Check
+         * inq_dtype to make sure that it is the right device
+         * type. See scsi_inquiry(9S)for possible device types.
+         */
+        switch (sdp-&gt;sd_inq-&gt;inq_dtype) {
+        case DTYPE_PRINTER:
+        scsi_log(sdp, "xx", SCSI_DEBUG,
+            "found %s device at target%d, lun%d\n",
+            scsi_dname((int)sdp-&gt;sd_inq-&gt;inq_dtype),
+            target, lun);
+        rval = DDI_PROBE_SUCCESS;
+        break;
+        case DTYPE_NOTPRESENT:
+        default:
+        rval = DDI_PROBE_FAILURE;
+        break;     
+        }    
+    }
+    scsi_unprobe(sdp);
+    return (rval);
+}</programlisting>
+</example><para>A more thorough  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+could check <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>  to make sure that the device is of the type expected
+by a particular driver.</para>
+</sect2><sect2 id="scsi-38411"><title><function>attach</function> Entry Point (SCSI
+Target Drivers)</title><para>After the <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+has verified that the expected device is present, <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is called. <function>attach</function> performs
+these tasks:</para><itemizedlist><listitem><para>Allocates and initializes any per-instance data.</para>
+</listitem><listitem><para>Creates minor device node information.</para>
+</listitem><listitem><para>Restores the hardware state of a device after a suspension
+of the device or the system.  See <olink targetptr="autoconf-41111" remap="internal">attach()
+Entry Point</olink> for details.</para>
+</listitem>
+</itemizedlist><para>A SCSI target driver needs to call <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> again to retrieve the device's
+inquiry data. The driver must also create a SCSI request sense packet. If
+the attach is successful, the <function>attach</function> function should
+not call <olink targetdoc="refman9f" targetptr="scsi-unprobe-9f" remap="external"><citerefentry><refentrytitle>scsi_unprobe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>Three routines are used to create the request sense packet: <olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates
+a buffer that is suitable for consistent DMA. <function>scsi_alloc_consistent_buf</function> then returns a pointer to a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. The advantage of a consistent buffer is
+that no explicit synchronization of the data is required. In other words,
+the target driver can access the data after the callback. The <structfield>sd_sense</structfield> element of the device's <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure must be initialized
+with the address of the sense buffer. <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> creates and partially initializes
+a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. <olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> creates a
+SCSI command descriptor block, in this case by creating a SCSI request sense
+command.</para><para><indexterm id="scsi-ix488"><primary>SCSI target driver</primary><secondary>properties</secondary></indexterm><indexterm id="scsi-ix489"><primary>properties</primary><secondary><literal>pm-hardware-state</literal> property</secondary></indexterm>Note that a SCSI device is not self-identifying and
+does not have a <literal>reg</literal> property. As a result, the driver must
+set the <literal>pm-hardware-state</literal> property. Setting <literal>pm-hardware-state</literal> informs the framework that this device needs to be suspended and
+then resumed.</para><para>The following example shows the SCSI target driver's <function>attach</function> routine.</para><example id="scsi-42148"><title>SCSI Target Driver <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    struct xxstate         *xsp;
+    struct scsi_pkt        *rqpkt = NULL;
+    struct scsi_device     *sdp;
+    struct buf         *bp = NULL;
+    int            instance;
+    instance = ddi_get_instance(dip);
+    switch (cmd) {
+      case DDI_ATTACH:
+          break;
+      case DDI_RESUME:
+          /* For information, see the "Directory Memory Access (DMA)" */
+          /* chapter in this book. */
+      default:
+          return (DDI_FAILURE);
+    }
+    /*
+     * Allocate a state structure and initialize it.
+     */
+    xsp = ddi_get_soft_state(statep, instance);
+    sdp = (struct scsi_device *)ddi_get_driver_private(dip);
+    /*
+     * Cross-link the state and scsi_device(9S) structures.
+     */
+    sdp-&gt;sd_private = (caddr_t)xsp;
+    xsp-&gt;sdp = sdp;
+    /*
+     * Call scsi_probe(9F) again to get and validate inquiry data.
+     * Allocate a request sense buffer. The buf(9S) structure
+     * is set to NULL to tell the routine to allocate a new one.
+     * The callback function is set to NULL_FUNC to tell the
+     * routine to return failure immediately if no
+     * resources are available.
+     */
+    bp = scsi_alloc_consistent_buf(&amp;sdp-&gt;sd_address, NULL,
+    SENSE_LENGTH, B_READ, NULL_FUNC, NULL);
+    if (bp == NULL)
+        goto failed;
+    /*
+     * Create a Request Sense scsi_pkt(9S) structure.
+     */
+    rqpkt = scsi_init_pkt(&amp;sdp-&gt;sd_address, NULL, bp,
+    CDB_GROUP0, 1, 0, PKT_CONSISTENT, NULL_FUNC, NULL);
+    if (rqpkt == NULL)
+        goto failed;
+    /*
+     * scsi_alloc_consistent_buf(9F) returned a buf(9S) structure.
+     * The actual buffer address is in b_un.b_addr.
+     */
+    sdp-&gt;sd_sense = (struct scsi_extended_sense *)bp-&gt;b_un.b_addr;
+    /*
+     * Create a Group0 CDB for the Request Sense command
+     */
+    if (scsi_setup_cdb((union scsi_cdb *)rqpkt-&gt;pkt_cdbp,
+        SCMD_REQUEST_SENSE, 0, SENSE__LENGTH, 0) == 0)
+        goto failed;;
+    /*
+     * Fill in the rest of the scsi_pkt structure.
+     * xxcallback() is the private command completion routine.
+     */
+    rqpkt-&gt;pkt_comp = xxcallback;
+    rqpkt-&gt;pkt_time = 30; /* 30 second command timeout */
+    rqpkt-&gt;pkt_flags |= FLAG_SENSING;
+    xsp-&gt;rqs = rqpkt;
+    xsp-&gt;rqsbuf = bp;
+    /*
+     * Create minor nodes, report device, and do any other initialization. */
+     * Since the device does not have the 'reg' property,
+     * cpr will not call its DDI_SUSPEND/DDI_RESUME entries.
+     * The following code is to tell cpr that this device
+     * needs to be suspended and resumed.
+     */
+    (void) ddi_prop_update_string(device, dip,
+        "pm-hardware-state", "needs-suspend-resume");
+    xsp-&gt;open = 0;
+    return (DDI_SUCCESS);
+failed:
+    if (bp)
+        scsi_free_consistent_buf(bp);
+    if (rqpkt)
+        scsi_destroy_pkt(rqpkt);
+    sdp-&gt;sd_private = (caddr_t)NULL;
+    sdp-&gt;sd_sense = NULL;
+    scsi_unprobe(sdp);
+    /* Free any other resources, such as the state structure. */
+    return (DDI_FAILURE);
+}</programlisting>
+</example>
+</sect2><sect2 id="scsi-41573"><title><function>detach</function> Entry Point (SCSI
+Target Drivers)</title><para>The <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is the inverse of <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. <function>detach</function> must free all resources that were allocated in <function>attach</function>. If successful, the detach should call  <olink targetdoc="refman9f" targetptr="scsi-unprobe-9f" remap="external"><citerefentry><refentrytitle>scsi_unprobe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The following example shows
+a target driver <function>detach</function> routine.</para><example id="scsi-42748"><title>SCSI Target Driver <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+    struct xxstate *xsp;
+    switch (cmd) {
+      case DDI_DETACH:
+          /*
+           * Normal detach(9E) operations, such as getting a
+           * pointer to the state structure
+           */
+          scsi_free_consistent_buf(xsp-&gt;rqsbuf);
+          scsi_destroy_pkt(xsp-&gt;rqs);
+          xsp-&gt;sdp-&gt;sd_private = (caddr_t)NULL;
+          xsp-&gt;sdp-&gt;sd_sense = NULL;
+          scsi_unprobe(xsp-&gt;sdp);
+          /*
+           * Remove minor nodes.
+           * Free resources, such as the state structure and properties.
+           */
+          return (DDI_SUCCESS);
+      case DDI_SUSPEND:
+          /* For information, see the "Directory Memory Access (DMA)" */
+          /* chapter in this book. */
+      default:
+          return (DDI_FAILURE);
+    }
+}</programlisting>
+</example>
+</sect2><sect2 id="scsi-31824"><title><function>getinfo</function> Entry Point (SCSI
+Target Drivers)</title><para>The <olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+for SCSI target drivers is much the same as for other drivers (see <olink targetptr="autoconf-28012" remap="internal">getinfo() Entry Point</olink> for more information
+on <literal>DDI_INFO_DEVT2INSTANCE</literal> case). However, in the <literal>DDI_INFO_DEVT2DEVINFO</literal> case of the <function>getinfo</function> routine, the target driver
+must return a pointer to its <literal>dev_info</literal> node. This pointer
+can be saved in the driver state structure or can be retrieved from the <structfield>sd_dev</structfield> field of the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. The following
+example shows an alternative SCSI target driver <function>getinfo</function> code
+fragment.</para><example id="scsi-17982"><title>Alternative SCSI Target Driver <function>getinfo</function> Code
+Fragment</title><programlisting>case DDI_INFO_DEVT2DEVINFO:
+    dev = (dev_t)arg;
+    instance = getminor(dev);
+    xsp = ddi_get_soft_state(statep, instance);
+    if (xsp == NULL)
+        return (DDI_FAILURE);
+    *result = (void *)xsp-&gt;sdp-&gt;sd_dev;
+    return (DDI_SUCCESS);</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="scsi-12"><title>Resource Allocation</title><para><indexterm id="scsi-ix490"><primary>SCSI target driver</primary><secondary>resource allocation</secondary></indexterm>To send a SCSI command
+to the device, the target driver must create and initialize a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+This structure must then be passed to the host bus adapter driver.</para><sect2 id="scsi-13"><title><function>scsi_init_pkt</function> Function</title><para><indexterm id="scsi-ix491"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_init_pkt</function> function</secondary></indexterm>The <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine allocates
+and zeroes a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. <function>scsi_init_pkt</function> also sets pointers to <literal>pkt_private</literal>, <literal>*pkt_scbp</literal>, and <literal>*pkt_cdbp</literal>. Additionally, <function>scsi_init_pkt</function> provides a callback mechanism to handle the case where resources
+are not available. This function has the following syntax:</para><programlisting>struct scsi_pkt *scsi_init_pkt(struct scsi_address *<replaceable>ap</replaceable>,
+     struct scsi_pkt *<replaceable>pktp</replaceable>, struct buf *<replaceable>bp</replaceable>, int <replaceable>cmdlen</replaceable>,
+     int <replaceable>statuslen</replaceable>, int <replaceable>privatelen</replaceable>, int <replaceable>flags</replaceable>,
+     int (*<replaceable>callback</replaceable>)(caddr_t), caddr_t <replaceable>arg</replaceable>)</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>ap</replaceable></term><listitem><para>Pointer to a <structname>scsi_address</structname> structure. <structfield>ap</structfield> is the <structfield>sd_address</structfield> field of the
+device's <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>pktp</replaceable></term><listitem><para>Pointer to the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure to be initialized.
+If this pointer is set to <literal>NULL</literal>, a new packet is allocated.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>bp</replaceable></term><listitem><para>Pointer to a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+If this pointer is not null and has a valid byte count, DMA resources are
+allocated.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>cmdlen</replaceable></term><listitem><para>Length of the SCSI command descriptor block in bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>statuslen</replaceable></term><listitem><para>Required length of the SCSI status completion block in bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>privatelen</replaceable></term><listitem><para>Number of bytes to allocate for the <structfield>pkt_private</structfield> field.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flags</replaceable></term><listitem><para>Set of flags:</para><itemizedlist><listitem><para><literal>PKT_CONSISTENT</literal> &ndash; This bit must be
+set if the DMA buffer was allocated using  <olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. In this
+case, the host bus adapter driver guarantees that the data transfer is properly
+synchronized before performing the target driver's command completion callback.</para>
+</listitem><listitem><para><literal>PKT_DMA_PARTIAL</literal> &ndash; This bit can be
+set if the driver accepts a partial DMA mapping. If set,  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates
+DMA resources with the <literal>DDI_DMA_PARTIAL</literal> flag set. The <structfield>pkt_resid</structfield> field of the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure can be returned
+with a nonzero residual. A nonzero value indicates the number of bytes for
+which  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> was unable to allocate DMA resources.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>callback</replaceable></term><listitem><para>Specifies the action to take if resources are not available.
+If set to <literal>NULL_FUNC</literal>, <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns the value <literal>NULL</literal> immediately.
+If set to <literal>SLEEP_FUNC</literal>, <function>scsi_init_pkt</function> does
+not return until resources are available. Any other valid kernel address is
+interpreted as the address of a function to be called when resources are likely
+to be available.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>arg</replaceable></term><listitem><para>Parameter to pass to the callback function.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <function>scsi_init_pkt</function> routine synchronizes the data
+prior to transport. If the driver needs to access the data after transport,
+the driver should call <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to flush any intermediate caches. The <function>scsi_sync_pkt</function> routine can be used to synchronize any cached data.</para>
+</sect2><sect2 id="scsi-2"><title><function>scsi_sync_pkt</function> Function</title><para><indexterm><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_sync_pkt</function> function</secondary></indexterm>If
+the target driver needs to resubmit the packet after changing the data,  <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> must be called
+before calling  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. However, if the target driver does not need to access
+the data, <function>scsi_sync_pkt</function> does not need to be called after
+the transport.</para>
+</sect2><sect2 id="scsi-30"><title><function>scsi_destroy_pkt</function> Function</title><para><indexterm><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_destroy_pkt</function> function</secondary></indexterm>The <olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine synchronizes any remaining cached data that
+is associated with the packet, if necessary. The routine then frees the packet
+and associated command, status, and target driver-private data areas. This
+routine should be called in the command completion routine.</para>
+</sect2><sect2 id="scsi-14"><title><function>scsi_alloc_consistent_buf</function> Function</title><para><indexterm id="scsi-ix494"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_alloc_consistent_buf</function>function</secondary></indexterm>For most I/O requests, the data buffer passed to the driver entry
+points is not accessed directly by the driver. The buffer is just passed on
+to <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. If a driver sends SCSI commands that operate on buffers
+that the driver itself examines, the buffers should be DMA consistent. The
+SCSI request sense command is  a good example. The  <olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine allocates
+a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and a data buffer that is suitable for DMA-consistent operations. The HBA
+performs any necessary synchronization of the buffer before performing the
+command completion callback.</para><note><para><olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> uses scarce system resources. Thus, you should use <function>scsi_alloc_consistent_buf</function> sparingly.</para>
+</note>
+</sect2><sect2 id="scsi-40488"><title><function>scsi_free_consistent_buf</function> Function</title><para><indexterm><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_free_consistent_buf</function> function</secondary></indexterm><olink targetdoc="refman9f" targetptr="scsi-free-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_free_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> releases a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and the associated data buffer allocated with <olink targetdoc="refman9f" targetptr="scsi-alloc-consistent-buf-9f" remap="external"><citerefentry><refentrytitle>scsi_alloc_consistent_buf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. See <olink targetptr="scsi-38411" remap="internal">attach() Entry Point (SCSI Target Drivers)</olink> and <olink targetptr="scsi-41573" remap="internal">detach() Entry Point (SCSI Target Drivers)</olink> for
+examples.</para>
+</sect2>
+</sect1><sect1 id="scsi-15"><title>Building and Transporting a Command</title><para>The host bus adapter driver is responsible for transmitting the command
+to the device. Furthermore, the driver is responsible for handling the low-level
+SCSI protocol. The <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine hands a packet to the host bus adapter driver
+for transmission. The target driver has the responsibility to create a valid <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. </para><sect2 id="scsi-16"><title>Building a Command</title><para><indexterm id="scsi-ix496"><primary>SCSI target driver</primary><secondary>building a command</secondary></indexterm>The routine <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates
+space for a SCSI CDB, allocates DMA resources if necessary, and sets the <literal>pkt_flags</literal> field, as shown in this example:</para><programlisting>pkt = scsi_init_pkt(&amp;sdp-&gt;sd_address, NULL, bp,
+    CDB_GROUP0, 1, 0, 0, SLEEP_FUNC, NULL);</programlisting><para>This example creates a new packet along with allocating DMA resources
+as specified in the passed <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+pointer. A SCSI CDB is allocated for a Group 0 (6-byte) command. The <literal>pkt_flags</literal> field is set to zero, but no space is allocated for the <literal>pkt_private</literal> field. This call to <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, because of the <literal>SLEEP_FUNC</literal> parameter, waits indefinitely for resources if no resources are
+currently available.</para><para><indexterm id="scsi-ix497"><primary>SCSI target driver</primary><secondary>initializing a command descriptor block</secondary></indexterm><indexterm id="scsi-ix498"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_setup_cdb</function> function</secondary></indexterm>The next step is
+to initialize the SCSI CDB, using the <olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function:</para><programlisting>if (scsi_setup_cdb((union scsi_cdb *)pkt-&gt;pkt_cdbp,
+    SCMD_READ, bp-&gt;b_blkno, bp-&gt;b_bcount &gt;&gt; DEV_BSHIFT, 0) == 0)
+    goto failed;</programlisting><para>This example builds a Group 0 command descriptor block. The example
+fills in the <literal>pkt_cdbp</literal> field as follows:</para><itemizedlist><listitem><para>The command itself is in byte 0. The command is set from the
+parameter <literal>SCMD_READ</literal>.</para>
+</listitem><listitem><para>The address field is in bits 0-4 of byte 1 and bytes 2 and
+3. The address is set from <literal>bp-&gt;b_blkno</literal>.</para>
+</listitem><listitem><para>The count field is in byte 4. The count is set from the last
+parameter. In this case, <structfield>count</structfield> is set to <literal>bp-&gt;b_bcount</literal> <literal>&gt;&gt;</literal> <literal>DEV_BSHIFT</literal>, where <literal>DEV_BSHIFT</literal> is the byte count of the transfer converted to the number of blocks.</para>
+</listitem>
+</itemizedlist><note><para><indexterm><primary>LUN bits</primary></indexterm><olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> does not
+support setting a target device's logical unit number (LUN) in bits 5-7 of
+byte 1 of the SCSI command block. This requirement is defined by SCSI-1. For
+SCSI-1 devices that require the LUN bits set in the command block, use  <olink targetdoc="refman9f" targetptr="makecom-g0-9f" remap="external"><citerefentry><refentrytitle>makecom_g0</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or some equivalent
+rather than  <olink targetdoc="refman9f" targetptr="scsi-setup-cdb-9f" remap="external"><citerefentry><refentrytitle>scsi_setup_cdb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</note><para>After initializing the SCSI CDB, initialize three other fields in the
+packet and store as a pointer to the packet in the state structure.</para><programlisting>pkt-&gt;pkt_private = (opaque_t)bp;
+pkt-&gt;pkt_comp = xxcallback;
+pkt-&gt;pkt_time = 30;
+xsp-&gt;pkt = pkt;</programlisting><para>The <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> pointer
+is saved in the <literal>pkt_private</literal> field for later use in the
+completion routine.</para>
+</sect2><sect2 id="scsi-17"><title>Setting Target Capabilities</title><para><indexterm id="scsi-ix499"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_ifsetcap</function> function</secondary></indexterm><indexterm id="scsi-ix500"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_ifgetcap</function> function</secondary></indexterm>The target drivers
+use  <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to set the capabilities of the host adapter driver.
+A <emphasis>cap</emphasis> is a name-value pair, consisting of a null-terminated
+character string and an integer value. The current value of a capability can
+be retrieved using  <olink targetdoc="refman9f" targetptr="scsi-ifgetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifgetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allows capabilities to be set for all targets on the
+bus.</para><para>In general, however, setting capabilities of targets that are not owned
+by the target driver is not recommended. This practice is not universally
+supported by HBA drivers. Some capabilities, such as disconnect and synchronous,
+can be set by default by the HBA driver. Other capabilities might need to
+be set explicitly by the target driver. Wide-xfer and tagged-queueing must
+be set by the target drive, for example.</para>
+</sect2><sect2 id="scsi-61361"><title>Transporting a Command</title><para><indexterm id="scsi-ix501"><primary>SCSI target driver</primary><secondary>transporting a command</secondary></indexterm>After the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+is filled in, use <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to hand the structure to the bus adapter driver:</para><programlisting>if (scsi_transport(pkt) != TRAN_ACCEPT) {
+    bp-&gt;b_resid = bp-&gt;b_bcount;
+    bioerror(bp, EIO);
+    biodone(bp);
+}</programlisting><para><indexterm id="scsi-ix502"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_transport</function> function</secondary></indexterm>The
+other return values from <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> are as follows:</para><itemizedlist><listitem><para><returnvalue>TRAN_BUSY</returnvalue> &ndash; A command for
+the specified target is already in progress.</para>
+</listitem><listitem><para><returnvalue>TRAN_BADPKT</returnvalue> &ndash; The DMA count
+in the packet was too large, or the host adapter driver rejected this packet
+for other reasons.</para>
+</listitem>
+</itemizedlist><itemizedlist><listitem><para><returnvalue>TRAN_FATAL_ERROR</returnvalue> &ndash; The host
+adapter driver is unable to accept this packet.</para>
+</listitem>
+</itemizedlist><note><para>The mutex <structname>sd_mutex</structname> in the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+must not be held across a call to <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</note><para>If  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns <returnvalue>TRAN_ACCEPT</returnvalue>, the
+packet becomes the responsibility of the host bus adapter driver. The packet
+should not be accessed by the target driver until the command completion routine
+is called.</para><sect3 id="scsi-18"><title>Synchronous <function>scsi_transport</function> Function</title><para>If <literal>FLAG_NOINTR</literal> is set in the packet, then <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> does not
+return until the command is complete.  No callback is performed.</para><note><para>Do not use <literal>FLAG_NOINTR</literal> in interrupt context.</para>
+</note>
+</sect3>
+</sect2><sect2 id="scsi-19"><title>Command Completion</title><para><indexterm id="scsi-ix503"><primary>SCSI target driver</primary><secondary>callback routine</secondary></indexterm>When the host bus adapter
+driver is through with the command, the driver invokes the packet's completion
+callback routine. The driver then passes a pointer to the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+as a parameter. After decoding the packet, the completion routine takes the
+appropriate action.</para><para><olink targetptr="scsi-35252" remap="internal">Example&nbsp;17&ndash;5</olink> presents
+a simple completion callback routine. This code checks for transport failures.
+In case of failure, the routine gives up rather than retrying the command.
+If the target is busy, extra code is required to resubmit the command at a
+later time.</para><para>If the command results in a check condition, the target driver needs
+to send a request sense command unless auto request sense has been enabled.</para><para>Otherwise, the command succeeded. At the end of processing for the command,
+the command destroys the packet and calls <olink targetdoc="refman9f" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>In the event of a transport error, such as a bus reset or parity problem,
+the target driver can resubmit the packet by using <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. No values in the packet
+need to be changed prior to resubmitting.</para><para>The following example does not attempt to retry incomplete commands.</para><note><para>Normally, the target driver's callback function is called in interrupt
+context. Consequently, the callback function should never sleep.</para>
+</note><example id="scsi-35252"><title>Completion Routine for a SCSI Driver</title><programlisting>static void
+xxcallback(struct scsi_pkt *pkt)
+{
+    struct buf        *bp;
+    struct xxstate    *xsp;
+    minor_t           instance;
+    struct scsi_status *ssp;
+    /*
+     * Get a pointer to the buf(9S) structure for the command
+     * and to the per-instance data structure.
+     */
+    bp = (struct buf *)pkt-&gt;pkt_private;
+    instance = getminor(bp-&gt;b_edev);
+    xsp = ddi_get_soft_state(statep, instance);
+    /*
+     * Figure out why this callback routine was called
+     */
+    if (pkt-&gt;pkt_reason != CMP_CMPLT) {
+        bp-&gt;b_resid = bp-&gt;b_bcount;
+        bioerror(bp, EIO);
+        scsi_destroy_pkt(pkt);          /* Release resources */
+        biodone(bp);                    /* Notify waiting threads */ ;
+    } else {
+        /*
+         * Command completed, check status.
+         * See scsi_status(9S)
+         */
+        ssp = (struct scsi_status *)pkt-&gt;pkt_scbp;
+        if (ssp-&gt;sts_busy) {
+            /* error, target busy or reserved */
+        } else if (ssp-&gt;sts_chk) {
+            /* Send a request sense command. */
+        } else {
+            bp-&gt;b_resid = pkt-&gt;pkt_resid;  /* Packet completed OK */
+            scsi_destroy_pkt(pkt);
+            biodone(bp);
+       }
+    }
+}</programlisting>
+</example>
+</sect2><sect2 id="scsi-200"><title>Reuse of Packets</title><para><indexterm id="scsi-ix504"><primary>SCSI target driver</primary><secondary>reusing packets</secondary></indexterm>A target driver can reuse
+packets in the following ways:</para><itemizedlist><listitem><para>Resubmit the packet unchanged.</para>
+</listitem><listitem><para><indexterm id="scsi-ix505"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_sync_pkt</function> function</secondary></indexterm>Use  <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to synchronize the data. Then, process the data in
+the driver. Finally, resubmit the packet.</para>
+</listitem><listitem><para><indexterm id="scsi-ix506"><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_dmafree</function> function</secondary></indexterm>Free DMA resources, using  <olink targetdoc="refman9f" targetptr="scsi-dmafree-9f" remap="external"><citerefentry><refentrytitle>scsi_dmafree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and pass the <literal>pkt</literal> pointer
+to  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for binding to a new <literal>bp</literal>. The target
+driver is responsible for reinitializing the packet. The CDB has to have the
+same length as the previous CDB.</para>
+</listitem><listitem><para>If only partial DMA is allocated during the first call to
+ <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, subsequent calls to  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> can be made for the same
+packet. Calls can be made to  <literal>bp</literal> as well to adjust the
+DMA resources to the next portion of the transfer.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="scsi-21"><title>Auto-Request Sense Mode</title><para><indexterm id="scsi-ix507"><primary>SCSI target driver</primary><secondary>auto-request sense mode</secondary></indexterm><indexterm><primary>auto-request sense mode</primary></indexterm>Auto-request sense mode is most desirable
+if queuing is used, whether the queuing is tagged or untagged. A contingent
+allegiance condition is cleared by any subsequent command and, consequently,
+the sense data is lost. Most HBA drivers start the next command before performing
+the target driver callback. Other HBA drivers can use a separate, lower-priority
+thread to perform the callbacks. This approach might increase the time needed
+to notify the target driver that the packet completed with a check condition.
+In this case, the target driver might not be able to submit a request sense
+command in time to retrieve the sense data.</para><para>To avoid this loss of sense data, the HBA driver, or controller, should
+issue a request sense command if a check condition has been detected. This
+mode is known as auto-request sense mode. Note that not all HBA drivers are
+capable of auto-request sense mode, and some drivers can only operate with
+auto-request sense mode enabled.</para><para>A target driver enables auto-request-sense mode by using <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The following
+example shows auto-request sense enabling.</para><example id="scsi-73381"><title>Enabling Auto-Request Sense Mode</title><programlisting>static int
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    struct xxstate *xsp;
+    struct scsi_device *sdp = (struct scsi_device *)
+    ddi_get_driver_private(dip);
+    /*
+     * Enable auto-request-sense; an auto-request-sense cmd might
+     * fail due to a BUSY condition or transport error. Therefore,
+     * it is recommended to allocate a separate request sense
+     * packet as well.
+     * Note that scsi_ifsetcap(9F) can return -1, 0, or 1
+     */
+    xsp-&gt;sdp_arq_enabled =
+    ((scsi_ifsetcap(ROUTE, &ldquo;auto-rqsense&rdquo;, 1, 1) == 1) ? 1 : 0);
+    /*
+     * If the HBA driver supports auto request sense then the
+     * status blocks should be sizeof (struct scsi_arq_status);
+     * else
+     * One byte is sufficient
+     */
+    xsp-&gt;sdp_cmd_stat_size =  (xsp-&gt;sdp_arq_enabled ?
+    sizeof (struct scsi_arq_status) : 1);
+    /* ... */
+}</programlisting>
+</example><para>If a packet is allocated using <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and auto-request sense is
+desired on this packet, additional space is needed. The target driver must
+request this  space for the status block to hold the auto-request sense structure.
+The sense length used in the request sense command is <literal>sizeof</literal>,
+from <literal>struct</literal> <literal>scsi_extended_sense</literal>. Auto-request
+sense can be disabled per individual packet by allocating <literal>sizeof</literal>,
+from <literal>struct</literal> <literal>scsi_status</literal>, for the status
+block.</para><para>The packet is submitted using <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> as usual. When a check condition
+occurs on this packet, the host adapter driver takes the following steps:</para><itemizedlist><listitem><para>Issues a request sense command if the controller does not
+have auto-request sense capability</para>
+</listitem><listitem><para>Obtains the sense data</para>
+</listitem><listitem><para>Fills in the <literal>scsi_arq_status</literal> information
+in the packet's status block</para>
+</listitem><listitem><para>Sets <literal>STATE_ARQ_DONE</literal> in the packet's <structname>pkt_state</structname> field</para>
+</listitem><listitem><para>Calls the packet's callback handler (<function>pkt_comp</function>)</para>
+</listitem>
+</itemizedlist><para>The target driver's callback routine should verify that sense data is
+available by checking the <literal>STATE_ARQ_DONE</literal> bit in <structfield>pkt_state</structfield>. <literal>STATE_ARQ_DONE</literal> implies that a check condition
+has occurred and that a request sense has been performed. If auto-request
+sense has been temporarily disabled in a packet, subsequent retrieval of the
+sense data cannot be guaranteed.</para><para>The target driver should then verify whether the auto-request sense
+command completed successfully and decode the sense data.</para>
+</sect2><sect2 id="scsi-1a"><title>Dump Handling</title><para>The <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point copies a portion of virtual address space directly to the specified
+device in the case of system failure or checkpoint operation. See the <olink targetdoc="refman7" targetptr="cpr-7" remap="external"><citerefentry><refentrytitle>cpr</refentrytitle><manvolnum>7</manvolnum></citerefentry></olink> and <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man pages. The <olink targetdoc="refman9e" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point must be capable of performing
+this operation without the use of interrupts.</para><para>The arguments for <function>dump</function> are as follows:</para><variablelist><varlistentry><term><replaceable>dev</replaceable></term><listitem><para>Device number of the dump device</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>addr</replaceable></term><listitem><para>Kernel virtual address at which to start the dump</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>blkno</replaceable></term><listitem><para>First destination block on the device</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>nblk</replaceable></term><listitem><para>Number of blocks to dump</para>
+</listitem>
+</varlistentry>
+</variablelist><example id="scsi-ex-3"><title><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxdump(dev_t dev, caddr_t addr, daddr_t blkno, int nblk)
+{
+    struct xxstate     *xsp;
+    struct buf         *bp;
+    struct scsi_pkt    *pkt;
+    int    rval;
+    int    instance;
+
+    instance = getminor(dev);
+    xsp = ddi_get_soft_state(statep, instance);
+
+    if (tgt-&gt;suspended) {
+        (void) pm_raise_power(DEVINFO(tgt), 0, 1);
+    }
+
+    bp = getrbuf(KM_NOSLEEP);
+    if (bp == NULL) {
+        return (EIO);
+    }
+
+/* Calculate block number relative to partition. */
+    bp-&gt;b_un.b_addr = addr;
+    bp-&gt;b_edev = dev;
+    bp-&gt;b_bcount = nblk * DEV_BSIZE;
+    bp-&gt;b_flags = B_WRITE | B_BUSY;
+    bp-&gt;b_blkno = blkno;
+
+    pkt = scsi_init_pkt(ROUTE(tgt), NULL, bp, CDB_GROUP1,
+    sizeof (struct scsi_arq_status),
+    sizeof (struct bst_pkt_private), 0, NULL_FUNC, NULL);
+    if (pkt == NULL) {
+        freerbuf(bp);
+        return (EIO);
+    }
+    (void) scsi_setup_cdb((union scsi_cdb *)pkt-&gt;pkt_cdbp,
+        SCMD_WRITE_G1, blkno, nblk, 0);
+    /*
+     * While dumping in polled mode, other cmds might complete
+     * and these should not be resubmitted. we set the
+     * dumping flag here which prevents requeueing cmds.
+     */
+    tgt-&gt;dumping = 1;
+    rval = scsi_poll(pkt);
+    tgt-&gt;dumping = 0;
+
+    scsi_destroy_pkt(pkt);
+    freerbuf(bp);
+
+    if (rval != DDI_SUCCESS) {
+        rval = EIO;
+    }
+    return (rval);
+}</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="scsi-100"><title>SCSI Options</title><para><indexterm><primary>SCSA</primary><secondary>global data definitions</secondary></indexterm>SCSA defines a global variable, <replaceable>scsi_options</replaceable>,
+for control and debugging. The defined bits in <replaceable>scsi_options</replaceable> can
+be found in the file <filename>&lt;sys/scsi/conf/autoconf.h&gt;</filename>. The <replaceable>scsi_options</replaceable> uses the bits as follows:</para><variablelist><varlistentry><term><literal>SCSI_OPTIONS_DR</literal></term><listitem><para>Enables global disconnect or reconnect.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST</literal></term><listitem><para>Enables global FAST SCSI support: 10 Mbytes/sec transfers.
+The HBA should not operate in FAST SCSI mode unless the SCSI_OPTIONS_FAST
+(0x100) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST20</literal></term><listitem><para>Enables global FAST20 SCSI support: 20 Mbytes/sec transfers.
+The HBA should not operate in FAST20 SCSI mode unless the SCSI_OPTIONS_FAST20
+(0x400) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST40</literal></term><listitem><para>Enables global FAST40 SCSI support: 40 Mbytes/sec transfers.
+The HBA should not operate in FAST40 SCSI mode unless the SCSI_OPTIONS_FAST40
+(0x800) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST80</literal></term><listitem><para>Enables global FAST80 SCSI support: 80 Mbytes/sec transfers.
+The HBA should not operate in FAST80 SCSI mode unless the SCSI_OPTIONS_FAST80
+(0x1000) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST160</literal></term><listitem><para>Enables global FAST160 SCSI support: 160 Mbytes/sec transfers.
+The HBA should not operate in FAST160 SCSI mode unless the SCSI_OPTIONS_FAST160
+(0x2000) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_FAST320</literal></term><listitem><para>Enables global FAST320 SCSI support: 320 Mbytes/sec transfers.
+The HBA should not operate in FAST320 SCSI mode unless the SCSI_OPTIONS_FAST320
+(0x4000) bit is set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_LINK</literal></term><listitem><para>Enables global link support.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_PARITY</literal></term><listitem><para>Enables global parity support.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_QAS</literal></term><listitem><para>Enables the Quick Arbitration Select feature. QAS is used
+to decrease protocol overhead when devices arbitrate for and access the bus.
+ QAS is only supported on Ultra4 (FAST160) SCSI devices, although not all
+such devices support QAS. The HBA should not operate in QAS SCSI mode unless
+the SCSI_OPTIONS_QAS (0x100000) bit is set. Consult the appropriate Sun hardware
+documentation to determine whether your  machine supports QAS.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_SYNC</literal></term><listitem><para>Enables global synchronous transfer capability.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_TAG</literal></term><listitem><para>Enables global tagged queuing support.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SCSI_OPTIONS_WIDE</literal></term><listitem><para>Enables global WIDE SCSI.</para>
+</listitem>
+</varlistentry>
+</variablelist><note><para>The setting of <replaceable>scsi_options</replaceable> affects <emphasis>all</emphasis> host bus adapter drivers and all target drivers that are present
+on the system. Refer to the <olink targetdoc="refman9f" targetptr="scsi-hba-attach-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for information
+on controlling these options for a particular host adapter.</para>
+</note>
+</sect1>
+</chapter><?Pub *0000089542 0?>

@@ -1,0 +1,852 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="interrupt-15678"><title>Interrupt Handlers</title><indexterm id="fxjys"><primary>interrupts</primary><secondary>writing handlers</secondary>
+</indexterm><indexterm id="fxjyr"><primary>interrupt handling</primary>
+</indexterm><highlights><para>This chapter describes mechanisms for handling interrupts, such as registering,
+servicing, and removing interrupts. This chapter provides information on the
+following subjects:</para><itemizedlist><listitem><para><olink targetptr="interrupt-1" remap="internal">Interrupt Handler Overview</olink></para>
+</listitem><listitem><para><olink targetptr="interrupt-11" remap="internal">Device Interrupts</olink></para>
+</listitem><listitem><para><olink targetptr="interrupt-14" remap="internal">Registering Interrupts</olink></para>
+</listitem><listitem><para><olink targetptr="interrupt-16" remap="internal">Interrupt Handler Functionality</olink></para>
+</listitem><listitem><para><olink targetptr="interrupt-18" remap="internal">Handling High-Level Interrupts</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="interrupt-1"><title>Interrupt Handler Overview</title><para><indexterm id="interrupt-ix274"><primary>interrupts</primary><secondary>description of</secondary></indexterm>An interrupt is a hardware signal from a device
+to a CPU. An interrupt tells the CPU that the device needs attention and that
+the CPU should stop any current activity and respond to the device. If the
+CPU is not performing a task that has higher priority than the priority of
+the interrupt, then the CPU suspends the current thread. The CPU then invokes
+the interrupt handler for the device that sent the interrupt signal. The job
+of the interrupt handler is to service the device and stop the device from
+interrupting. When the interrupt handler returns, the CPU resumes the work
+it was doing before the interrupt occurred.</para><para>The Solaris DDI/DKI provides interfaces for performing the following
+tasks:</para><itemizedlist><listitem><para>Determining interrupt type and registration requirements</para>
+</listitem><listitem><para>Registering interrupts</para>
+</listitem><listitem><para>Servicing interrupts</para>
+</listitem><listitem><para>Masking interrupts</para>
+</listitem><listitem><para>Getting interrupt pending information</para>
+</listitem><listitem><para>Getting and setting priority information</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="interrupt-11"><title>Device Interrupts</title><indexterm><primary>device interrupts</primary><see>interrupts; interrupt handling</see>
+</indexterm><para><indexterm><primary>interrupts</primary><secondary>types of</secondary></indexterm><indexterm><primary>autovectored interrupts</primary></indexterm>I/O
+buses implement interrupts in two common ways: <emphasis>vectored</emphasis> and <emphasis>polled</emphasis>. Both methods commonly supply a bus-interrupt priority level.
+Vectored devices also supply an interrupt vector. Polled devices do not  supply
+interrupt vectors.</para><para>To stay current with changing bus technologies, the Solaris OS has been
+enhanced to accommodate both newer types of interrupts and more traditional
+interrupts that have been in use for many years. Specifically, the operating
+system now recognizes three types of interrupts:</para><itemizedlist><listitem><para><indexterm id="fxjzi"><primary>legacy interrupts</primary><secondary>defined</secondary></indexterm><indexterm id="fxjyo"><primary>interrupts</primary><secondary>legacy defined</secondary></indexterm><emphasis role="strong">Legacy interrupts</emphasis> &ndash; <emphasis>Legacy</emphasis> or <emphasis>fixed interrupts</emphasis> refer to interrupts that use older bus technologies.
+With these technologies, interrupts are signaled by using one or more external
+pins that are wired &ldquo;out-of-band,&rdquo; that is, separately from the
+main lines of the bus. Newer bus technologies such as PCI Express maintain
+software compatibility by emulating legacy interrupts through in-band mechanisms.
+These emulated interrupts are treated as legacy interrupts by the host OS.</para>
+</listitem><listitem><para><indexterm id="fxjyx"><primary>interrupts</primary><secondary>message-signaled defined</secondary></indexterm><indexterm id="fxjzc"><primary>message-signaled interrupts</primary><secondary>defined</secondary></indexterm><indexterm id="fxjzj"><primary>interrupts</primary><secondary>MSI defined</secondary></indexterm><indexterm id="fxjzl"><primary>MSI interrupts</primary><secondary>defined</secondary></indexterm><emphasis role="strong">Message-signaled interrupts</emphasis> &ndash;
+Instead of using pins, message-signaled interrupts (MSI) are in-band messages
+and can target addresses in the host bridge. (See <olink targetptr="hwovr-22" remap="internal">PCI
+Local Bus</olink> for more information on host bridges.) MSIs can send data
+along with the interrupt message. Each MSI is unshared so that an MSI that
+is assigned to a device is guaranteed to be unique within the system. A PCI
+function can request up to 32 MSI messages.</para>
+</listitem><listitem><para><indexterm id="fxjyn"><primary>interrupts</primary><secondary>MSI-X defined</secondary></indexterm><indexterm id="fxjyw"><primary>MSI-X interrupts</primary><secondary>defined</secondary></indexterm><emphasis role="strong">Extended
+message-signaled interrupts</emphasis> &ndash; Extended message-signaled interrupts
+(MSI-X) are an enhanced version of MSIs. MSI-X interrupts have the following
+added advantages:</para><itemizedlist><listitem><para>Support 2048 messages rather than 32 messages</para>
+</listitem><listitem><para>Support independent message address and message data for each
+message</para>
+</listitem><listitem><para>Support per-message masking</para>
+</listitem><listitem><para>Enable more flexibility when software allocates fewer vectors
+than hardware requests. The software can reuse the same MSI-X address and
+data in multiple MSI-X slots.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><note><para>Some newer bus technologies such as PCI Express require MSIs but
+can accommodate legacy interrupts by using INTx emulation. INTx emulation
+is used for compatibility purposes, but is not considered to be good practice.</para>
+</note><sect2 id="interrupt-4"><title>High-Level Interrupts</title><para><indexterm><primary>interrupts</primary><secondary>priority levels</secondary></indexterm><indexterm><primary>interrupt handling</primary><secondary>high-level interrupts</secondary></indexterm>A bus prioritizes a device interrupt at
+a <emphasis>bus-interrupt level</emphasis>. The bus interrupt level is then
+mapped to a processor-interrupt level. A bus interrupt level that maps to
+a CPU interrupt priority above the scheduler priority level is called a <emphasis>high-level interrupt</emphasis>. High-level interrupt handlers are restricted
+to calling the following DDI interfaces:</para><itemizedlist><listitem><para><indexterm><primary><function>mutex_enter</function> function</primary></indexterm><indexterm><primary><function>mutex_exit</function> function</primary></indexterm><olink targetdoc="group-refman" targetptr="mutex-enter-9f" remap="external"><citerefentry><refentrytitle>mutex_enter</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="mutex-exit-9f" remap="external"><citerefentry><refentrytitle>mutex_exit</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> on a mutex that is initialized
+with an interrupt priority associated with the high-level interrupt</para>
+</listitem><listitem><para><indexterm><primary><function>ddi_intr_trigger_softint</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_trigger_softint</function> function</secondary></indexterm><olink targetdoc="group-refman" targetptr="ddi-intr-trigger-softint-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_trigger_softint</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para>The following DDI <literal>get</literal> and <literal>put</literal> routines: <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-get16-9f" remap="external"><citerefentry><refentrytitle>ddi_get16</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-put16-9f" remap="external"><citerefentry><refentrytitle>ddi_put16</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-get32-9f" remap="external"><citerefentry><refentrytitle>ddi_get32</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-put32-9f" remap="external"><citerefentry><refentrytitle>ddi_put32</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-get64-9f" remap="external"><citerefentry><refentrytitle>ddi_get64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="ddi-put64-9f" remap="external"><citerefentry><refentrytitle>ddi_put64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist><para>A bus-interrupt level by itself does not determine whether a device
+interrupts at a high level. A particular bus-interrupt level can map to a
+high-level interrupt on one platform, but map to an ordinary interrupt on
+another platform.</para><para><indexterm><primary><function>ddi_intr_hilevel</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_hilevel</function> function</secondary></indexterm>A driver is not
+required to support devices that have high-level interrupts. However, the
+driver is required to check the interrupt level. If the interrupt priority
+is greater than or equal to the highest system priority, the interrupt handler
+runs in high-level interrupt context. In this case, the driver can fail to
+attach, or the driver can use a two-level scheme to handle interrupts. For
+more information, see <olink targetptr="interrupt-18" remap="internal">Handling High-Level
+Interrupts</olink>.</para>
+</sect2><sect2 id="interrupt-12"><title>Legacy Interrupts</title><indexterm><primary>legacy interrupts</primary><secondary>using</secondary>
+</indexterm><indexterm id="fxjyh"><primary>interrupts</primary><secondary>using legacy</secondary>
+</indexterm><para>The only information that the system has about a device interrupt is
+the priority level of the bus interrupt and the interrupt request number.
+An example of the priority level for a bus interrupt is the IPL on an SBus
+in a SPARC machine. An example of an interrupt request number is the IRQ on
+an ISA bus in an x86 machine.</para><para>When an interrupt handler is registered, the system adds the handler
+to a list of potential interrupt handlers for each IPL or IRQ. When the interrupt
+occurs, the system must determine which device actually caused the interrupt,
+among all devices that are associated with a given IPL or IRQ. The system
+calls all the interrupt handlers for the designated IPL or IRQ until one handler
+claims the interrupt.</para><para>The following buses are capable of supporting polled interrupts:</para><itemizedlist><listitem><para>SBus</para>
+</listitem><listitem><para>ISA</para>
+</listitem><listitem><para>PCI</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="fvjco"><title>Standard and Extended Message-Signaled Interrupts</title><para>Both standard (MSI) and extended (MSI-X) message-signaled interrupts
+are implemented as in-band messages. A message-signaled interrupt is posted
+as a write with an address and value that are specified by the software.</para><sect3 id="fvjga"><title>MSI Interrupts</title><para><indexterm id="fxjyp"><primary>interrupts</primary><secondary>MSI implementation</secondary></indexterm><indexterm id="fxjyi"><primary>MSI interrupts</primary><secondary>implementation</secondary></indexterm>Conventional PCI specifications
+include optional support for Message Signaled Interrupts (MSI). An MSI  is
+an in-band message that is implemented as a posted write. The address and
+the data for the MSI are specified by software and are specific to the host
+bridge. Because the messages are in-band, the receipt of the message can be
+used to &ldquo;push&rdquo; data that is associated with the interrupt. By
+definition, MSI interrupts are unshared. Each MSI message that is assigned
+to a device is guaranteed to be a unique message in the system. PCI functions
+can request 1, 2, 4, 8, 16, or 32 MSI messages. Note that the system software
+can allocate fewer MSI messages to a function than the function requested.
+The host bridge can be limited in the number of unique MSI messages that are
+allocated for devices.</para>
+</sect3><sect3 id="fvjdn"><title>MSI-X Interrupts</title><para><indexterm id="fxjyq"><primary>interrupts</primary><secondary>MSI-X implementation</secondary></indexterm><indexterm id="fxjzo"><primary>MSI-X interrupts</primary><secondary>implementation</secondary></indexterm>MSI-X
+interrupts are enhanced versions of MSI interrupts that have the same features
+as MSI interrupts with the following key differences:</para><itemizedlist><listitem><para>A maximum of 2048 MSI-X interrupt vectors are supported per
+device.</para>
+</listitem><listitem><para>Address and data entries are unique per interrupt vector.</para>
+</listitem><listitem><para>MSI-X supports per function masking and per vector masking.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary><function>ddi_intr_dup_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_dup_handler</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_add_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_add_handler</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_enable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_enable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_disable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_disable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_alloc</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_alloc</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_free</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_free</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_remove_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_remove_handler</function> function</secondary></indexterm>With MSI-X interrupts, an unallocated interrupt vector of a device
+can use a previously added or initialized MSI-X interrupt vector to share
+the same vector address, vector data, interrupt handler, and handler arguments.
+Use the <olink targetdoc="refman9f" targetptr="ddi-intr-dup-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_dup_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to alias the resources provided by the Solaris
+OS to the unallocated interrupt vectors on an associated device. For example,
+if 2 MSI-X interrupts are allocated to a driver and 32 interrupts are supported
+on the device, then the driver can use <function>ddi_intr_dup_handler</function> to
+alias the 2 interrupts it received to the 30 additional interrupts on the
+device.</para><para>The <function>ddi_intr_dup_handler</function> function can duplicate
+interrupts that were added with <olink targetdoc="refman9f" targetptr="ddi-intr-add-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or initialized
+with <olink targetdoc="refman9f" targetptr="ddi-intr-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_enable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>A duplicated interrupt is disabled initially. Use <function>ddi_intr_enable</function> to enable the duplicated interrupt. You cannot remove the original
+MSI-X interrupt handler until all duplicated interrupt handlers that are associated
+with this original interrupt handler are removed. To remove a duplicated interrupt
+handler, first call <olink targetdoc="refman9f" targetptr="ddi-intr-disable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_disable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and then call <olink targetdoc="refman9f" targetptr="ddi-intr-free-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. When all duplicated interrupt
+handlers that are associated with this original interrupt handler are removed,
+then you can use <olink targetdoc="refman9f" targetptr="ddi-intr-remove-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_remove_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to remove
+the original MSI-X interrupt handler. See the <citerefentry><refentrytitle>ddi_intr_dup_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man page for examples.</para>
+</sect3>
+</sect2><sect2 id="interrupt-13"><title>Software Interrupts</title><para><indexterm><primary>soft interrupts</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary>software interrupts</secondary></indexterm>The Solaris DDI/DKI supports software interrupts, also known as <emphasis>soft interrupts</emphasis>. Soft interrupts are initiated by software rather
+than by a hardware device. Handlers for these interrupts must also be added
+to and removed from the system. Soft interrupt handlers run in interrupt context
+and therefore can be used to do many of the tasks that belong to an interrupt
+handler.</para><para>Hardware interrupt handlers must perform their tasks quickly, because
+the handlers might have to suspend other system activity while doing these
+tasks. This requirement is particularly true for high-level interrupt handlers,
+which operate at priority levels greater than the priority level of the system
+scheduler. High-level interrupt handlers mask the operations of all lower-priority
+interrupts, including the interrupt operations of the system clock. Consequently,
+the interrupt handler must avoid involvement in activities that might cause
+it to sleep, such as acquiring a mutex.</para><para><indexterm><primary>interrupt handling</primary><secondary>high-level interrupts</secondary></indexterm>If the handler sleeps, then the system might
+hang because the clock is masked and incapable of scheduling the sleeping
+thread. For this reason, high-level interrupt handlers normally perform a
+minimum amount of work at high-priority levels and delegate other tasks to
+software interrupts, which run below the priority level of the high-level
+interrupt handler. Because software interrupt handlers run below the priority
+level of the system scheduler, software interrupt handlers can do the work
+that the high-level interrupt handler was incapable of doing.</para>
+</sect2>
+</sect1><sect1 id="fwaeb"><title>DDI Interrupt Functions</title><para>The Solaris OS provides a framework for registering and unregistering
+interrupts and provides support for Message Signaled Interrupts (MSIs). Interrupt
+management interfaces enable you to manipulate priorities, capabilities, and
+interrupt masking, and to obtain pending information.</para><sect2 id="fwadu"><title>Interrupt Capability Functions</title><para><indexterm id="fxjzf"><primary>interrupts</primary><secondary>capability functions</secondary></indexterm><indexterm><primary><function>ddi_intr_get_navail</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_navail</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_nintrs</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_nintrs</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_supported_types</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_supported_types</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_cap</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_cap</function> function</secondary></indexterm>Use the following
+functions to obtain interrupt information:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-navail-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_navail</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the number of interrupts available for a specified
+hardware device and interrupt type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-nintrs-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_nintrs</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the number of interrupts that the device supports
+for the specified interrupt type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-supported-types-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_supported_types</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the hardware interrupt types that are supported by
+both the device and the host.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-cap-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_cap</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns interrupt capability flags for the specified interrupt.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="fwamz"><title>Interrupt Initialization and Destruction Functions</title><para><indexterm id="fxjza"><primary>interrupts</primary><secondary>initialization and destruction functions</secondary></indexterm><indexterm><primary><function>ddi_intr_alloc</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_alloc</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_free</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_free</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_set_cap</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_cap</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_add_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_add_handler</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_dup_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_dup_handler</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_remove_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_remove_handler</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_enable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_enable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_disable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_disable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_block_enable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_block_enable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_block_disable</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_block_disable</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_set_mask</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_mask</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_clr_mask</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_clr_mask</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_pending</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_pending</function> function</secondary></indexterm>Use the following functions to create and remove interrupts:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_alloc</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocates system resources and interrupt vectors for the specified
+type of interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-free-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_free</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Releases the system resources and interrupt vectors for a
+specified interrupt handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-set-cap-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_cap</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Sets the capability of the specified interrupt through the
+use of the DDI_INTR_FLAG_LEVEL and DDI_INTR_FLAG_EDGE flags.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-add-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_handler</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Adds an interrupt handler.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-dup-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_dup_handler</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Use with MSI-X only. Copies an address and data pair for an
+allocated interrupt vector to an unused interrupt vector on the same device.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-remove-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_remove_handler</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Removes the specified interrupt handler.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_enable</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Enables the specified interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-disable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_disable</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Disables the specified interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-block-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_block_enable</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Use with MSI only. Enables the specified range of interrupts.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-block-disable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_block_disable</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Use with MSI only. Disables the specified range of interrupts.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-set-mask-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_mask</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Sets an interrupt mask if the specified interrupt is enabled.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-clr-mask-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_clr_mask</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Clears an interrupt mask if the specified interrupt is enabled.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-pending-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pending</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Reads the interrupt pending bit if such a bit is supported
+by either the host bridge or the device.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="fwamc"><title>Priority Management Functions</title><para><indexterm id="fxjyu"><primary>interrupts</primary><secondary>priority management functions</secondary></indexterm><indexterm><primary><function>ddi_intr_get_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_pri</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_set_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_pri</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_hilevel_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_hilevel_pri</function> function</secondary></indexterm>Use the following functions to
+obtain and set priority information:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pri</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the current software priority setting for the specified
+interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-set-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_pri</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Sets the interrupt priority level for the specified interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-hilevel-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_hilevel_pri</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the minimum priority level for a high-level interrupt.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="fwahx"><title>Soft Interrupt Functions</title><para><indexterm id="fxjzb"><primary>interrupts</primary><secondary>soft interrupt functions</secondary></indexterm><indexterm><primary><function>ddi_intr_add_softint</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_add_softint</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_trigger_softint</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_trigger_softint</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_remove_softint</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_remove_softint</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_softint_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_softint_pri</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_set_softint_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_softint_pri</function> function</secondary></indexterm>Use the following functions to manipulate soft interrupts and
+soft interrupt handlers:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-add-softint-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_softint</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Adds a soft interrupt handler.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-trigger-softint-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_trigger_softint</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Triggers the specified soft interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-remove-softint-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_remove_softint</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Removes the specified soft interrupt handler.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-get-softint-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_softint_pri</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns the soft interrupt priority for the specified interrupt.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="ddi-intr-set-softint-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_softint_pri</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Changes the relative soft interrupt priority for the specified
+soft interrupt.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="fxjou"><title>Interrupt Function Examples</title><para><indexterm id="fxjzd"><primary>interrupts</primary><secondary>changing soft interrupt priority example</secondary></indexterm><indexterm id="fxjym"><primary>interrupts</primary><secondary>checking pending interrupts example</secondary></indexterm><indexterm id="fxjzq"><primary>interrupts</primary><secondary>setting interrupt masks example</secondary></indexterm><indexterm id="fxjzp"><primary>interrupts</primary><secondary>clearing interrupt masks example</secondary></indexterm>This
+section provides examples for performing the following tasks:</para><itemizedlist><listitem><para>Changing soft interrupt priority</para>
+</listitem><listitem><para>Checking for pending interrupts</para>
+</listitem><listitem><para>Setting interrupt masks</para>
+</listitem><listitem><para>Clearing interrupt masks</para>
+</listitem>
+</itemizedlist><example id="fxjor"><title>Changing Soft Interrupt Priority</title><indexterm><primary><function>ddi_intr_set_softint_pri</function> function</primary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_softint_pri</function> function</secondary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary>software interrupts</secondary>
+</indexterm><indexterm><primary>software interrupts</primary><secondary>changing priority</secondary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="ddi-intr-set-softint-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_softint_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to change the soft interrupt priority to 9.</para><programlisting>if (ddi_intr_set_softint_pri(mydev-&gt;mydev_softint_hdl, 9) != DDI_SUCCESS)
+    cmn_err (CE_WARN, "ddi_intr_set_softint_pri failed");</programlisting>
+</example><example id="fxjpd"><title>Checking for Pending Interrupts</title><indexterm><primary><function>ddi_intr_get_pending</function> function</primary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_pending</function> function</secondary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary>pending interrupts</secondary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="ddi-intr-get-pending-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pending</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to check whether an interrupt is pending.</para><programlisting>if (ddi_intr_get_pending(mydevp-&gt;htable[0], &amp;pending) != DDI_SUCCESS)
+    cmn_err(CE_WARN, "ddi_intr_get_pending() failed");
+else if (pending)
+    cmn_err(CE_NOTE, "ddi_intr_get_pending(): Interrupt pending");</programlisting>
+</example><example id="fxjpb"><title>Setting Interrupt Masks</title><indexterm><primary><function>ddi_intr_set_mask</function> function</primary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_set_mask</function> function</secondary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary>setting masks</secondary>
+</indexterm><para>Use the <olink targetdoc="refman9f" targetptr="ddi-intr-set-mask-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_mask</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to set interrupt masking to prevent the device
+from receiving interrupts.</para><programlisting>if ((ddi_intr_set_mask(mydevp-&gt;htable[0]) != DDI_SUCCESS))
+    cmn_err(CE_WARN, "ddi_intr_set_mask() failed");</programlisting>
+</example><example id="fxjqj"><title>Clearing Interrupt Masks</title><indexterm><primary><function>ddi_intr_clr_mask</function> function</primary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_clr_mask</function> function</secondary>
+</indexterm><indexterm><primary>interrupt handling</primary><secondary>clearing masks</secondary>
+</indexterm><para>Use the <olink targetdoc="refman9f" targetptr="ddi-intr-clr-mask-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_clr_mask</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to clear interrupt masking. The <citerefentry><refentrytitle>ddi_intr_clr_mask</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function fails if the specified interrupt is not enabled.
+If the <citerefentry><refentrytitle>ddi_intr_clr_mask</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function succeeds, the device starts generating
+interrupts.</para><programlisting>if (ddi_intr_clr_mask(mydevp-&gt;htable[0]) != DDI_SUCCESS)
+    cmn_err(CE_WARN, "ddi_intr_clr_mask() failed");</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="interrupt-14"><title>Registering Interrupts</title><para><indexterm><primary>interrupt handlers</primary><secondary>registering</secondary></indexterm><indexterm><primary><function>ddi_intr_add_handler</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_add_handler</function> function</secondary></indexterm>Before a device driver can receive and service interrupts, the
+driver must call <olink targetdoc="group-refman" targetptr="ddi-intr-add-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to register
+an interrupt handler with the system. Registering interrupt handlers provides
+the system with a way to associate an interrupt handler with an interrupt
+specification. The interrupt handler is called when the device might have
+been responsible for the interrupt. The handler has the responsibility of
+determining whether it should handle the interrupt and, if so, of claiming
+that interrupt.</para><tip><para>Use the <command>::interrupts</command> command in the <command>mdb</command> or <command>kmdb</command> debugger to retrieve the registered interrupt information of
+a device on supported SPARC and x86 systems.</para>
+</tip><sect2 id="fvzmy"><title>Registering Legacy Interrupts</title><indexterm id="fxjzt"><primary>interrupts</primary><secondary>registering legacy interrupts</secondary>
+</indexterm><para>To register a driver's interrupt handler, the driver typically performs
+the following steps in  its <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point:</para><orderedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-supported-types-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_supported_types</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+which types of interrupts are supported.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-nintrs-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_nintrs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+the number of supported interrupt types.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="kmem-zalloc-9f" remap="external"><citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate memory for DDI interrupt handles.</para>
+</listitem><listitem><para>For each interrupt type that you allocate, take the following
+steps:</para><orderedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to get the priority for the
+interrupt.</para>
+</listitem><listitem><para>If you need to set a new priority for the interrupt, use <olink targetdoc="group-refman" targetptr="ddi-intr-set-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to initialize the lock.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-add-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to register
+the handler for the interrupt.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_enable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to enable the interrupt.</para>
+</listitem>
+</orderedlist>
+</listitem><listitem><para>Take the following steps to free each interrupt:</para><orderedlist><listitem><para>Disable each interrupt using <olink targetdoc="group-refman" targetptr="ddi-intr-disable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_disable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Remove the interrupt handler using <olink targetdoc="group-refman" targetptr="ddi-intr-remove-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_remove_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Remove the lock using <olink targetdoc="group-refman" targetptr="mutex-destroy-9f" remap="external"><citerefentry><refentrytitle>mutex_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Free the interrupt using <olink targetdoc="group-refman" targetptr="ddi-intr-free-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="kmem-free-9f" remap="external"><citerefentry><refentrytitle>kmem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to free memory
+that was allocated for DDI interrupt handles.</para>
+</listitem>
+</orderedlist>
+</listitem>
+</orderedlist><example id="fwbtg"><title>Registering a Legacy Interrupt</title><indexterm id="fxjzz"><primary>interrupts</primary><secondary>registering legacy interrupt example</secondary>
+</indexterm><para>The following example shows how to install an interrupt handler for
+a device called <literal>mydev</literal>. This example assumes that <literal>mydev</literal> supports one interrupt only.</para><programlisting>/* Determine which types of interrupts supported */
+ret = ddi_intr_get_supported_types(mydevp-&gt;mydev_dip, &amp;type);
+
+if ((ret != DDI_SUCCESS) || (!(type &amp; DDI_INTR_TYPE_FIXED))) {
+    cmn_err(CE_WARN, "Fixed type interrupt is not supported");
+    return (DDI_FAILURE);
+}
+
+/* Determine number of supported interrupts */
+ret = ddi_intr_get_nintrs(mydevp-&gt;mydev_dip, DDI_INTR_TYPE_FIXED,
+    &amp;count);
+
+/*
+ * Fixed interrupts can only have one interrupt. Check to make
+ * sure that number of supported interrupts and number of
+ * available interrupts are both equal to 1.
+ */
+if ((ret != DDI_SUCCESS) || (count != 1)) {
+    cmn_err(CE_WARN, "No fixed interrupts");
+    return (DDI_FAILURE);
+}
+
+/* Allocate memory for DDI interrupt handles */
+mydevp-&gt;mydev_htable = kmem_zalloc(sizeof (ddi_intr_handle_t),
+    KM_SLEEP);
+ret = ddi_intr_alloc(mydevp-&gt;mydev_dip, mydevp-&gt;mydev_htable,
+    DDI_INTR_TYPE_FIXED, 0, count, &amp;actual, 0);
+
+if ((ret != DDI_SUCCESS) || (actual != 1)) {
+    cmn_err(CE_WARN, "ddi_intr_alloc() failed 0x%x", ret);
+    kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));
+    return (DDI_FAILURE);
+}
+
+/* Sanity check that count and available are the same. */
+ASSERT(count == actual);
+
+/* Get the priority of the interrupt */
+if (ddi_intr_get_pri(mydevp-&gt;mydev_htable[0], &amp;mydevp-&gt;mydev_intr_pri)) {
+    cmn_err(CE_WARN, "ddi_intr_alloc() failed 0x%x", ret);
+
+    (void) ddi_intr_free(mydevp-&gt;mydev_htable[0]);
+    kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));
+
+    return (DDI_FAILURE);
+}
+
+cmn_err(CE_NOTE, "Supported Interrupt pri = 0x%x", mydevp-&gt;mydev_intr_pri);
+
+/* Test for high level mutex */
+if (mydevp-&gt;mydev_intr_pri &gt;= ddi_intr_get_hilevel_pri()) {
+    cmn_err(CE_WARN, "Hi level interrupt not supported");
+
+    (void) ddi_intr_free(mydevp-&gt;mydev_htable[0]);
+    kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));
+
+    return (DDI_FAILURE);
+}
+
+/* Initialize the mutex */
+mutex_init(&amp;mydevp-&gt;mydev_int_mutex, NULL, MUTEX_DRIVER,
+    DDI_INTR_PRI(mydevp-&gt;mydev_intr_pri));
+
+/* Register the interrupt handler */
+if (ddi_intr_add_handler(mydevp-&gt;mydev_htable[0], mydev_intr, 
+   (caddr_t)mydevp, NULL) !=DDI_SUCCESS) {
+    cmn_err(CE_WARN, "ddi_intr_add_handler() failed");
+
+    mutex_destroy(&amp;mydevp-&gt;mydev_int_mutex);
+    (void) ddi_intr_free(mydevp-&gt;mydev_htable[0]);
+    kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));
+
+    return (DDI_FAILURE);
+}
+
+/* Enable the interrupt */
+if (ddi_intr_enable(mydevp-&gt;mydev_htable[0]) != DDI_SUCCESS) {
+    cmn_err(CE_WARN, "ddi_intr_enable() failed");
+
+    (void) ddi_intr_remove_handler(mydevp-&gt;mydev_htable[0]);
+    mutex_destroy(&amp;mydevp-&gt;mydev_int_mutex);
+    (void) ddi_intr_free(mydevp-&gt;mydev_htable[0]);
+    kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));
+
+    return (DDI_FAILURE);
+}
+return (DDI_SUCCESS);
+}</programlisting>
+</example><example id="fwbjs"><title>Removing a Legacy Interrupt</title><indexterm id="fxjzy"><primary>interrupts</primary><secondary>removing legacy interrupt example</secondary>
+</indexterm><para>The following example shows how legacy interrupts are removed.</para><programlisting>/* disable interrupt */
+(void) ddi_intr_disable(mydevp-&gt;mydev_htable[0]);
+
+/* Remove interrupt handler */
+(void) ddi_intr_remove_handler(mydevp-&gt;mydev_htable[0]);
+
+/* free interrupt handle */
+(void) ddi_intr_free(mydevp-&gt;mydev_htable[0]);
+
+/* free memory */
+kmem_free(mydevp-&gt;mydev_htable, sizeof (ddi_intr_handle_t));</programlisting>
+</example>
+</sect2><sect2 id="fvzqn"><title>Registering MSI Interrupts</title><indexterm id="fxjzu"><primary>interrupts</primary><secondary>registering MSI interrupts</secondary>
+</indexterm><para>To register a driver's interrupt handler, the driver typically performs
+the following steps in  its <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point:</para><orderedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-supported-types-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_supported_types</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+which types of interrupts are supported.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-nintrs-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_nintrs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+the number of supported MSI interrupt types.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate memory for the MSI interrupts.</para>
+</listitem><listitem><para>For each interrupt type that you allocate, take the following
+steps:</para><orderedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-get-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to get the priority for the
+interrupt.</para>
+</listitem><listitem><para>If you need to set a new priority for the interrupt, use <olink targetdoc="group-refman" targetptr="ddi-intr-set-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_set_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to initialize the lock.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-add-handler-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_add_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to register
+the handler for the interrupt.</para>
+</listitem>
+</orderedlist>
+</listitem><listitem><para>Use one of the following functions to enable all the interrupts:</para><itemizedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-block-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_block_enable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to enable
+all the interrupts in a block.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-intr-enable-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_enable</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in a loop to enable each
+interrupt individually.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</orderedlist><example id="fwbiz"><title>Registering a Set of MSI Interrupts</title><indexterm id="fxkaa"><primary>interrupts</primary><secondary>registering MSI interrupts example</secondary>
+</indexterm><para>The following example illustrates how to register an MSI interrupt for
+a device called <literal>mydev</literal>.</para><programlisting>/* Get supported interrupt types */
+if (ddi_intr_get_supported_types(devinfo, &amp;intr_types) != DDI_SUCCESS) {
+    cmn_err(CE_WARN, "ddi_intr_get_supported_types failed");
+    goto attach_fail;
+}
+
+if (intr_types &amp; DDI_INTR_TYPE_MSI)
+    mydev_add_msi_intrs(mydevp);
+
+/* Check count, available and actual interrupts */
+static int
+mydev_add_msi_intrs(mydev_t *mydevp)
+{
+    dev_info_t    *devinfo = mydevp-&gt;devinfo;
+    int           count, avail, actual;
+    int           x, y, rc, inum = 0;
+
+    /* Get number of interrupts */
+    rc = ddi_intr_get_nintrs(devinfo, DDI_INTR_TYPE_MSI, &amp;count);
+    if ((rc != DDI_SUCCESS) || (count == 0)) {
+        cmn_err(CE_WARN, "ddi_intr_get_nintrs() failure, rc: %d, "
+            "count: %d", rc, count);
+        return (DDI_FAILURE);
+    }
+
+    /* Get number of available interrupts */
+    rc = ddi_intr_get_navail(devinfo, DDI_INTR_TYPE_MSI, &amp;avail);
+    if ((rc != DDI_SUCCESS) || (avail == 0)) {
+        cmn_err(CE_WARN, "ddi_intr_get_navail() failure, "
+            "rc: %d, avail: %d\n", rc, avail);
+        return (DDI_FAILURE);
+    }
+    if (avail &lt; count) {
+        cmn_err(CE_NOTE, "nitrs() returned %d, navail returned %d",
+            count, avail);
+    }
+
+    /* Allocate memory for MSI interrupts */
+    mydevp-&gt;intr_size = count * sizeof (ddi_intr_handle_t);
+    mydevp-&gt;htable = kmem_alloc(mydevp-&gt;intr_size, KM_SLEEP);
+
+    rc = ddi_intr_alloc(devinfo, mydevp-&gt;htable, DDI_INTR_TYPE_MSI, inum,
+        count, &amp;actual, DDI_INTR_ALLOC_NORMAL);
+
+    if ((rc != DDI_SUCCESS) || (actual == 0)) {
+        cmn_err(CE_WARN, "ddi_intr_alloc() failed: %d", rc);
+        kmem_free(mydevp-&gt;htable, mydevp-&gt;intr_size);
+        return (DDI_FAILURE);
+    }
+
+    if (actual &lt; count) {
+        cmn_err(CE_NOTE, "Requested: %d, Received: %d", count, actual);
+    }
+
+    mydevp-&gt;intr_cnt = actual;
+    /*
+     * Get priority for first msi, assume remaining are all the same
+     */
+    if (ddi_intr_get_pri(mydevp-&gt;htable[0], &amp;mydev-&gt;intr_pri) !=
+        DDI_SUCCESS) {
+        cmn_err(CE_WARN, "ddi_intr_get_pri() failed");
+
+        /* Free already allocated intr */
+        for (y = 0; y &lt; actual; y++) {
+            (void) ddi_intr_free(mydevp-&gt;htable[y]);
+        }
+
+        kmem_free(mydevp-&gt;htable, mydevp-&gt;intr_size);
+        return (DDI_FAILURE);
+    }
+
+    /* Call ddi_intr_add_handler() */
+    for (x = 0; x &lt; actual; x++) {
+        if (ddi_intr_add_handler(mydevp-&gt;htable[x], mydev_intr,
+           (caddr_t)mydevp, NULL) != DDI_SUCCESS) {
+            cmn_err(CE_WARN, "ddi_intr_add_handler() failed");
+
+            /* Free already allocated intr */
+            for (y = 0; y &lt; actual; y++) {
+                (void) ddi_intr_free(mydevp-&gt;htable[y]);
+            }
+
+            kmem_free(mydevp-&gt;htable, mydevp-&gt;intr_size);
+            return (DDI_FAILURE);
+        }
+    }
+
+    (void) ddi_intr_get_cap(mydevp-&gt;htable[0], &amp;mydevp-&gt;intr_cap);
+    if (mydev-&gt;m_intr_cap &amp; DDI_INTR_FLAG_BLOCK) {
+        /* Call ddi_intr_block_enable() for MSI */
+        (void) ddi_intr_block_enable(mydev-&gt;m_htable, mydev-&gt;m_intr_cnt);
+    } else {
+        /* Call ddi_intr_enable() for MSI non block enable */
+        for (x = 0; x &lt; mydev-&gt;m_intr_cnt; x++) {
+            (void) ddi_intr_enable(mydev-&gt;m_htable[x]);
+        }
+    }
+    return (DDI_SUCCESS);
+}</programlisting>
+</example><example id="fwbqn"><title>Removing MSI Interrupts</title><indexterm id="fxjzw"><primary>interrupts</primary><secondary>removing MSI interrupts example</secondary>
+</indexterm><para>The following example shows how to remove MSI interrupts.</para><programlisting>static void
+mydev_rem_intrs(mydev_t *mydev)
+{
+    int    x;
+
+    /* Disable all interrupts */
+    if (mydev-&gt;m_intr_cap &amp; DDI_INTR_FLAG_BLOCK) {
+        /* Call ddi_intr_block_disable() */
+        (void) ddi_intr_block_disable(mydev-&gt;m_htable, mydev-&gt;m_intr_cnt);
+    } else {
+        for (x = 0; x &lt; mydev-&gt;m_intr_cnt; x++) {
+            (void) ddi_intr_disable(mydev-&gt;m_htable[x]);
+        }
+    }
+
+    /* Call ddi_intr_remove_handler() */
+    for (x = 0; x &lt; mydev-&gt;m_intr_cnt; x++) {
+        (void) ddi_intr_remove_handler(mydev-&gt;m_htable[x]);
+        (void) ddi_intr_free(mydev-&gt;m_htable[x]);
+    }
+
+    kmem_free(mydev-&gt;m_htable, mydev-&gt;m_intr_size);
+}</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="interrupt-16"><title>Interrupt Handler Functionality</title><indexterm><primary>interrupt handlers</primary><secondary>functionality</secondary>
+</indexterm><para>The driver framework and the device each place demands on the interrupt
+handler. All interrupt handlers are required to do the following tasks:</para><itemizedlist><listitem><para><indexterm><primary>device polling</primary></indexterm><indexterm><primary><literal>DDI_INTR_UNCLAIMED</literal></primary></indexterm><emphasis role="strong">Determine whether the device is interrupting and possibly reject
+the interrupt.</emphasis></para><para>The interrupt handler first examines
+the device to determine whether this device issued the interrupt. If this
+device did not issue the interrupt, the handler must return <literal>DDI_INTR_UNCLAIMED</literal>. This step enables the implementation of <emphasis>device polling</emphasis>.
+Any device at the given interrupt priority level might have issued the interrupt.
+Device polling tells the system whether this device issued the interrupt.</para>
+</listitem><listitem><para><emphasis role="strong">Inform the device that the device
+is being serviced.</emphasis></para><para>Informing a device about servicing
+is a device-specific operation that is required for the majority of devices.
+For example, SBus devices are required to interrupt until the driver tells
+the SBus devices to stop. This approach guarantees that all SBus devices that
+interrupt at the same priority level are serviced.</para>
+</listitem><listitem><para><emphasis role="strong">Perform any I/O request-related processing.</emphasis></para><para>Devices interrupt for different reasons, such as <emphasis>transfer done</emphasis> or <emphasis>transfer error</emphasis>. This step
+can involve using data access functions to read the device's data buffer,
+examine the device's error register, and set the status field in a data structure
+accordingly. Interrupt dispatching and processing are relatively time consuming.</para>
+</listitem><listitem><para><emphasis role="strong">Do any additional processing that
+could prevent another interrupt.</emphasis></para><para>For example, read
+the next item of data from the device.</para>
+</listitem><listitem><para><indexterm><primary><literal>DDI_INTR_CLAIMED</literal></primary></indexterm><emphasis role="strong">Return</emphasis> <literal>DDI_INTR_CLAIMED</literal>.</para>
+</listitem><listitem><para><emphasis role="strong">MSI interrupts must always be claimed.</emphasis></para><para>Claiming an interrupt is optional for MSI-X interrupts. In either case,
+the ownership of the interrupt need not be checked, because MSI and MSI-X
+interrupts are not shared with other devices.</para>
+</listitem><listitem><para><indexterm><primary>ISR (interrupt service routine)</primary></indexterm><emphasis role="strong">Drivers that support hotplugging and multiple
+MSI or MSI-X interrupts should retain a separate interrupt for hotplug events
+and register a separate ISR (interrupt service routine) for that interrupt.</emphasis></para>
+</listitem>
+</itemizedlist><para><indexterm id="fxjzv"><primary>interrupts</primary><secondary>interrupt handling example</secondary></indexterm>The following example shows an interrupt
+routine for a device called <literal>mydev</literal>.</para><example id="interrupt-ex-17"><title>Interrupt Example</title><programlisting>static uint_t
+mydev_intr(caddr_t arg1, caddr_t arg2)
+{
+    struct mydevstate *xsp = (struct mydevstate *)arg1;
+    uint8_t     status; 
+    volatile    uint8_t  temp;
+
+    /*
+     * Claim or reject the interrupt.This example assumes
+     * that the device's CSR includes this information.
+     */
+    mutex_enter(&amp;xsp-&gt;high_mu);
+
+    /* use data access routines to read status */
+    status = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+    if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;high_mu);
+        return (DDI_INTR_UNCLAIMED); /* dev not interrupting */
+    }
+    /*
+     * Inform the device that it is being serviced, and re-enable
+     * interrupts. The example assumes that writing to the
+     * CSR accomplishes this. The driver must ensure that this data
+     * access operation makes it to the device before the interrupt
+     * service routine returns. For example, using the data access
+     * functions to read the CSR, if it does not result in unwanted
+     * effects, can ensure this.
+     */
+    ddi_put8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr,
+        CLEAR_INTERRUPT | ENABLE_INTERRUPTS);
+
+    /* flush store buffers */
+    temp = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+    
+    mutex_exit(&amp;xsp-&gt;mu);
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example><para>Most of the steps performed by the interrupt routine depend on the specifics
+of the device itself. Consult the hardware manual for the device to determine
+the cause of the interrupt, detect error conditions, and access the device
+data registers.</para>
+</sect1><sect1 id="interrupt-18"><title>Handling High-Level Interrupts</title><para><indexterm><primary>interrupt handling</primary><secondary>high-level interrupts</secondary></indexterm><indexterm><primary><function>ddi_intr_get_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_pri</function> function</secondary></indexterm><indexterm><primary><function>ddi_intr_get_hilevel_pri</function> function</primary></indexterm><indexterm><primary>interrupt handling</primary><secondary><function>ddi_intr_get_hilevel_pri</function> function</secondary></indexterm>High-level interrupts are those interrupts that interrupt at the
+level of the scheduler and above. This level does not allow the scheduler
+to run. Therefore, high-level interrupt handlers cannot be preempted by the
+scheduler. High-level interrupts cannot block because of the scheduler. High-level
+interrupts can only use mutual exclusion locks for locking.</para><para><indexterm><primary>interrupt handling</primary><secondary>software interrupts</secondary></indexterm><indexterm><primary>interrupts</primary><secondary>software interrupts</secondary></indexterm>The driver must determine
+whether the device is using high-level interrupts. Do this test in the driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+when you register interrupts. See <olink targetptr="interrupt-20" remap="internal">High-Level
+Interrupt Handling Example</olink>.</para><itemizedlist><listitem><para>If the interrupt priority returned from <olink targetdoc="group-refman" targetptr="ddi-intr-get-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is greater than or equal to the priority returned
+from <olink targetdoc="group-refman" targetptr="ddi-intr-get-hilevel-pri-9f" remap="external"><citerefentry><refentrytitle>ddi_intr_get_hilevel_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the driver can fail to attach, or the driver can
+implement a high-level interrupt handler. The high-level interrupt handler
+uses a lower-priority software interrupt to handle the device. To allow more
+concurrency, use a separate mutex to protect data from the high-level handler.</para>
+</listitem><listitem><para>If the interrupt priority returned from <citerefentry><refentrytitle>ddi_intr_get_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry> is less than the priority returned from <citerefentry><refentrytitle>ddi_intr_get_hilevel_pri</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point falls through to regular
+interrupt registration. In this case, a soft interrupt is not necessary.</para>
+</listitem>
+</itemizedlist><sect2 id="interrupt-19"><title>High-Level Mutexes</title><para><indexterm id="gfrdb"><primary>interrupts</primary><secondary>high-level mutexes</secondary></indexterm><indexterm id="gfrdl"><primary>high-level mutexes</primary><secondary>interrupts</secondary></indexterm>A mutex initialized with an interrupt
+priority that represents a high-level interrupt is known as a <emphasis>high-level
+mutex</emphasis>. While holding a high-level mutex, the driver is subject
+to the same restrictions as a high-level interrupt handler.</para>
+</sect2><sect2 id="interrupt-20"><title>High-Level Interrupt Handling Example</title><indexterm id="fxkab"><primary>interrupts</primary><secondary>handling high-level interrupts examples</secondary>
+</indexterm><para>In the following example, the high-level mutex (<literal>xsp-&gt;high_mu</literal>)
+is used only to protect data shared between the high-level interrupt handler
+and the soft interrupt handler. The protected data includes a queue used by
+both the high-level interrupt handler and the low-level handler, and a flag
+that indicates that the low-level handler is running. A separate low-level
+mutex (<literal>xsp-&gt;low_mu</literal>) protects the rest of the driver from
+the soft interrupt handler.</para><example id="interrupt-ex-21"><title>Handling High-Level Interrupts With <function>attach</function></title><programlisting>static int
+mydevattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    struct mydevstate *xsp;
+    /* ... */
+
+    ret = ddi_intr_get_supported_types(dip, &amp;type);
+    if ((ret != DDI_SUCCESS) || (!(type &amp; DDI_INTR_TYPE_FIXED))) {
+        cmn_err(CE_WARN, "ddi_intr_get_supported_types() failed");
+        return (DDI_FAILURE);
+    }
+
+    ret = ddi_intr_get_nintrs(dip, DDI_INTR_TYPE_FIXED, &amp;count);
+
+    /*
+     * Fixed interrupts can only have one interrupt. Check to make
+     * sure that number of supported interrupts and number of
+     * available interrupts are both equal to 1.
+     */
+    if ((ret != DDI_SUCCESS) || (count != 1)) {
+    cmn_err(CE_WARN, "No fixed interrupts found");
+            return (DDI_FAILURE);
+    }
+
+    xsp-&gt;xs_htable = kmem_zalloc(count * sizeof (ddi_intr_handle_t),
+        KM_SLEEP);
+
+    ret = ddi_intr_alloc(dip, xsp-&gt;xs_htable, DDI_INTR_TYPE_FIXED, 0,
+        count, &amp;actual, 0);
+
+    if ((ret != DDI_SUCCESS) || (actual != 1)) {
+    cmn_err(CE_WARN, "ddi_intr_alloc failed 0x%x", ret");
+        kmem_free(xsp-&gt;xs_htable, sizeof (ddi_intr_handle_t));
+        return (DDI_FAILURE);
+    }
+
+    ret = ddi_intr_get_pri(xsp-&gt;xs_htable[0], &amp;intr_pri);
+    if (ret != DDI_SUCCESS) {
+        cmn_err(CE_WARN, "ddi_intr_get_pri failed 0x%x", ret");
+        (void) ddi_intr_free(xsp-&gt;xs_htable[0]);
+        kmem_free(xsp-&gt;xs_htable, sizeof (ddi_intr_handle_t));
+        return (DDI_FAILURE);
+    }
+
+    if (intr_pri &gt;= ddi_intr_get_hilevel_pri()) {
+
+        mutex_init(&amp;xsp-&gt;high_mu, NULL, MUTEX_DRIVER,
+            DDI_INTR_PRI(intr_pri));
+
+        ret = ddi_intr_add_handler(xsp-&gt;xs_htable[0],
+            mydevhigh_intr, (caddr_t)xsp, NULL);
+
+        if (ret != DDI_SUCCESS) {
+            cmn_err(CE_WARN, "ddi_intr_add_handler failed 0x%x", ret");
+            mutex_destroy(&amp;xsp&gt;xs_int_mutex);
+                (void) ddi_intr_free(xsp-&gt;xs_htable[0]);
+                kmem_free(xsp-&gt;xs_htable, sizeof (ddi_intr_handle_t));
+            return (DDI_FAILURE);
+        }
+
+        /* add soft interrupt */
+        if (ddi_intr_add_softint(xsp-&gt;xs_dip, &amp;xsp-&gt;xs_softint_hdl,
+            DDI_INTR_SOFTPRI_MAX, xs_soft_intr, (caddr_t)xsp) !=
+            DDI_SUCCESS) {
+            cmn_err(CE_WARN, "add soft interrupt failed");
+            mutex_destroy(&amp;xsp-&gt;high_mu);
+            (void) ddi_intr_remove_handler(xsp-&gt;xs_htable[0]);
+            (void) ddi_intr_free(xsp-&gt;xs_htable[0]);
+            kmem_free(xsp-&gt;xs_htable, sizeof (ddi_intr_handle_t));
+            return (DDI_FAILURE);
+        }
+
+        xsp-&gt;low_soft_pri = DDI_INTR_SOFTPRI_MAX;
+
+        mutex_init(&amp;xsp-&gt;low_mu, NULL, MUTEX_DRIVER,
+            DDI_INTR_PRI(xsp-&gt;low_soft_pri));
+
+    } else {
+    /*
+     * regular interrupt registration continues from here
+     * do not use a soft interrupt
+     */
+    }
+
+    return (DDI_SUCCESS);
+}</programlisting>
+</example><para>The high-level interrupt routine services the device and queues the
+data. The high-level routine triggers a software interrupt if the low-level
+routine is not running, as the following example demonstrates.</para><example id="interrupt-ex-22"><title>High-level Interrupt Routine</title><programlisting>static uint_t
+mydevhigh_intr(caddr_t arg1, caddr_t arg2)
+{
+    struct mydevstate    *xsp = (struct mydevstate *)arg1;
+    uint8_t    status;
+    volatile  uint8_t  temp;
+    int    need_softint;
+
+    mutex_enter(&amp;xsp-&gt;high_mu);
+    /* read status */
+    status = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+    if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;high_mu);
+        return (DDI_INTR_UNCLAIMED); /* dev not interrupting */
+    }
+
+    ddi_put8(xsp-&gt;data_access_handle,&amp;xsp-&gt;regp-&gt;csr,
+        CLEAR_INTERRUPT | ENABLE_INTERRUPTS);
+    /* flush store buffers */
+    temp = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+
+    /* read data from device, queue data for low-level interrupt handler */
+    if (xsp-&gt;softint_running)
+        need_softint = 0;
+    else {
+        xsp-&gt;softint_count++;
+        need_softint = 1;
+    }
+    mutex_exit(&amp;xsp-&gt;high_mu);
+
+    /* read-only access to xsp-&gt;id, no mutex needed */
+    if (need_softint) {
+        ret = ddi_intr_trigger_softint(xsp-&gt;xs_softint_hdl, NULL);
+        if (ret == DDI_EPENDING) {
+            cmn_err(CE_WARN, "ddi_intr_trigger_softint() soft interrupt "
+                "already pending for this handler");
+        } else if (ret != DDI_SUCCESS) {
+            cmn_err(CE_WARN, "ddi_intr_trigger_softint() failed");
+        }           
+    }
+
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example><para><indexterm id="fxkae"><primary>interrupts</primary><secondary>handling low-level interrupts example</secondary></indexterm>The low-level interrupt
+routine is started by the high-level interrupt routine, which triggers a software
+interrupt. The low-level interrupt routine runs until there is nothing left
+to process, as the following example shows.</para><example id="interrupt-ex-23"><title>Low-Level Soft Interrupt Routine</title><programlisting>static uint_t
+mydev_soft_intr(caddr_t arg1, caddr_t arg2)
+{
+    struct mydevstate *mydevp = (struct mydevstate *)arg1;
+    /* ... */
+    mutex_enter(&amp;mydevp-&gt;low_mu);
+    mutex_enter(&amp;mydevp-&gt;high_mu);
+    if (mydevp-&gt;softint_count &gt; 1) {
+        mydevp-&gt;softint_count--;
+        mutex_exit(&amp;mydevp-&gt;high_mu);
+        mutex_exit(&amp;mydevp-&gt;low_mu);
+        return (DDI_INTR_CLAIMED);
+    }
+
+    if ( /* queue empty */ ) {
+        mutex_exit(&amp;mydevp-&gt;high_mu);
+        mutex_exit(&amp;mydevp-&gt;low_mu);
+        return (DDI_INTR_UNCLAIMED);
+    }
+
+    mydevp-&gt;softint_running = 1;
+    while (EMBEDDED COMMENT:data on queue) {
+        ASSERT(mutex_owned(&amp;mydevp-&gt;high_mu);
+        /* Dequeue data from high-level queue. */
+        mutex_exit(&amp;mydevp-&gt;high_mu);
+        /* normal interrupt processing */
+        mutex_enter(&amp;mydevp-&gt;high_mu);
+    }
+
+    mydevp-&gt;softint_running = 0;
+    mydevp-&gt;softint_count = 0;
+    mutex_exit(&amp;mydevp-&gt;high_mu);
+    mutex_exit(&amp;mydevp-&gt;low_mu);
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example>
+</sect2>
+</sect1>
+</chapter><?Pub *0000072627 0?>

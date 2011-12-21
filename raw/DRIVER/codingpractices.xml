@@ -1,0 +1,195 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(2)part(title()partintro()chapter()?><chapter id="coding-practices"><?Pub Tag atict:info tracking="off"
+ref="2"?><?Pub Tag atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user user="ae149097" fullname="Alta Elstad"?><title>Recommended
+Coding Practices</title><highlights><para>This chapter describes how to write drivers that are robust. Drivers
+that are written in accordance with the guidelines that are discussed in this
+chapter are easier to debug. The recommended practices also protect the system
+from hardware and software faults.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="debugging" remap="internal">Debugging Preparation Techniques</olink></para>
+</listitem><listitem><para><olink targetptr="codingpractices-1" remap="internal">Declaring a Variable
+Volatile</olink></para>
+</listitem><listitem><para><olink targetptr="serviceability" remap="internal">Serviceability</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="debugging"><title>Debugging Preparation Techniques</title><para>Driver code is more difficult to debug than user programs because:</para><itemizedlist><listitem><para>The driver interacts directly with the hardware</para>
+</listitem><listitem><para>The driver operates without the protection of the operating
+system that is available to user processes</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>debugging</primary><secondary>coding hints</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>debugging</secondary><tertiary>coding hints</tertiary></indexterm>Be sure to build debugging support
+into your driver. This support facilitates both  maintenance work and future
+development.</para><sect2 id="gfhey"><title>Use a Unique Prefix to Avoid Kernel Symbol Collisions</title><indexterm><primary>naming</primary><secondary>unique prefix for driver symbols</secondary>
+</indexterm><indexterm><primary>prefix</primary><secondary>unique prefix for driver symbols</secondary>
+</indexterm><para>The name of each function, data element, and driver preprocessor definition
+must be unique for each driver.</para><para>A driver module is linked into the kernel. The name of each symbol unique
+to a particular driver must not collide with other kernel symbols. To avoid
+such collisions, each function and data element for a particular driver must
+be named with a prefix common to that driver. The prefix must be sufficient
+to uniquely name each driver symbol. Typically, this prefix is the name of
+the driver or an abbreviation for the name of the driver. For example, <function>xx_open</function> would be the name of the <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine of driver <literal>xx</literal>.</para><para>When building a driver, a driver must necessarily include a number of
+system header files. The globally-visible names within these header files
+cannot be predicted. To avoid collisions with these names, each driver preprocessor
+definition must be given a unique name by using an identifying prefix.</para><para>A distinguishing driver symbol prefix also is an aid to deciphering
+system logs and panics when troubleshooting. Instead of seeing an error related
+to an ambiguous <function>attach</function> function, you see an error message
+about <function>xx_attach</function>.</para>
+</sect2><sect2 id="use-cmn_err"><title>Use <function>cmn_err</function> to Log Driver
+Activity</title><para><indexterm><primary><function>cmn_err</function> function</primary><secondary>debugging</secondary></indexterm>Use the <olink targetdoc="refman9f" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to print messages
+to a system log from within the device driver. The <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function for kernel
+modules is similar to the <citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry> function for applications. The <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function
+provides additional format characters, such as the <literal>%b</literal> format
+to print device register bits. The <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function writes messages to a system
+log. Use the <olink targetdoc="refman1" targetptr="tail-1" remap="external"><citerefentry><refentrytitle>tail</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+to monitor these messages on <filename>/var/adm/messages</filename>.</para><screen>% <userinput>tail -f /var/adm/messages</userinput></screen>
+</sect2><sect2 id="use-assert"><title>Use <function>ASSERT</function> to Catch Invalid
+Assumptions</title><indexterm><primary><function>ASSERT</function> macro</primary>
+</indexterm><indexterm><primary>debugging</primary><secondary><function>ASSERT</function> macro</secondary>
+</indexterm><indexterm><primary><literal>DEBUG</literal> symbol</primary>
+</indexterm><indexterm><primary>debugging</primary><secondary><literal>DEBUG</literal> symbol</secondary>
+</indexterm><para>Assertions are an extremely valuable form of active documentation. The
+syntax for
+<olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is
+as follows:</para><programlisting>void ASSERT(EXPRESSION)</programlisting><para>The <function>ASSERT</function> macro halts the execution of the kernel
+if a condition that is expected to be true is actually false.
+<function>ASSERT</function> provides a way for the programmer to validate the
+assumptions made by a piece of code.</para><para>The <function>ASSERT</function> macro is defined only when the
+<literal>DEBUG</literal> compilation symbol is defined. When
+<literal>DEBUG</literal> is not defined, the <function>ASSERT</function> macro
+has no effect.</para><para>The following example assertion tests the assumption that a particular
+pointer value is not <literal>NULL</literal>:</para><programlisting>ASSERT(ptr != NULL);</programlisting><para>If the driver has been compiled with <literal>DEBUG</literal>, and if
+the value of <literal>ptr</literal> is <literal>NULL</literal> at this point
+in execution, then the following panic message is printed to the console:</para><programlisting>panic: assertion failed: ptr != NULL, file: driver.c, line: 56</programlisting><note><para>Because <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> uses the <literal>DEBUG</literal> compilation
+symbol, any conditional debugging code should also use <literal>DEBUG</literal>.</para>
+</note>
+</sect2><sect2 id="mutex_owned"><title>Use <function>mutex_owned</function> to Validate
+and Document Locking Requirements</title><para>The syntax for <olink targetdoc="refman9f" targetptr="mutex-owned-9f" remap="external"><citerefentry><refentrytitle>mutex_owned</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is as follows:</para><programlisting>int mutex_owned(kmutex_t *mp);</programlisting><para><indexterm><primary><function>mutex_owned</function> function</primary><secondary>example of</secondary></indexterm>A significant portion of driver
+development involves properly handling multiple threads. Comments should always
+be used when a mutex is acquired. Comments can be even more useful when an
+apparently necessary mutex is <emphasis>not</emphasis> acquired. To determine
+whether a mutex is held by a thread, use <function>mutex_owned</function> within <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>:</para><programlisting>void helper(void)
+{
+    /* this routine should always be called with xsp's mutex held */
+    ASSERT(mutex_owned(&amp;xsp-&gt;mu));
+    /* ... */
+}</programlisting><note><para><function>mutex_owned</function> is only valid within <function>ASSERT</function> macros.  You should use <function>mutex_owned</function> to control
+the behavior of a driver.</para>
+</note>
+</sect2><sect2 id="conditional_compilation"><title>Use Conditional Compilation to
+Toggle Costly Debugging Features</title><para><indexterm><primary>debugging</primary><secondary>conditional compilation</secondary></indexterm>You can insert code for debugging into a driver through conditional
+compiles by using a preprocessor symbol such as <literal>DEBUG</literal> or
+by using a global variable. With conditional compilation, unnecessary code
+can be removed in the production driver. Use a variable to set the amount
+of debugging output at runtime. The output can be specified by setting a debugging
+level at runtime with an <literal>ioctl</literal> or through a debugger. Commonly,
+these two methods are combined.</para><para>The following example relies on the compiler to remove unreachable code,
+in this case, the code following the always-false test of zero. The example
+also provides a local variable that can be set in <literal>/etc/system</literal> or
+patched by a debugger.</para><programlisting>#ifdef DEBUG
+/* comments on values of xxdebug and what they do */
+static int xxdebug;
+#define dcmn_err if (xxdebug) cmn_err
+#else
+#define dcmn_err if (0) cmn_err
+#endif
+/* ... */
+    dcmn_err(CE_NOTE, "Error!\n");</programlisting><para>This method handles the fact that  <olink targetdoc="refman9f" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> has a variable number of
+arguments. Another method relies on the fact that the macro has one argument,
+a parenthesized argument list for <olink targetdoc="refman9f" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The macro removes this argument.
+This macro also removes the reliance on the optimizer by expanding the macro
+to nothing if <literal>DEBUG</literal> is not defined.</para><programlisting>#ifdef DEBUG
+/* comments on values of xxdebug and what they do */
+static int xxdebug;
+#define dcmn_err(X) if (xxdebug) cmn_err X
+#else
+#define dcmn_err(X) /* nothing */
+#endif
+/* ... */
+/* Note:double parentheses are required when using dcmn_err. */
+    dcmn_err((CE_NOTE, "Error!"));</programlisting><para>You can extend this technique in many ways. One way is to specify different
+messages from <olink targetdoc="refman9f" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>,
+depending on the value of <literal>xxdebug</literal>. However, in such a case,
+you must be careful not to obscure the code with too much debugging information.</para><para>Another common scheme is to write an <function>xxlog</function> function,
+which uses <olink targetdoc="refman9f" targetptr="vsprintf-9f" remap="external"><citerefentry><refentrytitle>vsprintf</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="vcmn-err-9f" remap="external"><citerefentry><refentrytitle>vcmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to handle
+variable argument lists.</para>
+</sect2>
+</sect1><sect1 id="codingpractices-1"><title>Declaring a Variable Volatile</title><para><literal>volatile</literal> is a keyword that must be applied when declaring
+any variable that will reference a device register. Without the use of <literal>volatile</literal>, the compile-time optimizer can inadvertently delete important
+accesses. Neglecting to use <literal>volatile</literal> might result in bugs
+that are difficult to track down.</para><para><indexterm><primary><literal>volatile</literal> keyword</primary></indexterm>The correct use of <literal>volatile</literal> is necessary to
+prevent elusive bugs. The <literal>volatile</literal> keyword instructs the
+compiler to use exact semantics for the declared objects, in particular, not
+to remove or reorder accesses to the object. Two instances where device drivers
+must use the <literal>volatile</literal> qualifier are:</para><itemizedlist><listitem><para>When data refers to an external hardware device register,
+that is, memory that has side effects other than just storage. Note, however,
+that if the DDI data  access functions are used to access device registers,
+you do not have to use <literal>volatile</literal>.</para>
+</listitem><listitem><para>When data refers to global memory that is accessible by more
+than one thread, that is not protected by locks, and that relies on the sequencing
+of memory accesses. Using <literal>volatile</literal>consumes fewer resources
+than using lock.</para>
+</listitem>
+</itemizedlist><para>The following example uses <command>volatile</command>. A busy flag
+is used to prevent a thread from continuing while the device is busy and the
+flag is not protected by a lock:</para><programlisting>while (busy) {
+    /* do something else */
+}</programlisting><para>The testing thread will continue when another thread turns off the <literal>busy</literal> flag:</para><programlisting>busy = 0;</programlisting><para>Because <literal>busy</literal> is accessed frequently in the testing
+thread, the compiler can potentially optimize the test by placing the value
+of <literal>busy</literal> in a register and test the contents of the register
+without reading the value of <literal>busy</literal> in memory before every
+test. The testing thread would never see <literal>busy</literal> change and
+the other thread would only change the value of <literal>busy</literal> in
+memory, resulting in deadlock. Declaring the <literal>busy</literal> flag
+as <command>volatile</command> forces its value to be read before each test.</para><note><para>An alternative to the <literal>busy</literal> flag is to use a
+condition variable. See <olink targetptr="mt-90140" remap="internal">Condition Variables in
+Thread Synchronization</olink>.</para>
+</note><para>When using the <command>volatile</command> qualifier, avoid the risk
+of accidental omission. For example, the following code</para><programlisting>struct device_reg {
+    volatile uint8_t csr;
+    volatile uint8_t data;
+};
+struct device_reg *regp;</programlisting><para>is preferable to the next example:</para><programlisting>struct device_reg {
+    uint8_t csr;
+    uint8_t data;
+};
+volatile struct device_reg *regp;</programlisting><para>Although the two examples are functionally equivalent, the second one
+requires the writer to ensure that <command>volatile</command> is used in
+every declaration of type <structname>struct</structname> <structname>device_reg</structname>.
+The first example results in the data being treated as volatile in all declarations
+and is therefore preferred. As mentioned above, using the DDI data access
+functions to access device registers makes qualifying variables as <command>volatile</command> unnecessary.</para>
+</sect1><sect1 id="serviceability"><title>Serviceability</title><para>To ensure serviceability, the driver must be enabled to take the following
+actions:</para><itemizedlist><listitem><para><indexterm><primary>serviceability</primary><secondary>detect faulty device</secondary></indexterm><indexterm><primary>serviceability</primary><secondary>report faults</secondary></indexterm>Detect faulty devices and
+report the fault</para>
+</listitem><listitem><para><indexterm><primary>serviceability</primary><secondary>remove faulty device</secondary></indexterm>Remove a device as supported by the Solaris
+hot-plug model</para>
+</listitem><listitem><para><indexterm><primary>serviceability</primary><secondary>add new device</secondary></indexterm>Add a new device as supported by the Solaris
+hot-plug model</para>
+</listitem><listitem><para><indexterm><primary>serviceability</primary><secondary>perform periodic health checks</secondary></indexterm>Perform periodic health checks
+to enable the detection of latent faults</para>
+</listitem>
+</itemizedlist><sect2 id="periodic-health-checks"><title>Periodic Health Checks</title><para><indexterm><primary>faults</primary><secondary>latent fault, definition of</secondary></indexterm><indexterm><primary>latent fault</primary><secondary>definition of</secondary></indexterm>A latent fault is one that does not show itself
+until some other action occurs. For example, a hardware failure occurring
+in a device that is a cold standby could remain undetected until a fault occurs
+on the master device. At this point, the system now contains two defective
+devices and might be unable to continue operation.</para><para>Latent faults that remain undetected typically cause system failure
+eventually. Without latent fault checking, the overall availability of a redundant
+system is jeopardized. To avoid this situation, a device driver must detect
+latent faults and report them in the same way as other faults.</para><para>You should provide the driver with a mechanism for making periodic health
+checks on the device. In a fault-tolerant situation where the device can be
+the secondary or failover device, early detection of a failed secondary device
+is essential to ensure that the secondary device can be repaired or replaced
+before any failure in the primary device occurs.</para><para>Periodic health checks can be used to perform the following activities:</para><itemizedlist><listitem><para>Check any register or memory location on the device whose
+value might have been altered since the last poll.</para><para>Features of
+a device that typically exhibit deterministic behavior include heartbeat semaphores,
+device timers (for example, local <literal>lbolt</literal> used by download),
+and event counters. Reading an updated predictable value from the device gives
+a degree of confidence that things are proceeding satisfactorily.</para>
+</listitem><listitem><para>Timestamp outgoing requests such as transmit blocks or commands
+that are issued by the driver.</para><para>The periodic health check can look
+for any suspect requests that have not completed.</para>
+</listitem><listitem><para>Initiate an action on the device that should be completed
+before the next scheduled check.</para><para>If this action is an interrupt,
+this check is an ideal way to ensure that the device's circuitry can deliver
+an interrupt.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1>
+</chapter><?Pub *0000018653 0?>

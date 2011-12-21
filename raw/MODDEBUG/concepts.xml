@@ -1,0 +1,97 @@
+<?Pub CX solbook(?><chapter id="concepts-1"><?Pub Tag atict:info tracking="off" ref="4"?><?Pub Tag atict:user user="ae149097" fullname="Alta Elstad"?><title>Debugger
+Concepts</title><highlights><para>This chapter discusses the significant features of MDB and the benefits
+derived from this architecture.</para>
+</highlights><sect1 id="chapter-11"><title>Building Blocks</title><indexterm><primary>target</primary><secondary>definition</secondary>
+</indexterm><para>The <emphasis role="strong">target</emphasis> is the program being inspected
+by the debugger.  MDB currently provides support for the following types of
+targets:</para><itemizedlist><listitem><para>User processes</para>
+</listitem><listitem><para>User process core files</para>
+</listitem><listitem><para>Live operating system without kernel execution control (through <literal>/dev/kmem</literal> and <literal>/dev/ksyms</literal>)</para>
+</listitem><listitem><para>Live operating system with kernel execution control (through
+the <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command)</para>
+</listitem><listitem><para>Operating system crash dumps</para>
+</listitem><listitem><para>User process images recorded inside an operating system crash
+dump</para>
+</listitem><listitem><para>ELF object files</para>
+</listitem><listitem><para>Raw data files</para>
+</listitem>
+</itemizedlist><para>Each target exports a standard set of properties, including one or more
+address spaces, one or more symbol tables, a set of load objects, and a set
+of threads. <olink targetptr="chapter-fig-10" remap="internal">Figure&nbsp;2&ndash;1</olink> shows
+an overview of the MDB architecture, including two of the built-in targets
+and a pair of sample modules.</para><para><indexterm><primary>dcmd</primary><secondary>definition</secondary></indexterm>A debugger command, or <emphasis role="strong">dcmd</emphasis> (pronounced <emphasis>dee-command</emphasis>) in MDB terminology, is a routine in the debugger that
+can access any of the properties of the current target.  MDB parses commands
+from standard input, then executes the corresponding dcmds.  Each dcmd can
+also accept a list of string or numerical arguments, as shown in <olink targetptr="syntax-17" remap="internal">Syntax</olink>. MDB contains a set of built-in dcmds
+that are always available.  These built-in dcmds are described in <olink targetptr="commands-1" remap="internal">Chapter&nbsp;5, Built-In Commands</olink>. You can
+also extend the capabilities of MDB by writing dcmds using a programming API
+provided with MDB.</para><para><indexterm><primary>walker</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">walker</emphasis> is a set of routines
+that describe how to walk, or iterate, through the elements of a particular
+program data structure.  A walker encapsulates the data structure's implementation
+from dcmds and from MDB.  You can use walkers interactively, or you can use
+walkers as primitives to build other dcmds or walkers.  As with dcmds, you
+can extend MDB by implementing additional walkers as part of a debugger module.</para><para><indexterm><primary>dmod</primary><secondary>definition</secondary></indexterm>A debugger module, or <emphasis role="strong">dmod</emphasis> (pronounced <emphasis>dee-mod</emphasis>), is a dynamically loaded library that contains a set of
+dcmds and walkers.  During initialization, MDB attempts to load dmods corresponding
+to the load objects present in the target.  You can subsequently load or unload
+dmods at any time while running MDB.  MDB provides a set of standard dmods
+for debugging the Solaris kernel.</para><para><indexterm><primary>macro file</primary><secondary>definition</secondary></indexterm>A <emphasis role="strong">macro file</emphasis> is a text file
+that contains a set of commands to execute. Macro files are typically used
+to automate the process of displaying a simple data structure.  MDB provides
+complete backward compatibility for the execution of macro files written for <command>adb</command>.   The set of macro files provided with the Solaris installation
+can therefore be used with either tool.</para><figure id="chapter-fig-10"><title>MDB architecture</title><mediaobject><imageobject><imagedata entityref="mdb-arch"/>
+</imageobject><textobject><simpara>This graphic describes MDB components: the MDB language
+and the MDB module API overlying the debugger engine.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="concepts-10"><title>Modularity</title><para>The benefit of MDB's modular architecture extends beyond the ability
+to load a module containing additional debugger commands. The MDB architecture
+defines clear interface boundaries between each of the layers shown in <olink targetptr="chapter-fig-10" remap="internal">Figure&nbsp;2&ndash;1</olink>. Macro files execute commands
+written in the MDB or <command>adb</command> language. Dcmds and walkers in
+debugger modules are written using the MDB Module API. The MDB Module API
+is the basis of an application binary interface that allows the debugger and
+its modules to evolve independently.</para><para>The MDB name space of walkers and dcmds also defines a second set of
+layers between debugging code. These layers maximize code sharing and limit
+the amount of code that must be modified as the target program evolves. For
+example, one of the primary data structures in the Solaris kernel is the list
+of <literal>proc_t</literal> structures that represent active processes in
+the system. The <command>::ps</command> dcmd must iterate over this list in
+order to produce its output. However, the code to iterate over the list is
+not in the <command>::ps</command> dcmd. The code to iterate over the list
+of <literal>proc_t</literal> structures is encapsulated in the <literal>genunix</literal> module's <literal>proc</literal> walker.</para><para>MDB provides both <command>::ps</command> and <command>::ptree</command> dcmds,
+but neither of these dcmds has any knowledge of how <literal>proc_t</literal> structures
+are accessed in the kernel. Instead, these dcmds invoke the <literal>proc</literal> walker
+programmatically and format the set of returned structures appropriately.
+If the data structure used for <literal>proc_t</literal> structures ever changed,
+MDB could provide a new <literal>proc</literal> walker, and none of the dependent
+dcmds would need to change.  The <literal>proc</literal> walker can also be
+accessed interactively using the <command>::walk</command> dcmd in order to
+create novel commands as you work during a debugging session.</para><para>In addition to facilitating layering and code sharing, the MDB Module
+API provides dcmds and walkers with a single stable interface for accessing
+various properties of the underlying target. The same API functions are used
+to access information from user process or kernel targets, simplifying the
+task of developing new debugging facilities.</para><para>In addition, you can use a custom MDB module to perform debugging tasks
+in a variety of contexts. For example, you might want to develop an MDB module
+for a user program you are developing. Once you have done so, you can use
+this module when MDB examines a live process executing your program, a core
+dump of your program, or even a kernel crash dump taken on a system where
+your program was executing.</para><para>The Module API provides facilities for accessing the following target
+properties:</para><variablelist termlength="medium"><varlistentry><term>Address Spaces</term><listitem><para>The module API provides facilities for reading and writing
+data from the target's virtual address space.  Functions for reading and writing
+using physical addresses are also provided for kernel debugging modules.</para>
+</listitem>
+</varlistentry><varlistentry><term>Symbol Tables</term><listitem><para>The module API provides access to the static and dynamic symbol
+tables of the target's primary executable file, its runtime link-editor, and
+a set of load objects. Load objects are shared libraries in a user process
+or loadable modules in the Solaris kernel.</para>
+</listitem>
+</varlistentry><varlistentry><term>External Data</term><listitem><para>The module API provides a facility for retrieving a collection
+of named external data buffers associated with the target.  For example, MDB
+provides programmatic access to the <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> structures associated with a user process or user core file target.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>In addition, you can use built-in MDB dcmds to access information about
+target memory mappings, load objects, register values, and control the execution
+of user process targets.</para>
+</sect1>
+</chapter><?Pub *0000009142 0?>

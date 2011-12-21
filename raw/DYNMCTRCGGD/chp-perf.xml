@@ -1,0 +1,78 @@
+<chapter id="chp-perf"><title>Performance Considerations</title><highlights><para>Because DTrace causes additional work in the system, enabling DTrace always affects system performance in some way. Often, this effect is negligible, but it can become substantial if many probes are enabled with costly enablings. This chapter describes techniques for minimizing the performance effect of DTrace.</para>
+</highlights><sect1 id="chp-perf-1"><title>Limit Enabled Probes</title><para><indexterm><primary>performance</primary></indexterm><indexterm><primary>probes</primary><secondary>limiting</secondary></indexterm>Dynamic instrumentation techniques enable DTrace to provide unparalleled tracing coverage of the kernel and of arbitrary user processes. While this coverage allows revolutionary new insight into system behavior, it also can cause enormous probe effect. If tens of thousands or hundreds of thousands of probes are enabled, the effect on the system can easily be substantial. Therefore, you should only enable as many probes as you need to solve a problem. You should not, for example, enable all <acronym>FBT</acronym> probes if a more concise enabling will answer your question. For example, your question might allow you to concentrate on a specific module of interest or a specific function.</para><para>When using the <literal>pid</literal> provider, you should be especially careful. Because the <literal>pid</literal> provider can instrument every <emphasis>instruction</emphasis>, you could enable millions of probes in an application, and therefore slow the target process to a crawl.</para><para>DTrace can also be used in situations where large numbers of probes <emphasis>must</emphasis> be enabled for a question to be answered. Enabling a large number of probes might slow down the system quite a bit, but it will never induce fatal failure on the machine. You should therefore not hesitate to enable many probes if required.</para>
+</sect1><sect1 id="chp-perf-2"><title>Use Aggregations</title><para><indexterm><primary>aggregations</primary></indexterm>As discussed in <olink targetptr="chp-aggs" remap="internal">Chapter&nbsp;9, Aggregations</olink>, DTrace's aggregations allow for a scalable way of aggregating data. Associative arrays might appear to offer similar functionality to aggregations. However, by nature of being global, general-purpose variables, they cannot offer the linear scalability of aggregations. You should therefore prefer to use aggregations over associative arrays when possible. The following example is not recommended:</para><programlisting>syscall:::entry
+{
+	totals[execname]++;
+}
+
+syscall::rexit:entry
+{
+	printf("%40s %d\n", execname, totals[execname]);
+	totals[execname] = 0;
+}</programlisting><para>The following example is preferable:</para><programlisting>syscall:::entry
+{
+	@totals[execname] = count();
+}
+
+END
+{
+	printa("%40s %@d\n", @totals);
+}</programlisting>
+</sect1><sect1 id="chp-perf-3"><title>Use Cacheable Predicates</title><para><indexterm><primary>performance</primary><secondary>cacheable predicates</secondary></indexterm><indexterm><primary>cacheable predicates</primary></indexterm>DTrace predicates are used to filter unwanted data from the experiment by tracing data is only traced if a specified condition is found to be true. When enabling many probes, you generally use predicates of a form that identifies a specific thread or threads of interest, such as <literal>/self-&gt;traceme/</literal> or <literal>/pid == 12345/</literal>. Although many of these predicates evaluate to a false value for most threads in most probes, the evaluation itself can become costly when done for many thousands of probes. To reduce this cost, DTrace caches the evaluation of a predicate if it includes only thread-local variables (for example, <literal>/self-&gt;traceme/</literal>) or immutable variables (for example, <literal>/pid == 12345/</literal>). The cost of evaluating a cached predicate is much smaller than the cost of evaluating a non-cached predicate, especially if the predicate involves thread-local variables, string comparisons, or other relatively costly operations. While predicate caching is transparent to the user, it does imply some guidelines for constructing optimal predicates, as shown in the following table:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="6.02in"?><colspec colname="colspec0" colwidth="1.54in"/><colspec colname="colspec1" colwidth="3.21in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Cacheable</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>Uncacheable</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>self-&gt;mumble</literal></para>
+</entry><entry><para><literal>mumble[curthread]</literal>, <literal>mumble[pid, tid]</literal></para>
+</entry>
+</row><row><entry><para><literal>execname</literal></para>
+</entry><entry><para><literal>curpsinfo-&gt;pr_fname</literal>, <literal>curthread-&gt;t_procp-&gt;p_user.u_comm</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>pid</literal></para>
+</entry><entry colname="colspec1"><para><literal>curpsinfo-&gt;pr_pid</literal>, <literal>curthread-&gt;t_procp-&gt;p_pipd-&gt;pid_id</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>tid</literal></para>
+</entry><entry colname="colspec1"><para><literal>curlwpsinfo-&gt;pr_lwpid</literal>, <literal>curthread-&gt;t_tid</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>curthread</literal></para>
+</entry><entry colname="colspec1"><para><literal>curthread-&gt;</literal><replaceable>any member</replaceable><literal></literal>, <literal>curlwpsinfo-&gt;</literal><replaceable>any member</replaceable><literal></literal>, <literal>curpsinfo-&gt;</literal><replaceable>any member</replaceable><literal></literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The following example is not recommended:</para><programlisting>syscall::read:entry
+{
+	follow[pid, tid] = 1;
+}
+
+fbt:::
+/follow[pid, tid]/
+{}
+
+syscall::read:return
+/follow[pid, tid]/
+{
+	follow[pid, tid] = 0;
+}</programlisting><para>The following example using thread-local variables is preferable:</para><programlisting>syscall::read:entry
+{
+	self-&gt;follow = 1;
+}
+
+fbt:::
+/self-&gt;follow/
+{}
+
+syscall::read:return
+/self-&gt;follow/
+{
+	self-&gt;follow = 0;
+}</programlisting><para>A predicate must consist <emphasis>exclusively</emphasis> of cacheable expressions in order to be cacheable. The following predicates are all cacheable:</para><programlisting>/execname == "myprogram"/
+/execname == $$1/
+/pid == 12345/
+/pid == $1/
+/self-&gt;traceme == 1/</programlisting><para>The following examples, which use global variables, are not cacheable:</para><programlisting>/execname == one_to_watch/
+/traceme[execname]/
+/pid == pid_i_care_about/
+/self-&gt;traceme == my_global/</programlisting>
+</sect1>
+</chapter>

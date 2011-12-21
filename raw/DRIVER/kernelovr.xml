@@ -1,0 +1,318 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="kernelovr-77198"><?Pub Tag atict:info tracking="off"
+ref="2"?><?Pub Tag atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user user="ae149097" fullname="Alta Elstad"?><title>Solaris
+Kernel and Device Tree</title><highlights><para>A device driver needs to work transparently as an integral part of the
+operating system. Understanding how the kernel works is a prerequisite for
+learning about device drivers. This chapter provides an overview of the Solaris
+kernel and device tree.  For an overview of how device drivers work, see <olink targetptr="eqbqn" remap="internal">Chapter&nbsp;1, Overview of Solaris Device Drivers</olink>.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="kernelovr-1" remap="internal">What Is the Kernel?</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-2" remap="internal">Multithreaded Execution Environment</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-3" remap="internal">Virtual Memory</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-4" remap="internal">Devices as Special Files</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-40" remap="internal">DDI/DKI Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-43" remap="internal">Device Tree Components</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-11" remap="internal">Displaying the Device Tree</olink></para>
+</listitem><listitem><para><olink targetptr="kernelovr-14" remap="internal">Binding a Driver to a Device</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="kernelovr-1"><title>What Is the Kernel?</title><para><indexterm><primary>kernel</primary><secondary>overview</secondary></indexterm><indexterm><primary>Solaris kernel</primary><see>kernel</see></indexterm>The Solaris kernel is a program that manages system resources.
+The kernel insulates applications from the system hardware and provides them
+with essential system services such as input/output (I/O) management, virtual
+memory, and scheduling. The kernel consists of object modules that are dynamically
+loaded into memory when needed.</para><para>The Solaris kernel can be divided logically into two parts: the first
+part, referred to as the <emphasis>kernel</emphasis>, manages file systems,
+scheduling, and virtual memory. The second part, referred to as the <emphasis>I/O
+subsystem</emphasis>, manages the physical components.</para><para><indexterm id="kernelovr-ix2"><primary>system calls</primary></indexterm><indexterm><primary>device drivers</primary><secondary>purpose in kernel</secondary></indexterm>The kernel provides a set of interfaces for applications to use
+that are accessible through <emphasis>system calls</emphasis>. System calls
+are documented in section&nbsp;2 of the <citetitle>Reference Manual Collection</citetitle> (see <olink targetdoc="group-refman" targetptr="intro-2" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>). Some system calls are used
+to invoke device drivers to perform I/O. <emphasis>Device drivers</emphasis> are
+loadable kernel modules that manage data transfers while insulating the rest
+of the kernel from the device hardware. To be compatible with the operating
+system, device drivers need to be able to accommodate such features as multithreading,
+virtual memory addressing, and both 32-bit and 64-bit operation.</para><para>The following figure illustrates the kernel. The kernel modules handle
+system calls from application programs. The I/O modules communicate with hardware.</para><figure id="kernelovr-fig-19"><title>Solaris Kernel</title><mediaobject><imageobject><imagedata entityref="kernelovr.arch.epsi"/>
+</imageobject><textobject><simpara>Diagram shows calls from user-level applications to specific
+kernel-level modules, and calls between drivers and other modules to devices.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The kernel provides access to device drivers through the following features:</para><itemizedlist><listitem><para><indexterm><primary>device tree</primary><secondary>purpose in kernel</secondary></indexterm><indexterm><primary>kernel</primary><secondary>device tree</secondary></indexterm><emphasis role="strong">Device-to-driver mapping</emphasis>.
+The kernel maintains the <emphasis>device tree</emphasis>. Each node in the
+tree represents a virtual or a physical device. The kernel binds each node
+to a driver by matching the device node name with the set of drivers installed
+in the system. The device is made accessible to applications only if there
+is a driver binding.</para>
+</listitem><listitem><para><indexterm><primary>DDI/DKI</primary><secondary>purpose in kernel</secondary></indexterm><indexterm><primary>LDI</primary><secondary>definition</secondary></indexterm><emphasis role="strong">DDI/DKI interfaces</emphasis>.
+DDI/DKI (Device Driver Interface/Driver-Kernel Interface) interfaces standardize
+interactions between the driver and the kernel, the device hardware, and the
+boot/configuration software. These interfaces keep the driver independent
+from the kernel and improve the driver's portability across successive releases
+of the operating system on a particular machine.</para>
+</listitem><listitem><para><emphasis role="strong">LDI</emphasis>. The LDI (Layered Driver
+Interface) is an extension of the DDI/DKI. The LDI enables a kernel module
+to access other devices in the system. The LDI also enables you to determine
+which devices are currently being used by the kernel. See <olink targetptr="ldi-1" remap="internal">Chapter&nbsp;14, Layered Driver Interface (LDI)</olink>.</para>
+</listitem>
+</itemizedlist><sect2 id="kernelovr-2"><title>Multithreaded Execution Environment</title><para><indexterm><primary>multithreading</primary><secondary>execution environment</secondary></indexterm>The Solaris kernel is multithreaded. On a multiprocessor
+machine, multiple kernel threads can be running kernel code, and can do so
+concurrently. Kernel threads can also be preempted by other kernel threads
+at any time.</para><para>The multithreading of the kernel imposes some additional restrictions
+on device drivers. For more information on multithreading considerations,
+see <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3, Multithreading</olink>. Device
+drivers must be coded to run as needed at the request of many different threads.
+For each thread, a driver must handle contention problems from overlapping
+I/O requests.</para>
+</sect2><sect2 id="kernelovr-3"><title>Virtual Memory</title><para>A complete overview of the Solaris virtual memory system is beyond the
+scope of this book, but two virtual memory terms of special importance are
+used when discussing device drivers: virtual address and address space.</para><itemizedlist><listitem><para><indexterm id="kernelovr-ix4"><primary>virtual addresses</primary><secondary>description of</secondary></indexterm><indexterm id="kernelovr-ix5"><primary>memory management unit</primary><secondary>description of</secondary></indexterm><indexterm id="kernelovr-ix6"><primary>virtual memory</primary><secondary>memory management unit (MMU)</secondary></indexterm><emphasis role="strong">Virtual address</emphasis>. A <emphasis>virtual address</emphasis> is
+an address that is mapped by the memory management unit (MMU) to a physical
+hardware address. All addresses directly accessible by the driver are kernel
+virtual addresses. Kernel virtual addresses refer to the <emphasis>kernel
+address space</emphasis>.</para>
+</listitem><listitem><para><indexterm id="kernelovr-ix7"><primary>virtual memory</primary><secondary>address spaces</secondary></indexterm><indexterm id="kernelovr-ix8"><primary>address spaces</primary><secondary>description of</secondary></indexterm><emphasis role="strong">Address space</emphasis>. An <emphasis>address
+space</emphasis> is a set of <emphasis>virtual address segments</emphasis>.
+Each segment is a contiguous range of virtual addresses. Each user process
+has an address space called the <emphasis>user address space</emphasis>. The
+kernel has its own address space, called the <emphasis>kernel address space</emphasis>.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="kernelovr-4"><title>Devices as Special Files</title><para><indexterm id="kernelovr-ix9"><primary>special files</primary><secondary>description of</secondary></indexterm><indexterm><primary><filename>/devices</filename> directory</primary><secondary>description of</secondary></indexterm>Devices are represented
+in the file system by <emphasis>special files</emphasis>. In the Solaris OS,
+these files reside in the <filename>/devices</filename> directory hierarchy.</para><para>Special files can be of type <emphasis>block</emphasis> or <emphasis>character</emphasis>. The type indicates which kind of device driver operates the device.
+Drivers can be implemented to operate on both types. For example, disk drivers
+export a character interface for use by the <literal>fsck(1)</literal> and <literal>mkfs(1)</literal> utilities, and a block interface for use by the file system.</para><para><indexterm id="kernelovr-ix10"><primary>device number</primary><secondary>description of</secondary></indexterm><indexterm><primary>major numbers</primary><secondary>description of</secondary></indexterm><indexterm><primary>minor numbers</primary></indexterm>Associated with each special file is a <emphasis>device number</emphasis> (<literal>dev_t</literal>). A device number consists of a <emphasis>major number</emphasis> and
+a <emphasis>minor number</emphasis>. The <emphasis>major</emphasis> number
+identifies the device driver associated with the special file. The <emphasis>minor</emphasis> number is created and used by the device driver to further identify
+the special file. Usually, the minor number is an encoding that is used to
+identify which device instance the driver should access and which type of
+access should be performed. For example, the minor number can identify a tape
+device used for backup and can specify that the tape needs to be rewound when
+the backup operation is complete.</para>
+</sect2><sect2 id="kernelovr-40"><title>DDI/DKI Interfaces</title><indexterm id="kernelovr-ix15"><primary>DDI/DKI</primary><secondary>overview</secondary>
+</indexterm><indexterm id="kernelovr-ix14"><primary>DKI</primary><see>DDI/DKI</see>
+</indexterm><para>In System V Release 4 (SVR4), the interface between device drivers and
+the rest of the UNIX kernel was standardized as the DDI/DKI. The DDI/DKI is
+documented in section&nbsp;9 of the <citetitle>Reference Manual Collection</citetitle>.
+Section 9E documents driver entry points, section 9F documents driver-callable
+functions, and section 9S documents kernel data structures used by device
+drivers. See <olink targetdoc="group-refman" targetptr="intro-9e" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="intro-9f" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="intro-9s" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>.</para><para><indexterm id="kernelovr-ix16"><primary>source compatibility</primary><secondary>description of</secondary></indexterm><indexterm id="kernelovr-ix17"><primary>binary compatibility</primary><secondary>description of</secondary></indexterm>The DDI/DKI is intended to standardize and document all interfaces
+between device drivers and the rest of the kernel. In addition, the DDI/DKI
+enables source and binary compatibility for drivers on any machine that runs
+the Solaris OS, regardless of the processor architecture, whether SPARC or
+x86. Drivers that use only kernel facilities that are part of the DDI/DKI
+are known as <emphasis>DDI/DKI-compliant device drivers</emphasis>.</para><para>The DDI/DKI enables you to write platform-independent device drivers
+for any machine that runs the Solaris OS. These binary-compatible drivers
+enable you to more easily integrate third-party hardware and software into
+any machine that runs the Solaris OS. The DDI/DKI is architecture independent,
+which enables the same driver to work across a diverse set of machine architectures.</para><para>Platform independence is accomplished by the design of DDI in the following
+areas:</para><itemizedlist><listitem><para>Dynamic loading and unloading of modules</para>
+</listitem><listitem><para>Power management</para>
+</listitem><listitem><para>Interrupt handling</para>
+</listitem><listitem><para>Accessing the device space from the kernel or a user process,
+that is, register mapping and memory mapping</para>
+</listitem><listitem><para>Accessing kernel or user process space from the device using
+DMA services</para>
+</listitem><listitem><para>Managing device properties</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="kernelovr-64300"><title>Overview of the Device Tree</title><para>Devices in the Solaris OS are represented as a tree of interconnected
+device information nodes. The device tree describes the configuration of loaded
+devices for a particular machine.</para><sect2 id="kernelovr-43"><title>Device Tree Components</title><para><indexterm><primary>device tree</primary><secondary>overview</secondary></indexterm><indexterm><primary>device information</primary><secondary>tree structure</secondary></indexterm><indexterm><primary>device information</primary><secondary>tree structure</secondary></indexterm><indexterm><primary>leaf devices</primary><secondary>description of</secondary></indexterm><indexterm><primary>bus nexus device drivers</primary><secondary>description of</secondary></indexterm><indexterm><primary>nexus</primary><see>bus nexus device drivers</see></indexterm>The system builds a tree structure that contains information about
+the devices connected to the machine at boot time. The device tree can also
+be modified by dynamic reconfiguration operations while the system is in normal
+operation. The tree begins at the root device node, which represents the platform.</para><para>Below the root node are the branches of the device tree. A branch consists
+of one or more bus nexus devices and a  terminating leaf device.</para><para>A <emphasis>bus nexus device</emphasis> provides bus mapping and translation
+services to subordinate devices in the device tree.   PCI - PCI bridges, 
+PCMCIA adapters, and SCSI HBAs are all examples of nexus devices.  The discussion
+of writing drivers for nexus devices is limited to the development of SCSI
+HBA drivers (see <olink targetptr="scsihba-32898" remap="internal">Chapter&nbsp;18, SCSI Host
+Bus Adapter Drivers</olink>).</para><para><emphasis>Leaf devices</emphasis> are typically peripheral devices such
+as disks, tapes, network adapters, frame buffers, and so forth.  Leaf device
+drivers export the traditional character driver interfaces and block driver
+interfaces. The interfaces enable user processes to read data from and write
+data to either storage or communication devices.</para><para>The system goes through the following steps to build the tree:</para><orderedlist><listitem><para>The CPU is initialized and searches for firmware.</para>
+</listitem><listitem><para>The main firmware (OpenBoot, Basic Input/Output System (BIOS),
+or <literal>Bootconf</literal>) initializes and creates the device tree with
+known or self-identifying hardware.</para>
+</listitem><listitem><para>When the main firmware finds compatible firmware on a device,
+the main firmware initializes the device and retrieves the device's properties.</para>
+</listitem><listitem><para>The firmware locates and boots the operating system.</para>
+</listitem><listitem><para>The kernel starts at the root node of the tree, searches for
+a matching device driver, and binds that driver to the device.</para>
+</listitem><listitem><para>If the device is a nexus, the kernel looks for child devices
+that have not been detected by the firmware. The kernel adds any child devices
+to the tree below the nexus node.</para>
+</listitem><listitem><para>The kernel repeats the process from Step 5 until no further
+device nodes need to be created.</para>
+</listitem>
+</orderedlist><para>Each driver exports a device operations structure <olink targetdoc="group-refman" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> to define
+the operations that the device driver can perform. The device operations structure
+contains function pointers for generic operations such as <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. The structure
+also contains a pointer to a set of operations specific to bus nexus drivers
+and a pointer to a set of operations specific to leaf drivers.</para><para>The tree structure creates a parent-child relationship between nodes.
+This parent-child relationship is the key to architectural independence. When
+a leaf or bus nexus driver requires a service that is architecturally dependent
+in nature, that driver requests its parent to provide the service. This approach
+enables drivers to function regardless of the architecture of the machine
+or the processor. A typical device tree is shown in the following figure.</para><figure id="kernelovr-fig-9"><title id="kernelovr-18420">Example Device Tree</title><mediaobject><imageobject><imagedata entityref="kernelovr.devtree.epsi"/>
+</imageobject><textobject><simpara>Diagram shows leaves and nodes in a typical device tree.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The nexus nodes can have one or more children. The leaf nodes represent
+individual devices.</para>
+</sect2><sect2 id="kernelovr-11"><title>Displaying the Device Tree</title><para><indexterm><primary>device tree</primary><secondary>displaying</secondary></indexterm>The device tree can be displayed in three ways:</para><itemizedlist><listitem><para>The <literal>libdevinfo</literal> library provides interfaces
+to access the contents of the device tree programmatically.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+displays the complete contents of the device tree.</para>
+</listitem><listitem><para>The <filename>/devices</filename> hierarchy is a representation
+of the device tree. Use the <olink targetdoc="group-refman" targetptr="ls-1" remap="external"><citerefentry><refentrytitle>ls</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+to view the hierarchy.</para>
+</listitem>
+</itemizedlist><note><para><filename>/devices</filename> displays only devices that have
+drivers configured into the system. The <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command shows all device
+nodes regardless of whether a driver for the device exists on the system.</para>
+</note><sect3 id="kernelovr-28"><title><command>libdevinfo</command> Library</title><para><indexterm><primary><function>libdevinfo</function></primary><secondary>displaying the device tree</secondary></indexterm>The <command>libdevinfo</command> library
+provides interfaces for accessing all public device configuration data. See
+the <olink targetdoc="group-refman" targetptr="libdevinfo-3lib" remap="external"><citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> man page for a list of interfaces.</para>
+</sect3><sect3 id="kernelovr-12"><title><command>prtconf</command> Command</title><para><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying the device tree</secondary></indexterm>The following
+excerpted <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+example displays all the devices in the system.</para><programlisting>System Configuration:  Sun Microsystems  sun4u
+Memory size: 128 Megabytes
+System Peripherals (Software Nodes):
+
+SUNW,Ultra-5_10
+    packages (driver not attached)
+        terminal-emulator (driver not attached)
+        deblocker (driver not attached)
+        obp-tftp (driver not attached)
+        disk-label (driver not attached)
+        SUNW,builtin-drivers (driver not attached)
+        sun-keyboard (driver not attached)
+        ufs-file-system (driver not attached)
+    chosen (driver not attached)
+    openprom (driver not attached)
+        client-services (driver not attached)
+    options, instance #0
+    aliases (driver not attached)
+    memory (driver not attached)
+    virtual-memory (driver not attached)
+    pci, instance #0
+        pci, instance #0
+            ebus, instance #0
+                auxio (driver not attached)
+                power, instance #0
+                SUNW,pll (driver not attached)
+                se, instance #0
+                su, instance #0
+                su, instance #1
+                ecpp (driver not attached)
+                fdthree, instance #0
+                eeprom (driver not attached)
+                flashprom (driver not attached)
+                SUNW,CS4231 (driver not attached)
+            network, instance #0
+            SUNW,m64B (driver not attached)
+            ide, instance #0
+                disk (driver not attached)
+                cdrom (driver not attached)
+                dad, instance #0
+                sd, instance #15
+        pci, instance #1
+            pci, instance #0
+                pci108e,1000 (driver not attached)
+                SUNW,hme, instance #1
+                SUNW,isptwo, instance #0
+                    sd (driver not attached)
+                    st (driver not attached)
+                    sd, instance #0 (driver not attached)
+                    sd, instance #1 (driver not attached)
+                    sd, instance #2 (driver not attached)
+                    ...
+    SUNW,UltraSPARC-IIi (driver not attached)
+    SUNW,ffb, instance #0
+    pseudo, instance #0</programlisting>
+</sect3><sect3 id="kernelovr-13"><title><filename>/devices</filename> Directory</title><para><indexterm><primary><filename>/devices</filename> directory</primary><secondary>displaying the device tree</secondary></indexterm>The <filename>/devices</filename> hierarchy provides a namespace that represents the device tree.
+Following is an abbreviated listing of the <filename>/devices</filename> namespace.
+The sample output corresponds to the example device tree and <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> output shown
+previously.</para><programlisting>/devices
+/devices/pseudo
+/devices/pci@1f,0:devctl
+/devices/SUNW,ffb@1e,0:ffb0
+/devices/pci@1f,0
+/devices/pci@1f,0/pci@1,1
+/devices/pci@1f,0/pci@1,1/SUNW,m64B@2:m640
+/devices/pci@1f,0/pci@1,1/ide@3:devctl
+/devices/pci@1f,0/pci@1,1/ide@3:scsi
+/devices/pci@1f,0/pci@1,1/ebus@1
+/devices/pci@1f,0/pci@1,1/ebus@1/power@14,724000:power_button
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:a
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:b
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:0,hdlc
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:1,hdlc
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:a,cu
+/devices/pci@1f,0/pci@1,1/ebus@1/se@14,400000:b,cu
+/devices/pci@1f,0/pci@1,1/ebus@1/ecpp@14,3043bc:ecpp0
+/devices/pci@1f,0/pci@1,1/ebus@1/fdthree@14,3023f0:a
+/devices/pci@1f,0/pci@1,1/ebus@1/fdthree@14,3023f0:a,raw
+/devices/pci@1f,0/pci@1,1/ebus@1/SUNW,CS4231@14,200000:sound,audio
+/devices/pci@1f,0/pci@1,1/ebus@1/SUNW,CS4231@14,200000:sound,audioctl
+/devices/pci@1f,0/pci@1,1/ide@3
+/devices/pci@1f,0/pci@1,1/ide@3/sd@2,0:a
+/devices/pci@1f,0/pci@1,1/ide@3/sd@2,0:a,raw
+/devices/pci@1f,0/pci@1,1/ide@3/dad@0,0:a
+/devices/pci@1f,0/pci@1,1/ide@3/dad@0,0:a,raw
+/devices/pci@1f,0/pci@1
+/devices/pci@1f,0/pci@1/pci@2
+/devices/pci@1f,0/pci@1/pci@2/SUNW,isptwo@4:devctl
+/devices/pci@1f,0/pci@1/pci@2/SUNW,isptwo@4:scsi</programlisting>
+</sect3>
+</sect2><sect2 id="kernelovr-14"><title>Binding a Driver to a Device</title><para><indexterm id="kernelovr-ix25"><primary>device information</primary><secondary>binding a driver to a device</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>binding to device node</secondary></indexterm><indexterm><primary>binding a driver to a device</primary></indexterm>In addition to constructing the device tree, the kernel determines
+the drivers that are used to manage the devices.</para><para><indexterm id="kernelovr-ix26"><primary>driver binding name</primary></indexterm>Binding a driver to a device refers to the process by which the
+system selects a driver to manage a particular device. The binding name is
+the name that links a driver to a unique device node in the device information
+tree. For each device in the device tree, the system attempts to choose a
+driver from a list of installed drivers.</para><para><indexterm id="kernelovr-ix27"><primary>properties</primary><secondary>device node name property</secondary></indexterm><indexterm><primary>name property</primary><secondary>description of</secondary></indexterm>Each device node has an associated <emphasis>name</emphasis> property. This property can be assigned either from an external
+agent, such as the PROM, during system boot or from a <filename>driver.conf</filename> configuration
+file. In any case, the <filename>name</filename> property represents the <literal>node name</literal> assigned to a device in the device tree. The <literal>node
+name</literal> is the name visible in <filename>/devices</filename> and listed
+in the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> output. </para><figure id="kernelovr-fig-15"><title id="kernelovr-21966">Device Node Names</title><mediaobject><imageobject><imagedata entityref="kernelovr.devnodenames.epsi"/>
+</imageobject><textobject><simpara>Diagram shows a simple example of device node names.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><indexterm><primary>compatible property</primary><secondary>description of</secondary></indexterm>A device node can have an associated <emphasis>compatible</emphasis> property as well. The <emphasis>compatible</emphasis> property
+contains an ordered list of one or more possible driver names or driver aliases
+for the device.</para><para>The system uses both the <emphasis>compatible</emphasis> and the <emphasis>name</emphasis> properties to select a driver for the device. The system first
+attempts to match the contents of the <emphasis>compatible</emphasis> property,
+if the <emphasis>compatible</emphasis> property exists, to a driver on the
+system. Beginning with the first driver name on the <emphasis>compatible</emphasis> property
+list, the system attempts to match the driver name to a known driver on the
+system. Each entry on the list is processed until the system either finds
+a match or reaches the end of the list.</para><para>If the contents of either the <emphasis>name</emphasis> property or
+the <emphasis>compatible</emphasis> property match a driver on the system,
+then that driver is bound to the device node. If no match is found, no driver
+is bound to the device node. </para><sect3 id="kernelovr-16"><title>Generic Device Names</title><para><indexterm><primary>generic device name</primary></indexterm>Some devices
+specify a <emphasis>generic</emphasis> device name as the value for the <emphasis>name</emphasis> property. Generic device names describe the function of a
+device without actually identifying a specific driver for the device. For
+example, a SCSI host bus adapter might have a generic device name of <filename>scsi</filename>. An Ethernet device might have a generic device name of <filename>ethernet</filename>.</para><para>The <emphasis>compatible</emphasis> property enables the system to determine
+alternate driver names for devices with a generic device name, for example, <filename>glm</filename> for <filename>scsi</filename> HBA device drivers or <filename>hme</filename> for <filename>ethernet</filename> device drivers.</para><para>Devices with generic device names are required to supply a <emphasis>compatible</emphasis> property.</para><note><para>For a complete description of <emphasis>generic device names</emphasis>,
+see the IEEE 1275 Open Firmware Boot Standard.</para>
+</note><para>The following figure shows a device node with a specific device name.
+The driver binding name <filename>SUNW,ffb</filename> is the same name as
+the device node name.</para><figure id="kernelovr-fig-17"><title id="kernelovr-16040">Specific Driver
+Node Binding</title><mediaobject><imageobject><imagedata entityref="kernelovr.specdevnodebinding.epsi"/>
+</imageobject><textobject><simpara>Diagram shows a device node using a specific device name:
+SUNW, ffb.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The following figure shows a device node with the generic device name <filename>display</filename>. The driver binding name <filename>SUNW,ffb</filename> is
+the first name on the <emphasis>compatible</emphasis> property driver list
+that matches a driver on the system driver list. In this case, <filename>display</filename> is
+a generic device name for frame buffers.</para><figure id="kernelovr-fig-18"><title id="kernelovr-41490">Generic Driver Node
+Binding</title><mediaobject><imageobject><imagedata entityref="kernelovr.gendevnodebinding.epsi"/>
+</imageobject><textobject><simpara>Diagram shows a device node using a generic device name:
+display.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000031135 0?>

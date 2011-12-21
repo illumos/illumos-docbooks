@@ -1,0 +1,1952 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part()part(title()partintro()chapter()?><chapter id="scsihba-32898"><title>SCSI Host Bus Adapter Drivers</title><highlights><para>This chapter contains information on creating SCSI host bus adapter
+(HBA) drivers. The chapter provides sample code illustrating the structure
+of a typical HBA driver. The sample code shows the use of the HBA driver interfaces
+that are provided by the Sun Common SCSI Architecture (SCSA). This chapter
+provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="scsihba-105" remap="internal">Introduction to Host Bus Adapter
+Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-10" remap="internal">SCSI Interface</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-16" remap="internal">SCSA HBA Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-32" remap="internal">HBA Driver Dependency and Configuration
+Issues</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-50" remap="internal">Entry Points for SCSA HBA Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-88" remap="internal">SCSI HBA Driver Specific Issues</olink></para>
+</listitem><listitem><para><olink targetptr="scsihba-100" remap="internal">Support for Queuing</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="scsihba-105"><title>Introduction to Host Bus Adapter Drivers</title><para>As described in <olink targetptr="scsi-36812" remap="internal">Chapter&nbsp;17, SCSI
+Target Drivers</olink>, the DDI/DKI divides the software interface to SCSI
+devices into two major parts:</para><itemizedlist><listitem><para>Target devices and drivers</para>
+</listitem><listitem><para>Host bus adapter devices and drivers</para>
+</listitem>
+</itemizedlist><para><emphasis>Target</emphasis> <emphasis>device</emphasis> refers to a
+device on a SCSI bus, such as a disk or a tape drive. <emphasis>Target</emphasis> <emphasis>driver</emphasis> refers to a software component installed as a device driver.
+Each target device on a SCSI bus is controlled by one instance of the target
+driver.</para><para><emphasis>Host bus adapter</emphasis> <emphasis>device</emphasis> refers
+to HBA hardware, such as an SBus or PCI SCSI adapter card. <emphasis>Host
+bus adapter</emphasis> <emphasis>driver</emphasis> refers to a software component
+that is installed as a device driver. Some examples are the <filename>esp</filename> driver
+on a SPARC machine, the <filename>ncrs</filename> driver on an x86 machine,
+and the <filename>isp</filename> driver, which works on both architectures.
+An instance of the HBA driver controls each of its host bus adapter devices
+that are configured in the system.</para><para>The Sun Common SCSI Architecture (SCSA) defines the interface between
+the target and HBA components.</para><note><para>Understanding SCSI target drivers is an essential prerequisite
+to writing effective SCSI HBA drivers. For information on SCSI target drivers,
+see <olink targetptr="scsi-36812" remap="internal">Chapter&nbsp;17, SCSI Target Drivers</olink>.
+Target driver developers can also benefit from reading this chapter. </para>
+</note><para>The host bus adapter driver is responsible for performing the following
+tasks:</para><itemizedlist><listitem><para>Managing host bus adapter hardware</para>
+</listitem><listitem><para>Accepting SCSI commands from the SCSI target driver</para>
+</listitem><listitem><para>Transporting the commands to the specified SCSI target device</para>
+</listitem><listitem><para>Performing any data transfers that the command requires</para>
+</listitem><listitem><para>Collecting status</para>
+</listitem><listitem><para>Handling auto-request sense (optional)</para>
+</listitem><listitem><para>Informing the target driver of command completion or failure</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="scsihba-10"><title>SCSI Interface</title><indexterm><primary>SCSI HBA driver</primary><secondary>overview</secondary>
+</indexterm><indexterm><primary>HBA driver</primary><see>SCSI HBA driver</see>
+</indexterm><para><indexterm><primary>SCSA</primary></indexterm>SCSA is the DDI/DKI programming
+interface for the transmission of SCSI commands from a target driver to a
+host adapter driver. By conforming to the SCSA, the target driver can easily
+pass any combination of SCSI commands and sequences to a target device. Knowledge
+of the hardware implementation of the host adapter is not necessary. Conceptually,
+SCSA separates the building of a SCSI command from the transporting of the
+command with data to the SCSI bus. SCSA manages the connections between the
+target and HBA drivers through an HBA <emphasis>transport</emphasis>layer,
+as shown in the following figure.</para><figure id="scsihba-fig-11"><title>SCSA Interface</title><mediaobject><imageobject><imagedata entityref="scsihba.scsadiagram.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the host bus adapter transport layer between
+a target driver and SCSI devices.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><indexterm><primary>SCSA</primary><secondary>HBA transport layer</secondary></indexterm><indexterm><primary>SCSI HBA driver</primary><secondary>overview</secondary></indexterm><indexterm><primary>host bus adapter transport layer</primary></indexterm>The <emphasis>HBA transport layer</emphasis> is a software and
+hardware layer that is responsible for transporting a SCSI command to a SCSI
+target device. The HBA driver provides resource allocation, DMA management,
+and transport services in response to requests made by SCSI target drivers
+through SCSA. The host adapter driver also manages the host adapter hardware
+and the SCSI protocols necessary to perform the commands. When a command has
+been completed, the HBA driver calls the target driver's SCSI <literal>pkt</literal> command
+completion routine.</para><para>The following example illustrates this flow, with emphasis on the transfer
+of information from target drivers to SCSA to HBA drivers. The figure also
+shows typical transport entry points and function calls.</para><figure id="scsihba-fig-14"><title>Transport Layer Flow</title><mediaobject><imageobject><imagedata entityref="scsihba.translayerflow.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how commands flow through the HBA transport
+layer.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="scsihba-16"><title>SCSA HBA Interfaces</title><para>SCSA HBA interfaces include HBA entry points, HBA data structures, and
+an HBA framework.</para><sect2 id="scsihba-17"><title>SCSA HBA Entry Point Summary</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>entry points summary</secondary></indexterm><indexterm><primary>SCSA</primary><secondary>interfaces</secondary></indexterm><indexterm><primary>entry points</primary><secondary>SCSA HBA summary</secondary></indexterm>SCSA defines a number of HBA driver entry
+points. These entry points are listed in the following table. The entry points
+are called by the system when a target driver instance connected to the HBA
+driver is configured. The entry points are also called when the target driver
+makes a SCSA request. See <olink targetptr="scsihba-50" remap="internal">Entry Points for SCSA
+HBA Drivers</olink> for more information.</para><table frame="topbot" id="scsihba-tbl-18"><title>SCSA HBA Entry Point Summary</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="4*"/><colspec colnum="2" colname="column2" colwidth="5*"/><thead><row rowsep="1"><entry><para>Function Name</para>
+</entry><entry><para>Called as a Result of</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="refman9e" targetptr="tran-abort-9e" remap="external"><citerefentry><refentrytitle>tran_abort</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling  <olink targetdoc="refman9f" targetptr="scsi-abort-9f" remap="external"><citerefentry><refentrytitle>scsi_abort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-bus-reset-9e" remap="external"><citerefentry><refentrytitle>tran_bus_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>System resetting bus</para>
+</entry>
+</row><row><?PubTbl row rht="0.23in"?><entry><para><olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-dmafree-9e" remap="external"><citerefentry><refentrytitle>tran_dmafree</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-dmafree-9f" remap="external"><citerefentry><refentrytitle>scsi_dmafree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-getcap-9e" remap="external"><citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling  <olink targetdoc="refman9f" targetptr="scsi-ifgetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifgetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-quiesce-9e" remap="external"><citerefentry><refentrytitle>tran_quiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>System quiescing bus</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-reset-9e" remap="external"><citerefentry><refentrytitle>tran_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <literal>scsi_reset</literal>(9F)</para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-reset-notify-9e" remap="external"><citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-reset-notify-9f" remap="external"><citerefentry><refentrytitle>scsi_reset_notify</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-setcap-9e" remap="external"><citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-start-9e" remap="external"><citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-sync-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_sync_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Target driver calling <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><citerefentry><refentrytitle>tran_tgt_free</refentrytitle><manvolnum>9E</manvolnum></citerefentry></para>
+</entry><entry><para>System detaching target device instance</para>
+</entry>
+</row><row><entry><para><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></para>
+</entry><entry><para>System attaching target device instance</para>
+</entry>
+</row><row><entry><para><citerefentry><refentrytitle>tran_tgt_probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></para>
+</entry><entry><para>Target driver calling  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9e" targetptr="tran-unquiesce-9e" remap="external"><citerefentry><refentrytitle>tran_unquiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>System resuming activity on bus</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="scsihba-19"><title>SCSA HBA Data Structures</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>data structures</secondary></indexterm>SCSA defines data structures to enable the exchange of information
+between the target and HBA drivers. The following data structures are included:</para><itemizedlist><listitem><para><olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="scsi-address-9s" remap="external"><citerefentry><refentrytitle>scsi_address</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><sect3 id="scsihba-20"><title><function>scsi_hba_tran</function> Structure</title><para><indexterm><primary><structname>scsi_</structname> structures</primary><secondary><structname>scsi_hba_tran</structname> structure</secondary></indexterm>Each instance of an HBA driver must allocate a <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+by using the <olink targetdoc="refman9f" targetptr="scsi-hba-tran-alloc-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_tran_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function in the  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. The <function>scsi_hba_tran_alloc</function> function initializes the <structname>scsi_hba_tran</structname> structure.
+The HBA driver must initialize specific vectors in the transport structure
+to point to entry points within the HBA driver. After the <structname>scsi_hba_tran</structname> structure is initialized, the HBA driver exports the transport
+structure to SCSA by calling the <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para><caution><para>Because SCSA keeps a pointer to the transport structure in
+the driver-private field on the <literal>devinfo</literal> node, HBA drivers
+must not use  <olink targetdoc="refman9f" targetptr="ddi-set-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_set_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. HBA drivers can, however, use  <olink targetdoc="refman9f" targetptr="ddi-get-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_get_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to retrieve the pointer to the transport structure.</para>
+</caution><para>The SCSA interfaces require the HBA driver to supply a number of entry
+points that are callable through the <structname>scsi_hba_tran</structname> structure.
+See <olink targetptr="scsihba-50" remap="internal">Entry Points for SCSA HBA Drivers</olink> for
+more information.</para><para>The <structname>scsi_hba_tran</structname> structure contains the following
+fields:</para><programlisting>struct scsi_hba_tran {
+    dev_info_t          *tran_hba_dip;          /* HBAs dev_info pointer */
+    void                *tran_hba_private;      /* HBA softstate */
+    void                *tran_tgt_private;      /* HBA target private pointer */
+    struct scsi_device  *tran_sd;               /* scsi_device */
+    int                 (*tran_tgt_init)();     /* Transport target */
+                                                /* Initialization */
+    int                 (*tran_tgt_probe)();    /* Transport target probe */
+    void                (*tran_tgt_free)();     /* Transport target free */
+    int                 (*tran_start)();        /* Transport start */
+    int                 (*tran_reset)();        /* Transport reset */
+    int                 (*tran_abort)();        /* Transport abort */
+    int                 (*tran_getcap)();       /* Capability retrieval */
+    int                 (*tran_setcap)();       /* Capability establishment */
+    struct scsi_pkt     *(*tran_init_pkt)();    /* Packet and DMA allocation */
+    void                (*tran_destroy_pkt)();  /* Packet and DMA */
+                                                /* Deallocation */
+    void                (*tran_dmafree)();      /* DMA deallocation */
+    void                (*tran_sync_pkt)();     /* Sync DMA */
+    void                (*tran_reset_notify)(); /* Bus reset notification */
+    int                 (*tran_bus_reset)();    /* Reset bus only */
+    int                 (*tran_quiesce)();      /* Quiesce a bus */
+    int                 (*tran_unquiesce)();    /* Unquiesce a bus */
+    int                 tran_interconnect_type; /* transport interconnect */
+};</programlisting><para>The following descriptions give more information about these <structname>scsi_hba_tran</structname> structure fields:</para><variablelist><varlistentry><term><structfield>tran_hba_dip</structfield></term><listitem><para>Pointer to the HBA device instance <structfield>dev_info</structfield> structure.
+The function  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> sets this field.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_hba_private</structfield></term><listitem><para>Pointer to private data maintained by the HBA driver. Usually, <structfield>tran_hba_private</structfield> contains a pointer to the state structure of
+the HBA driver.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_tgt_private</structfield></term><listitem><para>Pointer to private data maintained by the HBA driver when
+using cloning. By specifying <literal>SCSI_HBA_TRAN_CLONE</literal> when calling
+ <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure is cloned once
+per target. This approach enables the HBA to initialize this field to point
+to a per-target instance data structure in the  <olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. If <literal>SCSI_HBA_TRAN_CLONE</literal> is not specified, <structfield>tran_tgt_private</structfield> is <literal>NULL</literal>, and <structfield>tran_tgt_private</structfield> must not be
+referenced. See <olink targetptr="scsihba-27" remap="internal">Transport Structure Cloning</olink> for
+more information.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_sd</structfield></term><listitem><para>Pointer to a per-target instance <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure used when cloning.
+If <literal>SCSI_HBA_TRAN_CLONE</literal> is passed to  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <structfield>tran_sd</structfield> is initialized
+to point to the per-target <structname>scsi_device</structname> structure.
+This initialization takes place before any HBA functions are called on behalf
+of that target. If <literal>SCSI_HBA_TRAN_CLONE</literal> is not specified, <structfield>tran_sd</structfield> is <literal>NULL</literal>, and <structfield>tran_sd</structfield> must
+not be referenced. See <olink targetptr="scsihba-27" remap="internal">Transport Structure Cloning</olink> for
+more information.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_tgt_init</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+initializing a target device instance. If no per-target initialization is
+required, the HBA can leave <structfield>tran_tgt_init</structfield> set to <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_tgt_probe</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver instance calls  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. This routine is called to
+probe for the existence of a target device. If no target probing customization
+is required for this HBA, the HBA should set <structfield>tran_tgt_probe</structfield> to
+ <olink targetdoc="refman9f" targetptr="scsi-hba-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_tgt_free</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target device instance is destroyed. If no per-target deallocation is necessary,
+the HBA can leave <structfield>tran_tgt_free</structfield> set to <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_start</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_reset</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-reset-9f" remap="external"><citerefentry><refentrytitle>scsi_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_abort</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-abort-9f" remap="external"><citerefentry><refentrytitle>scsi_abort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_getcap</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls <olink targetdoc="refman9f" targetptr="scsi-ifgetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifgetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_setcap</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_init_pkt</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_destroy_pkt</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_dmafree</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-dmafree-9f" remap="external"><citerefentry><refentrytitle>scsi_dmafree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_sync_pkt</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_reset_notify</structfield></term><listitem><para>Pointer to the HBA driver entry point that is called when
+a target driver calls <olink targetdoc="refman9e" targetptr="tran-reset-notify-9e" remap="external"><citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_bus_reset</structfield></term><listitem><para>The function entry that  resets  the SCSI bus without resetting
+targets.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_quiesce</structfield></term><listitem><para>The function entry that waits for all outstanding commands
+to complete and  blocks  (or queues) any I/O requests issued.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_unquiesce</structfield></term><listitem><para>The function entry that allows I/O activities to resume on
+the SCSI bus.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>tran_interconnect_type</structfield></term><listitem><para>Integer value denoting interconnect type of the transport
+as defined in the <filename>services.h</filename> header file.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="scsihba-21"><title><literal>scsi_address</literal> Structure</title><para><indexterm><primary><structname>scsi_</structname> structures</primary><secondary><structname>scsi_address</structname> structure</secondary></indexterm>The <olink targetdoc="refman9s" targetptr="scsi-address-9s" remap="external"><citerefentry><refentrytitle>scsi_address</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure provides transport and addressing information
+for each SCSI command that is allocated and transported by a target driver
+instance.</para><para>The <structname>scsi_address</structname> structure contains the following
+fields:</para><programlisting>struct scsi_address {
+    struct scsi_hba_tran    *a_hba_tran;    /* Transport vectors */
+    ushort_t                a_target;       /* Target identifier */
+    uchar_t                 a_lun;          /* LUN on that target */
+    uchar_t                 a_sublun;       /* Sub LUN on that LUN */
+                                            /* Not used */
+};</programlisting><variablelist><varlistentry><term><structfield>a_hba_tran</structfield></term><listitem><para>Pointer to the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure, as allocated and
+initialized by the HBA driver. If <literal>SCSI_HBA_TRAN_CLONE</literal> was
+specified as the flag to  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <structfield>a_hba_tran</structfield> points to a copy of that structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>a_target</structfield></term><listitem><para>Identifies the SCSI target on the SCSI bus.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>a_lun</structfield></term><listitem><para>Identifies the SCSI logical unit on the SCSI target.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="scsihba-22"><title><literal>scsi_device</literal> Structure</title><para><indexterm><primary><structname>scsi_</structname> structures</primary><secondary><structname>scsi_device</structname> structure</secondary></indexterm>The HBA framework allocates and initializes a <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+for each instance of a target device. The allocation and initialization occur
+before the framework calls the HBA driver's <olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. This structure
+stores information about each SCSI logical unit, including pointers to information
+areas that contain both generic and device-specific information. One <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+exists for each target device instance that is attached to the system.</para><para>If the per-target initialization is successful, the HBA framework sets
+the target driver's per-instance private data to point to the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+using  <olink targetdoc="refman9f" targetptr="ddi-set-driver-private-9f" remap="external"><citerefentry><refentrytitle>ddi_set_driver_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Note that an initialization is successful if <function>tran_tgt_init</function> returns success or if the vector is null.</para><para>The <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure contains the following fields:</para><programlisting>struct scsi_device {
+    struct scsi_address           sd_address;    /* routing information */
+    dev_info_t                    *sd_dev;       /* device dev_info node */
+    kmutex_t                      sd_mutex;      /* mutex used by device */
+    void                          *sd_reserved;
+    struct scsi_inquiry           *sd_inq;
+    struct scsi_extended_sense    *sd_sense;
+    caddr_t                       sd_private;    /* for driver's use */
+};</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>sd_address</structfield></term><listitem><para>Data structure that is passed to the routines for SCSI resource
+allocation.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_dev</structfield></term><listitem><para>Pointer to the target's <structname>dev_info</structname> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_mutex</structfield></term><listitem><para>Mutex for use by the target driver. This mutex is initialized
+by the HBA framework. The mutex can be used by the target driver as a per-device
+mutex. This mutex should not be held across a call to <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="scsi-poll-9f" remap="external"><citerefentry><refentrytitle>scsi_poll</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3, Multithreading</olink> for more information on mutexes.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_inq</structfield></term><listitem><para>Pointer for the target device's SCSI inquiry data. The <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine allocates
+a buffer, fills the buffer in, and attaches the buffer to this field.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_sense</structfield></term><listitem><para>Pointer to a buffer to contain request sense data from the
+device. The target driver must allocate and manage this buffer itself. See
+the target driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+in <olink targetptr="autoconf-41111" remap="internal">attach() Entry Point</olink> for more
+information.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>sd_private</structfield></term><listitem><para>Pointer field for use by the target driver. This field is
+commonly used to store a pointer to a private target driver state structure.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="scsihba-23"><title><literal>scsi_pkt</literal> Structure (HBA)</title><para><indexterm><primary><structname>scsi_</structname> structures</primary><secondary><structname>scsi_pkt</structname> structure</secondary></indexterm>To
+execute SCSI commands, a target driver must first allocate a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+for the command. The target driver must then specify its own private data
+area length, the command status, and the command length. The HBA driver is
+responsible for implementing the packet allocation in the  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.
+The HBA driver is also responsible for freeing the packet in its  <olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. See <olink targetptr="scsi-39157" remap="internal">scsi_pkt
+Structure (Target Drivers)</olink> for more information.</para><para>The <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+contains these fields:</para><programlisting>struct scsi_pkt {
+    opaque_t pkt_ha_private;             /* private data for host adapter */
+    struct scsi_address pkt_address;     /* destination address */
+    opaque_t pkt_private;                /* private data for target driver */
+    void (*pkt_comp)(struct scsi_pkt *); /* completion routine */
+    uint_t  pkt_flags;                   /* flags */
+    int     pkt_time;                    /* time allotted to complete command */
+    uchar_t *pkt_scbp;                   /* pointer to status block */
+    uchar_t *pkt_cdbp;                   /* pointer to command block */
+    ssize_t pkt_resid;                   /* data bytes not transferred */
+    uint_t  pkt_state;                   /* state of command */
+    uint_t  pkt_statistics;              /* statistics */
+    uchar_t pkt_reason;                  /* reason completion called */
+};</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>pkt_ha_private</structfield></term><listitem><para>Pointer to per-command HBA-driver private data.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_address</structfield></term><listitem><para>Pointer to the <olink targetdoc="refman9s" targetptr="scsi-address-9s" remap="external"><citerefentry><refentrytitle>scsi_address</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure providing address
+information for this command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_private</structfield></term><listitem><para>Pointer to per-packet target-driver private data.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_comp</structfield></term><listitem><para>Pointer to the target-driver completion routine called by
+the HBA driver when the transport layer has completed this command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_flags</structfield></term><listitem><para>Flags for the command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_time</structfield></term><listitem><para>Specifies the completion timeout in seconds for the command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_scbp</structfield></term><listitem><para>Pointer to the status completion block for the command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_cdbp</structfield></term><listitem><para>Pointer to the command descriptor block (CDB) for the command.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_resid</structfield></term><listitem><para>Count of the data bytes that were <emphasis>not</emphasis> transferred
+when the command completed. This field can also be used to specify the amount
+of data for which resources have not been allocated. The HBA must modify this
+field during transport.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_state</structfield></term><listitem><para>State of the command. The HBA must modify this field during
+transport.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_statistics</structfield></term><listitem><para>Provides a history of the events that the command experienced
+while in the transport layer. The HBA must modify this field during transport.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>pkt_reason</structfield></term><listitem><para>Reason for command completion. The HBA must modify this field
+during transport.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="scsihba-24"><title>Per-Target Instance Data</title><para><indexterm><primary><structname>scsi_hba_tran</structname> structures</primary><secondary><structname>scsi_pkt</structname> structure</secondary></indexterm>An
+HBA driver must allocate a <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure during  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. The HBA driver must then
+initialize the vectors in this transport structure to point to the required
+entry points for the HBA driver. This <structname>scsi_hba_tran</structname> structure
+is then passed into  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The <structname>scsi_hba_tran</structname> structure contains a <structfield>tran_hba_private</structfield> field, which can be used to refer to the HBA
+driver's per-instance state.</para><para>Each <olink targetdoc="refman9s" targetptr="scsi-address-9s" remap="external"><citerefentry><refentrytitle>scsi_address</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure contains a pointer to the <structname>scsi_hba_tran</structname> structure. In addition, the <structname>scsi_address</structname> structure
+provides the target, that is, <literal>a_target</literal>, and logical unit
+(<structname>a_lun</structname>) addresses for the particular target device.
+Each entry point for the HBA driver is passed a pointer to the <structname>scsi_address</structname> structure, either directly or indirectly through the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+As a result, the HBA driver can reference its own state. The HBA driver can
+also identify the target device that is addressed.</para><para>The following figure illustrates the HBA data structures for transport
+operations.</para><figure id="scsihba-fig-25"><title>HBA Transport Structures</title><mediaobject><imageobject><imagedata entityref="scsihba.transportstructs.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the relationships of structures involved
+in the HBA transport layer.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="scsihba-27"><title>Transport Structure Cloning</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>cloning</secondary></indexterm><indexterm><primary>cloning SCSI HBA driver</primary></indexterm>Cloning
+can be useful if an HBA driver needs to maintain per-target private data in
+the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. Cloning can also be used to maintain a
+more complex address than is provided in the <olink targetdoc="refman9s" targetptr="scsi-address-9s" remap="external"><citerefentry><refentrytitle>scsi_address</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para><para>In the cloning process, the HBA driver must still allocate a <structname>scsi_hba_tran</structname> structure at  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time.
+The HBA driver must also initialize the <structfield>tran_hba_private</structfield> soft
+state pointer and the entry point vectors for the HBA driver. The difference
+occurs when the framework begins to connect an instance of a target driver
+to the HBA driver. Before calling the HBA driver's  <olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point, the framework
+clones the <structname>scsi_hba_tran</structname> structure that is associated
+with that instance of the HBA. Accordingly, each <structname>scsi_address</structname> structure
+that is allocated and initialized for a particular target device instance
+points to a per-target instance <emphasis>copy</emphasis> of the <structname>scsi_hba_tran</structname> structure. The <structname>scsi_address</structname> structures
+do not point to the <structname>scsi_hba_tran</structname> structure that
+is allocated by the HBA driver at  <function>attach</function> time. </para><para>An HBA driver can use two important pointers when cloning is  specified.
+These pointers are contained in the <structname>scsi_hba_tran</structname> structure.
+The first pointer is the <structfield>tran_tgt_private</structfield> field,
+which the driver can use to point to per-target HBA private data. The <structfield>tran_tgt_private</structfield> pointer is useful, for example, if an HBA driver
+needs to maintain a more complex address than <literal>a_target</literal> and <literal>a_lun</literal> provide. The second pointer is the <literal>tran_sd</literal> field,
+which is a pointer to the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure referring to the particular target device.</para><para>When specifying cloning, the HBA driver must allocate and initialize
+the per-target data. The HBA driver must then initialize the <structfield>tran_tgt_private</structfield> field to point to this data during its  <olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.
+The HBA driver must free this per-target data during its  <olink targetdoc="refman9e" targetptr="tran-tgt-free-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_free</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para>When cloning, the framework initializes the <structfield>tran_sd</structfield> field
+to point to the <structname>scsi_device</structname> structure before the
+HBA driver  <function>tran_tgt_init</function> entry point is called. The
+driver requests cloning by passing the <literal>SCSI_HBA_TRAN_CLONE</literal> flag
+to  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The following figure illustrates the HBA data structures
+for cloning transport operations.</para><figure id="scsihba-fig-28"><title>Cloning Transport Operation</title><mediaobject><imageobject><imagedata entityref="scsihba.cloningtransportop.epsi" width="100"/>
+</imageobject><textobject><simpara>Diagram shows an example of cloned HBA structures.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="scsihba-30"><title>SCSA HBA Functions</title><para><indexterm><primary><literal>scsi_hba_</literal> functions</primary><secondary>summary list</secondary></indexterm>SCSA also provides a number
+of functions. The functions are listed in the following table, for use by
+HBA drivers.</para><table frame="topbot" id="scsihba-tbl-31"><title>SCSA HBA Functions</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="4*"/><colspec colnum="2" colname="column2" colwidth="5*"/><thead><row rowsep="1"><entry><para>Function Name</para>
+</entry><entry><para>Called by Driver Entry Point</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-init-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-fini-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-detach-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_detach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-tran-alloc-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_tran_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-tran-free-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_tran_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-tgt-probe-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-pkt-alloc-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-pkt-free-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><olink targetdoc="refman9f" targetptr="scsi-hba-lookup-capstr-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_lookup_capstr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-getcap-9e" remap="external"><citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="refman9e" targetptr="tran-setcap-9e" remap="external"><citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="scsihba-32"><title>HBA Driver Dependency and Configuration Issues</title><para>In addition to incorporating SCSA HBA entry points, structures, and
+functions into a driver, a developer must deal with driver dependency and
+configuration issues. These issues involve configuration properties, dependency
+declarations, state structure and per-command structure, entry points for
+module initialization, and autoconfiguration entry points.</para><sect2 id="scsihba-33"><title>Declarations and Structures</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>header files</secondary></indexterm>HBA drivers must include the following header files:</para><programlisting>#include &lt;sys/scsi/scsi.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;</programlisting><para>To inform the system that the module depends on SCSA routines, the driver
+binary must be generated with the following command. See <olink targetptr="scsihba-16" remap="internal">SCSA HBA Interfaces</olink> for more information on
+SCSA routines.</para><screen>% ld -r <replaceable>xx</replaceable>.o -o <replaceable>xx</replaceable> -N "misc/scsi"</screen><para>The code samples are derived from a simplified <filename>isp</filename> driver
+for the QLogic Intelligent SCSI Peripheral device. The <filename>isp</filename> driver
+supports WIDE SCSI, with up to 15 target devices and 8 logical units (LUNs)
+per target.</para><sect3 id="scsihba-34"><title>Per-Command Structure</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>command state structure</secondary></indexterm>An HBA driver usually needs to define a structure
+to maintain state for each command submitted by a target driver. The layout
+of this per-command structure is entirely up to the device driver writer.
+The layout needs to reflect the capabilities and features of the hardware
+and the software algorithms that are used in the driver.</para><para>The following structure is an example of a per-command structure. The
+remaining code fragments of this chapter use this structure to illustrate
+the HBA interfaces.</para><programlisting>struct isp_cmd {
+     struct isp_request     cmd_isp_request;
+     struct isp_response    cmd_isp_response;
+     struct scsi_pkt        *cmd_pkt;
+     struct isp_cmd         *cmd_forw;
+     uint32_t               cmd_dmacount;
+     ddi_dma_handle_t       cmd_dmahandle;
+     uint_t                 cmd_cookie;
+     uint_t                 cmd_ncookies;
+     uint_t                 cmd_cookiecnt;
+     uint_t                 cmd_nwin;
+     uint_t                 cmd_curwin;
+     off_t                  cmd_dma_offset;
+     uint_t                 cmd_dma_len;
+     ddi_dma_cookie_t       cmd_dmacookies[ISP_NDATASEGS];
+     u_int                  cmd_flags;
+     u_short                cmd_slot;
+     u_int                  cmd_cdblen;
+     u_int                  cmd_scblen;
+ };</programlisting>
+</sect3>
+</sect2><sect2 id="scsihba-35"><title>Entry Points for Module Initialization</title><para>This section describes the entry points for operations that are performed
+by SCSI HBA drivers.</para><para>The following code for a SCSI HBA driver illustrates a representative <olink targetdoc="refman9s" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. The driver must
+initialize the <structfield>devo_bus_ops</structfield> field in this structure
+to <literal>NULL</literal>. A SCSI HBA driver can provide leaf driver interfaces
+for special purposes, in which case the <structfield>devo_cb_ops</structfield> field
+might point to a <olink targetdoc="refman9s" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+In this example, no leaf driver interfaces are exported, so the <structfield>devo_cb_ops</structfield> field is initialized to <literal>NULL</literal>.</para><sect3 id="scsihba-36"><title><function>_init</function> Entry Point (SCSI
+HBA Drivers)</title><para>The <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function
+initializes a loadable module. <function>_init</function> is called before
+any other routine in the loadable module.</para><para>In a SCSI HBA, the <function>_init</function> function must call  <olink targetdoc="refman9f" targetptr="scsi-hba-init-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to inform
+the framework of the existence of the HBA driver before calling  <olink targetdoc="refman9f" targetptr="mod-install-9f" remap="external"><citerefentry><refentrytitle>mod_install</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. If <function>scsi_hba__init</function> returns a nonzero value,<function>_init</function> should return
+this value. Otherwise, <function>_init</function> must return the value returned
+by <olink targetdoc="refman9f" targetptr="mod-install-9f" remap="external"><citerefentry><refentrytitle>mod_install</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The driver should initialize any required global state before calling
+ <olink targetdoc="refman9f" targetptr="mod-install-9f" remap="external"><citerefentry><refentrytitle>mod_install</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>If  <function>mod_install</function> fails, the <function>_init</function> function
+must free any global resources allocated. <function>_init</function> must
+call  <olink targetdoc="refman9f" targetptr="scsi-hba-fini-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> before returning.</para><para>The following example uses a global mutex to show how to allocate data
+that is global to all instances of a driver. The code declares global mutex
+and soft-state structure information. The global mutex and soft state are
+initialized during <function>_init</function>.</para>
+</sect3><sect3 id="scsihba-37"><title><function>_fini</function> Entry Point (SCSI
+HBA Drivers)</title><para>The <olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function
+is called when the system is about to try to unload the SCSI HBA driver. The <function>_fini</function> function must call  <olink targetdoc="refman9f" targetptr="mod-remove-9f" remap="external"><citerefentry><refentrytitle>mod_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine whether the
+driver can be unloaded. If <function>mod_remove</function> returns 0, the
+module can be unloaded.  The HBA driver must deallocate any global resources
+allocated in <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+The HBA driver must also call  <olink targetdoc="refman9f" targetptr="scsi-hba-fini-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><function>_fini</function> must return the value returned by <function>mod_remove</function>.</para><note><para>The HBA driver must not free any resources or call  <olink targetdoc="refman9f" targetptr="scsi-hba-fini-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> unless <olink targetdoc="refman9f" targetptr="mod-remove-9f" remap="external"><citerefentry><refentrytitle>mod_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns 0.</para>
+</note><para><olink targetptr="scsihba-ex-38" remap="internal">Example&nbsp;18&ndash;1</olink> shows
+module initialization for SCSI HBA.</para><example id="scsihba-ex-38"><title>Module Initialization for SCSI HBA</title><programlisting>static struct dev_ops isp_dev_ops = {
+    DEVO_REV,       /* devo_rev */
+    0,              /* refcnt  */
+    isp_getinfo,    /* getinfo */
+    nulldev,        /* probe */
+    isp_attach,     /* attach */
+    isp_detach,     /* detach */
+    nodev,          /* reset */
+    NULL,           /* driver operations */
+    NULL,           /* bus operations */
+    isp_power,      /* power management */
+};
+
+/*
+ * Local static data
+ */
+static kmutex_t      isp_global_mutex;
+static void          *isp_state;
+
+int
+_init(void)
+{
+    int     err;
+    
+    if ((err = ddi_soft_state_init(&amp;isp_state,
+        sizeof (struct isp), 0)) != 0) {
+        return (err);
+    }
+    if ((err = scsi_hba_init(&amp;modlinkage)) == 0) {
+        mutex_init(&amp;isp_global_mutex, "isp global mutex",
+        MUTEX_DRIVER, NULL);
+        if ((err = mod_install(&amp;modlinkage)) != 0) {
+            mutex_destroy(&amp;isp_global_mutex);
+            scsi_hba_fini(&amp;modlinkage);
+            ddi_soft_state_fini(&amp;isp_state);    
+        }
+    }
+    return (err);
+}
+
+int
+_fini(void)
+{
+    int     err;
+    
+    if ((err = mod_remove(&amp;modlinkage)) == 0) {
+        mutex_destroy(&amp;isp_global_mutex);
+        scsi_hba_fini(&amp;modlinkage);
+        ddi_soft_state_fini(&amp;isp_state);
+    }
+    return (err);
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="scsihba-39"><title>Autoconfiguration Entry Points</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>autoconfiguration</secondary></indexterm><indexterm><primary>autoconfiguration</primary><secondary sortas="SCSI">of SCSI HBA drivers</secondary></indexterm>Associated with each
+device driver is a <olink targetdoc="refman9s" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+which enables the kernel to locate the autoconfiguration entry points of the
+driver. A complete description of these autoconfiguration routines is given
+in <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink>.
+This section describes only those entry points associated with operations
+performed by SCSI HBA drivers. These entry points include  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para><sect3 id="scsihba-40"><title><function>attach</function> Entry Point (SCSI
+HBA Drivers)</title><para>The <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point for a SCSI HBA driver performs several tasks when configuring and attaching
+an instance of the driver for the device. For a typical driver of real devices,
+the following operating system and hardware concerns must be addressed:</para><itemizedlist><listitem><para>Soft-state structure</para>
+</listitem><listitem><para>DMA</para>
+</listitem><listitem><para>Transport structure</para>
+</listitem><listitem><para>Attaching an HBA driver</para>
+</listitem><listitem><para>Register mapping</para>
+</listitem><listitem><para>Interrupt specification</para>
+</listitem><listitem><para>Interrupt handling</para>
+</listitem><listitem><para>Create power manageable components</para>
+</listitem><listitem><para>Report attachment status</para>
+</listitem>
+</itemizedlist><sect4 id="scsihba-41"><title>Soft-State Structure</title><para>When allocating the per-device-instance soft-state structure, a driver
+must clean up carefully if an error occurs.</para>
+</sect4><sect4 id="scsihba-42"><title>DMA</title><para>The HBA driver must describe the attributes of its DMA engine by properly
+initializing the <literal>ddi_dma_attr_t</literal> structure.</para><programlisting>static ddi_dma_attr_t isp_dma_attr = {
+     DMA_ATTR_V0,        /* ddi_dma_attr version */
+     0,                  /* low address */
+     0xffffffff,         /* high address */
+     0x00ffffff,         /* counter upper bound */
+     1,                  /* alignment requirements */
+     0x3f,               /* burst sizes */
+     1,                  /* minimum DMA access */
+     0xffffffff,         /* maximum DMA access */
+     (1&lt;&lt;24)-1,          /* segment boundary restrictions */
+     1,                  /* scatter-gather list length */
+     512,                /* device granularity */
+     0                   /* DMA flags */
+};</programlisting><para>The driver, if providing DMA, should also check that its hardware is
+installed in a DMA-capable slot:</para><programlisting>if (ddi_slaveonly(dip) == DDI_SUCCESS) {
+    return (DDI_FAILURE);
+}</programlisting>
+</sect4><sect4 id="scsihba-43"><title>Transport Structure</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>initializing a transport structure</secondary></indexterm>The driver should further allocate
+and initialize a transport structure for this instance. The <structfield>tran_hba_private</structfield> field is set to point to this instance's soft-state structure.
+The <structfield>tran_tgt_probe</structfield> field can be set to <literal>NULL</literal> to
+achieve the default behavior, if no special probe customization is needed.</para><programlisting>tran = scsi_hba_tran_alloc(dip, SCSI_HBA_CANSLEEP);
+
+isp-&gt;isp_tran                   = tran;
+isp-&gt;isp_dip                    = dip;
+
+tran-&gt;tran_hba_private          = isp;
+tran-&gt;tran_tgt_private          = NULL;
+tran-&gt;tran_tgt_init             = isp_tran_tgt_init;
+tran-&gt;tran_tgt_probe            = scsi_hba_probe;
+tran-&gt;tran_tgt_free             = (void (*)())NULL;
+
+tran-&gt;tran_start                = isp_scsi_start;
+tran-&gt;tran_abort                = isp_scsi_abort;
+tran-&gt;tran_reset                = isp_scsi_reset;
+tran-&gt;tran_getcap               = isp_scsi_getcap;
+tran-&gt;tran_setcap               = isp_scsi_setcap;
+tran-&gt;tran_init_pkt             = isp_scsi_init_pkt;
+tran-&gt;tran_destroy_pkt          = isp_scsi_destroy_pkt;
+tran-&gt;tran_dmafree              = isp_scsi_dmafree;
+tran-&gt;tran_sync_pkt             = isp_scsi_sync_pkt;
+tran-&gt;tran_reset_notify         = isp_scsi_reset_notify;
+tran-&gt;tran_bus_quiesce          = isp_tran_bus_quiesce
+tran-&gt;tran_bus_unquiesce        = isp_tran_bus_unquiesce
+tran-&gt;tran_bus_reset            = isp_tran_bus_reset
+tran-&gt;tran_interconnect_type    = isp_tran_interconnect_type</programlisting>
+</sect4><sect4 id="scsihba-44"><title>Attaching an HBA Driver</title><para>The driver should attach this instance of the device, and perform error
+cleanup if necessary.</para><programlisting>i = scsi_hba_attach_setup(dip, &amp;isp_dma_attr, tran, 0);
+if (i != DDI_SUCCESS) {
+    /* do error recovery */
+    return (DDI_FAILURE);
+}</programlisting>
+</sect4><sect4 id="scsihba-45"><title>Register Mapping</title><para>The driver should map in its device's registers. The driver need to
+specify the following items:</para><itemizedlist><listitem><para>Register set index</para>
+</listitem><listitem><para>Data access characteristics of the device</para>
+</listitem><listitem><para>Size of the register to be mapped</para>
+</listitem>
+</itemizedlist><programlisting>ddi_device_acc_attr_t    dev_attributes;
+
+     dev_attributes.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+     dev_attributes.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+     dev_attributes.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+
+     if (ddi_regs_map_setup(dip, 0, (caddr_t *)&amp;isp-&gt;isp_reg,
+     0, sizeof (struct ispregs), &amp;dev_attributes,
+     &amp;isp-&gt;isp_acc_handle) != DDI_SUCCESS) {
+        /* do error recovery */
+        return (DDI_FAILURE);
+     }</programlisting>
+</sect4><sect4 id="scsihba-46"><title>Adding an Interrupt Handler</title><para>The driver must first obtain the <emphasis>iblock cookie</emphasis> to
+initialize any mutexes that are used in the driver handler. Only after those
+mutexes have been initialized can the interrupt handler be added.</para><programlisting>i = ddi_get_iblock_cookie(dip, 0, &amp;isp-&gt;iblock_cookie};
+if (i != DDI_SUCCESS) {
+    /* do error recovery */
+    return (DDI_FAILURE);
+}
+
+mutex_init(&amp;isp-&gt;mutex, "isp_mutex", MUTEX_DRIVER,
+(void *)isp-&gt;iblock_cookie);
+i = ddi_add_intr(dip, 0, &amp;isp-&gt;iblock_cookie,
+0, isp_intr, (caddr_t)isp);
+if (i != DDI_SUCCESS) {
+    /* do error recovery */
+    return (DDI_FAILURE);
+}</programlisting><para>If a high-level handler is required, the driver should be coded to provide
+such a handler. Otherwise, the driver must be able to fail the attach. See <olink targetptr="interrupt-18" remap="internal">Handling High-Level Interrupts</olink> for a description
+of high-level interrupt handling.</para>
+</sect4><sect4 id="scsihba-104"><title>Create Power Manageable Components</title><para>With power management, if the host bus adapter only needs to power down
+when all target adapters are at power level 0, the HBA driver only needs to
+provide a <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. Refer to <olink targetptr="powermgt-37437" remap="internal">Chapter&nbsp;12, Power Management</olink>. The HBA driver also needs to create a <olink targetdoc="refman9s" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> property that describes the
+components that the device implements.</para><para>Nothing more is necessary, since the components will default to idle,
+and the power management framework's default dependency processing will ensure
+that the host bus adapter will be powered up whenever an target adapter is
+powered up. Provided that automatic power management is enabled automatically,
+the processing will also power down the host bus adapter when all target adapters
+are powered down ().</para>
+</sect4><sect4 id="scsihba-47"><title>Report Attachment Status</title><para>Finally, the driver should report that this instance of the device is
+attached and return success.</para><programlisting>ddi_report_dev(dip);
+    return (DDI_SUCCESS);</programlisting>
+</sect4>
+</sect3><sect3 id="scsihba-48"><title><function>detach</function> Entry Point (SCSI
+HBA Drivers)</title><para>The driver should perform standard detach operations, including   calling <olink targetdoc="refman9f" targetptr="scsi-hba-detach-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_detach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="scsihba-50"><title>Entry Points for SCSA HBA Drivers</title><para>An HBA driver can work with target drivers through the SCSA interface.
+The SCSA interfaces require the HBA driver to supply a number of entry points
+that are callable through the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para><para>These entry points fall into five functional groups:</para><itemizedlist><listitem><para>Target driver instance initialization</para>
+</listitem><listitem><para>Resource allocation and deallocation</para>
+</listitem><listitem><para>Command transport</para>
+</listitem><listitem><para>Capability management</para>
+</listitem><listitem><para>Abort and reset handling</para>
+</listitem><listitem><para>Dynamic reconfiguration</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary>by category</secondary></indexterm>The following table lists the entry points
+for SCSA HBA by function groups.</para><table frame="topbot" id="scsihba-tbl-51"><title>SCSA Entry Points</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="3*"/><colspec colnum="2" colname="column2" colwidth="3*"/><colspec colnum="3" colname="column3" colwidth="4*"/><thead><row rowsep="1"><entry><para>Function Groups</para>
+</entry><entry><para>Entry Points Within Group</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Target Driver Instance Initialization</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Performs per-target initialization (optional)</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-tgt-probe-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Probes SCSI bus for existence of a target (optional)</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-tgt-free-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_free</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Performs per-target deallocation (optional)</para>
+</entry>
+</row><row><entry><para>Resource Allocation</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Allocates SCSI packet and DMA resources</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Frees SCSI packet and DMA resources</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-sync-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_sync_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Synchronizes memory before and after DMA</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-dmafree-9e" remap="external"><citerefentry><refentrytitle>tran_dmafree</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Frees DMA resources</para>
+</entry>
+</row><row><entry><para>Command Transport</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-start-9e" remap="external"><citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Transports a SCSI command</para>
+</entry>
+</row><row><entry><para>Capability Management</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-getcap-9e" remap="external"><citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Inquires about a capability's value</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-setcap-9e" remap="external"><citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Sets a capability's value</para>
+</entry>
+</row><row><entry><para>Abort and Reset</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-abort-9e" remap="external"><citerefentry><refentrytitle>tran_abort</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Aborts outstanding SCSI commands</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-reset-9e" remap="external"><citerefentry><refentrytitle>tran_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Resets a target device or the SCSI bus</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-bus-reset-9e" remap="external"><citerefentry><refentrytitle>tran_bus_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Resets the SCSI bus</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-reset-notify-9e" remap="external"><citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Request to notify target of bus reset (optional)</para>
+</entry>
+</row><row><entry><para>Dynamic Reconfiguration</para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-quiesce-9e" remap="external"><citerefentry><refentrytitle>tran_quiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Stops activity on the bus</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="refman9e" targetptr="tran-unquiesce-9e" remap="external"><citerefentry><refentrytitle>tran_unquiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Resumes activity on the bus</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="scsihba-52"><title>Target Driver Instance Initialization</title><para>The following sections describe target entry points.</para><sect3 id="scsihba-53"><title><function>tran_tgt_init</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>driver instance initialization</secondary></indexterm><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_tgt_init</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-tgt-init-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point enables the HBA to allocate and initialize
+any per-target resources. <function>tran_tgt_init</function> also enables
+the HBA to qualify the device's address as valid and supportable for that
+particular HBA. By returning <literal>DDI_FAILURE</literal>, the instance
+of the target driver for that device is not probed or attached.</para><para><function>tran_tgt_init</function> is not required. If <function>tran_tgt_init</function> is not supplied, the framework attempts to probe and attach all
+possible instances of the appropriate target drivers.</para><programlisting>static int
+isp_tran_tgt_init(
+    dev_info_t            *hba_dip,
+    dev_info_t            *tgt_dip,
+    scsi_hba_tran_t       *tran,
+    struct scsi_device    *sd)
+{
+    return ((sd-&gt;sd_address.a_target &lt; N_ISP_TARGETS_WIDE &amp;&amp;
+        sd-&gt;sd_address.a_lun &lt; 8) ? DDI_SUCCESS : DDI_FAILURE);
+}</programlisting>
+</sect3><sect3 id="scsihba-54"><title><function>tran_tgt_probe</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_tgt_probe</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-tgt-probe-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+enables the HBA to customize the operation of  <olink targetdoc="refman9f" targetptr="scsi-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, if necessary. This entry
+point is called only when the target driver calls <function>scsi_probe</function>.</para><para><indexterm><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_probe</function> function</secondary></indexterm><indexterm><primary><literal>scsi_hba_</literal> functions</primary><secondary><function>scsi_hba_probe</function> function</secondary></indexterm>The HBA driver can retain the
+normal operation of <function>scsi_probe</function> by calling  <olink targetdoc="refman9f" targetptr="scsi-hba-probe-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_probe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and returning
+its return value.</para><para>This entry point is not required, and if not needed, the HBA driver
+should set the <structfield>tran_tgt_probe</structfield> vector in the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+to point to <function>scsi_hba_probe</function>.</para><para><indexterm><primary><literal>scsi_</literal> functions</primary><secondary><function>scsi_unprobe</function> function</secondary></indexterm><function>scsi_probe</function> allocates a <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure and sets the <literal>sd_inq</literal> field of the <olink targetdoc="refman9s" targetptr="scsi-device-9s" remap="external"><citerefentry><refentrytitle>scsi_device</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure to point to the
+data in <structname>scsi_inquiry</structname>. <function>scsi_hba_probe</function> handles
+this task automatically.  <olink targetdoc="refman9f" targetptr="scsi-unprobe-9f" remap="external"><citerefentry><refentrytitle>scsi_unprobe</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> then frees the <structname>scsi_inquiry</structname> data.</para><para>Except for the allocation of <structname>scsi_inquiry</structname> data, <function>tran_tgt_probe</function> must be stateless, because the same SCSI device
+might call <function>tran_tgt_probe</function> several times. Normally, allocation
+of <structname>scsi_inquiry</structname> data is handled by  <function>scsi_hba_probe</function>.</para><note><para>The allocation of the <olink targetdoc="refman9s" targetptr="scsi-inquiry-9s" remap="external"><citerefentry><refentrytitle>scsi_inquiry</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure is handled automatically
+by  <function>scsi_hba_probe</function>. This information is only of concern
+if you want custom <function>scsi_probe</function> handling.</para>
+</note><programlisting>static int
+isp_tran_tgt_probe(
+    struct scsi_device    *sd,
+    int                   (*callback)())
+{
+    /*
+     * Perform any special probe customization needed.
+     * Normal probe handling.
+     */
+    return (scsi_hba_probe(sd, callback));
+}</programlisting>
+</sect3><sect3 id="scsihba-55"><title><function>tran_tgt_free</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_tgt_free</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-tgt-free-9e" remap="external"><citerefentry><refentrytitle>tran_tgt_free</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+enables the HBA to perform any deallocation or clean-up procedures for an
+instance of a target. This entry point is optional.</para><programlisting>static void
+isp_tran_tgt_free(
+    dev_info_t            *hba_dip,
+    dev_info_t            *tgt_dip,
+    scsi_hba_tran_t       *hba_tran,
+    struct scsi_device    *sd)
+{
+    /*
+     * Undo any special per-target initialization done
+     * earlier in tran_tgt_init(9F) and tran_tgt_probe(9F)
+     */
+}</programlisting>
+</sect3>
+</sect2><sect2 id="scsihba-56"><title>Resource Allocation</title><para>The following sections discuss resource allocation.</para><sect3 id="scsihba-57"><title><function>tran_init_pkt</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>resource allocation</secondary></indexterm><indexterm><primary><function>tran_init_pkt</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_init_pkt</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point allocates and
+initializes a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and DMA resources for a target driver request.</para><para>The  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called when the target driver calls
+the SCSA function  <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>Each call of the  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is a request to perform one or more of
+three possible services:</para><itemizedlist><listitem><para>Allocation and initialization of a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure</para>
+</listitem><listitem><para>Allocation of DMA resources for data transfer</para>
+</listitem><listitem><para>Reallocation of DMA resources for the next portion of the
+data transfer</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="scsihba-58"><title>Allocation and Initialization of a <citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry> Structure</title><para>The  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point must allocate a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure through <olink targetdoc="refman9f" targetptr="scsi-hba-pkt-alloc-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> if <literal>pkt</literal> is <literal>NULL</literal>.</para><para><indexterm><primary><literal>scsi_hba_</literal> functions</primary><secondary><function>scsi_hba_pkt_alloc</function> function</secondary></indexterm><olink targetdoc="refman9f" targetptr="scsi-hba-pkt-alloc-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates space for the following items:</para><itemizedlist><listitem><para><olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para>SCSI CDB of length <literal>cmdlen</literal></para>
+</listitem><listitem><para>Completion area for SCSI status of length <literal>statuslen</literal></para>
+</listitem><listitem><para>Per-packet target driver private data area of length <literal>tgtlen</literal></para>
+</listitem><listitem><para>Per-packet HBA driver private data area of length <literal>hbalen</literal></para>
+</listitem>
+</itemizedlist><para>The <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+members, including <literal>pkt</literal>, must be initialized to zero except
+for the following members:</para><itemizedlist><listitem><para><literal>pkt_scbp</literal> &ndash; Status completion</para>
+</listitem><listitem><para><literal>pkt_cdbp</literal> &ndash; CDB</para>
+</listitem><listitem><para><literal>pkt_ha_private</literal> &ndash; HBA driver private
+data</para>
+</listitem><listitem><para><literal>pkt_private</literal> &ndash; Target driver private
+data</para>
+</listitem>
+</itemizedlist><para>These members are pointers to memory space where the values of the fields
+are stored, as shown in the following figure. For more information, refer
+to <olink targetptr="scsihba-23" remap="internal">scsi_pkt Structure (HBA)</olink>.</para><figure id="scsihba-fig-59"><title><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry> Structure Pointers</title><mediaobject><imageobject><imagedata entityref="scsihba.structptrs.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the scsi_pkt structure with those members
+that point to values rather than being initialized to zero.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The following example shows allocation and initialization of a <structname>scsi_pkt</structname> structure.</para><example id="scsihba-ex-61"><title>HBA Driver Initialization of a SCSI Packet
+Structure</title><programlisting>static struct scsi_pkt                 *
+isp_scsi_init_pkt(
+    struct scsi_address    *ap,
+    struct scsi_pkt        *pkt,
+    struct buf             *bp,
+    int                    cmdlen,
+    int                    statuslen,
+    int                    tgtlen,
+    int                    flags,
+    int                    (*callback)(),
+    caddr_t                arg)
+{
+    struct isp_cmd         *sp;
+    struct isp             *isp;
+    struct scsi_pkt        *new_pkt;
+
+    ASSERT(callback == NULL_FUNC || callback == SLEEP_FUNC);
+
+    isp = (struct isp *)ap-&gt;a_hba_tran-&gt;tran_hba_private;
+    /*
+     * First step of isp_scsi_init_pkt:  pkt allocation
+     */
+    if (pkt == NULL) {
+        pkt = scsi_hba_pkt_alloc(isp-&gt;isp_dip, ap, cmdlen,
+            statuslen, tgtlen, sizeof (struct isp_cmd),
+            callback, arg);
+        if (pkt == NULL) {
+            return (NULL);
+        }
+
+        sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+        /*
+         * Initialize the new pkt
+         */
+        sp-&gt;cmd_pkt         = pkt;
+        sp-&gt;cmd_flags       = 0;
+        sp-&gt;cmd_scblen      = statuslen;
+        sp-&gt;cmd_cdblen      = cmdlen;
+        sp-&gt;cmd_dmahandle   = NULL;
+        sp-&gt;cmd_ncookies    = 0;
+        sp-&gt;cmd_cookie      = 0; 
+        sp-&gt;cmd_cookiecnt   = 0;
+        sp-&gt;cmd_nwin        = 0;
+        pkt-&gt;pkt_address    = *ap;
+        pkt-&gt;pkt_comp       = (void (*)())NULL;
+        pkt-&gt;pkt_flags      = 0;
+        pkt-&gt;pkt_time       = 0;
+        pkt-&gt;pkt_resid      = 0;
+        pkt-&gt;pkt_statistics = 0;
+        pkt-&gt;pkt_reason     = 0;
+        new_pkt = pkt;
+    } else {
+        sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+        new_pkt = NULL;
+    }
+    /*
+     * Second step of isp_scsi_init_pkt:  dma allocation/move
+     */
+    if (bp &amp;&amp; bp-&gt;b_bcount != 0) {
+        if (sp-&gt;cmd_dmahandle == NULL) {
+            if (isp_i_dma_alloc(isp, pkt, bp, flags, callback) == 0) {
+                if (new_pkt) {
+                    scsi_hba_pkt_free(ap, new_pkt);
+                }
+                return ((struct scsi_pkt *)NULL);
+            }
+        } else {
+            ASSERT(new_pkt == NULL);
+            if (isp_i_dma_move(isp, pkt, bp) == 0) {
+                return ((struct scsi_pkt *)NULL);
+            }
+        }
+    }
+    return (pkt);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-62"><title>Allocation of DMA Resources</title><para>The  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point must allocate DMA resources for a data
+transfer if the following conditions are true:</para><itemizedlist><listitem><para><literal>bp</literal> is not null.</para>
+</listitem><listitem><para><literal>bp-&gt;b_bcount</literal> is not zero.</para>
+</listitem><listitem><para>DMA resources have not yet been allocated for this <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>SCSI HBA driver</primary><secondary>DMA resources</secondary></indexterm>The HBA driver needs to track how DMA resources are allocated
+for a particular command. This allocation can take place with a flag bit or
+a DMA handle in the per-packet HBA driver private data.</para><para>The <literal>PKT_DMA_PARTIAL</literal> flag in the <literal>pkt</literal> enables
+the target driver to break up a data transfer into multiple SCSI commands
+to accommodate the complete request. This approach is useful when the HBA
+hardware scatter-gather capabilities or system DMA resources cannot complete
+a request in a single SCSI command.</para><para>The <literal>PKT_DMA_PARTIAL</literal> flag enables the HBA driver to
+set the <literal>DDI_DMA_PARTIAL</literal> flag. The <literal>DDI_DMA_PARTIAL</literal> flag
+is useful when the DMA resources for this SCSI command are allocated. For
+example the <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>) command can be used to allocate DMA resources. The
+DMA attributes used when allocating the DMA resources should accurately describe
+any constraints placed on the ability of the HBA hardware to perform DMA.
+If the system can only allocate DMA resources for part of the request,  <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns <literal>DDI_DMA_PARTIAL_MAP</literal>. </para><para>The  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point must return the amount of DMA resources
+not allocated for this transfer in the field <literal>pkt_resid</literal>. </para><para>A target driver can make one request to  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to simultaneously allocate
+both a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and DMA resources for that <literal>pkt</literal>. In this case, if the HBA
+driver is unable to allocate DMA resources, that driver must free the allocated <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> before returning.
+The <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> must
+be freed by calling  <olink targetdoc="refman9f" targetptr="scsi-hba-pkt-free-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The target driver might first allocate the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> and allocate DMA resources
+for this <literal>pkt</literal> at a later time. In this case, if the HBA
+driver is unable to allocate DMA resources, the driver must <emphasis>not</emphasis> free <literal>pkt</literal>. The target driver in this case is responsible for freeing the <literal>pkt</literal>.</para><example id="scsihba-ex-63"><title>HBA Driver Allocation of DMA Resources</title><programlisting>static int
+isp_i_dma_alloc(
+    struct isp         *isp,
+    struct scsi_pkt    *pkt,
+    struct buf         *bp,
+    int                flags,
+    int                (*callback)())
+{
+    struct isp_cmd     *sp  = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+    int                dma_flags;
+    ddi_dma_attr_t     tmp_dma_attr;
+    int                (*cb)(caddr_t);
+    int                i;
+
+    ASSERT(callback == NULL_FUNC || callback == SLEEP_FUNC);
+
+    if (bp-&gt;b_flags &amp; B_READ) {
+        sp-&gt;cmd_flags &amp;= ~CFLAG_DMASEND;
+        dma_flags = DDI_DMA_READ;
+    } else {
+        sp-&gt;cmd_flags |= CFLAG_DMASEND;
+        dma_flags = DDI_DMA_WRITE;
+    }
+    if (flags &amp; PKT_CONSISTENT) {
+        sp-&gt;cmd_flags |= CFLAG_CMDIOPB;
+        dma_flags |= DDI_DMA_CONSISTENT;
+    }
+    if (flags &amp; PKT_DMA_PARTIAL) {
+        dma_flags |= DDI_DMA_PARTIAL;
+    }
+
+    tmp_dma_attr = isp_dma_attr;
+    tmp_dma_attr.dma_attr_burstsizes = isp-&gt;isp_burst_size;
+
+    cb = (callback == NULL_FUNC) ? DDI_DMA_DONTWAIT : DDI_DMA_SLEEP;
+
+    if ((i = ddi_dma_alloc_handle(isp-&gt;isp_dip, &amp;tmp_dma_attr,
+      cb, 0, &amp;sp-&gt;cmd_dmahandle)) != DDI_SUCCESS) {
+        switch (i) {
+          case DDI_DMA_BADATTR:
+              bioerror(bp, EFAULT);
+              return (0);
+          case DDI_DMA_NORESOURCES:
+              bioerror(bp, 0);
+              return (0);
+        }
+    }
+
+    i = ddi_dma_buf_bind_handle(sp-&gt;cmd_dmahandle, bp, dma_flags,
+    cb, 0, &amp;sp-&gt;cmd_dmacookies[0], &amp;sp-&gt;cmd_ncookies);
+
+    switch (i) {
+      case DDI_DMA_PARTIAL_MAP:
+          if (ddi_dma_numwin(sp-&gt;cmd_dmahandle, &amp;sp-&gt;cmd_nwin) == DDI_FAILURE) {
+              cmn_err(CE_PANIC, "ddi_dma_numwin() failed\n");
+          }
+
+          if (ddi_dma_getwin(sp-&gt;cmd_dmahandle, sp-&gt;cmd_curwin,
+            &amp;sp-&gt;cmd_dma_offset, &amp;sp-&gt;cmd_dma_len, &amp;sp-&gt;cmd_dmacookies[0], 
+            &amp;sp-&gt;cmd_ncookies) == DDI_FAILURE) {
+              cmn_err(CE_PANIC, "ddi_dma_getwin() failed\n");
+          }
+          goto get_dma_cookies;
+
+      case DDI_DMA_MAPPED:
+          sp-&gt;cmd_nwin = 1;
+          sp-&gt;cmd_dma_len = 0;
+          sp-&gt;cmd_dma_offset = 0;
+
+      get_dma_cookies:
+          i = 0;
+          sp-&gt;cmd_dmacount = 0;
+          for (;;) {
+              sp-&gt;cmd_dmacount += sp-&gt;cmd_dmacookies[i++].dmac_size;
+              if (i == ISP_NDATASEGS || i == sp-&gt;cmd_ncookies)
+                  break;
+              ddi_dma_nextcookie(sp-&gt;cmd_dmahandle,
+              &amp;sp-&gt;cmd_dmacookies[i]);
+          }
+          sp-&gt;cmd_cookie = i;
+          sp-&gt;cmd_cookiecnt = i;
+          sp-&gt;cmd_flags |= CFLAG_DMAVALID;
+          pkt-&gt;pkt_resid = bp-&gt;b_bcount - sp-&gt;cmd_dmacount;
+          return (1);
+
+      case DDI_DMA_NORESOURCES:
+          bioerror(bp, 0);
+          break;
+
+      case DDI_DMA_NOMAPPING:
+          bioerror(bp, EFAULT);
+          break;
+
+      case DDI_DMA_TOOBIG:
+          bioerror(bp, EINVAL);
+          break;
+
+      case DDI_DMA_INUSE:
+          cmn_err(CE_PANIC, "ddi_dma_buf_bind_handle:"
+            " DDI_DMA_INUSE impossible\n");
+
+      default:
+          cmn_err(CE_PANIC, "ddi_dma_buf_bind_handle:"
+            " 0x%x impossible\n", i);
+    }
+    ddi_dma_free_handle(&amp;sp-&gt;cmd_dmahandle);
+    sp-&gt;cmd_dmahandle = NULL;
+    sp-&gt;cmd_flags &amp;= ~CFLAG_DMAVALID;
+    return (0);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-64"><title>Reallocation of DMA Resources for Data Transfer</title><para>For a previously allocated packet with data remaining to be transferred,
+the  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point must reallocate DMA resources when the
+following conditions apply:</para><itemizedlist><listitem><para>Partial DMA resources have already been allocated.</para>
+</listitem><listitem><para>A non-zero <returnvalue>pkt_resid</returnvalue> was returned
+in the previous call to  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para><literal>bp</literal> is not null.</para>
+</listitem><listitem><para><literal>bp-&gt;b_bcount</literal> is not zero.</para>
+</listitem>
+</itemizedlist><para>When reallocating DMA resources to the next portion of the transfer,
+ <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>  must return the amount of DMA resources not allocated
+for this transfer in the field <literal>pkt_resid</literal>.</para><para>If an error occurs while attempting to move DMA resources, <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must not
+free the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>.
+The target driver in this case is responsible for freeing the packet.</para><para>If the callback parameter is <literal>NULL_FUNC</literal>, the  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+must not sleep or call any function that might sleep. If the callback parameter
+is <literal>SLEEP_FUNC</literal> and resources are not immediately available,
+the  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point should sleep. Unless the request is impossible
+to satisfy, <function>tran_init_pkt</function> should sleep until resources
+become available.</para><example id="scsihba-ex-65"><title>DMA Resource Reallocation for HBA Drivers</title><programlisting>static int
+isp_i_dma_move(
+    struct isp         *isp,
+    struct scsi_pkt    *pkt,
+    struct buf         *bp)
+{
+    struct isp_cmd     *sp  = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+    int                i;
+
+    ASSERT(sp-&gt;cmd_flags &amp; CFLAG_COMPLETED);
+    sp-&gt;cmd_flags &amp;= ~CFLAG_COMPLETED;
+    /*
+     * If there are no more cookies remaining in this window,
+     * must move to the next window first.
+     */
+    if (sp-&gt;cmd_cookie == sp-&gt;cmd_ncookies) {
+        /*
+         * For small pkts, leave things where they are
+         */
+        if (sp-&gt;cmd_curwin == sp-&gt;cmd_nwin &amp;&amp; sp-&gt;cmd_nwin == 1)
+            return (1);
+        /*
+         * At last window, cannot move
+         */
+        if (++sp-&gt;cmd_curwin &gt;= sp-&gt;cmd_nwin)
+            return (0);
+        if (ddi_dma_getwin(sp-&gt;cmd_dmahandle, sp-&gt;cmd_curwin,
+          &amp;sp-&gt;cmd_dma_offset, &amp;sp-&gt;cmd_dma_len,
+          &amp;sp-&gt;cmd_dmacookies[0], &amp;sp-&gt;cmd_ncookies) == DDI_FAILURE)
+            return (0);
+        sp-&gt;cmd_cookie = 0;
+    } else {
+        /*
+         * Still more cookies in this window - get the next one
+         */
+        ddi_dma_nextcookie(sp-&gt;cmd_dmahandle, &amp;sp-&gt;cmd_dmacookies[0]);
+    }
+    /*
+     * Get remaining cookies in this window, up to our maximum
+     */
+    i = 0;
+    for (;;) {
+        sp-&gt;cmd_dmacount += sp-&gt;cmd_dmacookies[i++].dmac_size;
+        sp-&gt;cmd_cookie++;
+        if (i == ISP_NDATASEGS || sp-&gt;cmd_cookie == sp-&gt;cmd_ncookies)
+            break;
+        ddi_dma_nextcookie(sp-&gt;cmd_dmahandle, &amp;sp-&gt;cmd_dmacookies[i]);
+    }
+    sp-&gt;cmd_cookiecnt = i;
+    pkt-&gt;pkt_resid = bp-&gt;b_bcount - sp-&gt;cmd_dmacount;
+    return (1);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-66"><title><function>tran_destroy_pkt</function> Entry
+Point</title><para><indexterm><primary><function>tran_destroy_pkt</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is the HBA driver function that deallocates <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structures.
+The <function>tran_destroy_pkt</function> entry point is called when the target
+driver calls <olink targetdoc="refman9f" targetptr="scsi-destroy-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_destroy_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm><primary><literal>scsi_hba</literal>_ functions</primary><secondary><function>scsi_hba_pkt_free</function> function</secondary></indexterm>The <function>tran_destroy_pkt</function> entry point must free
+any DMA resources that have been allocated for the packet. An implicit DMA
+synchronization occurs if the DMA resources are freed and any cached data
+remains after the completion of the transfer. The <function>tran_destroy_pkt</function> entry
+point frees the SCSI packet by calling  <olink targetdoc="refman9f" targetptr="scsi-hba-pkt-free-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_pkt_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><example id="scsihba-ex-67"><title>HBA Driver <citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static void
+isp_scsi_destroy_pkt(
+    struct scsi_address    *ap,
+    struct scsi_pkt    *pkt)
+{
+    struct isp_cmd *sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+    /*
+     * Free the DMA, if any
+     */
+    if (sp-&gt;cmd_flags &amp; CFLAG_DMAVALID) {
+        sp-&gt;cmd_flags &amp;= ~CFLAG_DMAVALID;
+        (void) ddi_dma_unbind_handle(sp-&gt;cmd_dmahandle);
+        ddi_dma_free_handle(&amp;sp-&gt;cmd_dmahandle);
+        sp-&gt;cmd_dmahandle = NULL;
+    }
+    /*
+     * Free the pkt
+     */
+    scsi_hba_pkt_free(ap, pkt);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-68"><title><function>tran_sync_pkt</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_sync_pkt</function> function</secondary></indexterm><indexterm><primary><function>tran_sync_pkt</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-sync-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_sync_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point synchronizes the DMA object allocated
+for the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+before or after a DMA transfer. The <function>tran_sync_pkt</function> entry
+point is called when the target driver calls  <olink targetdoc="refman9f" targetptr="scsi-sync-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_sync_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>If the data transfer direction is a DMA read from device to memory, <function>tran_sync_pkt</function> must synchronize the CPU's view of the data. If the
+data transfer direction is a DMA write from memory to device, <function>tran_sync_pkt</function> must synchronize the device's view of the data.</para><example id="scsihba-ex-69"><title>HBA Driver <citerefentry><refentrytitle>tran_sync_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static void
+isp_scsi_sync_pkt(
+    struct scsi_address    *ap,
+    struct scsi_pkt        *pkt)
+{
+    struct isp_cmd *sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+
+    if (sp-&gt;cmd_flags &amp; CFLAG_DMAVALID) {
+        (void)ddi_dma_sync(sp-&gt;cmd_dmahandle, sp-&gt;cmd_dma_offset,
+        sp-&gt;cmd_dma_len,
+        (sp-&gt;cmd_flags &amp; CFLAG_DMASEND) ?
+        DDI_DMA_SYNC_FORDEV : DDI_DMA_SYNC_FORCPU);
+    }
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-70"><title><function>tran_dmafree</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_dmafree</function> function</secondary></indexterm><indexterm><primary><function>tran_dmafree</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-dmafree-9e" remap="external"><citerefentry><refentrytitle>tran_dmafree</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point deallocates DMA resources that have been
+allocated for a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+The <function>tran_dmafree</function> entry point is called when the target
+driver calls  <olink targetdoc="refman9f" targetptr="scsi-dmafree-9f" remap="external"><citerefentry><refentrytitle>scsi_dmafree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><function>tran_dmafree</function> must free only DMA resources allocated
+for a <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+not the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> itself.
+When DMA resources are freed,  a DMA synchronization is implicitly performed.</para><note><para>The <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> is
+freed in a separate request to  <olink targetdoc="refman9e" targetptr="tran-destroy-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_destroy_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. Because  <function>tran_destroy_pkt</function> must also free DMA resources, the HBA driver must keep accurate
+note of whether <function>scsi_pkt</function> structures have DMA resources
+allocated.</para>
+</note><example id="scsihba-ex-71"><title>HBA Driver <citerefentry><refentrytitle>tran_dmafree</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static void
+isp_scsi_dmafree(
+    struct scsi_address    *ap,
+    struct scsi_pkt        *pkt)
+{
+    struct isp_cmd    *sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+
+    if (sp-&gt;cmd_flags &amp; CFLAG_DMAVALID) {
+        sp-&gt;cmd_flags &amp;= ~CFLAG_DMAVALID;
+        (void)ddi_dma_unbind_handle(sp-&gt;cmd_dmahandle);
+        ddi_dma_free_handle(&amp;sp-&gt;cmd_dmahandle);
+        sp-&gt;cmd_dmahandle = NULL;
+    }
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="scsihba-72"><title>Command Transport</title><para>An HBA driver goes through the following steps as part of command transport:</para><orderedlist><listitem><para>Accept a command from the target driver.</para>
+</listitem><listitem><para>Issue the command to the device hardware.</para>
+</listitem><listitem><para>Service any interrupts that occur.</para>
+</listitem><listitem><para><indexterm><primary>SCSI HBA driver</primary><secondary>command transport</secondary></indexterm>Manage time outs.</para>
+</listitem>
+</orderedlist><sect3 id="scsihba-73"><title><function>tran_start</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_start</function> function</secondary></indexterm><indexterm><primary><function>tran_start</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-start-9e" remap="external"><citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a SCSI HBA driver is called to transport
+a SCSI command to the addressed target. The SCSI command is described entirely
+within the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+which the target driver allocated through the HBA driver's  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.
+If the command involves a data transfer, DMA resources must also have been
+allocated for the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para><para>The <function>tran_start</function> entry point is called when a target
+driver calls  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><function>tran_start</function> should perform basic error checking
+along with any initialization that is required by the command. The <literal>FLAG_NOINTR</literal> flag in the <literal>pkt_flags</literal> field of the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+can affect the behavior of <function>tran_start</function>. If <literal>FLAG_NOINTR</literal> is not set, <function>tran_start</function> must queue the command
+for execution on the  hardware and return immediately. Upon completion of
+the command,  the HBA driver should call the <literal>pkt</literal> completion
+routine.</para><para>If the <literal>FLAG_NOINTR</literal> is set, then the HBA driver should
+not call the <literal>pkt</literal> completion routine.</para><para>The following example demonstrates how to handle the  <olink targetdoc="refman9e" targetptr="tran-start-9e" remap="external"><citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.
+The ISP hardware provides a queue per-target device. For devices that can
+manage only one active outstanding command, the driver is typically required
+to manage a per-target queue. The driver then starts up a new command upon
+completion of the current command in a round-robin fashion.</para><example id="scsihba-ex-74"><title>HBA Driver <citerefentry><refentrytitle>tran_start</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static int
+isp_scsi_start(
+    struct scsi_address    *ap,
+    struct scsi_pkt        *pkt)
+{
+    struct isp_cmd         *sp;
+    struct isp             *isp;
+    struct isp_request     *req;
+    u_long                 cur_lbolt;
+    int                    xfercount;
+    int                    rval = TRAN_ACCEPT;
+    int                    i;
+
+    sp = (struct isp_cmd *)pkt-&gt;pkt_ha_private;
+    isp = (struct isp *)ap-&gt;a_hba_tran-&gt;tran_hba_private;
+
+    sp-&gt;cmd_flags = (sp-&gt;cmd_flags &amp; ~CFLAG_TRANFLAG) |
+                CFLAG_IN_TRANSPORT;
+    pkt-&gt;pkt_reason = CMD_CMPLT;
+    /*
+     * set up request in cmd_isp_request area so it is ready to
+     * go once we have the request mutex
+     */
+    req = &amp;sp-&gt;cmd_isp_request;
+
+    req-&gt;req_header.cq_entry_type = CQ_TYPE_REQUEST;
+    req-&gt;req_header.cq_entry_count = 1;
+    req-&gt;req_header.cq_flags        = 0;
+    req-&gt;req_header.cq_seqno = 0;
+    req-&gt;req_reserved = 0;
+    req-&gt;req_token = (opaque_t)sp;
+    req-&gt;req_target = TGT(sp);
+    req-&gt;req_lun_trn = LUN(sp);
+    req-&gt;req_time = pkt-&gt;pkt_time;
+    ISP_SET_PKT_FLAGS(pkt-&gt;pkt_flags, req-&gt;req_flags);
+    /*
+     * Set up data segments for dma transfers.
+     */
+    if (sp-&gt;cmd_flags &amp; CFLAG_DMAVALID) {
+        if (sp-&gt;cmd_flags &amp; CFLAG_CMDIOPB) {
+            (void) ddi_dma_sync(sp-&gt;cmd_dmahandle,
+            sp-&gt;cmd_dma_offset, sp-&gt;cmd_dma_len,
+            DDI_DMA_SYNC_FORDEV);
+        }
+
+        ASSERT(sp-&gt;cmd_cookiecnt &gt; 0 &amp;&amp;
+            sp-&gt;cmd_cookiecnt &lt;= ISP_NDATASEGS);
+
+        xfercount = 0;
+        req-&gt;req_seg_count = sp-&gt;cmd_cookiecnt;
+        for (i = 0; i &lt; sp-&gt;cmd_cookiecnt; i++) {
+            req-&gt;req_dataseg[i].d_count =
+            sp-&gt;cmd_dmacookies[i].dmac_size;
+            req-&gt;req_dataseg[i].d_base =
+            sp-&gt;cmd_dmacookies[i].dmac_address;
+            xfercount +=
+            sp-&gt;cmd_dmacookies[i].dmac_size;
+        }
+
+        for (; i &lt; ISP_NDATASEGS; i++) {
+            req-&gt;req_dataseg[i].d_count = 0;
+            req-&gt;req_dataseg[i].d_base = 0;
+        }
+
+        pkt-&gt;pkt_resid = xfercount;
+
+        if (sp-&gt;cmd_flags &amp; CFLAG_DMASEND) {
+            req-&gt;req_flags |= ISP_REQ_FLAG_DATA_WRITE;
+        } else {
+            req-&gt;req_flags |= ISP_REQ_FLAG_DATA_READ;
+        }
+    } else {
+        req-&gt;req_seg_count = 0;
+        req-&gt;req_dataseg[0].d_count = 0;
+    }
+    /*
+     * Set up cdb in the request
+     */
+    req-&gt;req_cdblen = sp-&gt;cmd_cdblen;
+    bcopy((caddr_t)pkt-&gt;pkt_cdbp, (caddr_t)req-&gt;req_cdb,
+    sp-&gt;cmd_cdblen);
+    /*
+     * Start the cmd.  If NO_INTR, must poll for cmd completion.
+     */
+    if ((pkt-&gt;pkt_flags &amp; FLAG_NOINTR) == 0) {
+        mutex_enter(ISP_REQ_MUTEX(isp));
+        rval = isp_i_start_cmd(isp, sp);
+        mutex_exit(ISP_REQ_MUTEX(isp));
+    } else {
+        rval = isp_i_polled_cmd_start(isp, sp);
+    }
+    return (rval);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-75"><title>Interrupt Handler and Command Completion</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>interrupt handling</secondary></indexterm>The interrupt handler must check the status of the device to be
+sure the device is generating the interrupt in question. The interrupt handler
+must also check for any errors that have occurred and service any interrupts
+generated by the device.</para><para>If data is transferred, the hardware should be checked to determine
+how much data was actually transferred. The <structfield>pkt_resid</structfield> field
+in the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+should be set to the residual of the transfer.</para><para>Commands that are marked with the <literal>PKT_CONSISTENT</literal> flag
+when DMA resources are allocated through  <olink targetdoc="refman9e" targetptr="tran-init-pkt-9e" remap="external"><citerefentry><refentrytitle>tran_init_pkt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> take special handling. The
+HBA driver must ensure that the data transfer for the command is correctly
+synchronized before the target driver's command completion callback is performed.</para><para>Once a command has completed, you need to act on two requirements:</para><itemizedlist><listitem><para>If a new command is queued up, start the command on the hardware
+as quickly as possible.</para>
+</listitem><listitem><para>Call the command completion callback. The callback has been
+set up in the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+by the target driver to notify the target driver when the command is complete.</para>
+</listitem>
+</itemizedlist><para>Start a new command on the hardware, if possible, before calling the <literal>PKT_COMP</literal> command completion callback. The command completion handling
+can take considerable time. Typically, the target driver calls functions such
+as  <olink targetdoc="refman9f" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and
+possibly  <olink targetdoc="refman9f" targetptr="scsi-transport-9f" remap="external"><citerefentry><refentrytitle>scsi_transport</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to begin a new command.</para><para>The interrupt handler must return <returnvalue>DDI_INTR_CLAIMED</returnvalue> if
+this interrupt is claimed by this driver. Otherwise, the handler returns <returnvalue>DDI_INTR_UNCLAIMED</returnvalue>.</para><para>The following example shows an interrupt handler for the SCSI HBA <filename>isp</filename> driver. The <structfield>caddr_t</structfield> parameter is
+set up when the interrupt handler is added in  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. This parameter is typically
+a pointer to the state structure, which is allocated on a per instance basis.</para><example id="scsihba-ex-76"><title>HBA Driver Interrupt Handler</title><programlisting>static u_int
+isp_intr(caddr_t arg)
+{
+    struct isp_cmd         *sp;
+    struct isp_cmd         *head, *tail;
+    u_short                response_in;
+    struct isp_response    *resp;
+    struct isp             *isp = (struct isp *)arg;
+    struct isp_slot        *isp_slot;
+    int                    n;
+
+    if (ISP_INT_PENDING(isp) == 0) {
+        return (DDI_INTR_UNCLAIMED);
+    }
+
+    do {
+again:
+        /*
+         * head list collects completed packets for callback later
+         */
+        head = tail = NULL;
+        /*
+         * Assume no mailbox events (e.g., mailbox cmds, asynch
+         * events, and isp dma errors) as common case.
+         */
+        if (ISP_CHECK_SEMAPHORE_LOCK(isp) == 0) {
+            mutex_enter(ISP_RESP_MUTEX(isp));
+            /*
+             * Loop through completion response queue and post
+             * completed pkts.  Check response queue again
+             * afterwards in case there are more.
+             */
+            isp-&gt;isp_response_in =
+            response_in = ISP_GET_RESPONSE_IN(isp);
+            /*
+             * Calculate the number of requests in the queue
+             */
+            n = response_in - isp-&gt;isp_response_out;
+            if (n &lt; 0) {
+                n = ISP_MAX_REQUESTS -
+                isp-&gt;isp_response_out + response_in;
+            }
+            while (n-- &gt; 0) {
+                ISP_GET_NEXT_RESPONSE_OUT(isp, resp);
+                sp = (struct isp_cmd *)resp-&gt;resp_token;
+                /*
+                 * Copy over response packet in sp
+                 */
+                isp_i_get_response(isp, resp, sp);
+            }
+            if (head) {
+                tail-&gt;cmd_forw = sp;
+                tail = sp;
+                tail-&gt;cmd_forw = NULL;
+            } else {
+                tail = head = sp;
+                sp-&gt;cmd_forw = NULL;
+            }
+            ISP_SET_RESPONSE_OUT(isp);
+            ISP_CLEAR_RISC_INT(isp);
+            mutex_exit(ISP_RESP_MUTEX(isp));
+
+            if (head) {
+                isp_i_call_pkt_comp(isp, head);
+            }
+        } else {
+            if (isp_i_handle_mbox_cmd(isp) != ISP_AEN_SUCCESS) {
+                return (DDI_INTR_CLAIMED);
+            }
+            /*
+             * if there was a reset then check the response
+             * queue again
+             */
+            goto again;    
+        }
+
+    } while (ISP_INT_PENDING(isp));
+
+    return (DDI_INTR_CLAIMED);
+}
+
+static void
+isp_i_call_pkt_comp(
+    struct isp             *isp,
+    struct isp_cmd         *head)
+{
+    struct isp             *isp;
+    struct isp_cmd         *sp;
+    struct scsi_pkt        *pkt;
+    struct isp_response    *resp;
+    u_char                 status;
+
+    while (head) {
+        sp = head;
+        pkt = sp-&gt;cmd_pkt;
+        head = sp-&gt;cmd_forw;
+
+        ASSERT(sp-&gt;cmd_flags &amp; CFLAG_FINISHED);
+
+        resp = &amp;sp-&gt;cmd_isp_response;
+
+        pkt-&gt;pkt_scbp[0] = (u_char)resp-&gt;resp_scb;
+        pkt-&gt;pkt_state = ISP_GET_PKT_STATE(resp-&gt;resp_state);
+        pkt-&gt;pkt_statistics = (u_long)
+            ISP_GET_PKT_STATS(resp-&gt;resp_status_flags);
+        pkt-&gt;pkt_resid = (long)resp-&gt;resp_resid;
+        /*
+         * If data was xferred and this is a consistent pkt,
+         * do a dma sync
+         */
+        if ((sp-&gt;cmd_flags &amp; CFLAG_CMDIOPB) &amp;&amp;
+            (pkt-&gt;pkt_state &amp; STATE_XFERRED_DATA)) {
+                (void) ddi_dma_sync(sp-&gt;cmd_dmahandle,
+                sp-&gt;cmd_dma_offset, sp-&gt;cmd_dma_len,
+                DDI_DMA_SYNC_FORCPU);
+        }
+
+        sp-&gt;cmd_flags = (sp-&gt;cmd_flags &amp; ~CFLAG_IN_TRANSPORT) |
+            CFLAG_COMPLETED;
+        /*
+         * Call packet completion routine if FLAG_NOINTR is not set.
+         */
+        if (((pkt-&gt;pkt_flags &amp; FLAG_NOINTR) == 0) &amp;&amp;
+            pkt-&gt;pkt_comp) {
+                (*pkt-&gt;pkt_comp)(pkt);
+        }
+    }
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-77"><title>Timeout Handler</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>command timeout</secondary></indexterm>The HBA driver is responsible for enforcing time outs. A command
+must be complete within a specified time unless a zero time out has been specified
+in the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para><para>When a command times out, the HBA driver should mark the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> with <literal>pkt_reason</literal> set to <literal>CMD_TIMEOUT</literal> and <literal>pkt_statistics</literal> OR'd
+with <literal>STAT_TIMEOUT</literal>. The HBA driver should also attempt to
+recover the target and bus. If this recovery can be performed successfully,
+the driver should mark the <olink targetdoc="refman9s" targetptr="scsi-pkt-9s" remap="external"><citerefentry><refentrytitle>scsi_pkt</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> using <literal>pkt_statistics</literal> OR'd with either <literal>STAT_BUS_RESET</literal> or <literal>STAT_DEV_RESET</literal>.</para><para>After the recovery attempt has completed, the HBA driver should call
+the command completion callback.</para><note><para>If recovery was unsuccessful or not attempted, the target driver
+might attempt to recover from the timeout by calling  <olink targetdoc="refman9f" targetptr="scsi-reset-9f" remap="external"><citerefentry><refentrytitle>scsi_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</note><para>The ISP hardware manages command timeout directly and returns timed-out
+commands with the necessary status. The timeout handler for the <filename>isp</filename> sample
+driver checks active commands for the time out state only once every 60 seconds.</para><para>The <filename>isp</filename> sample driver uses the  <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> facility to arrange for the
+kernel to call the timeout handler every 60 seconds. The <literal>caddr_t</literal> argument
+is the parameter set up when the timeout is initialized at  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time. In this case, the <literal>caddr_t</literal> argument is a pointer to the state structure allocated per
+driver instance.</para><para>If timed-out commands have not been returned as timed-out by the ISP
+hardware, a problem has occurred. The hardware is not functioning correctly
+and needs to be reset.</para>
+</sect3>
+</sect2><sect2 id="scsihba-78"><title>Capability Management</title><para>The following sections discuss capability management.</para><sect3 id="scsihba-79"><title><function>tran_getcap</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>capability management</secondary></indexterm><indexterm><primary><function>tran_getcap</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_getcap</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-getcap-9e" remap="external"><citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a SCSI HBA
+driver is called by  <olink targetdoc="refman9f" targetptr="scsi-ifgetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifgetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The target driver calls <function>scsi_ifgetcap</function> to
+determine the current value of one of a set of SCSA-defined capabilities.</para><para>The target driver can request the current setting of the capability
+for a particular target by setting the <literal>whom</literal> parameter to
+nonzero. A <literal>whom</literal> value of zero indicates a request for the
+current setting of the general capability for the SCSI bus or for adapter
+hardware.</para><para>The <function>tran_getcap</function> entry point should return <literal>-1</literal> for
+undefined capabilities or the current value of the requested capability.</para><para><indexterm><primary><literal>scsi_hba_</literal> functions</primary><secondary><function>scsi_hba_lookup_capstr</function> function</secondary></indexterm>The HBA driver can use the function  <olink targetdoc="refman9f" targetptr="scsi-hba-lookup-capstr-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_lookup_capstr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to compare
+the capability string against the canonical set of defined capabilities.</para><example id="scsihba-ex-80"><title>HBA Driver <citerefentry><refentrytitle>tran_getcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static int
+isp_scsi_getcap(
+    struct scsi_address    *ap,
+    char                   *cap,
+    int                    whom)
+{
+    struct isp             *isp;
+    int                    rval = 0;
+    u_char                 tgt = ap-&gt;a_target;
+    /*
+      * We don't allow getting capabilities for other targets
+    */
+    if (cap == NULL || whom  == 0) {
+        return (-1);
+    }
+    isp = (struct isp *)ap-&gt;a_hba_tran-&gt;tran_hba_private;
+    ISP_MUTEX_ENTER(isp);
+
+    switch (scsi_hba_lookup_capstr(cap)) {
+      case SCSI_CAP_DMA_MAX:
+          rval = 1 &lt;&lt; 24; /* Limit to 16MB max transfer */
+          break;
+      case SCSI_CAP_MSG_OUT:
+          rval = 1;
+          break;
+      case SCSI_CAP_DISCONNECT:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_DR) == 0) {
+              break;
+          } else if (
+              (isp-&gt;isp_cap[tgt] &amp; ISP_CAP_DISCONNECT) == 0) {
+                  break;
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_SYNCHRONOUS:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_SYNC) == 0) {
+              break;
+          } else if (
+              (isp-&gt;isp_cap[tgt] &amp; ISP_CAP_SYNC) == 0) {
+                  break;
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_WIDE_XFER:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_WIDE) == 0) {
+              break;
+          } else if (
+              (isp-&gt;isp_cap[tgt] &amp; ISP_CAP_WIDE) == 0) {
+                  break;
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_TAGGED_QING:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_DR) == 0 ||
+            (isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_TAG) == 0) {
+              break;
+          } else if (
+              (isp-&gt;isp_cap[tgt] &amp; ISP_CAP_TAG) == 0) {
+                  break;
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_UNTAGGED_QING:
+          rval = 1;
+          break;
+      case SCSI_CAP_PARITY:
+          if (isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_PARITY) {
+              rval = 1;
+          }
+          break;
+      case SCSI_CAP_INITIATOR_ID:
+          rval = isp-&gt;isp_initiator_id;
+          break;
+      case SCSI_CAP_ARQ:
+          if (isp-&gt;isp_cap[tgt] &amp; ISP_CAP_AUTOSENSE) {
+              rval = 1;
+          }
+          break;
+      case SCSI_CAP_LINKED_CMDS:
+          break;
+      case SCSI_CAP_RESET_NOTIFICATION:
+         rval = 1;
+          break;
+      case SCSI_CAP_GEOMETRY:
+          rval = (64 &lt;&lt; 16) | 32;
+          break;
+      default:
+          rval = -1;
+          break;
+    }
+    ISP_MUTEX_EXIT(isp);
+    return (rval);
+}</programlisting>
+</example>
+</sect3><sect3 id="scsihba-81"><title><function>tran_setcap</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_setcap</function> function</secondary></indexterm><indexterm><primary><function>tran_setcap</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-setcap-9e" remap="external"><citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a SCSI HBA driver is called by  <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. A target
+driver calls <function>scsi_ifsetcap</function> to change the current one
+of a set of SCSA-defined capabilities.</para><para>The target driver might request that the new value be set for a particular
+target by setting the <literal>whom</literal> parameter to nonzero. A <literal>whom</literal> value of zero means the request is to set the new value for the
+SCSI bus or for adapter hardware in general.</para><para><function>tran_setcap</function> should return the following values
+as appropriate:</para><itemizedlist><listitem><para><literal>-1</literal> for undefined capabilities</para>
+</listitem><listitem><para><literal>0</literal> if the HBA driver cannot set the capability
+to the requested value</para>
+</listitem><listitem><para><literal>1</literal> if the HBA driver is able to set the
+capability to the requested value</para>
+</listitem>
+</itemizedlist><para>The HBA driver can use the function  <olink targetdoc="refman9f" targetptr="scsi-hba-lookup-capstr-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_lookup_capstr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to compare
+the capability string against the canonical set of defined capabilities. </para><example id="scsihba-ex-82"><title>HBA Driver <citerefentry><refentrytitle>tran_setcap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>static int
+isp_scsi_setcap(
+    struct scsi_address    *ap,
+    char                   *cap,
+    int                    value,
+    int                    whom)
+{
+    struct isp             *isp;
+    int                    rval = 0;
+    u_char                 tgt = ap-&gt;a_target;
+    int                    update_isp = 0;
+    /*
+     * We don't allow setting capabilities for other targets
+     */
+    if (cap == NULL || whom == 0) {
+        return (-1);
+    }
+
+    isp = (struct isp *)ap-&gt;a_hba_tran-&gt;tran_hba_private;
+    ISP_MUTEX_ENTER(isp);
+
+    switch (scsi_hba_lookup_capstr(cap)) {
+      case SCSI_CAP_DMA_MAX:
+      case SCSI_CAP_MSG_OUT:
+      case SCSI_CAP_PARITY:
+      case SCSI_CAP_UNTAGGED_QING:
+      case SCSI_CAP_LINKED_CMDS:
+      case SCSI_CAP_RESET_NOTIFICATION:
+          /*
+           * None of these are settable through
+           * the capability interface.
+           */
+          break;
+      case SCSI_CAP_DISCONNECT:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_DR) == 0) {
+                break;
+          } else {
+              if (value) {
+                  isp-&gt;isp_cap[tgt] |= ISP_CAP_DISCONNECT;
+              } else {
+                isp-&gt;isp_cap[tgt] &amp;= ~ISP_CAP_DISCONNECT;
+              }
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_SYNCHRONOUS:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_SYNC) == 0) {
+                break;
+          } else {
+              if (value) {
+                  isp-&gt;isp_cap[tgt] |= ISP_CAP_SYNC;
+              } else {
+                  isp-&gt;isp_cap[tgt] &amp;= ~ISP_CAP_SYNC;
+              }
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_TAGGED_QING:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_DR) == 0 ||
+            (isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_TAG) == 0) {
+                break;
+          } else {
+              if (value) {
+                  isp-&gt;isp_cap[tgt] |= ISP_CAP_TAG;
+              } else {
+                  isp-&gt;isp_cap[tgt] &amp;= ~ISP_CAP_TAG;
+              }
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_WIDE_XFER:
+          if ((isp-&gt;isp_target_scsi_options[tgt] &amp;
+            SCSI_OPTIONS_WIDE) == 0) {
+                break;
+          } else {
+              if (value) {
+                  isp-&gt;isp_cap[tgt] |= ISP_CAP_WIDE;
+              } else {
+                  isp-&gt;isp_cap[tgt] &amp;= ~ISP_CAP_WIDE;
+              }
+          }
+          rval = 1;
+          break;
+      case SCSI_CAP_INITIATOR_ID:
+          if (value &lt; N_ISP_TARGETS_WIDE) {
+              struct isp_mbox_cmd mbox_cmd;
+              isp-&gt;isp_initiator_id = (u_short) value;
+              /*
+               * set Initiator SCSI ID
+               */
+              isp_i_mbox_cmd_init(isp, &amp;mbox_cmd, 2, 2,
+                ISP_MBOX_CMD_SET_SCSI_ID,
+                isp-&gt;isp_initiator_id,
+                0, 0, 0, 0);
+              if (isp_i_mbox_cmd_start(isp, &amp;mbox_cmd) == 0) {
+                  rval = 1;
+              }
+          }
+          break;
+      case SCSI_CAP_ARQ:
+          if (value) {
+              isp-&gt;isp_cap[tgt] |= ISP_CAP_AUTOSENSE;
+          } else {
+              isp-&gt;isp_cap[tgt] &amp;= ~ISP_CAP_AUTOSENSE;
+          }
+          rval = 1;
+          break;
+      default:
+          rval = -1;
+          break;
+    }
+    ISP_MUTEX_EXIT(isp);
+    return (rval);
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="scsihba-83"><title>Abort and Reset Management</title><para>The following sections discuss the abort and reset entry points for
+SCSI HBA.</para><sect3 id="scsihba-84"><title><function>tran_abort</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>abort and reset management</secondary></indexterm><indexterm><primary><function>tran_abort</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_abort</function> function</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-abort-9e" remap="external"><citerefentry><refentrytitle>tran_abort</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a SCSI HBA driver is called to abort
+any commands that are currently in transport for a particular target. This
+entry point is called when a target driver calls <olink targetdoc="refman9f" targetptr="scsi-abort-9f" remap="external"><citerefentry><refentrytitle>scsi_abort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The <function>tran_abort</function> entry point should attempt to abort
+the command denoted by the <literal>pkt</literal> parameter. If the <literal>pkt</literal> parameter
+is <literal>NULL</literal>, <function>tran_abort</function> should attempt
+to abort all outstanding commands in the transport layer for the particular
+target or logical unit.</para><para>Each command successfully aborted must be marked with <literal>pkt_reason</literal> <literal>CMD_ABORTED</literal> and <literal>pkt_statistics</literal> OR'd with <literal>STAT_ABORTED</literal>.</para>
+</sect3><sect3 id="scsihba-85"><title><function>tran_reset</function> Entry Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_reset</function> function</secondary></indexterm><indexterm><primary><function>tran_reset</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>The <olink targetdoc="refman9e" targetptr="tran-reset-9e" remap="external"><citerefentry><refentrytitle>tran_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a SCSI HBA driver is called to reset
+either the SCSI bus or a particular SCSI target device. This entry point is
+called when a target driver calls  <olink targetdoc="refman9f" targetptr="scsi-reset-9f" remap="external"><citerefentry><refentrytitle>scsi_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The <function>tran_reset</function> entry point must reset the SCSI
+bus if level is <literal>RESET_ALL</literal>. If level is <literal>RESET_TARGET</literal>,
+just the particular target or logical unit must be reset.</para><para>Active commands affected by the reset must be marked with <literal>pkt_reason</literal> <literal>CMD_RESET</literal>. The type of reset determines whether <literal>STAT_BUS_RESET</literal> or <literal>STAT_DEV_RESET</literal> should be used
+to OR <literal>pkt_statistics</literal>.</para><para>Commands in the transport layer, but not yet active on the target, must
+be marked with <literal>pkt_reason</literal> <literal>CMD_RESET</literal>,
+and <literal>pkt_statistics</literal> OR'd with <literal>STAT_ABORTED</literal>.</para>
+</sect3><sect3 id="scsihba-9"><title><function>tran_bus_reset</function> Entry Point</title><para><olink targetdoc="refman9e" targetptr="tran-bus-reset-9e" remap="external"><citerefentry><refentrytitle>tran_bus_reset</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must reset the SCSI bus without resetting targets.</para><programlisting>#include &lt;sys/scsi/scsi.h&gt;
+
+int tran_bus_reset(dev_info_t <replaceable>*hba-dip</replaceable>, int <replaceable>level</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>*hba-dip</replaceable></term><listitem><para>Pointer associated with the SCSI HBA</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>level</replaceable></term><listitem><para>Must be set to <literal>RESET_BUS</literal> so that only the
+SCSI bus is reset, not the targets</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <function>tran_bus_reset</function> vector in the  <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+should be initialized during the HBA driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. The vector should point
+to an HBA entry point that is to be called when a user initiates a bus reset.</para><para>Implementation is hardware specific. If the HBA driver cannot reset
+the SCSI bus without affecting the targets, the driver should fail <literal>RESET_BUS</literal> or not initialize this vector.</para>
+</sect3><sect3 id="scsihba-86"><title><function>tran_reset_notify</function> Entry
+Point</title><para><indexterm><primary>SCSI HBA driver entry points</primary><secondary><function>tran_reset_notify</function> function</secondary></indexterm><indexterm><primary><function>tran_reset_notify</function> entry point</primary><secondary>SCSI HBA drivers</secondary></indexterm>Use the <olink targetdoc="refman9e" targetptr="tran-reset-notify-9e" remap="external"><citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point when a SCSI bus
+reset occurs. This function requests the SCSI HBA driver to notify the target
+driver by callback.</para><example id="scsihba-ex-87"><title>HBA Driver <citerefentry><refentrytitle>tran_reset_notify</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point</title><programlisting>isp_scsi_reset_notify(
+    struct scsi_address    *ap,
+    int                    flag,
+    void                   (*callback)(caddr_t),
+    caddr_t                arg)
+{
+    struct isp                       *isp;
+    struct isp_reset_notify_entry    *p, *beforep;
+    int                              rval = DDI_FAILURE;
+
+    isp = (struct isp *)ap-&gt;a_hba_tran-&gt;tran_hba_private;
+    mutex_enter(ISP_REQ_MUTEX(isp));
+    /*
+     * Try to find an existing entry for this target
+     */
+    p = isp-&gt;isp_reset_notify_listf;
+    beforep = NULL;
+
+    while (p) {
+        if (p-&gt;ap == ap)
+            break;
+        beforep = p;
+        p = p-&gt;next;
+    }
+
+    if ((flag &amp; SCSI_RESET_CANCEL) &amp;&amp; (p != NULL)) {
+        if (beforep == NULL) {
+            isp-&gt;isp_reset_notify_listf = p-&gt;next;
+        } else {
+            beforep-&gt;next = p-&gt;next;
+        }
+        kmem_free((caddr_t)p, sizeof (struct isp_reset_notify_entry));
+        rval = DDI_SUCCESS;
+    } else if ((flag &amp; SCSI_RESET_NOTIFY) &amp;&amp; (p == NULL)) {
+        p = kmem_zalloc(sizeof (struct isp_reset_notify_entry),
+          KM_SLEEP);
+        p-&gt;ap = ap;
+        p-&gt;callback = callback;
+        p-&gt;arg = arg;
+        p-&gt;next = isp-&gt;isp_reset_notify_listf;
+        isp-&gt;isp_reset_notify_listf = p;
+        rval = DDI_SUCCESS;
+    }
+    mutex_exit(ISP_REQ_MUTEX(isp));
+    return (rval);
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="scsihba-96"><title>Dynamic Reconfiguration</title><indexterm><primary>SCSI HBA driver</primary><secondary sortas="hotplug">and hotplugging</secondary>
+</indexterm><indexterm><primary>hotplugging</primary><secondary>and SCSI HBA driver</secondary>
+</indexterm><para>To support the minimal set of hot-plugging operations, drivers might
+need to implement support for bus <emphasis>quiesce</emphasis>, bus <emphasis>unquiesce</emphasis>, and bus <emphasis>reset</emphasis>. The <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure supports these
+operations. If quiesce, unquiesce, or reset are not required by hardware,
+no driver changes are needed.</para><para>The <structname>scsi_hba_tran</structname> structure includes the following
+fields:</para><programlisting>int (*tran_quiesce)(dev_info_t *<replaceable>hba-dip</replaceable>);
+int (*tran_unquiesce)(dev_info_t *<replaceable>hba-dip</replaceable>);
+int (*tran_bus_reset)(dev_info_t *<replaceable>hba-dip</replaceable>, int <replaceable>level</replaceable>);</programlisting><para>These interfaces quiesce and unquiesce a SCSI bus.</para><programlisting>#include &lt;sys/scsi/scsi.h&gt;
+
+int prefixtran_quiesce(dev_info_t *<replaceable>hba-dip</replaceable>);
+int prefixtran_unquiesce(dev_info_t *<replaceable>hba-dip</replaceable>);</programlisting><para><olink targetdoc="refman9e" targetptr="tran-quiesce-9e" remap="external"><citerefentry><refentrytitle>tran_quiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="refman9e" targetptr="tran-unquiesce-9e" remap="external"><citerefentry><refentrytitle>tran_unquiesce</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> are used for SCSI devices
+that are not designed for hot-plugging. These functions must be implemented
+by an HBA driver to support dynamic reconfiguration (DR).</para><para>The <function>tran_quiesce</function> and <function>tran_unquiesce</function> vectors
+in the <olink targetdoc="refman9s" targetptr="scsi-hba-tran-9s" remap="external"><citerefentry><refentrytitle>scsi_hba_tran</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure should be initialized to point to HBA entry
+points during <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+These functions are called when a user initiates quiesce and unquiesce operations.</para><para>The <function>tran_quiesce</function> entry point stops all activity
+on a SCSI bus prior to and during the reconfiguration of devices that are
+ attached to the SCSI bus.  The <function>tran_unquiesce</function> entry
+point is called by the SCSA framework to resume activity on the SCSI bus after
+the reconfiguration operation has been completed.</para><para>HBA drivers are required to handle <function>tran_quiesce</function> by
+waiting for all outstanding commands to complete before returning success.
+ After the driver has quiesced the bus, any new I/O requests must be queued
+until the SCSA framework calls the corresponding <function>tran_unquiesce</function> entry
+point.</para><para>HBA drivers handle calls to <function>tran_unquiesce</function> by starting
+any target driver I/O requests in the queue.</para>
+</sect2>
+</sect1><sect1 id="scsihba-88"><title>SCSI HBA Driver Specific Issues</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>installation</secondary></indexterm>The section covers issues specific to SCSI HBA drivers.</para><sect2 id="scsihba-89"><title>Installing HBA Drivers</title><para>A SCSI HBA driver is installed in similar fashion to a leaf driver.
+See <olink targetptr="loading-15035" remap="internal">Chapter&nbsp;21, Compiling, Loading,
+Packaging, and Testing Drivers</olink>. The difference is that the <olink targetdoc="refman1m" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command must specify the
+driver class as SCSI, such as:</para><programlisting># add_drv -m" * 0666 root root" -i'"pci1077,1020"' -c scsi isp</programlisting>
+</sect2><sect2 id="scsihba-90"><title>HBA Configuration Properties</title><para><indexterm><primary>SCSI HBA driver</primary><secondary>configuration properties</secondary></indexterm><indexterm><primary><literal>scsi_hba_</literal> functions</primary><secondary><function>scsi_hba_attach_setup</function> function</secondary></indexterm>When attaching an instance of an HBA device,  <olink targetdoc="refman9f" targetptr="scsi-hba-attach-setup-9f" remap="external"><citerefentry><refentrytitle>scsi_hba_attach_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> creates a number of SCSI configuration properties
+for that HBA instance. A particular property is created only if no existing
+property of the same name is already attached to the HBA instance. This restriction
+avoids overriding any default property values in an HBA configuration file.</para><para><indexterm><primary>properties</primary><secondary>SCSI HBA properties</secondary></indexterm><indexterm><primary><function>ddi_prop_get_int</function> function</primary></indexterm>An HBA driver must use  <olink targetdoc="refman9f" targetptr="ddi-prop-get-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_get_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to retrieve each property.
+The HBA driver then modifies or accepts the default value of the properties
+to configure its specific operation.</para><sect3 id="scsihba-91"><title><literal>scsi-reset-delay</literal> Property</title><para>The <literal>scsi-reset-delay</literal> property is an integer specifying
+the recovery time in milliseconds for a reset delay by either a SCSI bus or
+SCSI device.</para>
+</sect3><sect3 id="scsihba-92"><title><literal>scsi-options</literal> Property</title><para>The <literal>scsi-options</literal> property is an integer specifying
+a number of options through individually defined bits:</para><itemizedlist><listitem><para><literal>SCSI_OPTIONS_DR (0x008)</literal> &ndash;  If not
+set, the HBA should not grant disconnect privileges to a target device.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_LINK (0x010)</literal> &ndash;  If not
+set, the HBA should not enable linked commands.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_SYNC (0x020)</literal> &ndash; If not
+set, the HBA driver must not negotiate synchronous data transfer. The driver
+should reject any attempt to negotiate synchronous data transfer initiated
+by a target.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_PARITY (0x040)</literal> &ndash; If
+not set, the HBA should run the SCSI bus without parity.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_TAG (0x080)</literal> &ndash; If not
+set, the HBA should not operate in Command Tagged Queuing mode.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_FAST (0x100)</literal> &ndash; If not
+set, the HBA should not operate the bus in FAST SCSI mode.</para>
+</listitem><listitem><para><literal>SCSI_OPTIONS_WIDE (0x200)</literal> &ndash; If not
+set, the HBA should not operate the bus in WIDE SCSI mode.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="scsihba-93"><title>Per-Target <literal>scsi-options</literal></title><para>An HBA driver might support a per-target <literal>scsi</literal>-<literal>options</literal> feature in the following format:</para><programlisting>target&lt;n&gt;-scsi-options=&lt;hex value&gt;</programlisting><para>In this example, &lt; <emphasis>n</emphasis>&gt; is the target ID. If the
+per-target <literal>scsi-options</literal> property is defined, the HBA driver
+uses that value  rather than the per-HBA driver instance <literal>scsi-options</literal> property.
+This approach can provide more precise control if, for example, synchronous
+data transfer needs to be disabled for just one particular target device.
+The per-target <literal>scsi-options</literal> property can be defined in
+the <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file.</para><para>The following example shows a per-target <literal>scsi-options</literal> property
+definition to disable synchronous data transfer for target device 3:</para><programlisting>target3-scsi-options=0x2d8</programlisting>
+</sect3>
+</sect2><sect2 id="scsihba-94"><title>x86 Target Driver Configuration Properties</title><para><indexterm><primary>SCSI target driver</primary><secondary>properties</secondary></indexterm><indexterm><primary>properties</primary><secondary>SCSI target driver</secondary></indexterm>Some x86 SCSI target drivers, such as the driver
+for <literal>cmdk</literal> disk, use the following configuration properties:</para><itemizedlist><listitem><para><literal>disk</literal></para>
+</listitem><listitem><para><literal>queue</literal></para>
+</listitem><listitem><para><literal>flow_control</literal></para>
+</listitem>
+</itemizedlist><para><indexterm><primary>SCSI HBA driver</primary><secondary>properties</secondary></indexterm>If you use the <literal>cmdk</literal> sample driver to write
+an HBA driver for an x86 platform, any appropriate properties must be defined
+in the <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file.</para><note><para>These property definitions should appear only in an HBA driver's <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file. The
+HBA driver itself should not inspect or attempt to interpret these properties
+in any way. These properties are advisory only and serve as an adjunct to
+the <literal>cmdk</literal> driver. The properties should not be relied upon
+in any way. The property definitions might not be used in future releases.</para>
+</note><para>The <literal>disk</literal> property can be used to define the type
+of disk supported by <literal>cmdk</literal>. For a SCSI HBA, the only possible
+value for the <literal>disk</literal> property is:</para><itemizedlist><listitem><para><literal>disk="scdk"</literal> &ndash; Disk type is a SCSI
+disk</para>
+</listitem>
+</itemizedlist><para>The <literal>queue</literal> property defines how the disk driver sorts
+the queue of incoming requests during  <olink targetdoc="refman9e" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. Two values are possible:</para><itemizedlist><listitem><para><literal>queue="qsort"</literal> &ndash; One-way elevator
+queuing model, provided by  <olink targetdoc="refman9f" targetptr="disksort-9f" remap="external"><citerefentry><refentrytitle>disksort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><literal>queue="qfifo"</literal> &ndash; FIFO, that is, first
+in, first out queuing model</para>
+</listitem>
+</itemizedlist><para>The <literal>flow_control</literal> property defines how commands are
+transported to the HBA driver. Three values are possible:</para><itemizedlist><listitem><para><literal>flow_control="dsngl"</literal> &ndash; Single command
+per HBA driver</para>
+</listitem><listitem><para><literal>flow_control="dmult"</literal> &ndash; Multiple commands
+per HBA driver. When the HBA queue is full, the driver returns <returnvalue>TRAN_BUSY</returnvalue>.</para>
+</listitem><listitem><para><literal>flow_control="duplx"</literal> &ndash; The HBA can
+support separate read and write queues, with multiple commands per queue.
+FIFO ordering is used for the write queue. The queuing model that is used
+for the read queue is described by the <emphasis>queue</emphasis> property.
+When an HBA queue is full, the driver returns <returnvalue>TRAN_BUSY</returnvalue></para>
+</listitem>
+</itemizedlist><para>The following example is a <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file for use with an x86 HBA
+PCI device that has been designed for use with the <literal>cmdk</literal> sample
+driver:</para><programlisting>#
+# config file for ISP 1020 SCSI HBA driver     
+#
+       flow_control="dsngl" queue="qsort" disk="scdk"
+       scsi-initiator-id=7;</programlisting>
+</sect2>
+</sect1><sect1 id="scsihba-100"><title>Support for Queuing</title><para><indexterm><primary>queuing</primary></indexterm><indexterm><primary>tagged queuing</primary></indexterm>For a definition of <emphasis>tagged queuing</emphasis>,
+refer to the SCSI-2 specification. To support tagged queuing, first check
+the <replaceable>scsi_options</replaceable> flag <literal>SCSI_OPTIONS_TAG</literal> to
+see whether tagged queuing is enabled globally. Next, check to see whether
+the target is a SCSI-2 device and whether the target has tagged queuing enabled.
+If these conditions are all true, attempt to enable tagged queuing by using <olink targetdoc="refman9f" targetptr="scsi-ifsetcap-9f" remap="external"><citerefentry><refentrytitle>scsi_ifsetcap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm><primary>untagged queuing</primary></indexterm>If tagged
+queuing fails, you can attempt to set <emphasis>untagged queuing</emphasis>.
+In this mode, you submit as many commands as you think necessary or optimal
+to the host adapter driver. Then the host adapter queues the commands to the
+target one command at a time, in contrast to tagged queuing. In tagged queuing,
+ the host adapter submits as many commands as possible until the target indicates
+that the queue is full.</para>
+</sect1>
+</chapter><?Pub *0000159307 0?>

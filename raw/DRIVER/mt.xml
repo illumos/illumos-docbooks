@@ -1,0 +1,234 @@
+<?Pub UDT _bookmark _target?><?Pub CX book(title()bookinfo()part(title()partintro()chapter()?><chapter id="mt-17026"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag atict:user user="jstearns" fullname="John Stearns"?><title>Multithreading</title><highlights><para>This chapter describes the locking primitives and thread synchronization mechanisms of the Solaris multithreaded kernel. You should design device drivers to take advantage of multithreading. This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="mt-8" remap="internal">Locking Primitives</olink></para>
+</listitem><listitem><para><olink targetptr="mt-24990" remap="internal">Thread Synchronization</olink></para>
+</listitem><listitem><para><olink targetptr="mt-35265" remap="internal">Choosing a Locking Scheme</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="mt-8"><title>Locking Primitives</title><para><indexterm id="mt-ix183"><primary>threads</primary><secondary>preemption of</secondary></indexterm><indexterm id="mt-ix184"><primary>multithreading</primary><secondary sortas="locking">and locking primitives</secondary></indexterm><indexterm id="mt-ix185"><primary>locking primitives, types of</primary></indexterm>In traditional UNIX systems, every section of kernel code terminates either through an explicit call to <olink targetdoc="refman1" targetptr="sleep-1" remap="external"><citerefentry><refentrytitle>sleep</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to give up the processor or through a hardware
+interrupt. The Solaris OS operates differently. A kernel thread can be preempted at any time to run another thread. Because all kernel threads share kernel address space and often need to read and modify the same data, the kernel provides a number of locking primitives to prevent threads
+from corrupting shared data. These mechanisms include mutual exclusion locks, which are also known as <emphasis>mutexes</emphasis>, readers/writer locks, and semaphores.</para><sect2 id="mt-9"><title>Storage Classes of Driver Data</title><para><indexterm id="mt-ix186"><primary>data storage classes</primary></indexterm><indexterm><primary>storage classes</primary><secondary>driver data</secondary></indexterm>The storage class of data is a guide to whether the driver might need to take explicit steps to control access to the data. The three
+data storage classes are:</para><itemizedlist><listitem><para><emphasis role="strong">Automatic (stack) data</emphasis>. Every thread has a private stack, so drivers never need to lock automatic variables.</para>
+</listitem><listitem><para><emphasis role="strong">Global static data</emphasis>. Global static data can be shared by any number of threads in the driver. The driver might need to lock this type of data at times.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel heap data</emphasis>. Any number of threads in the driver can share kernel heap data, such as data allocated by <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.
+The driver needs to protect shared data at all times.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="mt-10"><title>Mutual-Exclusion Locks</title><indexterm id="mt-ix187"><primary>thread synchronization</primary><secondary>mutex locks</secondary>
+</indexterm><indexterm id="mt-ix188"><primary>mutex</primary><secondary>locks</secondary>
+</indexterm><indexterm><primary>locks</primary><secondary>mutex</secondary>
+</indexterm><indexterm><primary>mutual-exclusion locks</primary><see>mutex</see>
+</indexterm><para><indexterm id="mt-ix189"><primary>mutex</primary><secondary>routines</secondary></indexterm>A mutual-exclusion lock, or <emphasis>mutex</emphasis>, is usually associated with a set of data and regulates access to that data. Mutexes provide a way to allow only one thread at a time access to that
+data. The mutex functions are:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-destroy-9f" remap="external"><citerefentry><refentrytitle>mutex_destroy</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Releases any associated storage.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-enter-9f" remap="external"><citerefentry><refentrytitle>mutex_enter</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Acquires a mutex.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-exit-9f" remap="external"><citerefentry><refentrytitle>mutex_exit</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Releases a mutex.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Initializes a mutex.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-owned-9f" remap="external"><citerefentry><refentrytitle>mutex_owned</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Tests to determine whether the mutex is held by the current thread. To be used in <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> only.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="mutex-tryenter-9f" remap="external"><citerefentry><refentrytitle>mutex_tryenter</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Acquires a mutex if available, but does not block.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect3 id="mt-11"><title>Setting Up Mutexes</title><para><indexterm id="mt-ix190"><primary>thread synchronization</primary><secondary><command>mutex_init</command></secondary></indexterm><indexterm id="mt-ix191"><primary>mutex</primary><secondary>functions</secondary></indexterm>Device drivers usually allocate a mutex for each driver data structure. The
+mutex is typically a field in the structure of type <literal>kmutex_t</literal>. <olink targetdoc="refman9f" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is called to prepare the mutex for use. This call is usually made
+at <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time for per-device mutexes and <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time for global driver mutexes.</para><para>For example,</para><programlisting>struct xxstate *xsp;
+/* ... */
+mutex_init(&amp;xsp-&gt;mu, NULL, MUTEX_DRIVER, NULL);
+/* ... */</programlisting><para>For a more complete example of mutex initialization, see <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink>.</para><para>The driver must destroy the mutex with <olink targetdoc="refman9f" targetptr="mutex-destroy-9f" remap="external"><citerefentry><refentrytitle>mutex_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> before being unloaded. Destroying the mutex is usually done at <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time for per-device mutexes and <olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time for global driver mutexes.</para>
+</sect3><sect3 id="mt-12"><title>Using Mutexes</title><para>Every section of the driver code that needs to read or write the shared data structure must do the following tasks:</para><itemizedlist><listitem><para>Acquire the mutex</para>
+</listitem><listitem><para>Access the data</para>
+</listitem><listitem><para>Release the mutex</para>
+</listitem>
+</itemizedlist><para>The scope of a mutex, that is, the data the mutex protects, is entirely up to the programmer. A mutex protects a data structure only if every code path that accesses the data structure does so while holding the mutex.</para>
+</sect3>
+</sect2><sect2 id="mt-13"><title>Readers/Writer Locks</title><indexterm id="mt-ix192"><primary>thread synchronization</primary><secondary>readers/writer locks</secondary>
+</indexterm><para><indexterm id="mt-ix193"><primary>readers/writer locks</primary></indexterm><indexterm><primary>locks</primary><secondary>readers/writer</secondary></indexterm>A <emphasis>readers/writer lock</emphasis> regulates access to a set of data. The readers/writer lock is so called because many threads
+can hold the lock simultaneously for reading, but only one thread can hold the lock for writing.</para><para>Most device drivers do not use readers/writer locks. These locks are slower than mutexes. The locks provide a performance gain only when they protect commonly read data that is not frequently written. In this case, contention for a mutex could become a bottleneck, so using a readers/writer lock
+might be more efficient. The readers/writer functions are summarized in the following table. See the <olink targetdoc="refman9f" targetptr="rwlock-9f" remap="external"><citerefentry><refentrytitle>rwlock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for detailed information. The readers/writer
+lock functions are:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-destroy-9f" remap="external"><citerefentry><refentrytitle>rw_destroy</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Destroys a readers/writer lock</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-downgrade-9f" remap="external"><citerefentry><refentrytitle>rw_downgrade</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Downgrades a readers/writer lock holder from writer to reader</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-enter-9f" remap="external"><citerefentry><refentrytitle>rw_enter</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Acquires a readers/writer lock</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-exit-9f" remap="external"><citerefentry><refentrytitle>rw_exit</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Releases a readers/writer lock</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-init-9f" remap="external"><citerefentry><refentrytitle>rw_init</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Initializes a readers/writer lock</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-read-locked-9f" remap="external"><citerefentry><refentrytitle>rw_read_locked</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Determines whether a readers/writer lock is held for read or write</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-tryenter-9f" remap="external"><citerefentry><refentrytitle>rw_tryenter</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Attempts to acquire a readers/writer lock without waiting</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="rw-tryupgrade-9f" remap="external"><citerefentry><refentrytitle>rw_tryupgrade</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Attempts to upgrade readers/writer lock holder from reader to writer</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="mt-14"><title>Semaphores</title><para>Counting semaphores are available as an alternative primitive for managing threads within device drivers. See the <olink targetdoc="refman9f" targetptr="semaphore-9f" remap="external"><citerefentry><refentrytitle>semaphore</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for more information.
+The semaphore functions are:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-destroy-9f" remap="external"><citerefentry><refentrytitle>sema_destroy</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Destroys a semaphore.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-init-9f" remap="external"><citerefentry><refentrytitle>sema_init</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Initialize a semaphore.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-p-9f" remap="external"><citerefentry><refentrytitle>sema_p</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Decrement semaphore and possibly block.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-p-sig-9f" remap="external"><citerefentry><refentrytitle>sema_p_sig</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Decrement semaphore but do not block if signal is pending. See <olink targetptr="mt-23" remap="internal">Threads Unable to Receive Signals</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-tryp-9f" remap="external"><citerefentry><refentrytitle>sema_tryp</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Attempt to decrement semaphore, but do not block.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="sema-v-9f" remap="external"><citerefentry><refentrytitle>sema_v</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Increment semaphore and possibly unblock waiter.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="mt-24990"><title>Thread Synchronization</title><para>In addition to protecting shared data, drivers often need to synchronize execution among multiple threads.</para><sect2 id="mt-90140"><title>Condition Variables in Thread Synchronization</title><indexterm id="mt-ix194"><primary>thread synchronization</primary><secondary>condition variables</secondary>
+</indexterm><para><indexterm id="mt-ix195"><primary>condition variables</primary><secondary sortas="mutex">and mutex locks</secondary></indexterm><indexterm id="mt-ix196"><primary>multithreading</primary><secondary>thread synchronization</secondary></indexterm>Condition variables are a standard form of thread synchronization.
+They are designed to be used with mutexes. The associated mutex is used to ensure that a condition can be checked atomically, and that the thread can block on the associated condition variable without missing either a change to the condition or a signal that the condition has changed.</para><para>The <olink targetdoc="refman9f" targetptr="condvar-9f" remap="external"><citerefentry><refentrytitle>condvar</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> functions are:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Signals all threads waiting on the condition variable.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-destroy-9f" remap="external"><citerefentry><refentrytitle>cv_destroy</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Destroys a condition variable.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-init-9f" remap="external"><citerefentry><refentrytitle>cv_init</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Initializes a condition variable.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-signal-9f" remap="external"><citerefentry><refentrytitle>cv_signal</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Signals one thread waiting on the condition variable.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Waits for condition, time-out, or signal. See <olink targetptr="mt-23" remap="internal">Threads Unable to Receive Signals</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-timedwait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait_sig</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Waits for condition or time-out.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Waits for condition.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Waits for condition or return zero on receipt of a signal. See <olink targetptr="mt-23" remap="internal">Threads Unable to Receive Signals</olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect3 id="mt-15"><title>Initializing Condition Variables</title><para><indexterm id="eoqoj"><primary>condition variable functions</primary><secondary><function>cv_destroy</function></secondary></indexterm><indexterm id="eoqoi"><primary>multithreading</primary><secondary sortas="condition">and condition variables</secondary></indexterm><indexterm id="eoqop"><primary>condition variable functions</primary><secondary><function>cv_init</function></secondary></indexterm>Declare a condition variable of type <literal>kcondvar_t</literal> for each condition. Usually, the condition variables are declared in the driver's soft-state structure. Use <olink targetdoc="refman9f" targetptr="cv-init-9f" remap="external"><citerefentry><refentrytitle>cv_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to initialize each condition variable. Similar to mutexes, condition variables are usually initialized at <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> time. A typical example of initializing a condition variable is:</para><programlisting>cv_init(&amp;xsp-&gt;cv, NULL, CV_DRIVER, NULL);</programlisting><para><indexterm id="mt-ix200"><primary>condition variables</primary><secondary>routines</secondary></indexterm>For a more complete example of condition variable initialization, see <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink>.</para>
+</sect3><sect3 id="mt-19"><title>Waiting for the Condition</title><para>To use condition variables, follow these steps in the code path waiting for the condition:</para><orderedlist><listitem><para>Acquire the mutex guarding the condition.</para>
+</listitem><listitem><para>Test the condition.</para>
+</listitem><listitem><para><indexterm id="mt-ix201"><primary>condition variable functions</primary><secondary><function>cv_wait</function></secondary></indexterm>If the
+test results do not allow the thread to continue, use
+<olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>
+to block the current thread on the condition. The
+<olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>
+function releases the mutex before blocking the thread and reacquires the mutex
+before returning. On return from
+<olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>,
+repeat the test.</para>
+</listitem><listitem><para>After the test allows the thread to continue, set the condition to its new value. For example, set a device flag to busy.</para>
+</listitem><listitem><para>Release the mutex.</para>
+</listitem>
+</orderedlist>
+</sect3><sect3 id="mt-16"><title>Signaling the Condition</title><para>Follow these steps in the code path to signal the condition:</para><orderedlist><listitem><para>Acquire the mutex guarding the condition.</para>
+</listitem><listitem><para>Set the condition.</para>
+</listitem><listitem><para><indexterm id="mt-ix202"><primary>condition variable functions</primary><secondary><function>cv_broadcast</function></secondary></indexterm>Signal the blocked thread with <olink targetdoc="refman9f" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Release the mutex.</para>
+</listitem>
+</orderedlist><para>The following example uses a busy flag along with mutex and condition variables to force the <olink targetdoc="refman9e" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine to wait until the device is no longer busy before
+starting a transfer.</para><example id="mt-28544"><title>Using Mutexes and Condition Variables</title><programlisting>static int
+xxread(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        struct xxstate *xsp;
+        /* ... */
+        mutex_enter(&amp;xsp-&gt;mu);
+        while (xsp-&gt;busy)
+                cv_wait(&amp;xsp-&gt;cv, &amp;xsp-&gt;mu);
+        xsp-&gt;busy = 1;
+        mutex_exit(&amp;xsp-&gt;mu);
+        /* perform the data access */
+}
+
+static uint_t
+xxintr(caddr_t arg)
+{
+        struct xxstate *xsp = (struct xxstate *)arg;
+        mutex_enter(&amp;xsp-&gt;mu);
+        xsp-&gt;busy = 0;
+        cv_broadcast(&amp;xsp-&gt;cv);
+        mutex_exit(&amp;xsp-&gt;mu);
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="mt-35650"><title><function>cv_wait</function> and <function>cv_timedwait</function> Functions</title><para><indexterm id="mt-ix204"><primary>condition variable functions</primary><secondary><function>cv_timedwait</function></secondary></indexterm>If a thread is blocked on a condition with <olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and that condition does not occur, the thread would wait forever. To avoid that situation, use <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which
+depends upon another thread to perform a wakeup. <function>cv_timedwait</function> takes an absolute wait time as an argument. <function>cv_timedwait</function> returns <literal>-1</literal> if the time is reached and the event has not occurred. <function>cv_timedwait</function> returns a positive value
+if the condition is met.</para><para><olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> requires an absolute wait time expressed in clock ticks since the system was last rebooted. The wait time can be determined by retrieving
+the current value with <olink targetdoc="refman9f" targetptr="ddi-get-lbolt-9f" remap="external"><citerefentry><refentrytitle>ddi_get_lbolt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The driver usually has a maximum number of seconds or microseconds to wait, so this value is converted to clock ticks
+with <olink targetdoc="refman9f" targetptr="drv-usectohz-9f" remap="external"><citerefentry><refentrytitle>drv_usectohz</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and added to the value from <olink targetdoc="refman9f" targetptr="ddi-get-lbolt-9f" remap="external"><citerefentry><refentrytitle>ddi_get_lbolt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The following example shows how to use <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to wait up to five seconds to access the device before returning <literal>EIO</literal> to the
+caller.</para><example id="mt-14239"><title>Using <function>cv_timedwait</function></title><programlisting>clock_t            cur_ticks, to;
+mutex_enter(&amp;xsp-&gt;mu);
+while (xsp-&gt;busy) {
+        cur_ticks = ddi_get_lbolt();
+        to = cur_ticks + drv_usectohz(5000000); /* 5 seconds from now */
+        if (cv_timedwait(&amp;xsp-&gt;cv, &amp;xsp-&gt;mu, to) == -1) {
+                /*
+                 * The timeout time 'to' was reached without the
+                 * condition being signaled.
+                 */
+                /* tidy up and exit */
+                mutex_exit(&amp;xsp-&gt;mu);
+                return (EIO);
+        }
+}
+xsp-&gt;busy = 1;
+mutex_exit(&amp;xsp-&gt;mu);</programlisting>
+</example><para>Although device driver writers generally prefer to use <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> over <olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, sometimes <olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is a better choice. For example, <olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is better if a driver is waiting on the following conditions:</para><itemizedlist><listitem><para>Internal driver state changes, where such a state change might require some command to be executed, or a set amount of time to pass</para>
+</listitem><listitem><para>Something the driver needs to single-thread</para>
+</listitem><listitem><para>Some situation that is already managing a possible timeout, as when &ldquo;A&rdquo; depends on &ldquo;B,&rdquo; and &ldquo;B&rdquo; is using <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="mt-20167"><title><function>cv_wait_sig</function> Function</title><para>A driver might be waiting for a condition that cannot occur or will not happen for a long time. In such cases, the user can send a signal to abort the thread. Depending on the driver design, the signal might not cause the driver to wake up.</para><para><indexterm id="mt-ix205"><primary>condition variable functions</primary><secondary><function>cv_wait_sig</function></secondary></indexterm><olink targetdoc="refman9f" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allows
+a signal to unblock the thread. This capability enables the user to break out of potentially long waits by sending a signal to the thread with <olink targetdoc="refman1" targetptr="kill-1" remap="external"><citerefentry><refentrytitle>kill</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> or by typing the
+interrupt character. <olink targetdoc="refman9f" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns zero if it is returning because of a signal, or nonzero if the condition occurred. However, see <olink targetptr="mt-23" remap="internal">Threads Unable to Receive Signals</olink> for cases in which signals might not be received.</para><para>The following example shows how to use <olink targetdoc="refman9f" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allow a signal to unblock the thread.</para><example id="mt-41633"><title>Using <function>cv_wait_sig</function></title><programlisting>mutex_enter(&amp;xsp-&gt;mu);
+while (xsp-&gt;busy) {
+        if (cv_wait_sig(&amp;xsp-&gt;cv, &amp;xsp-&gt;mu) == 0) {
+        /* Signaled while waiting for the condition */
+                /* tidy up and exit */
+                mutex_exit(&amp;xsp-&gt;mu);
+                return (EINTR);
+        }
+}
+xsp-&gt;busy = 1;
+mutex_exit(&amp;xsp-&gt;mu);</programlisting>
+</example>
+</sect2><sect2 id="mt-65632"><title><function>cv_timedwait_sig</function> Function</title><para><indexterm id="mt-ix206"><primary>condition variable functions</primary><secondary><function>cv_timedwait_sig</function></secondary></indexterm><indexterm><primary>functions</primary><seealso>condition variable functions</seealso></indexterm><indexterm><primary>functions</primary><see>specific function name</see></indexterm><olink targetdoc="refman9f" targetptr="cv-timedwait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is similar to  <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and  <olink targetdoc="refman9f" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, except that <function>cv_timedwait_sig</function> returns <literal>-1</literal> without
+the condition being signaled after a timeout has been reached, or <literal>0</literal> if a signal (for example,  <olink targetdoc="refman2" targetptr="kill-2" remap="external"><citerefentry><refentrytitle>kill</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>) is sent to the thread.</para><para>For both  <olink targetdoc="refman9f" targetptr="cv-timedwait-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="cv-timedwait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_timedwait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, time is measured in absolute clock ticks since the last system reboot.</para>
+</sect2>
+</sect1><sect1 id="mt-35265"><title>Choosing a Locking Scheme</title><para><indexterm id="mt-ix207"><primary>locks</primary><secondary>scheme for</secondary></indexterm>The locking scheme for most device drivers should be kept straightforward. Using additional locks allows more concurrency but increases overhead. Using fewer locks is less time consuming but allows less
+concurrency. Generally, use one mutex per data structure, a condition variable for each event or condition the driver must wait for, and a mutex for each major set of data global to the driver. Avoid holding mutexes for long periods of time. Use the following guidelines when choosing a locking scheme:</para><itemizedlist><listitem><para>Use the multithreading semantics of the entry point to your advantage.</para>
+</listitem><listitem><para>Make all entry points re-entrant. You can reduce the amount of shared data by changing a static variable to automatic.</para>
+</listitem><listitem><para>If your driver acquires multiple mutexes, acquire and release the mutexes in the same order in all code paths.</para>
+</listitem><listitem><para>Hold and release locks within the same functional space.</para>
+</listitem><listitem><para>Avoid holding driver mutexes when calling DDI interfaces that can block, for example, <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> with <literal>KM_SLEEP</literal>.</para>
+</listitem>
+</itemizedlist><para>To look at lock usage, use  <olink targetdoc="refman1m" targetptr="lockstat-1m" remap="external"><citerefentry><refentrytitle>lockstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. <olink targetdoc="refman1m" targetptr="lockstat-1m" remap="external"><citerefentry><refentrytitle>lockstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> monitors all kernel lock events, gathers frequency and timing data about the events, and displays the data.</para><para>See the <olink targetdoc="mtp" remap="external"><citetitle remap="book">Multithreaded Programming Guide</citetitle></olink> for more details on multithreaded operations.</para><sect2 id="mt-22"><title>Potential Locking Pitfalls</title><para><indexterm><primary>mutex</primary><secondary>related panics</secondary></indexterm>Mutexes are not re-entrant by the same thread. If you already own the mutex, attempting to claim this mutex a second time leads to the following panic:</para><para><literal>panic: recursive mutex_enter. mutex %x caller %x</literal></para><para>Releasing a mutex that the current thread does not hold causes this panic:</para><para><literal>panic: mutex_adaptive_exit: mutex not held by thread</literal></para><para>The following panic occurs only on uniprocessors:</para><para><literal>panic: lock_set: lock held and only one CPU</literal></para><para>The <literal>lock_set</literal> panic indicates that a spin mutex is held and will spin forever, because no other CPU can release this mutex. This situation can happen if the driver forgets to release the mutex on one code path or becomes blocked while holding the mutex.</para><para>A common cause of the <literal>lock_set</literal> panic occurs when a device with a high-level interrupt calls a routine that blocks, such as <olink targetdoc="refman9f" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Another
+typical cause is a high-level handler grabbing an adaptive mutex by calling <olink targetdoc="refman9f" targetptr="mutex-enter-9f" remap="external"><citerefentry><refentrytitle>mutex_enter</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="mt-23"><title>Threads Unable to Receive Signals</title><para>The <function>sema_p_sig</function>, <function>cv_wait_sig</function>, and <function>cv_timedwait_sig</function> functions can be awakened when the thread receives a signal. A problem can arise because some threads are unable to receive signals.  For example, when <olink targetdoc="refman9e" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is called as a result of the application calling <olink targetdoc="refman2" targetptr="close-2" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, signals can be received.
+However, when <olink targetdoc="refman9e" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is called from within the <olink targetdoc="refman2" targetptr="exit-2" remap="external"><citerefentry><refentrytitle>exit</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> processing that closes all open file descriptors, the thread cannot receive signals. When the thread cannot receive signals, <function>sema_p_sig</function> behaves as <function>sema_p</function>, <function>cv_wait_sig</function> behaves as <function>cv_wait</function>, and <function>cv_timedwait_sig</function> behaves as <function>cv_timedwait</function>.</para><para>Use caution to avoid sleeping forever on events that might never occur. Events that never occur create unkillable (<literal>defunct</literal>) threads and make the device unusable until the system is rebooted.  Signals cannot be received by defunct processes.</para><para>To detect whether the current thread is able to receive a signal, use the <olink targetdoc="refman9f" targetptr="ddi-can-receive-sig-9f" remap="external"><citerefentry><refentrytitle>ddi_can_receive_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.  If the <function>ddi_can_receive_sig</function>function returns <literal>B_TRUE</literal>, then the above functions can wake up on a received signal.  If the <function>ddi_can_receive_sig</function>function returns <literal>B_FALSE</literal>, then the above functions cannot wake up on a received signal.  If the <function>ddi_can_receive_sig</function>function returns <literal>B_FALSE</literal>, then the driver should use an alternate means, such as the <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function, to reawaken.</para><para>One important case where this problem occurs is with serial ports.  If the remote system asserts flow control and the <olink targetdoc="refman9e" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function blocks while attempting
+to drain the output data, a port can be stuck until the flow control condition is resolved or the system is rebooted.  Such drivers should detect this case and set up a timer to abort the drain operation when the flow control condition persists for an excessive period of time.</para><para>This issue also affects the <olink targetdoc="refman9f" targetptr="qwait-sig-9f" remap="external"><citerefentry><refentrytitle>qwait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function, which is described in <olink targetdoc="streams" targetptr="frmkern7-17735" remap="external">Chapter 7, <citetitle remap="chapter">STREAMS Framework &ndash; Kernel Level,</citetitle> in <citetitle remap="book">STREAMS Programming Guide</citetitle></olink>.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000039703 0?>

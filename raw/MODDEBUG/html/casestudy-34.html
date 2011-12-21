@@ -1,0 +1,277 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Advanced Memory Analysis - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-31.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-5.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level2"><a href="casestudy-13.html">Getting Started: Creating a Sample Crash Dump</a></p>
+<p class="toc level2"><a href="casestudy-18.html">Allocator Basics</a></p>
+<p class="toc level2"><a href="casestudy-27.html">Kernel Memory Caches</a></p>
+<p class="toc level2"><a href="casestudy-26.html">Detecting Memory Corruption</a></p>
+<p class="toc level2"><a href="casestudy-31.html">Memory Allocation Logging</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Advanced Memory Analysis</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-34"></a><h3>Advanced Memory Analysis</h3>
+<p>This section describes facilities for performing advanced memory analysis, including locating memory leaks
+and sources of data corruption.</p>
+
+<a name="casestudy-35"></a><h4>Finding Memory Leaks</h4>
+<p><a name="indexterm-476"></a>The <tt>::findleaks</tt> dcmd provides powerful and efficient detection of memory leaks in kernel
+crash dumps where the full set of kmem debug features has been enabled.
+ The first execution of <tt>::findleaks</tt> processes the dump for memory leaks (this can
+take a few minutes), and then coalesces the leaks by the allocation stack
+trace.  The findleaks report shows a bufctl address and the topmost stack
+frame for each memory leak that was identified:</p><pre>&gt; ::findleaks
+CACHE     LEAKED   BUFCTL CALLER
+70039ba8       1 703746c0 pm_autoconfig+0x708
+70039ba8       1 703748a0 pm_autoconfig+0x708
+7003a028       1 70d3b1a0 sigaddq+0x108
+7003c7a8       1 70515200 pm_ioctl+0x187c
+------------------------------------------------------
+   Total       4 buffers, 376 bytes</pre><p><a name="indexterm-477"></a>Using the bufctl pointers, you can obtain the complete stack backtrace of the
+allocation by applying the <tt>bufctl_audit</tt> macro: </p><pre>&gt; 70d3b1a0$&lt;bufctl_audit
+0x70d3b1a0:     next            addr            slab
+                70a049c0        70d03b28        70bb7480
+0x70d3b1ac:     cache           timestamp       thread
+                7003a028        13f7cf63b3      70b38380
+0x70d3b1bc:     lastlog         contents        stackdepth
+                700d6e60        0               5
+0x70d3b1c8:
+                kmem_alloc+0x30
+                sigaddq+0x108
+                sigsendproc+0x210
+                sigqkill+0x90
+                kill+0x28</pre><p>The programmer can usually use the <tt>bufctl_audit</tt> information and the allocation stack trace
+to quickly track down the code path that leaks the given buffer.</p>
+
+<a name="casestudy-36"></a><h4>Finding References to Data</h4>
+<p><a name="indexterm-478"></a><a name="indexterm-479"></a>When trying to diagnose a memory corruption problem, you should know what other
+kernel entities hold a copy of a particular pointer. This is important because
+it can reveal which thread accessed a data structure after it was freed.
+ It can also make it easier to understand what kernel entities are
+sharing knowledge of a particular (valid) data item.  The <tt>::whatis</tt> and
+<tt>::kgrep</tt> dcmds can be used to answer these questions.  You can apply
+<tt>::whatis</tt> to a value of interest: </p><pre>&gt; 0x705d8640::whatis
+705d8640 is 705d8640+0, allocated from streams_mblk</pre><p>In this case, <tt>0x705d8640</tt> is revealed to be a pointer to a STREAMS
+<tt>mblk</tt> structure.  To see the entire allocation tree, use <tt>::whatis</tt> <tt>-a</tt> instead:</p><pre>&gt; 0x705d8640::whatis -a
+705d8640 is 705d8640+0, allocated from streams_mblk
+705d8640 is 705d8000+640, allocated from kmem_va_8192
+705d8640 is 705d8000+640 from kmem_default vmem arena
+705d8640 is 705d2000+2640 from kmem_va vmem arena
+705d8640 is 705d2000+2640 from heap vmem arena</pre><p>This reveals that the allocation also appears in the <tt>kmem_va_8192</tt> cache. The
+<tt>kmem_va_8192</tt> cache is a kmem cache that is fronting the <tt>kmem_va</tt> vmem arena.
+ It also shows the full stack of vmem allocations.</p><p>The complete list of kmem caches and vmem arenas is displayed by
+the <tt>::kmastat</tt> dcmd.  You can use <tt>::kgrep</tt> to locate other kernel addresses
+that contain a pointer to this <tt>mblk</tt>. This illustrates the hierarchical nature of
+memory allocations in the system; in general, you can determine the type of
+object referred to by the given address from the name of the most
+specific kmem cache. </p><pre>&gt; 0x705d8640::kgrep
+400a3720
+70580d24
+7069d7f0
+706a37ec
+706add34</pre><p>and investigate them by applying <tt>::whatis</tt> again:</p><pre>&gt; 400a3720::whatis
+400a3720 is in thread 7095b240's stack
+
+&gt; 706add34::whatis
+706add34 is 706add20+14, allocated from streams_dblk_120</pre><p>Here one pointer is located on the stack of a known kernel
+thread, and another is the <tt>mblk</tt> pointer inside of the corresponding STREAMS <tt>dblk</tt> structure.</p>
+
+<a name="casestudy-37"></a><h4>Finding Corrupt Buffers With <tt>::kmem_verify</tt></h4>
+<p><a name="indexterm-480"></a>MDB's <tt>::kmem_verify</tt> dcmd implements most of the same checks that the kmem allocator
+does at runtime.  <tt>::kmem_verify</tt> can be invoked in order to scan every
+kmem cache with appropriate <tt>kmem_flags</tt>, or to examine a particular cache. </p><p>Here is an example of using <tt>::kmem_verify</tt> to isolate a problem: </p><pre>&gt; ::kmem_verify
+Cache Name                      Addr     Cache Integrity
+kmem_alloc_8                    70039428 clean
+kmem_alloc_16                   700396a8 clean
+kmem_alloc_24                   70039928 1 corrupt buffer
+kmem_alloc_32                   70039ba8 clean
+kmem_alloc_40                   7003a028 clean
+kmem_alloc_48                   7003a2a8 clean
+...</pre><p>It is easy to see here that the <tt>kmem_alloc_24</tt> cache contains what <tt>::kmem_verify</tt>
+believes to be a problem.  With an explicit cache argument, the <tt>::kmem_verify</tt>
+dcmd provides more detailed information about the problem:</p><pre>&gt; 70039928::kmem_verify
+Summary for cache 'kmem_alloc_24'
+  buffer 702babc0 (free) seems corrupted, at 702babc0</pre><p>The next step is to examine the buffer which <tt>::kmem_verify</tt> believes to be
+corrupt: </p><pre>&gt; 0x702babc0,5/KKn
+0x702babc0:     0               deadbeef
+                deadbeef        deadbeef
+                deadbeef        deadbeef
+                feedface        feedface
+                703785a0        84d9714e</pre><p>The reason that <tt>::kmem_verify</tt> flagged this buffer is now clear: The first word
+in the buffer (at <tt>0x702babc0</tt>) should probably be filled with the <tt>0xdeadbeef</tt> pattern, not
+with a <tt>0</tt>.  At this point, examining the <tt>bufctl_audit</tt> for this
+buffer might yield clues about what code recently wrote to the buffer, indicating
+where and when it was freed.</p><p>Another useful technique in this situation is to use <tt>::kgrep</tt> to search the
+address space for references to address <tt>0x702babc0</tt>, in order to discover what threads
+or data structures are still holding references to this freed data. </p>
+
+<a name="casestudy-38"></a><h4>Allocator Logging Facility</h4>
+<p><a name="indexterm-481"></a><a name="indexterm-482"></a>When <tt>KMF_AUDIT</tt> is set for a cache, the kernel memory allocator maintains a
+log that records the recent history of its activity.  This <b>transaction log</b> records
+<tt>bufctl_audit</tt> records. If the <tt>KMF_AUDIT</tt> and the <tt>KMF_CONTENTS</tt> flags are both set,
+the allocator generates a <b>contents log</b> that records portions of the actual contents
+of allocated and freed buffers.  The structure and use of the contents
+log is outside the scope of this document. The transaction log is discussed
+in this section. </p><p><a name="indexterm-483"></a>MDB provides several facilities for displaying the transaction log.  The simplest is
+<tt>::walk kmem_log</tt>, which prints out the transaction in the log as a series of
+<tt>bufctl_audit_t</tt> pointers: </p><pre>&gt; ::walk kmem_log
+70128340
+701282e0
+70128280
+70128220
+701281c0
+...
+&gt; 70128340$&lt;bufctl_audit
+0x70128340:     next            addr            slab
+                70ac1d40        70bc4ea8        70bb7c00
+0x7012834c:     cache           timestamp       thread
+                70039428        e1bd7abe721     70aacde0
+0x7012835c:     lastlog         contents        stackdepth
+                701282e0        7018f340        4
+0x70128368:
+                kmem_cache_free+0x24
+                nfs3_sync+0x3c
+                vfs_sync+0x84
+                syssync+4</pre><p><a name="indexterm-484"></a>A more elegant way to view the entire transaction log is by using
+the <tt>::kmem_log</tt> command:</p><pre>&gt; ::kmem_log
+CPU ADDR     BUFADDR         TIMESTAMP THREAD
+  0 70128340 70bc4ea8      e1bd7abe721 70aacde0
+  0 701282e0 70bc4ea8      e1bd7aa86fa 70aacde0
+  0 70128280 70bc4ea8      e1bd7aa27dd 70aacde0
+  0 70128220 70bc4ea8      e1bd7a98a6e 70aacde0
+  0 701281c0 70d03738      e1bd7a8e3e0 70aacde0
+  ...
+  0 70127140 70cf78a0      e1bd78035ad 70aacde0
+  0 701270e0 709cf6c0      e1bd6d2573a 40033e60
+  0 70127080 70cedf20      e1bd6d1e984 40033e60
+  0 70127020 70b09578      e1bd5fc1791 40033e60
+  0 70126fc0 70cf78a0      e1bd5fb6b5a 40033e60
+  0 70126f60 705ed388      e1bd5fb080d 40033e60
+  0 70126f00 705ed388      e1bd551ff73 70aacde0
+  ...</pre><p>The output of <tt>::kmem_log</tt> is sorted in descending order by timestamp. The <tt>ADDR</tt>
+column is the <tt>bufctl_audit</tt> structure corresponding to that transaction; <tt>BUFADDR</tt> points to the
+actual buffer. </p><p>These figures represent <b>transactions</b> on buffers (both allocations and frees). When a particular
+buffer is corrupted, it can be helpful to locate that buffer in the
+transaction log, then determine in which other transactions the transacting thread was involved.
+ This can help to assemble a picture of the sequence of events
+that occurred prior to and after the allocation (or free) of a buffer.</p><p><a name="indexterm-485"></a>You can employ the <tt>::bufctl</tt> command to filter the output of walking the
+transaction log.  The <tt>::bufctl -a</tt> command filters the buffers in the transaction
+log by buffer address.  This example filters on buffer <tt>0x70b09578</tt>:</p><pre>&gt; ::walk kmem_log | ::bufctl -a 0x70b09578
+ADDR     BUFADDR   TIMESTAMP   THREAD   CALLER
+70127020 70b09578  e1bd5fc1791 40033e60 biodone+0x108
+70126e40 70b09578  e1bd55062da 70aacde0 pageio_setup+0x268
+70126de0 70b09578  e1bd52b2317 40033e60 biodone+0x108
+70126c00 70b09578  e1bd497ee8e 70aacde0 pageio_setup+0x268
+70120480 70b09578  e1bd21c5e2a 70aacde0 elfexec+0x9f0
+70120060 70b09578  e1bd20f5ab5 70aacde0 getelfhead+0x100
+7011ef20 70b09578  e1bd1e9a1dd 70aacde0 ufs_getpage_miss+0x354
+7011d720 70b09578  e1bd1170dc4 70aacde0 pageio_setup+0x268
+70117d80 70b09578  e1bcff6ff27 70bc2480 elfexec+0x9f0
+70117960 70b09578  e1bcfea4a9f 70bc2480 getelfhead+0x100
+...</pre><p>This example illustrates that a particular buffer can be used in numerous transactions.</p>
+<hr><p><b>Note - </b>Remember that the kmem transaction log is an incomplete record of the transactions
+made by the kernel memory allocator. Older entries in the log are evicted
+as needed in order to keep the size of the log constant.</p>
+<hr>
+<p><a name="indexterm-486"></a><a name="indexterm-487"></a>The <tt>::allocdby</tt> and <tt>::freedby</tt> dcmds provide a convenient way to summarize transactions associated
+with a particular thread.  Here is an example of listing the recent
+allocations performed by thread <tt>0x70aacde0</tt>: </p><pre>&gt; 0x70aacde0::allocdby
+BUFCTL      TIMESTAMP CALLER
+70d4d8c0  e1edb14511a allocb+0x88
+70d4e8a0  e1edb142472 dblk_constructor+0xc
+70d4a240  e1edb13dd4f allocb+0x88
+70d4e840  e1edb13aeec dblk_constructor+0xc
+70d4d860  e1ed8344071 allocb+0x88
+70d4e7e0  e1ed8342536 dblk_constructor+0xc
+70d4a1e0  e1ed82b3a3c allocb+0x88
+70a53f80  e1ed82b0b91 dblk_constructor+0xc
+70d4d800  e1e9b663b92 allocb+0x88</pre><p>By examining <tt>bufctl_audit</tt> records, you can understand the recent activities of a particular
+thread.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-31.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-5.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

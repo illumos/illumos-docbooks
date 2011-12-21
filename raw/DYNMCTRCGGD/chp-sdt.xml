@@ -1,0 +1,223 @@
+<chapter id="chp-sdt"><title><literal>sdt</literal> Provider</title><highlights><para>The Statically Defined Tracing (<acronym>SDT</acronym>) provider creates probes at sites that a software programmer has formally designated. The SDT mechanism allows programmers to consciously choose locations of interest to users of DTrace and to convey some semantic knowledge about each location through the probe name. The Solaris kernel has defined a handful of <acronym>SDT</acronym> probes, and will likely add more over time. DTrace also provides a mechanism for user application developers to define static probes, described in <olink targetptr="chp-usdt" remap="internal">Chapter&nbsp;34, Statically Defined Tracing for User Applications</olink>.</para>
+</highlights><sect1 id="chp-sdt-1"><title>Probes</title><para><indexterm><primary>probes</primary><secondary><literal>sdt</literal></secondary></indexterm><indexterm><primary><literal>sdt</literal> probe</primary></indexterm>The <acronym>SDT</acronym> probes defined by the Solaris kernel are listed in <olink targetptr="tbl-sdt" remap="internal">Table&nbsp;22&ndash;1</olink>. The name stability and data stability of these probes are both Private because their description here thus reflects the kernel's implementation and should not be inferred to be an interface commitment. For more information about the DTrace stability mechanism, see <olink targetptr="chp-sdt-stability" remap="internal">Stability</olink>.</para><table frame="topbot" id="tbl-sdt"><title><acronym>SDT</acronym> Probes</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.43in"/><colspec colname="colspec1" colwidth="1.88in"/><colspec colname="colspec2" colwidth="1.88in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Probe name</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>Description</para>
+</entry><entry colname="colspec2" rowsep="1" valign="top"><para><literal>arg0</literal></para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>callout-start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before executing a callout (see <literal>&lt;sys/callo.h&gt;</literal>). Callouts are executed by periodic system clock, and represent the implementation for <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</entry><entry colname="colspec2"><para>Pointer to the <literal>callout_t</literal> (see <literal>&lt;sys/callo.h&gt;</literal>) corresponding to the callout to be executed.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>callout-end</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately after executing a callout (see <literal>&lt;sys/callo.h&gt;</literal>).</para>
+</entry><entry colname="colspec2"><para>Pointer to the <literal>callout_t</literal> (see <literal>&lt;sys/callo.h&gt;</literal>) corresponding to the callout just executed.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>interrupt-start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before calling into a device's interrupt handler.</para>
+</entry><entry colname="colspec2"><para>Pointer to the <literal>dev_info</literal> structure (see <literal>&lt;sys/ddi_impldefs.h&gt;</literal>) corresponding to the interrupting device.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>interrupt-complete</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately after returning from a device's interrupt handler.</para>
+</entry><entry colname="colspec2"><para>Pointer to <literal>dev_info</literal> structure (see <literal>&lt;sys/ddi_impldefs.h&gt;</literal>) corresponding to the interrupting device.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-sdt-2"><title>Examples</title><para><indexterm><primary>probes</primary><secondary><literal>sdt</literal></secondary><tertiary>example of use</tertiary></indexterm><indexterm><primary>examples</primary><secondary><literal>sdt</literal> probe</secondary></indexterm>The following example is a script to observe callout behavior on a per-second basis:</para><programlisting>#pragma D option quiet
+
+sdt:::callout-start
+{
+	@callouts[((callout_t *)arg0)-&gt;c_func] = count();
+}
+
+tick-1sec
+{
+	printa("%40a %10@d\n", @callouts);
+	clear(@callouts);
+}</programlisting><para>Running this example reveals the frequent users of <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in the system, as shown in the following output:</para><screen><userinput># dtrace -s ./callout.d</userinput>
+                                    FUNC      COUNT
+                            TS`ts_update          1
+              uhci`uhci_cmd_timeout_hdlr          3
+                          genunix`setrun          5
+                     genunix`schedpaging          5
+                         ata`ghd_timeout         10
+ uhci`uhci_handle_root_hub_status_change        309
+
+                                    FUNC      COUNT
+              ip`tcp_time_wait_collector          1
+                            TS`ts_update          1
+              uhci`uhci_cmd_timeout_hdlr          3
+                     genunix`schedpaging          4
+                          genunix`setrun          8
+                         ata`ghd_timeout         10
+ uhci`uhci_handle_root_hub_status_change        300
+
+                                    FUNC      COUNT
+              ip`tcp_time_wait_collector          0
+                        iprb`mii_portmon          1
+                            TS`ts_update          1
+              uhci`uhci_cmd_timeout_hdlr          3
+                     genunix`schedpaging          4
+                          genunix`setrun          7
+                         ata`ghd_timeout         10
+ uhci`uhci_handle_root_hub_status_change        300</screen><para>The <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> interface only produces a single timer expiration. Consumers of <function>timeout</function> requiring interval timer functionality typically reinstall their timeout from their <function>timeout</function> handler. The following example shows this behavior:</para><programlisting>#pragma D option quiet
+
+sdt:::callout-start
+{
+	self-&gt;callout = ((callout_t *)arg0)-&gt;c_func;
+}
+
+fbt::timeout:entry
+/self-&gt;callout &amp;&amp; arg2 &lt;= 100/
+{
+	/*
+	 * In this case, we are most interested in interval timeout(9F)s that
+	 * are short.  We therefore do a linear quantization from 0 ticks to
+	 * 100 ticks.  The system clock's frequency &mdash; set by the variable
+	 * "hz" &mdash; defaults to 100, so 100 system clock ticks is one second. 
+	 */
+	@callout[self-&gt;callout] = lquantize(arg2, 0, 100);
+}
+
+sdt:::callout-end
+{
+	self-&gt;callout = NULL;
+}
+
+END
+{
+	printa("%a\n%@d\n\n", @callout);
+}</programlisting><para>Running this script and waiting several seconds before typing Control-C results in output similar to the following example:</para><screen><userinput># dtrace -s ./interval.d</userinput>
+<userinput>^C</userinput>
+genunix`schedpaging
+
+           value  ------------- Distribution ------------- count    
+              24 |                                         0        
+              25 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 20       
+              26 |                                         0        
+
+
+ata`ghd_timeout
+
+           value  ------------- Distribution ------------- count    
+               9 |                                         0        
+              10 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 51       
+              11 |                                         0        
+
+
+uhci`uhci_handle_root_hub_status_change
+
+           value  ------------- Distribution ------------- count    
+               0 |                                         0        
+               1 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 1515     
+               2 |                                         0</screen><para>The output shows that <function>uhci_handle_root_hub_status_change</function> in the <olink targetdoc="refman7" targetptr="uhci-7d" remap="external"><citerefentry><refentrytitle>uhci</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver represents the shortest interval timer on the system: it is called every system clock tick.</para><para>The <literal>interrupt-start</literal> probe can be used to understand interrupt activity. The following example shows how to quantize the time spent executing an interrupt handler by driver name:</para><programlisting>interrupt-start
+{
+	self-&gt;ts = vtimestamp;
+}
+
+interrupt-complete
+/self-&gt;ts/
+{
+	this-&gt;devi = (struct dev_info *)arg0;
+	@[stringof(`devnamesp[this-&gt;devi-&gt;devi_major].dn_name),
+	    this-&gt;devi-&gt;devi_instance] = quantize(vtimestamp - self-&gt;ts);
+}</programlisting><para>Running this script results in output similar to the following example:</para><screen><userinput># dtrace -s ./intr.d</userinput>
+dtrace: script './intr.d' matched 2 probes
+<userinput>^C</userinput>
+ isp                                                       0
+           value  ------------- Distribution ------------- count    
+            8192 |                                         0        
+           16384 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 1        
+           32768 |                                         0        
+
+  pcf8584                                                   0
+           value  ------------- Distribution ------------- count    
+              64 |                                         0        
+             128 |                                         2        
+             256 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         157      
+             512 |@@@@@@                                   31       
+            1024 |                                         3        
+            2048 |                                         0        
+
+  pcf8584                                                   1
+           value  ------------- Distribution ------------- count    
+            2048 |                                         0        
+            4096 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@          154      
+            8192 |@@@@@@@                                  37       
+           16384 |                                         2        
+           32768 |                                         0        
+
+  qlc                                                       0
+           value  ------------- Distribution ------------- count    
+           16384 |                                         0        
+           32768 |@@                                       9        
+           65536 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@      126      
+          131072 |@                                        5        
+          262144 |                                         2        
+          524288 |                                         0        
+
+  hme                                                       0
+           value  ------------- Distribution ------------- count    
+            1024 |                                         0        
+            2048 |                                         6        
+            4096 |                                         2        
+            8192 |@@@@                                     89       
+           16384 |@@@@@@@@@@@@@                            262      
+           32768 |@                                        37       
+           65536 |@@@@@@@                                  139      
+          131072 |@@@@@@@@                                 161      
+          262144 |@@@                                      73       
+          524288 |                                         4        
+         1048576 |                                         0        
+         2097152 |                                         1        
+         4194304 |                                         0        
+
+  ohci                                                      0
+           value  ------------- Distribution ------------- count    
+            8192 |                                         0        
+           16384 |                                         3        
+           32768 |                                         1        
+           65536 |@@@                                      143      
+          131072 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@     1368     
+          262144 |                                         0 </screen>
+</sect1><sect1 id="chp-sdt-3"><title>Creating <acronym>SDT</acronym> Probes</title><para><indexterm><primary>probes</primary><secondary><literal>sdt</literal></secondary><tertiary>creating</tertiary></indexterm><indexterm><primary><literal>sdt</literal> probe</primary><secondary>creating</secondary></indexterm>If you are a device driver developer, you might be interested in creating your own <acronym>SDT</acronym> probes in your Solaris driver. The disabled probe effect of <acronym>SDT</acronym> is essentially the cost of several no-operation machine instructions. You are therefore encouraged to add <acronym>SDT</acronym> probes to your device drivers as needed. Unless these probes negatively affect performance, you can leave them in your shipping code.</para><sect2 id="chp-sdt-4"><title>Declaring Probes</title><para><acronym>SDT</acronym> probes are declared using the <literal>DTRACE_PROBE</literal>, <literal>DTRACE_PROBE1</literal>, <literal>DTRACE_PROBE2</literal>, <literal>DTRACE_PROBE3</literal> and <literal>DTRACE_PROBE4</literal> macros from <literal>&lt;sys/sdt.h&gt;</literal>. The module name and function name of an <acronym>SDT</acronym>-based probe corresponds to the kernel module and function of the probe. The name of the probe depends on the name given in the <literal>DTRACE_PROBE</literal><replaceable>n</replaceable><literal></literal> macro. If the name contains no two consecutive underbars (<literal>__</literal>), the name of the probe is as written in the macro. If the name contains any two consecutive underbars, the probe name converts the consecutive underbars to a single dash (<literal>-</literal>). For example, if a <literal>DTRACE_PROBE</literal> macro specifies <literal>transaction__start</literal>, the <acronym>SDT</acronym> probe will be named <literal>transaction-start</literal>. This substitution allows C code to provide macro names that are not valid C identifiers without specifying a string.</para><para>DTrace includes the kernel module name and function name as part of the tuple identifying a probe, so you do not need to include this information in the probe name to prevent name space collisions. You can use the command <command>dtrace -l -P sdt -m <replaceable>module</replaceable></command> on your driver <replaceable>module</replaceable> to list the probes you have installed and the full names that will be seen by users of DTrace.</para>
+</sect2><sect2 id="chp-sdt-5"><title>Probe Arguments</title><para><indexterm><primary>probes</primary><secondary><literal>sdt</literal></secondary><tertiary>arguments</tertiary></indexterm><indexterm><primary><literal>sdt</literal> probe</primary><secondary>arguments</secondary></indexterm>The arguments for each <acronym>SDT</acronym> probe are the arguments specified in the corresponding <literal>DTRACE_PROBE</literal><replaceable>n</replaceable><literal></literal> macro reference. The number of arguments depends on which macro was used to create the probe: <literal>DTRACE_PROBE1</literal> specifies one argument, <literal>DTRACE_PROBE2</literal> specifies two arguments, and so on. When declaring your <acronym>SDT</acronym> probes, you can minimize their disabled probe effect by not dereferencing pointers and not loading from global variables in the probe arguments. Both pointer dereferencing and global variable loading may be done safely in D actions that enable probes, so DTrace users can request these actions only when they are needed.</para>
+</sect2>
+</sect1><sect1 id="chp-sdt-stability"><title>Stability</title><para><indexterm><primary>probes</primary><secondary><literal>sdt</literal></secondary><tertiary>stability</tertiary></indexterm><indexterm><primary>stability</primary><secondary><literal>sdt</literal> probe</secondary></indexterm>The <acronym>SDT</acronym> provider uses DTrace's stability mechanism to describe its stabilities, as shown in the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

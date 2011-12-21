@@ -1,0 +1,606 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(3)part(title()partintro()?><appendix id="hwovr-18191"><title>Hardware Overview</title><highlights><para>This appendix discusses general issues about hardware that is capable
+of supporting the Solaris OS. The discussion includes the processor, bus architectures,
+and memory models that are supported by the Solaris OS. Various device issues
+and the PROM used in Sun platforms are also covered.</para><note><para>The material in this appendix is for informational purposes only.
+This information might be of use during driver debugging. However, many of
+these implementation details are hidden from device drivers by the Solaris
+DDI/DKI interfaces.</para>
+</note><para>This appendix provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="hwovr-1" remap="internal">SPARC Processor Issues</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-35423" remap="internal">x86 Processor Issues</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-66" remap="internal">Endianness</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-14" remap="internal">Store Buffers</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-15" remap="internal">System Memory Model</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-18" remap="internal">Bus Architectures</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-25520" remap="internal">Bus Specifics</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-100" remap="internal">Device Issues</olink></para>
+</listitem><listitem><para><olink targetptr="hwovr-101" remap="internal">PROM on SPARC Machines</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="hwovr-1"><title>SPARC Processor Issues</title><para><indexterm><primary>processor issues</primary><secondary>SPARC</secondary></indexterm><indexterm id="hwovr-ix33"><primary>SPARC processor</primary><secondary>floating point operations</secondary></indexterm>This section describes
+a number of SPARC processor-specific topics such as data alignment, byte ordering,
+register windows, and availability of floating-point instructions. For information
+on x86 processor-specific topics, see <olink targetptr="hwovr-35423" remap="internal">x86 Processor
+Issues</olink>.</para><note><para>Drivers should never perform floating-point operations, because
+these operations are not supported in the kernel.</para>
+</note><sect2 id="hwovr-2"><title>SPARC Data Alignment</title><indexterm id="hwovr-ix29"><primary>SPARC processor</primary><secondary>data alignment</secondary>
+</indexterm><indexterm><primary>data alignment for SPARC</primary>
+</indexterm><para>All quantities must be aligned on their natural boundaries, using standard
+C data types:</para><itemizedlist><listitem><para><literal>short</literal> integers are aligned on 16-bit boundaries.</para>
+</listitem><listitem><para><literal>int</literal> integers are aligned on 32-bit boundaries.</para>
+</listitem><listitem><para><literal>long</literal> integers are aligned on 64-bit boundaries
+for SPARC systems. For information on data models, see <olink targetptr="lp64-35004" remap="internal">Appendix&nbsp;C, Making a Device Driver 64-Bit Ready</olink>.</para>
+</listitem><listitem><para><literal>long long</literal> integers are aligned on 64-bit
+boundaries.</para>
+</listitem>
+</itemizedlist><para>Usually, the compiler handles any alignment issues. However, driver
+writers are more likely to be concerned about alignment because the proper
+data types must be used to access the devices. Because device registers are
+commonly accessed through a pointer reference, drivers must ensure that pointers
+are properly aligned when accessing the device.</para>
+</sect2><sect2 id="hwovr-3"><title>Member Alignment in SPARC Structures</title><indexterm id="hwovr-ix30"><primary>SPARC processor</primary><secondary>structure member alignment</secondary>
+</indexterm><para>Because of the data alignment restrictions imposed by the SPARC processor,
+C structures also have alignment requirements. Structure alignment requirements
+are imposed by the most strictly aligned structure component. For example,
+a structure containing only characters has no alignment restrictions, while
+a structure containing a <literal>long</literal> <literal>long</literal> member
+must be constructed to guarantee that this member falls on a 64-bit boundary.</para>
+</sect2><sect2 id="hwovr-4"><title>SPARC Byte Ordering</title><indexterm id="hwovr-ix31"><primary>SPARC processor</primary><secondary>byte ordering</secondary>
+</indexterm><para>The SPARC processor uses <emphasis>big-endian</emphasis> byte ordering.
+The most significant byte (MSB) of an integer is stored at the lowest address
+of the integer. The least significant byte is stored at the highest address
+for words in this processor. For example, byte 63 is the least significant
+byte for 64-bit processors.</para><mediaobject><imageobject><imagedata entityref="hwovr.sparcbyteorder.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how bytes are ordered in big-endian architectures,
+that is, byte 0 is the most significant byte.</simpara>
+</textobject>
+</mediaobject>
+</sect2><sect2 id="hwovr-5"><title>SPARC Register Windows</title><indexterm id="hwovr-ix32"><primary>SPARC processor</primary><secondary>register windows</secondary>
+</indexterm><para>SPARC processors use register windows. Each register window consists
+of eight <emphasis>in</emphasis> registers, eight <emphasis>local</emphasis> registers,
+eight <emphasis>out</emphasis> registers, and eight <emphasis>global</emphasis> registers.
+Out registers are the in registers for the next window. The number of register
+windows ranges from 2 to 32, depending on the processor implementation.</para><para><indexterm><primary>processor issues</primary><secondary>SPARC</secondary></indexterm>Because drivers are normally written in C, the compiler usually
+hides the fact that register windows are used. However, you might have to
+use register windows when debugging the driver.</para>
+</sect2><sect2 id="hwovr-165"><title>SPARC Multiply and Divide Instructions</title><indexterm><primary>SPARC processor</primary><secondary>multiply and divide instructions</secondary>
+</indexterm><para><indexterm><primary>processor issues</primary><secondary>SPARC</secondary></indexterm>The Version 7 SPARC processors do not have multiply or divide
+instructions. The multiply and divide instructions are emulated in software.
+Because a driver might run on a Version 7, Version 8, or Version 9 processor,
+avoid intensive integer multiplication and division. Instead, use bitwise
+left and right shifts to multiply and divide by powers of two.</para><para>The <citetitle>SPARC Architecture Manual, Version 9</citetitle>, contains
+more specific information on the SPARC CPU. The <citetitle>SPARC Compliance
+Definition</citetitle>, Version 2.4, contains details of the application binary
+interface (ABI) for SPARC V9. The manual describes the 32-bit SPARC V8 ABI
+and the 64-bit SPARC V9 ABI. You can obtain this document from SPARC International
+at <ulink url="http://www.sparc.com" type="url"></ulink>.</para>
+</sect2>
+</sect1><sect1 id="hwovr-35423"><title>x86 Processor Issues</title><para><indexterm id="hwovr-ix35"><primary>processor issues</primary><secondary>x86</secondary></indexterm><indexterm><primary>x86 processor</primary><secondary>data alignment</secondary></indexterm><indexterm><primary>x86  processor</primary><secondary>floating point operations</secondary></indexterm>Data types have
+no alignment restrictions. However, extra memory cycles might be required
+for the x86 processor to properly handle misaligned data transfers.</para><note><para>Drivers should not perform floating-point operations, as these
+operations are not supported in the kernel.</para>
+</note><sect2 id="hwovr-11"><title>x86 Byte Ordering</title><indexterm id="hwovr-ix38"><primary>x86 processor</primary><secondary>byte ordering</secondary>
+</indexterm><para>The x86 processors use <emphasis>little-endian</emphasis> byte ordering.
+The least significant byte (LSB) of an integer is stored at the lowest address
+of the integer. The most significant byte is stored at the highest address
+for data items in this processor. For example, byte 7 is the most significant
+byte for 64-bit processors.</para><mediaobject><imageobject><imagedata entityref="hwovr.iabyteorder.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how bytes are ordered in little-endian
+architectures, that is, byte 0 is the least significant byte.</simpara>
+</textobject>
+</mediaobject>
+</sect2><sect2 id="hwovr-13"><title>x86 Architecture Manuals</title><para>Both Intel Corporation and AMD publish a number of books on the x86
+family of processors. See <ulink url="http://www.intel.com" type="url"></ulink> and <ulink url="http://www.amd.com/" type="url"></ulink>.</para>
+</sect2>
+</sect1><sect1 id="hwovr-66"><title>Endianness</title><para><indexterm><primary>byte ordering</primary></indexterm>To achieve the
+goal of multiple-platform, multiple-instruction-set architecture portability,
+host bus dependencies were removed from the drivers. The first dependency
+issue to be addressed was the endianness, that is, byte ordering, of the processor.
+For example, the x86 processor family is little-endian while the SPARC architecture
+is big-endian.</para><para>Bus architectures display the same endianness types as processors. The
+PCI local bus, for example, is little-endian, the SBus is big-endian, the
+ISA bus is little-endian, and so on.</para><para><indexterm><primary>DDI-compliant drivers</primary><secondary>byte ordering</secondary></indexterm>To maintain portability between processors and buses,
+DDI-compliant drivers must be endian neutral. Although drivers can manage
+their endianness by runtime checks or by preprocessor directives like <literal>#ifdef
+_LITTLE_ENDIAN</literal>  in the source code, long-term maintenance can be
+troublesome. In some cases, the DDI framework performs the byte swapping using
+a software approach. In other cases, byte swapping can be done by hardware
+page-level swapping as in memory management unit (MMU) or by special machine
+instructions. The DDI framework can take advantage of the hardware features
+to improve performance.</para><figure id="hwovr-fig-67"><title>Byte Ordering Required for Host Bus Dependency</title><mediaobject><imageobject><imagedata entityref="hwovr.byteorderbusdepend.epsi"/>
+</imageobject><textobject><simpara>Diagram shows byte swapping to reverse endianness.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>Along with being endian-neutral, portable drivers must also be independent
+from data ordering of the processor. Under most circumstances, data must be
+transferred in the sequence instructed by the driver. However, sometimes data
+can be merged, batched, or reordered to streamline the data transfer, as illustrated
+in the following figure. For example, data merging can be applied to accelerate
+graphics display on frame buffers. Drivers have the option to advise the DDI
+framework to use other optimal data transfer mechanisms during the transfer.</para><figure id="hwovr-fig-69"><title>Data Ordering Host Bus Dependency</title><mediaobject><imageobject><imagedata entityref="hwovr.dataorderbusdepend.epsi"/>
+</imageobject><textobject><simpara>Diagram shows reordering of bytes by CPU.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="hwovr-14"><title>Store Buffers</title><indexterm id="hwovr-ix40"><primary>memory model</primary><secondary>store buffers</secondary>
+</indexterm><indexterm id="hwovr-ix41"><primary>store buffers</primary>
+</indexterm><para>To improve performance, the CPU uses internal store buffers to temporarily
+store data. Using internal buffers can affect the synchronization of device
+I/O operations. Therefore, the driver needs to take explicit steps to make
+sure that writes to registers are completed at the proper time.</para><para>For example, consider the case where access to device space, such as
+registers or a frame buffer, is synchronized by a lock. The driver needs to
+check that the store to the device space has actually completed before releasing
+the lock. The release of the lock does not guarantee the flushing of I/O buffers.</para><para>To give another example, when acknowledging an interrupt, the driver
+usually sets or clears a bit in a device control register. The driver must
+ensure that the write to the control register has reached the device before
+the interrupt handler returns. Similarly, a device might require a delay,
+that is, driver busy-waits, after writing a command to the control register.
+In such a case, the driver must ensure that the write has reached the device
+before delaying.</para><para>Where device registers can be read without undesirable side effects,
+verification of a write can simply consist of reading the register immediately
+after the write. If that particular register cannot be read without undesirable
+side effects, another device register in the same register set can be used.</para>
+</sect1><sect1 id="hwovr-15"><title>System Memory Model</title><para><indexterm id="hwovr-ix42"><primary>memory model</primary><secondary>SPARC</secondary></indexterm>The system memory model defines the semantics of memory operations
+such as <emphasis>load</emphasis> and <emphasis>store</emphasis> and specifies
+how the order in which these operations are issued by a processor is related
+to the order in which they reach memory. The memory model applies to both
+uniprocessors and shared-memory multiprocessors. Two memory models are supported:
+total store ordering (TSO) and partial store ordering (PSO).</para><sect2 id="hwovr-16"><title>Total Store Ordering (TSO)</title><para>TSO guarantees that the sequence in which store, FLUSH, and atomic load-store
+instructions appear in memory for a given processor is identical to the sequence
+in which they were issued by the processor.</para><para><indexterm><primary>total store ordering</primary></indexterm>Both x86
+and SPARC processors support TSO.</para>
+</sect2><sect2 id="hwovr-17"><title>Partial Store Ordering (PSO)</title><para><indexterm><primary>partial store ordering</primary></indexterm>PSO
+does not guarantee that the sequence in which store, FLUSH, and atomic load-store
+instructions appear in memory for a given processor is identical to the sequence
+in which they were issued by the processor. The processor can reorder the
+stores so that the sequence of stores to memory is not the same as the sequence
+of stores issued by the CPU.</para><para>SPARC processors support PSO; x86 processors do not.</para><para>For SPARC processors, conformance between <emphasis>issuing</emphasis> order
+and <emphasis>memory</emphasis> order is provided by the system framework
+using the STBAR instruction. If two of the above instructions are separated
+by an STBAR instruction in the issuing order of a processor, or if the instructions
+reference the same location, the memory order of the two instructions is the
+same as the issuing order. Enforcement of strong data-ordering in DDI-compliant
+drivers is provided by the <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> interface.
+Compliant drivers cannot use the STBAR instruction directly.</para><para>See the <citetitle>SPARC Architecture Manual, Version 9</citetitle>,
+for more details on the SPARC memory model.</para>
+</sect2>
+</sect1><sect1 id="hwovr-18"><title>Bus Architectures</title><para><indexterm id="hwovr-ix43"><primary>bus</primary><secondary>architectures</secondary></indexterm>This section describes device identification, device addressing,
+and interrupts.</para><sect2 id="hwovr-59532"><title>Device Identification</title><para><indexterm id="hwovr-ix45"><primary>device information</primary><secondary>self-identifying</secondary></indexterm><indexterm id="hwovr-ix44"><primary>self-identifying devices</primary></indexterm>Device identification
+is the process of determining which devices are present in the system. Some
+devices are self-identifying meaning that the device itself provides information
+to the system so that the system can identify the device driver that needs
+to be used. SBus and PCI local bus devices are examples of self-identifying
+devices. On SBus, the information is usually derived from a small Forth program
+stored in the FCode PROM on the device. Most PCI devices provide a configuration
+space  containing device configuration information. See the <olink targetdoc="group-refman" targetptr="sbus-4" remap="external"><citerefentry><refentrytitle>sbus</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pci-4" remap="external"><citerefentry><refentrytitle>pci</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man pages for more information.</para><para>All modern bus architectures require devices to be self-identifying.</para>
+</sect2><sect2 id="hwovr-21"><title>Supported Interrupt Types</title><para>The Solaris platform supports both polling and vectored interrupts.
+The Solaris DDI/DKI interrupt model is the same for both types of interrupts.
+See <olink targetptr="interrupt-15678" remap="internal">Chapter&nbsp;8, Interrupt Handlers</olink> for
+more information about interrupt handling.</para>
+</sect2>
+</sect1><sect1 id="hwovr-25520"><title>Bus Specifics</title><para>This section covers addressing and device configuration issues specific
+to the buses that the Solaris platform supports.</para><sect2 id="hwovr-22"><title>PCI Local Bus</title><para><indexterm id="hwovr-ix47"><primary>bus</primary><secondary>PCI architectures</secondary></indexterm><indexterm id="hwovr-ix48"><primary>PCI bus</primary></indexterm>The PCI local bus is a high-performance bus designed for high-speed
+data transfer. The PCI bus resides on the system board. This bus is normally
+used as an interconnect mechanism between highly integrated peripheral components,
+peripheral add-on boards, and host processor or memory systems. The host processor,
+main memory, and the PCI bus itself are connected through a PCI host bridge,
+as shown in <olink targetptr="hwovr-fig-23" remap="internal">Figure&nbsp;A&ndash;3</olink>.</para><para>A tree structure of interconnected I/O buses is supported through a
+series of PCI bus bridges. Subordinate PCI bus bridges can be extended underneath
+the PCI host bridge to enable a single bus system to be expanded into a complex
+system with multiple secondary buses. PCI devices can be connected to one
+or more of these secondary buses. In addition, other bus bridges, such as
+SCSI or USB, can be connected.</para><para><indexterm id="hwovr-ix49"><primary>PCI devices</primary></indexterm>Every
+PCI device has a unique vendor ID and device ID. Multiple devices of the same
+kind are further identified by their unique device numbers on the bus where
+they reside.</para><figure id="hwovr-fig-23"><title id="hwovr-24466">Machine Block Diagram</title><mediaobject><imageobject><imagedata entityref="hwovr.machinediagram.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how a PCI host bridge connects the CPU
+and main memory to a PCI bus.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The PCI host bridge provides an interconnect between the processor and
+peripheral components. Through the PCI host bridge, the processor can directly
+access main memory independent of other PCI bus masters. For example, while
+the CPU is fetching data from the cache controller in the host bridge, other
+PCI devices can also access the system memory through the host bridge. The
+advantage of this architecture is that this architecture separates the I/O
+bus from the processor's host bus.</para><para>The PCI host bridge also provides data access mappings between the CPU
+and peripheral I/O devices. The bridge maps every peripheral device to the
+host address domain so that the processor can access the device through programmed
+I/O. On the local bus side, the PCI host bridge maps the system memory to
+the PCI address domain so that the PCI device can access the host memory as
+a bus master. <olink targetptr="hwovr-fig-23" remap="internal">Figure&nbsp;A&ndash;3</olink> shows
+the two address domains.</para>
+</sect2><sect2 id="hwovr-25"><title>PCI Address Domain</title><para>The PCI address domain consists of three distinct address spaces: configuration,
+memory, and I/O space.</para><sect3 id="hwovr-26"><title>PCI Configuration Address Space</title><para><indexterm id="hwovr-ix50"><primary>PCI bus</primary><secondary>configuration address space</secondary></indexterm>Configuration space is defined geographically.
+The location of a peripheral device is determined by its physical location
+within an interconnected tree of PCI bus bridges. A device is located by its <emphasis>bus number</emphasis> and <emphasis>device</emphasis> (<emphasis>slot</emphasis>) <emphasis>number</emphasis>. Each peripheral device contains a set of well-defined configuration
+registers in its PCI configuration space. The registers are used not only
+to identify devices but also to supply device configuration information to
+the configuration framework. For example, base address registers in the device
+configuration space must be mapped before a device can respond to data access.</para><para>The method for generating configuration cycles is host dependent. In
+x86 machines, special I/O ports are used. On other platforms, the PCI configuration
+space can be memory-mapped to certain address locations corresponding to the
+PCI host bridge in the host address domain. When a device configuration register
+is accessed by the processor, the request is routed to the PCI host bridge.
+The bridge then translates the access into proper configuration cycles on
+the bus.</para>
+</sect3><sect3 id="hwovr-28"><title>PCI Configuration Base Address Registers</title><para><indexterm id="hwovr-ix51"><primary>PCI bus</primary><secondary>configuration base address registers</secondary></indexterm>The PCI configuration space
+consists of up to six 32-bit base address registers for each device. These
+registers provide both size and data type information. System firmware assigns
+base addresses in the PCI address domain to these registers.</para><para>Each addressable region can be either memory or I/O space. The value
+contained in bit 0 of the base address register identifies the type. A value
+of 0 in bit 0 indicates a memory space and a value of 1 indicates an I/O space.
+The following figure shows two base address registers: one for memory and
+the other for I/O types.</para><figure id="hwovr-fig-29"><title id="hwovr-23659">Base Address Registers for
+Memory and I/O</title><mediaobject><imageobject><imagedata entityref="hwovr.memiobaseaddr.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how bit 0 in a base address indicates a
+memory or I/O space.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect3><sect3 id="hwovr-30746"><title>PCI Memory Address Space</title><para><indexterm id="hwovr-ix52"><primary>PCI bus</primary><secondary>memory address space</secondary></indexterm>PCI supports both 32-bit and 64-bit addresses
+for memory space. System firmware assigns regions of memory space in the PCI
+address domain to PCI peripherals. The base address of a region is stored
+in the base address register of the device's PCI configuration space. The
+size of each region must be a power of two, and the assigned base address
+must be aligned on a boundary equal to the size of the region. Device addresses
+in memory space are <emphasis>memory-mapped</emphasis> into the host address
+domain so that data access to any device can be performed by the processor's
+native load or store instructions.</para>
+</sect3><sect3 id="hwovr-30"><title>PCI I/O Address Space</title><para><indexterm id="hwovr-ix53"><primary>PCI bus</primary><secondary>I/O address space</secondary></indexterm>PCI supports 32-bit I/O space. I/O space
+can be accessed differently on different platforms. Processors with special
+I/O instructions, like the Intel processor family, access the I/O space with <literal>in</literal> and <literal>out</literal> instructions. Machines without special
+I/O instructions will map to the address locations corresponding to the PCI
+host bridge in the host address domain. When the processor accesses the memory-mapped
+addresses, an I/O request will be sent to the PCI host bridge, which then
+translates the addresses into I/O cycles and puts them on the PCI bus. Memory-mapped
+I/O is performed by the native load/store instructions of the processor.</para>
+</sect3><sect3 id="hwovr-31"><title>PCI Hardware Configuration Files</title><para><indexterm id="hwovr-ix54"><primary>hardware configuration files</primary><secondary>PCI devices</secondary></indexterm><indexterm id="hwovr-ix55"><primary>PCI bus</primary><secondary>hardware configuration files</secondary></indexterm>Hardware configuration files should be unnecessary for PCI local
+bus devices. However, on some occasions drivers for PCI devices need to use
+hardware configuration files to augment the driver private information. See
+the <olink targetdoc="group-refman" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pci-4" remap="external"><citerefentry><refentrytitle>pci</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+pages for further details.</para>
+</sect3>
+</sect2><sect2 id="fxjuf"><title>PCI Express</title><para>The standard PCI bus has evolved into PCI Express. PCI Express is the
+next generation high performance I/O bus for connecting peripheral devices
+in such applications as desktop, mobile, workstation, server, embedded computing
+and communication platforms.</para><para>PCI Express improves bus performance, reduces overall system cost and
+takes advantage of new developments in computer design. PCI Express uses a
+serial, point-to-point type interconnect for communication between two devices.
+Using switches enables users to connect a large number of devices together
+in a system. Serial interconnect implies fewer pins per device package, which
+reduces cost and makes the performance highly scalable.</para><para>The PCI Express bus has built-in features to accommodate the following
+technologies:</para><itemizedlist><listitem><para>QoS (Quality of Service)</para>
+</listitem><listitem><para>Hotplugging and hot swap</para>
+</listitem><listitem><para>Advanced power management</para>
+</listitem><listitem><para>RAS (Reliability, Available, Serviceable)</para>
+</listitem><listitem><para>Improved error handling</para>
+</listitem><listitem><para>MSI interrupts</para>
+</listitem>
+</itemizedlist><para>A PCI Express interconnect that connects two devices together is called
+a <emphasis>link</emphasis>. A link can either be x1, x2, x4, x8, x12, x16
+or x32 bidirectional signal pairs. These signals are called <emphasis>lanes</emphasis>.
+The bandwidth (x1) of each lane is 500 MB/sec in duplex mode.  Although PCI-X
+and PCI Express have different hardware connections, the two buses are identical
+from a driver writer's point of view. PCI-X is a shared bus. For example,
+all the devices on the bus share a single set of data lines and signal lines.
+PCI-Express is a switched bus, which enables more efficient use of the bandwidth
+between the devices and the system bus.</para><para>For more information on PCI Express, please refer to the following web
+site:  <ulink url="http://www.pcisig.com/" type="url"></ulink></para>
+</sect2><sect2 id="hwovr-32"><title>SBus</title><para><indexterm id="hwovr-ix56"><primary>bus</primary><secondary>SBus architecture</secondary></indexterm>Typical SBus systems consist of a motherboard (containing
+the CPU and SBus interface logic), a number of SBus devices on the motherboard
+itself, and a number of SBus expansion slots. An SBus can also be connected
+to other types of buses through an appropriate bus bridge.</para><para><indexterm id="hwovr-ix57"><primary>SBus</primary><secondary>geographical addressing</secondary></indexterm>The SBus is geographically addressed. Each
+SBus slot exists at a fixed physical address in the system. An SBus card has
+a different address, depending on which slot it is plugged into. Moving an
+SBus device to a new slot causes the system to treat this device as a new
+device.</para><para>The SBus uses polling interrupts. When an SBus device interrupts, the
+system only knows which of several devices might have issued the interrupt.
+The system interrupt handler must ask the driver for each device whether that
+device is responsible for the interrupt.</para><sect3 id="hwovr-33"><title>SBus Physical Address Space</title><para><indexterm id="hwovr-ix58"><primary>SBus</primary><secondary>physical address space</secondary></indexterm>The following table shows the physical
+address space layout of the Sun UltraSPARC 2 computer. A physical address
+on the UltraSPARC 2 model consists of 41 bits. The 41-bit physical address
+space is further broken down into multiple 33-bit address spaces identified
+by <literal>PA(40:33)</literal>.</para><table id="hwovr-tbl-34"><title id="hwovr-34856">Device Physical Space in
+the Ultra 2</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="2*"/><colspec colnum="2" colname="column2" colwidth="4*"/><colspec colnum="3" colname="column3" colwidth="3*"/><thead><row rowsep="1"><entry><para>PA(40:33)</para>
+</entry><entry><para>33-bit Space</para>
+</entry><entry><para>Usage</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>0x0</para>
+</entry><entry><para><literal>0x000000000 - 0x07FFFFFFF</literal></para>
+</entry><entry><para>2 Gbytes main memory</para>
+</entry>
+</row><row><entry><para>0x80 &ndash; 0xDF</para>
+</entry><entry><para><literal>Reserved on Ultra 2</literal></para>
+</entry><entry><para>Reserved on Ultra 2</para>
+</entry>
+</row><row><entry><para>0xE0</para>
+</entry><entry><para><literal>Processor 0</literal></para>
+</entry><entry><para>Processor 0</para>
+</entry>
+</row><row><entry><para>0xE1</para>
+</entry><entry><para><literal>Processor 1</literal></para>
+</entry><entry><para>Processor 1</para>
+</entry>
+</row><row><entry><para>0xE2 &ndash; 0xFD</para>
+</entry><entry><para><literal>Reserved on Ultra 2</literal></para>
+</entry><entry><para>Reserved on Ultra 2</para>
+</entry>
+</row><row><entry><para>0xFE</para>
+</entry><entry><para><literal>0x000000000 - 0x1FFFFFFFF</literal></para>
+</entry><entry><para>UPA Slave (FFB)</para>
+</entry>
+</row><row><entry><para>0xFF</para>
+</entry><entry><para><literal>0x000000000 - 0x0FFFFFFFF</literal></para>
+</entry><entry><para>System I/O space</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x100000000 - 0x10FFFFFFF</literal></para>
+</entry><entry><para>SBus Slot 0</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x110000000 - 0x11FFFFFFF</literal></para>
+</entry><entry><para>SBus Slot 1</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x120000000 - 0x12FFFFFFF</literal></para>
+</entry><entry><para>SBus Slot 2</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x130000000 - 0x13FFFFFFF</literal></para>
+</entry><entry><para>SBus Slot 3</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x1D0000000 - 0x1DFFFFFFF</literal></para>
+</entry><entry><para>SBus Slot D</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x1E0000000 - 0x1EFFFFFFF</literal></para>
+</entry><entry><para>SBus Slot E</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><literal>0x1F0000000 - 0x1FFFFFFFF</literal></para>
+</entry><entry><para>SBus Slot F</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3><sect3 id="hwovr-35"><title>Physical SBus Addresses</title><para><indexterm id="hwovr-ix59"><primary> SBus</primary><secondary>address bits</secondary></indexterm>The SBus has 32 address bits, as described in
+the <citetitle>SBus Specification</citetitle>. The following table describes
+how the Ultra 2 uses the address bits.</para><table frame="topbot" id="hwovr-37963"><title>Ultra 2 SBus Address Bits</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="2*"/><colspec colnum="2" colname="column2" colwidth="7*"/><thead><row rowsep="1"><entry><para>Bits</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>0 - 27</para>
+</entry><entry><para>These bits are the SBus address lines used by an SBus card to address
+the contents of the card.</para>
+</entry>
+</row><row><entry><para>28 - 31</para>
+</entry><entry><para>Used by the CPU to select one of the SBus slots. These bits generate
+the SlaveSelect lines.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>This addressing scheme yields the Ultra 2 addresses shown in <olink targetptr="hwovr-tbl-34" remap="internal">Table&nbsp;A&ndash;1</olink>. Other implementations
+might use a different number of address bits.</para><para>The Ultra 2 has seven SBus slots, four of which are physical. Slots
+0 through 3 are available for SBus cards. Slots 4-12 are reserved. The slots
+are used as follows:</para><itemizedlist><listitem><para><indexterm id="hwovr-ix60"><primary>DVMA</primary><secondary>SBus slots supporting</secondary></indexterm><indexterm id="hwovr-ix61"><primary>SBus</primary><secondary>slots supporting DVMA</secondary></indexterm>Slots 0-3 are physical
+slots that have DMA-master capability.</para>
+</listitem><listitem><para>Slots D, E, and F are not actual physical slots, but refer
+to the onboard direct memory access (DMA), SCSI, Ethernet, and audio controllers.
+For convenience, these classes of devices are viewed as being plugged into
+slots D, E, and F.</para><note><para>Some SBus slots are slave-only slots. Drivers that require DMA
+capability should use <olink targetdoc="group-refman" targetptr="ddi-slaveonly-9f" remap="external"><citerefentry><refentrytitle>ddi_slaveonly</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine whether their
+device is in a DMA-capable slot. For an example of this function, see <olink targetptr="autoconf-41111" remap="internal">attach() Entry Point</olink>.</para>
+</note>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="hwovr-36"><title>SBus Hardware Configuration Files</title><para><indexterm id="hwovr-ix62"><primary>hardware configuration files</primary><secondary>SBus devices</secondary></indexterm><indexterm id="hwovr-ix63"><primary>SBus</primary><secondary>hardware configuration files</secondary></indexterm>Hardware configuration files are normally unnecessary for SBus
+devices. However, on some occasions, drivers for SBus devices need to use
+hardware configuration files to augment the information provided by the SBus
+card. See the <olink targetdoc="group-refman" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="sbus-4" remap="external"><citerefentry><refentrytitle>sbus</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page for further details.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="hwovr-100"><title>Device Issues</title><para>This section describes issues with special devices.</para><sect2 id="hwovr-78"><title>Timing-Critical Sections</title><para><indexterm><primary><function>ddi_enter_critical</function> function</primary></indexterm>While most driver operations can be performed without mechanisms
+for synchronization and protection beyond those provided by the locking primitives,
+some devices require that a sequence of events occur in order without interruption.
+In conjunction with the locking primitives, the function <olink targetdoc="group-refman" targetptr="ddi-enter-critical-9f" remap="external"><citerefentry><refentrytitle>ddi_enter_critical</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> asks the system to guarantee, to the best of its ability,
+that the current thread will neither be preempted nor interrupted. This guarantee
+stays in effect until a closing call to <olink targetdoc="group-refman" targetptr="ddi-exit-critical-9f" remap="external"><citerefentry><refentrytitle>ddi_exit_critical</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is made. See the <olink targetdoc="group-refman" targetptr="ddi-enter-critical-9f" remap="external"><citerefentry><refentrytitle>ddi_enter_critical</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for details.</para>
+</sect2><sect2 id="hwovr-79"><title>Delays</title><para><indexterm><primary><command>drv_usecwait(9F)</command></primary></indexterm>Many chips specify that they can be accessed only at specified
+intervals. For example, the Zilog Z8530 SCC has a &ldquo;write recovery time&rdquo;
+of 1.6 microseconds. This specification means that a delay must be enforced
+with <olink targetdoc="group-refman" targetptr="drv-usecwait-9f" remap="external"><citerefentry><refentrytitle>drv_usecwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when writing characters with an 8530. In some instances,
+the specifications do not make explicit what delays are needed, so the delays
+must be determined empirically.</para><para>Be careful not to compound delays for parts of devices that might exist
+in large numbers, for example, thousands of SCSI disk drives.</para>
+</sect2><sect2 id="hwovr-80"><title>Internal Sequencing Logic</title><para><indexterm><primary>internal sequencing logic</primary></indexterm>Devices
+with internal sequencing logic map multiple internal registers to the same
+external address. The various kinds of internal sequencing logic include the
+following types:</para><itemizedlist><listitem><para><indexterm><primary>external registers</primary></indexterm><indexterm><primary>internal mode registers</primary></indexterm>The Intel 8251A and
+the Signetics 2651 alternate the same external register between <emphasis>two</emphasis> internal
+mode registers. Writing to the first internal register is accomplished by
+writing to the external register. This write, however, has the side effect
+of setting up the sequencing logic in the chip so that the next read/write
+operation refers to the second internal register.</para>
+</listitem><listitem><para>The NEC PD7201 PCC has multiple internal data registers. To
+write a byte into a particular register, two steps must be performed. The
+first step is to write into register zero the number of the register into
+which the following byte of data will go. The data is then written to the
+specified data register. The sequencing logic automatically sets up the chip
+so that the next byte sent will go into data register zero.</para>
+</listitem><listitem><para>The AMD 9513 timer has a data pointer register that points
+at the data register into which a data byte will go. When sending a byte to
+the data register, the pointer is incremented. The current value of the pointer
+register <emphasis>cannot</emphasis> be read.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="hwovr-81"><title>Interrupt Issues</title><para><indexterm><primary>interrupts</primary><secondary>common problems with</secondary></indexterm>Note the following common interrupt-related issues:</para><itemizedlist><listitem><para>A controller interrupt does <emphasis>not</emphasis> necessarily
+indicate that <emphasis>both</emphasis> the controller <emphasis>and</emphasis> one
+of its slave devices are ready. For some controllers, an interrupt can indicate
+that either the controller is ready or one of its devices is ready but not
+both.</para>
+</listitem><listitem><para>Not all devices power up with interrupts disabled and can
+begin interrupting at any time.</para>
+</listitem><listitem><para>Some devices do not provide a way to determine that the board
+has generated an interrupt.</para>
+</listitem><listitem><para>Not all interrupting boards shut off interrupts when told
+to do so or after a bus reset.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="hwovr-101"><title>PROM on SPARC Machines</title><para><indexterm><primary>device drivers</primary><secondary>debugging</secondary><tertiary>using the PROM</tertiary></indexterm><indexterm><primary>debugging</primary><secondary>using the SPARC PROM for device debugging</secondary></indexterm>Some
+platforms have a PROM monitor that provides support for debugging a device
+without an operating system. This section describes how to use the PROM on
+SPARC machines to map device registers so that they can be accessed. Usually,
+the device can be exercised enough with PROM commands to determine whether
+the device is working correctly.</para><para>See the <olink targetdoc="group-refman" targetptr="boot-1m" remap="external"><citerefentry><refentrytitle>boot</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for a description of the x86 boot subsystem.</para><para>The PROM has several purposes, including:</para><itemizedlist><listitem><para>Bringing the machine up from power on, or from a hard reset
+PROM <command>reset</command> command</para>
+</listitem><listitem><para>Providing an interactive tool for examining and setting memory,
+device registers, and memory mappings</para>
+</listitem><listitem><para>Booting the Solaris system.</para><para>Simply powering up
+the computer and attempting to use its PROM to examine device registers can
+fail. While the device might be correctly installed, those mappings are specific
+to the Solaris OS and do not become active until the Solaris kernel is booted.
+Upon power up, the PROM maps only essential system devices, such as the keyboard.</para>
+</listitem><listitem><para>Taking a system crash dump using the <command>sync</command> command</para>
+</listitem>
+</itemizedlist><sect2 id="hwovr-82"><title>Open Boot PROM 3</title><para><indexterm><primary>PROM commands</primary></indexterm>For complete
+documentation on the Open Boot PROM, see the <citetitle>Open Boot PROM Toolkit
+User's Guide</citetitle> and the <olink targetdoc="group-refman" targetptr="monitor-1m" remap="external"><citerefentry><refentrytitle>monitor</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page. The examples in
+this section refer to a <trademark>Sun4U</trademark> architecture. Other architectures
+might require different commands to perform actions.</para><note><para>The Open Boot PROM is currently used on Sun machines with an SBus
+or UPA/PCI. The Open Boot PROM uses an &ldquo;<command>ok</command>&rdquo;
+prompt. On older machines, you might have to type `<command>n</command>' to
+get the &ldquo;<command>ok</command>&rdquo; prompt.</para>
+</note><para>If the PROM is in <emphasis>secure mode</emphasis> (the <literal>security-mode</literal> parameter is not set to <emphasis>none</emphasis>), the PROM password
+might be required (set in the <literal>security-password</literal> parameter).</para><para>The <command>printenv</command> command displays all parameters and
+their values.</para><para>Help is available with the <command>help</command> command.</para><para>EMACS-style command-line history is available. Use Control-N (next)
+and Control-P (previous) to traverse the history list.</para><sect3 id="hwovr-83"><title>Forth Commands</title><para>The Open Boot PROM uses the Forth programming language. Forth is a stack-based
+language. Arguments must be pushed on the stack before running the correct
+command (called a <emphasis>word</emphasis>), and the result is left on the
+stack.</para><para>To place a number on the stack, type its value.</para><screen>ok <userinput>57</userinput>
+ok <userinput>68</userinput></screen><para>To add the two top values on the stack, use the <literal>+</literal> operator.</para><screen>ok <userinput>+</userinput></screen><para>The result remains on the stack. The stack is shown with the <literal>.s</literal> <emphasis>word</emphasis>.</para><screen>ok <userinput>.s</userinput>
+bf</screen><para>The default base is hexadecimal. The <literal>hex</literal> and <literal>decimal</literal> <emphasis>words</emphasis> can be used to switch bases.</para><screen>ok <userinput>decimal</userinput>
+ok <userinput>.s</userinput>
+191</screen><para>See the <citetitle>Forth User's Guide</citetitle> for more information.</para>
+</sect3><sect3 id="hwovr-84"><title>Walking the PROMs Device Tree</title><para>The commands <command>pwd</command>, <command>cd</command>, and <command>ls</command> walk the PROM device tree to get to the device. The <command>cd</command> command
+must be used to establish a position in the tree before <command>pwd</command> will
+work. This example is from an Ultra 1 workstation with a <literal>cgsix</literal> frame
+buffer on an SBus.</para><screen>ok <userinput>cd /</userinput></screen><para>To see the devices attached to the current node in the tree, use <command>ls</command>.</para><screen>ok <userinput>ls</userinput>
+f006a064 SUNW,UltraSPARC@0,0
+f00598b0 sbus@1f,0
+f00592dc counter-timer@1f,3c00
+f004eec8 virtual-memory
+f004e8e8 memory@0,0
+f002ca28 aliases
+f002c9b8 options
+f002c880 openprom
+f002c814 chosen
+f002c7a4 packages</screen><para>The full node name can be used:</para><screen>ok <userinput>cd sbus@1f,0</userinput>
+ok <userinput>ls</userinput>
+f006a4e4 cgsix@2,0
+f0068194 SUNW,bpp@e,c800000
+f0065370 ledma@e,8400010
+f006120c espdma@e,8400000
+f005a448 SUNW,pll@f,1304000
+f005a394 sc@f,1300000
+f005a24c zs@f,1000000
+f005a174 zs@f,1100000
+f005a0c0 eeprom@f,1200000
+f0059f8c SUNW,fdtwo@f,1400000
+f0059ec4 flashprom@f,0
+f0059e34 auxio@f,1900000
+f0059d28 SUNW,CS4231@d,c000000</screen><para>Rather than using the full node name in the previous example, you could
+also use an abbreviation. The abbreviated command-line entry looks like the
+following example:</para><screen>ok <userinput>cd sbus</userinput></screen><para>The name is actually <literal>device@slot,offset</literal> (for SBus
+devices). The <literal>cgsix</literal> device is in slot 2 and starts at offset
+0. If an SBus device is displayed in this tree, the device has been recognized
+by the PROM.</para><para>The <command>.properties</command> command displays the PROM properties
+of a device. These properties can be examined to determine which properties
+the device exports. This information is useful later to ensure that the driver
+is looking for the correct hardware properties. These properties are the same
+properties that can be retrieved with <olink targetdoc="group-refman" targetptr="ddi-getprop-9f" remap="external"><citerefentry><refentrytitle>ddi_getprop</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><screen>ok <userinput>cd cgsix</userinput>
+ok <userinput>.properties</userinput>
+character-set            ISO8859-1
+intr                     00000005 00000000
+interrupts               00000005
+reg                      00000002 00000000 01000000
+dblbuf                   00 00 00 00
+vmsize                   00 00 00 01
+...</screen><para>The <property>reg</property> property defines an array of register description
+structures containing the following fields:</para><screen>uint_t        bustype;       /* cookie for related bus type*/
+uint_t        addr;          /* address of reg relative to bus */
+uint_t        size;          /* size of this register set */</screen><para>For the <literal>cgsix</literal> example, the address is 0.</para>
+</sect3><sect3 id="hwovr-85"><title>Mapping the Device</title><para>A device must be mapped into memory to be tested. The PROM can then
+be used to verify proper operation of the device by using data-transfer commands
+to transfer bytes, words, and long words. If the device can be operated from
+the PROM, even in a limited way, the driver should also be able to operate
+the device.</para><para>To set up the device for initial testing, perform the following steps:</para><orderedlist><listitem><para>Determine the SBus slot number the device is in.</para><para>In
+this example, the <literal>cgsix</literal> device is located in slot 2.</para>
+</listitem><listitem><para>Determine the offset within the physical address space used
+by the device.</para><para>The offset used is specific to the device. In the <literal>cgsix</literal> example, the video memory happens to start at an offset of
+0x800000.</para>
+</listitem><listitem><para>Use the <literal>select-dev</literal> <emphasis>word</emphasis> to
+select the Sbus device and the <literal>map-in</literal> <emphasis>word</emphasis> to
+map the device in.</para><para>The <literal>select-dev</literal> <emphasis>word</emphasis> takes
+a string of the device path as its argument. The <literal>map-in</literal> <emphasis>word</emphasis> takes an <emphasis>offset</emphasis>, a <emphasis>slot number</emphasis>,
+and a <emphasis>size</emphasis> as arguments to map. Like the offset, the
+size of the byte transfer is specific to the device. In the <literal>cgsix</literal> example,
+the size is set to 0x100000 bytes.</para><para>In the following code example, the Sbus path is displayed as an argument
+to the <literal>select-dev</literal> word, and the offset, slot number, and
+size values for the frame buffer are displayed as arguments to the <literal>map-in</literal> word. Notice the space between the opening quote and / in the <literal>select-dev</literal> argument. The virtual address to use remains on top of
+the stack. The stack is shown using the <literal>.s</literal> word. The stack
+can be assigned a name with the <command>constant</command> operation.</para><screen>ok <userinput>" sbus@1f,0" select-dev</userinput>
+ok <userinput>800000 2 100000 map-in</userinput>
+ok <userinput>.s</userinput>
+ffe98000
+ok <userinput>constant fb</userinput></screen>
+</listitem>
+</orderedlist>
+</sect3>
+</sect2><sect2 id="hwovr-86"><title>Reading and Writing</title><para>The PROM provides a variety of 8-bit, 16-bit, and 32-bit operations.
+In general, a <literal>c</literal> (character) prefix indicates an 8-bit (one-byte)
+operation; a <literal>w</literal> (word) prefix indicates a 16-bit (two-byte)
+operation; and an <literal>L</literal> (longword) prefix indicates a 32-bit
+(four-byte) operation.</para><para>A suffix of <literal>!</literal> indicates a write operation. The write
+operation takes the first two items off the stack. The first item is the address,
+and the second item is the value.</para><screen>ok <userinput>55 ffe98000 c!</userinput></screen><para>A suffix of <literal>@</literal> indicates a read operation. The read
+operation takes the address off the stack.</para><screen>ok <userinput>ffe98000 c@</userinput>
+ok <userinput>.s</userinput>
+55</screen><para>A suffix of <literal>?</literal> is used to display the value without
+affecting the stack.</para><screen>ok <userinput>ffe98000 c?</userinput>
+55</screen><para>Be careful when trying to query the device. If the mappings are not
+set up correctly, trying to read or write could cause errors. Special words
+are provided to handle these cases. <literal>cprobe</literal>, <literal>wprobe</literal>,
+and <literal>lprobe</literal>, for example, read from the given address but
+return zero if the location does not respond, or nonzero if it does.</para><screen>ok <userinput>fffa4000 c@</userinput>
+Data Access Error
+
+ok <userinput>fffa4000 cprobe</userinput>
+ok <userinput>.s</userinput>0
+
+ok <userinput>ffe98000 cprobe</userinput>
+ok <userinput>.s</userinput>
+0 ffffffffffffffff</screen><para>A region of memory can be shown with the <command>dump</command> word.
+This takes an <replaceable>address</replaceable> and a <replaceable>length</replaceable>,
+and displays the contents of the memory region in bytes.</para><para>In the following example, the <literal>fill</literal> word is used to
+fill video memory with a pattern. <literal>fill</literal> takes the address,
+the number of bytes to fill, and the byte to use. Use <literal>wfill</literal> and
+an <literal>Lfill</literal> for words and longwords. This fill example causes
+the <literal>cgsix</literal> to display simple patterns based on the byte
+passed.</para><screen>ok <userinput>" /sbus" select-dev</userinput>
+ok <userinput>800000 2 100000 map-in</userinput>
+ok <userinput>constant fb</userinput>
+ok <userinput>fb 10000 ff fill</userinput>
+ok <userinput>fb 20000 0 fill</userinput>
+ok <userinput>fb 18000 55 fill</userinput>
+ok <userinput>fb 15000 3 fill</userinput>
+ok <userinput>fb 10000 5 fill</userinput>ok <userinput>fb 5000 f9 fill</userinput></screen>
+</sect2>
+</sect1>
+</appendix><?Pub *0000053488 0?>

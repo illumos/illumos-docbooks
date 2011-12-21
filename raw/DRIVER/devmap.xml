@@ -1,0 +1,378 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="devmap-24338"><title>Mapping Device and Kernel Memory</title><indexterm id="devmap-ix444"><primary>memory mapping</primary><secondary>device memory management</secondary>
+</indexterm><indexterm id="devmap-ix445"><primary>device memory</primary><secondary>mapping</secondary>
+</indexterm><highlights><para>Some device drivers allow applications to access device or kernel memory
+through  <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.
+Frame buffer drivers, for example, enable the frame buffer to be mapped into
+a user thread. Another example would be a pseudo driver that uses a shared
+kernel memory pool to communicate with an application. This chapter provides
+information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="devmap-85944" remap="internal">Memory Mapping Overview</olink></para>
+</listitem><listitem><para><olink targetptr="devmap-1" remap="internal">Exporting the Mapping</olink></para>
+</listitem><listitem><para><olink targetptr="devmap-3" remap="internal">Associating Device Memory With
+User Mappings</olink></para>
+</listitem><listitem><para><olink targetptr="devmap-4" remap="internal">Associating Kernel Memory With
+User Mappings</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="devmap-85944"><title>Memory Mapping Overview</title><para>The steps that a driver must take to export device or kernel memory
+are as follows:</para><orderedlist><listitem><para>Set the <literal>D_DEVMAP</literal> flag in the <structfield>cb_flag</structfield> flag of the <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem><listitem><para>Define a <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> driver
+entry point and optional <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point to export the mapping.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to set up
+user mappings to a device. To set up user mappings to kernel memory, use <olink targetdoc="group-refman" targetptr="devmap-umem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</orderedlist>
+</sect1><sect1 id="devmap-1"><title>Exporting the Mapping</title><para>This section describes how to use the <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points.</para><sect2 id="gebga"><title>The <literal>segmap</literal>(9E) Entry Point</title><para><indexterm><primary><function>segmap</function> entry point</primary><secondary>description of</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+is responsible for setting up a memory mapping requested by an <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. Drivers for many
+memory-mapped devices use <olink targetdoc="group-refman" targetptr="ddi-devmap-segmap-9f" remap="external"><citerefentry><refentrytitle>ddi_devmap_segmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> as the entry point rather
+than defining their own <citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine. By providing a <function>segmap</function> entry point, a driver can take care of general tasks before or
+after creating the mapping. For example, the driver can check mapping permissions
+and allocate private mapping resources. The driver can also make adjustments
+to the mapping to accommodate non-page-aligned device buffers. The <function>segmap</function> entry point must call the <citerefentry><refentrytitle>ddi_devmap_segmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function before returning.
+The <function>ddi_devmap_segmap</function> function calls the driver's <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+to perform the actual mapping.</para><para>The <function>segmap</function> function has the following syntax:</para><programlisting>int segmap(dev_t <replaceable>dev</replaceable>, off_t <replaceable>off</replaceable>, struct as *<replaceable>asp</replaceable>, caddr_t *<replaceable>addrp</replaceable>,
+     off_t <replaceable>len</replaceable>, unsigned int <replaceable>prot</replaceable>, unsigned int <replaceable>maxprot</replaceable>,
+     unsigned int <replaceable>flags</replaceable>, cred_t *<replaceable>credp</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>dev</replaceable></term><listitem><para>Device whose memory is to be mapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>off</replaceable></term><listitem><para>Offset within device memory at which mapping begins.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>asp</replaceable></term><listitem><para>Pointer to the address space into which the device memory
+should be mapped.</para><para>Note that this argument can be either a <literal>struct as *</literal>,
+as shown in <olink targetptr="segmap-1" remap="internal">Example&nbsp;10&ndash;1</olink>, or
+a <literal>ddi_as_handle_t</literal>, as shown in <olink targetptr="segmap-2" remap="internal">Example&nbsp;10&ndash;2</olink>. This is because <filename>ddidevmap.h</filename> includes the following
+declaration:</para><programlisting>typedef struct as *ddi_as_handle_t</programlisting>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>addrp</replaceable></term><listitem><para>Pointer to the address in the address space to which the device
+memory should be mapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length (in bytes) of the memory being mapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>prot</replaceable></term><listitem><para>A bit field that specifies the protections. Possible settings
+are PROT_READ, PROT_WRITE, PROT_EXEC, PROT_USER, and PROT_ALL. See the man
+page for details.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>maxprot</replaceable></term><listitem><para>Maximum protection flag possible for attempted mapping. The
+PROT_WRITE bit can be masked out if the user opened the special file read-only.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flags</replaceable></term><listitem><para>Flags that indicate the type of mapping. Possible values include
+MAP_SHARED and MAP_PRIVATE.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>credp</replaceable></term><listitem><para>Pointer to the user credentials structure.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>In the following example, the driver controls a frame buffer that allows
+write-only mappings. The driver returns <errorcode>EINVAL</errorcode> if the
+application tries to gain read access and then calls <olink targetdoc="group-refman" targetptr="ddi-devmap-segmap-9f" remap="external"><citerefentry><refentrytitle>ddi_devmap_segmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to set up the user mapping.</para><example id="segmap-1"><title><literal>segmap(9E)</literal> Routine</title><programlisting>static int
+xxsegmap(dev_t dev, off_t off, struct as *asp, caddr_t *addrp,
+    off_t len, unsigned int prot, unsigned int maxprot,
+    unsigned int flags, cred_t *credp)
+{
+    if (prot &amp; PROT_READ)
+        return (EINVAL);
+    return (ddi_devmap_segmap(dev, off, as, addrp,
+        len, prot, maxprot, flags, cred));
+}</programlisting>
+</example><para>The following example shows how to handle a device that has a buffer
+that is not page-aligned in its register space. This example maps a buffer
+that starts at offset 0x800, so that <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> returns an address that corresponds to the start of
+the buffer. The <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+maps entire pages, requires the mapping to be page aligned, and returns an
+address to the start of a page. If this address is passed through <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, or if no <function>segmap</function> entry point is defined, <function>mmap</function> returns
+the address that corresponds to the start of the page, not the address that
+corresponds to the start of the buffer. In this example, the buffer offset
+is added to the page-aligned address that was returned by <literal>devmap_devmem_setup</literal> so that the resulting address returned is the desired start of
+the buffer.</para><example id="segmap-2"><title>Using the <function>segmap</function> Function
+to Change the Address Returned by the <function>mmap</function> Call</title><programlisting>#define	BUFFER_OFFSET 0x800
+
+int
+xx_segmap(dev_t dev, off_t off, ddi_as_handle_t as, caddr_t *addrp, off_t len,
+    uint_t prot, uint_t maxprot, uint_t flags, cred_t *credp)
+{
+        int rval;
+        unsigned long pagemask = ptob(1L) - 1L;
+
+        if ((rval = ddi_devmap_segmap(dev, off, as, addrp, len, prot, maxprot,
+            flags, credp)) == DDI_SUCCESS) {
+                /*
+                 * The address returned by ddi_devmap_segmap is the start of the page
+                 * that contains the buffer.  Add the offset of the buffer to get the
+                 * final address.
+                 */
+                *addrp += BUFFER_OFFSET &amp; pagemask);
+        }
+        return (rval);
+}</programlisting>
+</example>
+</sect2><sect2 id="gebhs"><title>The <literal>devmap</literal>(9E) Entry Point</title><para>The <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is called from the <olink targetdoc="group-refman" targetptr="ddi-devmap-segmap-9f" remap="external"><citerefentry><refentrytitle>ddi_devmap_segmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function inside the <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para>The <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is called as a result of the <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. The <citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> function is called to export device
+memory or kernel memory to user applications. The <function>devmap</function> function
+is used for the following operations:</para><itemizedlist><listitem><para>Validate the user mapping to the device or kernel memory</para>
+</listitem><listitem><para>Translate the logical offset within the application mapping
+to the corresponding offset within the device or kernel memory</para>
+</listitem><listitem><para>Pass the mapping information to the system for setting up
+the mapping</para>
+</listitem>
+</itemizedlist><para>The <function>devmap</function> function has the following syntax:</para><programlisting>int devmap(dev_t <replaceable>dev</replaceable>, devmap_cookie_t <replaceable>handle</replaceable>, offset_t <replaceable>off</replaceable>,
+     size_t <replaceable>len</replaceable>, size_t *<replaceable>maplen</replaceable>, uint_t <replaceable>model</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>dev</replaceable></term><listitem><para>Device whose memory is to be mapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Device-mapping handle that the system creates and uses to
+describe a mapping to contiguous memory in the device or kernel.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>off</replaceable></term><listitem><para>Logical offset within the application mapping that has to
+be translated by the driver to the corresponding offset within the device
+or kernel memory.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length (in bytes) of the memory being mapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>maplen</replaceable></term><listitem><para>Enables driver to associate different kernel memory regions
+or multiple physically discontiguous memory regions with one contiguous user
+application mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>model</replaceable></term><listitem><para>Data model type of the current thread.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm id="devmap-ix446"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap</function> function</secondary></indexterm>The system creates multiple mapping handles in one  <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. For example,
+the mapping might contain multiple physically discontiguous memory regions.</para><para>Initially,  <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is
+called with the parameters <replaceable>off</replaceable> and <replaceable>len</replaceable>.
+These parameters are passed by the application to  <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> sets <literal>*</literal><replaceable>maplen</replaceable> to the length from <replaceable>off</replaceable> to
+the end of a contiguous memory region. The <literal>*</literal><replaceable>maplen</replaceable> value must be rounded up to a multiple of a page size. The <literal>*</literal><replaceable>maplen</replaceable> value can be set to less than
+the original mapping length <structfield>len</structfield>. If so, the system
+ uses a new mapping handle with adjusted <replaceable>off</replaceable> and <replaceable>len</replaceable> parameters to call  <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> repeatedly  until the initial
+mapping length is satisfied.</para><para>If a driver supports multiple application data models, <replaceable>model</replaceable> must
+be passed to <olink targetdoc="group-refman" targetptr="ddi-model-convert-from-9f" remap="external"><citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The <function>ddi_model_convert_from</function> function determines whether a data model mismatch exists between
+the current thread and the device driver. The device driver might have to
+adjust the shape of data structures before exporting the structures to a user
+thread that supports a different data model. See <olink targetptr="lp64-35004" remap="internal">Appendix&nbsp;C,
+Making a Device Driver 64-Bit Ready</olink> page for more details.</para><para>The <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point must return <literal>-1</literal> if the logical offset, <replaceable>off</replaceable>,
+is out of the range of memory exported by the driver.</para>
+</sect2>
+</sect1><sect1 id="devmap-3"><title>Associating Device Memory With User Mappings</title><para><indexterm id="devmap-ix447"><primary><literal>devmap_</literal> functions</primary><secondary><function>devmap_devmem_setup</function> function</secondary></indexterm><indexterm id="devmap-ix448"><primary>exporting device memory to user applications</primary></indexterm>Call <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> from the
+driver's <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point to export device memory to user applications.</para><para>The <citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function has the following syntax:</para><programlisting>int devmap_devmem_setup(devmap_cookie_t <replaceable>handle</replaceable>, dev_info_t *<replaceable>dip</replaceable>,
+    struct devmap_callback_ctl *<replaceable>callbackops</replaceable>, uint_t <replaceable>rnumber</replaceable>, 
+    offset_t <replaceable>roff</replaceable>, size_t <replaceable>len</replaceable>, uint_t <replaceable>maxprot</replaceable>, uint_t <replaceable>flags</replaceable>, 
+    ddi_device_acc_attr_t *<replaceable>accattrp</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Opaque device-mapping handle that the system uses to identify
+the mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>dip</replaceable></term><listitem><para>Pointer to the device's <literal>dev_info</literal> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>callbackops</replaceable></term><listitem><para>Pointer to a <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+that enables the driver to be notified of user events on the mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>rnumber</replaceable></term><listitem><para>Index number to the register address space set.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>roff</replaceable></term><listitem><para>Offset into the device memory.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length in bytes that is exported.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>maxprot</replaceable></term><listitem><para>Allows the driver to specify different protections for different
+regions within the exported device memory.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flags</replaceable></term><listitem><para>Must be set to <literal>DEVMAP_DEFAULTS</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>accattrp</replaceable></term><listitem><para>Pointer to a <olink targetdoc="group-refman" targetptr="ddi-device-acc-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_device_acc_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <replaceable>roff</replaceable> and <replaceable>len</replaceable> arguments
+describe a range within the device memory specified by the register set <replaceable>rnumber</replaceable>. The register specifications that are referred to by <replaceable>rnumber</replaceable> are described by the <literal>reg</literal> property.
+For devices with only one register set, pass zero for <literal>rnumber</literal>.
+The range is defined by <replaceable>roff</replaceable> and <replaceable>len</replaceable>.
+The range is made accessible to the user's application mapping at the <replaceable>offset</replaceable> that is passed in by the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. Usually the
+driver passes the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> offset
+directly to <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The return address of <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> then maps to the beginning address of the register
+set.</para><para>The <replaceable>maxprot</replaceable> argument enables the driver to
+specify different protections for different regions within the exported device
+memory. For example, to disallow write access for a region, set only <literal>PROT_READ</literal> and <literal>PROT_USER</literal> for that region.</para><para>The following example shows how to export device memory to an application.
+The driver first determines whether the requested mapping falls within the
+device memory region. The size of the device memory is determined using <olink targetdoc="group-refman" targetptr="ddi-dev-regsize-9f" remap="external"><citerefentry><refentrytitle>ddi_dev_regsize</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The length of the mapping is rounded up to a multiple
+of a page size using <olink targetdoc="group-refman" targetptr="ptob-9f" remap="external"><citerefentry><refentrytitle>ptob</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="btopr-9f" remap="external"><citerefentry><refentrytitle>btopr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Then <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is called to export the device memory to the application.</para><example id="devmap-23038"><title>Using the <function>devmap_devmem_setup</function> Routine</title><programlisting>static int
+xxdevmap(dev_t dev, devmap_cookie_t handle, offset_t off, size_t len,
+    size_t *maplen, uint_t model)
+{
+    struct xxstate *xsp;
+    int    error, rnumber;
+    off_t regsize;
+    
+    /* Set up data access attribute structure */
+    struct ddi_device_acc_attr xx_acc_attr = {
+        DDI_DEVICE_ATTR_V0,
+        DDI_NEVERSWAP_ACC,
+        DDI_STRICTORDER_ACC
+    };
+    xsp = ddi_get_soft_state(statep, getminor(dev));
+    if (xsp == NULL)
+        return (-1);
+    /* use register set 0 */
+    rnumber = 0;
+    /* get size of register set */
+    if (ddi_dev_regsize(xsp-&gt;dip, rnumber, &amp;regsize) != DDI_SUCCESS)
+        return (-1);
+    /* round up len to a multiple of a page size */
+       len = ptob(btopr(len));
+    if (off + len &gt; regsize)
+        return (-1);
+    /* Set up the device mapping */
+    error = devmap_devmem_setup(handle, xsp-&gt;dip, NULL, rnumber, 
+    off, len, PROT_ALL, DEVMAP_DEFAULTS, &amp;xx_acc_attr);
+    /* acknowledge the entire range */
+    *maplen = len;
+    return (error);
+}</programlisting>
+</example>
+</sect1><sect1 id="devmap-4"><title>Associating Kernel Memory With User Mappings</title><para><indexterm id="devmap-ix449"><primary>associating kernel memory with user applications</primary></indexterm><indexterm><primary>kernel</primary><secondary>memory</secondary><tertiary>associating with user applications</tertiary></indexterm>Some device drivers might need to allocate kernel memory that
+is made accessible to user programs through <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. One example is setting up shared memory for communication
+between two applications. Another example is sharing memory between a driver
+and an application.</para><para>When exporting kernel memory to user applications, follow these steps:</para><orderedlist><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate kernel memory.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="devmap-umem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to export the memory.</para>
+</listitem><listitem><para>Use <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to free the memory when the memory is no longer needed.</para>
+</listitem>
+</orderedlist><sect2 id="devmap-6"><title>Allocating Kernel Memory for User Access</title><para><indexterm id="devmap-ix450"><primary><function>ddi_umem_alloc</function> function</primary></indexterm>Use <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate kernel memory
+that is exported to applications. <function>ddi_umem_alloc</function> uses
+the following syntax:</para><programlisting>void *ddi_umem_alloc(size_t <replaceable>size</replaceable>, int <replaceable>flag</replaceable>, ddi_umem_cookie_t 
+*<replaceable>cookiep</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>size</replaceable></term><listitem><para>Number of bytes to allocate.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flag</replaceable></term><listitem><para>Used to determine the sleep conditions and the memory type.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>cookiep</replaceable></term><listitem><para>Pointer to a kernel memory cookie.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> allocates page-aligned kernel memory. <function>ddi_umem_alloc</function> returns a pointer to the allocated memory. Initially, the memory
+is filled with zeroes. The number of bytes that are allocated is a multiple
+of the system page size, which is rounded up from  the <replaceable>size</replaceable> parameter.
+The allocated memory can be used in the kernel. This memory can be exported
+to applications as well. <replaceable>cookiep</replaceable> is a pointer to
+the kernel memory cookie that describes the kernel memory being allocated. <replaceable>cookiep</replaceable> is used in <olink targetdoc="group-refman" targetptr="devmap-umem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when the driver exports the
+kernel memory to a user application.</para><para>The <replaceable>flag</replaceable> argument indicates whether <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> blocks or returns immediately, and whether the allocated
+kernel memory is pageable. The values for the <structfield>flag</structfield> argument
+as follows:</para><variablelist><varlistentry><term><literal>DDI_UMEM_NOSLEEP</literal></term><listitem><para>Driver does not need to wait for memory to become available.
+Return <literal>NULL</literal> if memory is not available.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DDI_UMEM_SLEEP</literal></term><listitem><para>Driver can wait indefinitely for memory to become available.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DDI_UMEM_PAGEABLE</literal></term><listitem><para>Driver allows memory to be paged out. If not set, the memory
+is locked down.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <function>ddi_umem_lock</function> function can perform device-locked-memory
+checks. The function checks against the limit value that is specified in <literal>project.max-locked-memory</literal>. If the current project locked-memory
+usage is below the limit, the project's locked-memory byte count is increased.
+After the limit check, the memory is locked. The <function>ddi_umem_unlock</function> function
+unlocks the memory, and the project's locked-memory byte count is decremented.</para><para>The accounting method that is used is an imprecise full price model.
+For example, two  callers of <function>umem_lockmemory</function> within the
+same project with overlapping memory regions are charged twice.</para><para>For information about the <literal>project.max-locked-memory</literal> and <literal>zone.max-locked_memory</literal> resource controls on Solaris systems with
+zones installed, see <olink targetdoc="rscmgrdevgd" remap="external"><citetitle remap="book">Solaris
+Containers: Resource Management and Solaris Zones Developer&rsquo;s Guide</citetitle></olink> and
+see <olink targetdoc="refman5" targetptr="resource-controls-5" remap="external"><citerefentry><refentrytitle>resource_controls</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink>.</para><para>The following example shows how to allocate kernel memory for application
+access. The driver exports one page of kernel memory, which is used by multiple
+applications as a shared memory area. The memory is allocated in <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> when an application
+maps the shared page the first time. An additional page is allocated if the
+driver has to support multiple application data models. For example, a 64-bit
+driver might export memory both to 64-bit applications and to 32-bit applications.
+64-bit applications share the first page, and 32-bit applications share the
+second page.</para><example id="devmap-25235"><title>Using the <function>ddi_umem_alloc</function> Routine</title><programlisting>static int
+xxsegmap(dev_t dev, off_t off, struct as *asp, caddr_t *addrp, off_t len,
+    unsigned int prot, unsigned int maxprot, unsigned int flags, 
+    cred_t *credp)
+{
+    int error;
+    minor_t instance = getminor(dev);
+    struct xxstate *xsp = ddi_get_soft_state(statep, instance);
+
+    size_t mem_size;
+        /* 64-bit driver supports 64-bit and 32-bit applications */
+    switch (ddi_mmap_get_model()) {
+        case DDI_MODEL_LP64:
+             mem_size = ptob(2);
+             break;
+        case DDI_MODEL_ILP32:
+             mem_size = ptob(1);
+             break;
+    }
+
+    mutex_enter(&amp;xsp-&gt;mu);
+    if (xsp-&gt;umem == NULL) {
+        /* allocate the shared area as kernel pageable memory */
+        xsp-&gt;umem = ddi_umem_alloc(mem_size,
+            DDI_UMEM_SLEEP | DDI_UMEM_PAGEABLE, &amp;xsp-&gt;ucookie);
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    /* Set up the user mapping */
+    error = devmap_setup(dev, (offset_t)off, asp, addrp, len,
+        prot, maxprot, flags, credp);
+    return (error);
+}</programlisting>
+</example>
+</sect2><sect2 id="devmap-7"><title>Exporting Kernel Memory to Applications</title><para><indexterm id="devmap-ix451"><primary><literal>devmap_</literal> functions</primary><secondary><function>devmap_umem_setup</function> function</secondary></indexterm>Use <olink targetdoc="group-refman" targetptr="devmap-umem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to export kernel memory to user applications. <function>devmap_umem_setup</function> must be called from the driver's <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. The syntax for <function>devmap_umem_setup</function> is as follows:</para><programlisting>int devmap_umem_setup(devmap_cookie_t <replaceable>handle</replaceable>, dev_info_t *<replaceable>dip</replaceable>,
+    struct devmap_callback_ctl *<replaceable>callbackops</replaceable>, ddi_umem_cookie_t <replaceable>cookie</replaceable>,
+    offset_t <replaceable>koff</replaceable>, size_t <replaceable>len</replaceable>, uint_t <replaceable>maxprot</replaceable>, uint_t <replaceable>flags</replaceable>,
+    ddi_device_acc_attr_t *<replaceable>accattrp</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Opaque structure used to describe the mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>dip</replaceable></term><listitem><para>Pointer to the device's <structname>dev_info</structname> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>callbackops</replaceable></term><listitem><para>Pointer to a <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>cookie</replaceable></term><listitem><para>Kernel memory cookie returned by <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>koff</replaceable></term><listitem><para>Offset into the kernel memory specified by cookie.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length in bytes that is exported.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>maxprot</replaceable></term><listitem><para>Specifies the maximum protection possible for the exported
+mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flags</replaceable></term><listitem><para>Must be set to <literal>DEVMAP_DEFAULTS</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>accattrp</replaceable></term><listitem><para>Pointer to a <olink targetdoc="group-refman" targetptr="ddi-device-acc-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_device_acc_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><replaceable>handle</replaceable> is a device-mapping handle that the
+system uses to identify the mapping. <replaceable>handle</replaceable> is
+passed in by the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. <replaceable>dip</replaceable> is a pointer to the device's <structname>dev_info</structname> structure. <replaceable>callbackops</replaceable> enables the
+driver to be notified of user events on the mapping. Most drivers set <replaceable>callbackops</replaceable> to <literal>NULL</literal> when kernel memory is
+exported.</para><para><replaceable>koff</replaceable> and <replaceable>len</replaceable> specify
+a range within the kernel memory allocated by <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. This range is made accessible
+to the user's application mapping at the offset that is passed in by the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.
+Usually, the driver  passes the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> offset directly to <olink targetdoc="group-refman" targetptr="devmap-umem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The return address of <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> then maps to the kernel address returned by <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. <replaceable>koff</replaceable> and <replaceable>len</replaceable> must
+be page-aligned.</para><para><replaceable>maxprot</replaceable> enables the driver to specify different
+protections for different regions within the exported kernel memory. For example,
+one region might not allow write access by only setting <literal>PROT_READ</literal> and <literal>PROT_USER</literal>.</para><para>The following example shows how to export kernel memory to an application.
+The driver first checks whether the requested mapping falls within the allocated
+kernel memory region. If a 64-bit driver receives a mapping request from a
+32-bit application, the request is redirected to the second page of the kernel
+memory area. This redirection ensures that only applications compiled to the
+same data model share the same page.</para><example id="devmap-19641"><title><citerefentry><refentrytitle>devmap_umem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxdevmap(dev_t dev, devmap_cookie_t handle, offset_t off, size_t len,
+    size_t *maplen, uint_t model)
+{
+    struct xxstate *xsp;
+    int    error;
+
+    /* round up len to a multiple of a page size */
+    len = ptob(btopr(len));
+    /* check if the requested range is ok */
+    if (off + len &gt; ptob(1))
+        return (ENXIO);
+    xsp = ddi_get_soft_state(statep, getminor(dev));
+    if (xsp == NULL)
+        return (ENXIO);
+
+    if (ddi_model_convert_from(model) == DDI_MODEL_ILP32)
+        /* request from 32-bit application. Skip first page */
+        off += ptob(1);
+
+    /* export the memory to the application */
+    error = devmap_umem_setup(handle, xsp-&gt;dip, NULL, xsp-&gt;ucookie,
+        off, len, PROT_ALL, DEVMAP_DEFAULTS, NULL);
+    *maplen = len;
+    return (error);
+}</programlisting>
+</example>
+</sect2><sect2 id="devmap-8"><title>Freeing Kernel Memory Exported for User Access</title><para><indexterm id="devmap-ix452"><primary><function>ddi_umem_free</function> function</primary></indexterm>When the driver is unloaded, the memory that was allocated
+by <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> must be freed by calling <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><programlisting>void ddi_umem_free(ddi_umem_cookie_t <replaceable>cookie</replaceable>);</programlisting><para><replaceable>cookie</replaceable> is the kernel memory cookie returned
+by <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000040839 0?>

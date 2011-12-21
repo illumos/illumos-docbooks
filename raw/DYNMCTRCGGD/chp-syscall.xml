@@ -1,0 +1,136 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-syscall"><title><literal>syscall</literal> Provider</title><highlights><para>The <literal>syscall</literal> provider makes available a probe at the
+entry to and return from every system call in the system. Because system calls
+are the primary interface between user-level applications and the operating
+system kernel, the <literal>syscall</literal> provider can offer tremendous
+insight into application behavior with respect to the system.</para>
+</highlights><sect1 id="chp-syscall-1"><title>Probes</title><para><indexterm><primary><literal>syscall</literal> probe</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>syscall</literal></secondary></indexterm><literal>syscall</literal> provides a pair of probes for each
+system call: an <literal>entry</literal> probe that fires before the system
+call is entered, and a <literal>return</literal> probe that fires after the
+system call has completed but before control has transferred back to user-level.
+For all <literal>syscall</literal> probes, the function name is set to be
+the name of the instrumented system call and the module name is undefined.</para><para>The names of the system calls as provided by the <literal>syscall</literal> provider
+may be found in the <filename>/etc/name_to_sysnum</filename> file. Often,
+the system call names provided by <literal>syscall</literal> correspond to
+names in Section 2 of the man pages. However, some probes provided by the <literal>syscall</literal> provider do not directly correspond to any documented system
+call. The common reasons for this discrepancy are described in
+this section.</para><sect2 id="chp-syscall-2"><title>System Call Anachronisms</title><para>In some cases, the name of the system call as provided by the <literal>syscall</literal> provider is actually a reflection of an ancient implementation
+detail. For example, for reasons dating back to <trademark>UNIX</trademark> antiquity,
+the name of <olink targetdoc="refman2" targetptr="exit-2" remap="external"><citerefentry><refentrytitle>exit</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> in <literal>/etc/name_to_sysnum</literal> is <literal>rexit</literal>. Similarly, the
+name of <olink targetdoc="refman2" targetptr="time-2" remap="external"><citerefentry><refentrytitle>time</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> is <literal>gtime</literal>, and the name of both <olink targetdoc="refman2" targetptr="execle-2" remap="external"><citerefentry><refentrytitle>execle</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="execve-2" remap="external"><citerefentry><refentrytitle>execve</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> is <literal>exece</literal>.</para>
+</sect2><sect2 id="chp-syscall-3"><title>Subcoded System Calls</title><para>Some system calls as presented in Section 2 are implemented as suboperations
+of an undocumented system call. For example, the system calls related to System
+V semaphores (<olink targetdoc="refman2" targetptr="semctl-2" remap="external"><citerefentry><refentrytitle>semctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="semget-2" remap="external"><citerefentry><refentrytitle>semget</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="semids-2" remap="external"><citerefentry><refentrytitle>semids</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="semop-2" remap="external"><citerefentry><refentrytitle>semop</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="semtimedop-2" remap="external"><citerefentry><refentrytitle>semtimedop</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>) are implemented as suboperations
+of a single system call, <literal>semsys</literal>. The <literal>semsys</literal> system
+call takes as its first argument an implementation-specific <emphasis>subcode</emphasis> denoting
+the specific system call required: <literal>SEMCTL</literal>, <literal>SEMGET</literal>, <literal>SEMIDS</literal>, <literal>SEMOP</literal> or <literal>SEMTIMEDOP</literal>,
+respectively. As a result of overloading a single system call to implement
+multiple system calls, there is only a single pair of syscall probes for System
+V semaphores: <literal>syscall::semsys:entry</literal> and <literal>syscall::semsys:return</literal>.</para>
+</sect2><sect2 id="chp-syscall-4"><title>Large File System Calls</title><para><indexterm><primary><literal>syscall</literal> probes</primary><secondary>large file system interfaces</secondary></indexterm><indexterm><primary>system calls</primary><secondary>for large files</secondary></indexterm><indexterm><primary>large file system calls</primary></indexterm>A 32-bit program that supports <emphasis>large
+files</emphasis> that exceed four gigabytes in size must be able to process
+64&ndash;bit file offsets. Because large files require use of large offsets,
+large files are manipulated through a parallel set of system interfaces, as
+described in <olink targetdoc="refman5" targetptr="lf64-5" remap="external"><citerefentry><refentrytitle>lf64</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink>.
+These interfaces are documented in <literal>lf64</literal>, but they do not
+have individual man pages. Each of these large file system call interfaces
+appears as its own <literal>syscall</literal> probe as shown in <olink targetptr="tbl-syscall" remap="internal">Table&nbsp;21&ndash;1</olink>.</para><table frame="topbot" id="tbl-syscall"><title><literal>sycall</literal> Large
+File Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="2.50in"/><colspec colname="colspec1" colwidth="2.52in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Large File <literal>syscall</literal> Probe</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>System Call</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>creat64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="creat-2" remap="external"><citerefentry><refentrytitle>creat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>fstat64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="fstat-2" remap="external"><citerefentry><refentrytitle>fstat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>fstatvfs64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="fstatvfs-2" remap="external"><citerefentry><refentrytitle>fstatvfs</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>getdents64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="getdents-2" remap="external"><citerefentry><refentrytitle>getdents</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>getrlimit64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="getrlimit-2" remap="external"><citerefentry><refentrytitle>getrlimit</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>lstat64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="lstat-2" remap="external"><citerefentry><refentrytitle>lstat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>mmap64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>open64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>pread64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="pread-2" remap="external"><citerefentry><refentrytitle>pread</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>pwrite64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="pwrite-2" remap="external"><citerefentry><refentrytitle>pwrite</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>setrlimit64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="setrlimit-2" remap="external"><citerefentry><refentrytitle>setrlimit</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>stat64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="stat-2" remap="external"><citerefentry><refentrytitle>stat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>statvfs64</literal></para>
+</entry><entry colname="colspec1"><para><olink targetdoc="refman2" targetptr="statvfs-2" remap="external"><citerefentry><refentrytitle>statvfs</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="chp-syscall-5"><title>Private System Calls</title><para>Some system calls are private implementation details of Solaris subsystems
+that span the user-kernel boundary. As such, these system calls do not have
+man pages in Section 2. Examples of system calls in this category include
+the <literal>signotify</literal> system call, which is used as part of the
+implementation of POSIX.4 message queues, and the <literal>utssys</literal> system
+call, which is used to implement <olink targetdoc="refman1m" targetptr="fuser-1m" remap="external"><citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="chp-syscall-6"><title>Arguments</title><para><indexterm><primary><literal>syscall</literal> probes</primary><secondary>arguments</secondary></indexterm>For <literal>entry</literal> probes, the arguments
+(<literal>arg0</literal> .. <literal>arg</literal><replaceable>n</replaceable><literal></literal>)
+are the arguments to the system call. For <literal>return</literal> probes,
+both <literal>arg0</literal> and <literal>arg1</literal> contain the return
+value. A non-zero value in the D variable <literal>errno</literal> indicates
+system call failure.</para>
+</sect1><sect1 id="chp-syscall-stability"><title>Stability</title><para><indexterm><primary>stability</primary><secondary>of <literal>syscall</literal> probes</secondary></indexterm><indexterm><primary><literal>syscall</literal> probes</primary><secondary>stability</secondary></indexterm>The <literal>syscall</literal> provider
+uses DTrace's stability mechanism to describe its stabilities as shown in
+the following table. For more information about the stability mechanism, refer
+to <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para>ISA</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para>Unstable</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000013166 0?>

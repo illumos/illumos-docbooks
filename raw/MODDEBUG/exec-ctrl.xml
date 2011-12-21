@@ -1,0 +1,429 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()chapter(5)?><chapter id="chp-exec"><title>Execution Control</title><highlights><para>MDB provides facilities for controlling and tracing the execution of
+live running programs, including both user applications and the live operating
+system kernel and device drivers. You can use the <command>mdb</command> command
+to control user processes that are already running, or create new processes
+under the control of the debugger. You can boot or load <command>kmdb</command> to
+control the execution of the operating system kernel itself, or debug a device
+driver. This chapter describes the built-in dcmds that can be used to control
+target execution. These commands can be used in either <command>mdb</command> or <command>kmdb</command>, except as noted in the descriptions. Additional topics relating
+only to execution control in <command>kmdb</command> are discussed in <olink targetptr="chp-kmdb" remap="internal">Chapter&nbsp;7, Kernel Execution Control</olink>.</para>
+</highlights><sect1 id="exec-ctrl-9"><title>Execution Control</title><para>MDB provides a simple model of execution control: a target process can
+be started from within the debugger using <command>::run</command>, or MDB
+can attach to an existing process using <command>:A</command>, <command>::attach</command>,
+or the <literal>-p</literal> command-line option (see <olink targetptr="commands-1" remap="internal">Chapter&nbsp;5, Built-In Commands</olink>). Alternately,
+the kernel can be booted using <command>kmdb</command> or <command>kmdb</command> can
+be loaded afterward. In either case, a list of traced <emphasis>software events</emphasis> can
+be specified by the user. Each time a traced event occurs in the target program,
+all threads in the target stop, the thread that triggered the event is chosen
+as the representative thread, and control returns to the debugger. Once the
+target program is set running, control can be asynchronously returned to the
+debugger by typing the user-defined interrupt character (typically Control-C).</para><para>A <emphasis>software event</emphasis> is a state transition in the target
+program that is observed by the debugger. For example, the debugger may observe
+the transition of a program counter register to a value of interest (a breakpoint)
+or the delivery of a particular signal.</para><para>A <emphasis>software event specifier</emphasis> is a description of
+a class of software events that is used by the debugger to instrument the
+target program in order to observe these events.  The <literal>::events</literal> dcmd
+is used to list the software event specifiers.  A set of standard properties
+is associated with each event specifier, as described under <command>::events</command> in <olink targetptr="execctrl-1" remap="internal">Built-in dcmds</olink>.</para><para>The debugger can observe a variety of different software events, including
+breakpoints, watchpoints, signals, machine faults, and system calls.  New
+specifiers can be created using <command>::bp</command>, <command>::fltbp</command>, <command>:: sigbp</command>, <command>::sysbp</command>, or <command>::wp</command>.
+Each specifier has an associated callback (an MDB command string to execute
+as if it had been typed at the command prompt) and a set of properties, as
+described under <command>::events</command> in <olink targetptr="execctrl-1" remap="internal">Built-in
+dcmds</olink>. Any number of specifiers for the same event may be created,
+each with different callbacks and properties. The current list of traced events
+and the properties of the corresponding event specifiers can be displayed
+using the <command>::events</command> dcmd.  The event specifier properties
+are defined as part of the description of the <command>::events</command> and <command>::evset</command> dcmds, in <olink targetptr="execctrl-1" remap="internal">Built-in dcmds</olink>.</para><para>The execution control built-in dcmds, described in <olink targetptr="execctrl-1" remap="internal">Built-in dcmds</olink>, are always available, but will
+issue an error message indicating they are not supported if applied to a target
+that does not support execution control.</para>
+</sect1><sect1 id="exec-ctrl-10"><title>Event Callbacks</title><para>The <command>::evset</command> dcmd and event tracing dcmds allow you
+to associate an event callback (using the <literal>-c</literal> option) with
+each event specifier. The event callbacks are strings that represent MDB commands
+to execute when the corresponding event occurs in the target.  These commands
+are executed as if they had been typed at the command prompt. Prior to executing
+each callback, the <emphasis>dot</emphasis> variable is set to the value of
+the representative thread's program counter and the <emphasis>hits</emphasis> variable
+is set to the number of times this specifier has been matched, including the
+current match.</para><para>If the event callbacks themselves contain one or more  commands to continue
+the target (for example, <command>::cont</command> or <command>::step</command>),
+these commands do <emphasis>not</emphasis> immediately continue the target
+and wait for it to stop again.  Instead, inside of an event callback, the
+continue dcmds note that a continue operation is now pending, and then return
+immediately. Therefore, if multiple dcmds are included in an event callback,
+the step or continue dcmd should be the last command specified. Following
+the execution of <emphasis>all</emphasis> event callbacks, the target will
+immediately resume execution if <emphasis>all</emphasis> matching event callbacks
+requested a continue. If conflicting continue operations are requested, the
+operation with the highest precedence determines what type of continue will
+occur. The order of precedence from highest to lowest is: step, step-over
+(next), step-out, continue.</para>
+</sect1><sect1 id="exec-ctrl-11"><title>Thread Support</title><para>MDB provides facilities to examine the stacks and registers of each
+thread associated with the target. The persistent <literal>thread</literal> variable
+contains the current representative thread identifier. The format of the thread
+identifier depends on the target. The <command>::regs</command> and <command>::fpregs</command> dcmds  can be used to examine the register set of the representative
+thread, or of another thread if its register set is currently available. In
+addition, the register set of the representative thread is exported as a set
+of named variables.  The user can modify the value of one or more registers
+by applying the <literal>&gt;</literal> dcmd to the corresponding named variable.</para><para>The MDB kernel target exports the virtual address of the corresponding
+internal thread structure as the identifier for a given thread. This address
+corresponds to the <literal>kthread_t</literal> data structure in the operating
+system source code. When using <command>kmdb</command>, the CPU identifier
+for the CPU running <command>kmdb</command> is stored in the <literal>cpuid</literal> variable.</para><para>The MDB process target provides proper support for examination of multi-threaded
+user processes that use the native <literal>lwp_*</literal> interfaces, <filename>/usr/lib/libthread.so</filename>, or <filename>/usr/lib/libpthread.so</filename>.
+When debugging a live user process, MDB will detect if a single threaded process
+dlopens or closes <filename>libthread</filename> and will automatically adjust
+its view of the threading model on-the-fly.  The process target thread identifiers
+will correspond to either the <literal>lwpid_t</literal>, <literal>thread_t</literal>,
+or <literal>pthread_t</literal> of the representative, depending on the threading
+model used by the application.</para><para>If MDB is debugging a user process target and the target makes use of
+compiler-supported thread-local storage, MDB will automatically evaluate symbol
+names referring to thread-local storage to the address of the storage corresponding
+to the current representative thread. The <command>::tls</command> built-in
+dcmd can be used to display the value of the symbol for threads other than
+the representative thread. </para>
+</sect1><sect1 id="execctrl-1"><title>Built-in dcmds</title><variablelist termlength="wholeline"><varlistentry><term>[ <replaceable>addr</replaceable> ] <command>::bp</command> [+/-dDestT]
+[<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>] <replaceable>sym</replaceable> ...</term><term><replaceable>addr</replaceable> <command>:b</command> [<replaceable>cmd</replaceable> ...
+]</term><listitem><para>Set a breakpoint at the specified locations.  The <command>::bp</command> dcmd
+sets a breakpoint at each address or symbol specified, including an optional
+address specified by an explicit expression preceding the dcmd, and each string
+or immediate value following the dcmd. The arguments may either be symbol
+names or immediate values denoting a particular virtual address of interest.
+If a symbol name is specified, it may refer to a symbol that cannot yet be
+evaluated in the target process: that is, it may consist of an object name
+and function name in a load object that has not yet been opened.  In this
+case, the breakpoint is deferred and it will not be active in the target until
+an object matching the given name is loaded. The breakpoint will be automatically
+enabled when the load object is opened. Breakpoints on symbols defined in
+a shared library should always be set using a symbol name and not using an
+address expression, as the address may refer to the corresponding Procedure
+Linkage Table (PLT) entry instead of the actual symbol definition. Breakpoints
+set on PLT entries may be overwritten by the run-time link-editor when the
+PLT entry is subsequently resolved to the actual           symbol definition.
+The <option>d</option>, <option>D</option>, <option>e</option>, <option>s</option>, <option>t</option>, <option>T</option>, <option>c</option>, and <option>n</option> options
+have the same meaning as they do for the <command>::evset</command> dcmd,
+as described later in this section. If the <command>:b</command> form of the
+ dcmd is used, a breakpoint is only set at the virtual address specified by
+the expression preceding the dcmd.  The arguments following the <command>:b</command> dcmd
+are concatenated together to form the callback string.  If this string contains
+meta-characters, it must be quoted.</para>
+</listitem>
+</varlistentry><varlistentry><term><command><replaceable>function</replaceable> ::call [ <replaceable>arg</replaceable> ... ]</command></term><listitem><para>When using <command>kmdb</command> only, call the specified <replaceable>function</replaceable> defined in the operating system kernel. The <replaceable>function</replaceable> expression must match the address of a defined function in
+a symbol table of one of the known kernel modules. If expression arguments
+are specified, these arguments as passed by value. If string arguments are
+specified, these arguments are passed by reference.</para><note><para>The <command>::call</command> command should be used only with
+extreme caution and should never be applied to a production system. The operating
+system kernel will not resume execution in order to execute the specified
+function. Therefore, the function being called must not utilize arbitrary
+kernel services and must not block for any reason. You must be fully aware
+of the side-effects of any function you call using this command.</para>
+</note>
+</listitem>
+</varlistentry><varlistentry><term><command>::cont</command> [<replaceable>SIG</replaceable>]</term><term><command>:c</command> [<replaceable>SIG</replaceable>]</term><listitem><para>Suspend the debugger, continue the target program, and wait
+for it to terminate or stop following a software event of interest. If the
+target is already running because the debugger was attached to a running program
+with the <literal>-o nostop</literal> option enabled, this dcmd simply waits
+for the target to terminate or stop after an event of interest. If an optional
+signal name or number (see the signal (3HEAD) man page) is specified as an
+argument, the signal is immediately delivered to the target as part of resuming
+its execution. If the SIGINT signal is traced, control may be asynchronously
+returned to the debugger by typing the user-defined interrupt character (usually
+^C).  This SIGINT signal will be automatically cleared and will not be observed
+by the target the next time it is continued.  If no target program is currently
+running, <command>::cont</command> will start a new program running  as if
+by <command>::run</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>addr</replaceable> <command>::delete</command> [<replaceable>id</replaceable> | <literal>all</literal>]</term><term><replaceable>addr</replaceable> <command>:d</command> [<replaceable>id</replaceable> | <literal>all</literal>]</term><listitem><para>Delete the event specifiers with the given id number. The <replaceable>id</replaceable> number argument is interpreted in decimal by default.  If
+an optional address is specified preceding the dcmd, all event specifiers
+that are associated with the given virtual address are deleted (e.g. all breakpoints
+or watchpoints affecting that address).  If the special argument <literal>all</literal> is
+given, all event specifiers are deleted, except those that are marked sticky
+(T flag).  The <command>::events</command> dcmd displays the current list
+of event specifiers.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>::events</literal> [<option>av</option>]</term><term><command>$b</command> [<option>av</option>]</term><listitem><para>Display the list of software event specifiers.  Each event
+specifier is assigned a unique ID number that can be used to delete or modify
+it at a later time. The debugger may also have its own internal events enabled
+for tracing; these will only be displayed if the <option>a</option> option
+is present.  If the <option>v</option> option is present, a more verbose display
+including the reason for any specifier inactivity will be shown. The following <command>::events</command> dcmd shows example output:</para><programlisting>&gt; ::events
+   ID S TA HT LM Description                              Action
+----- - -- -- -- ---------------------------------------- -------------
+[ 1 ] - T   1  0 stop on SIGINT                           -      
+[ 2 ] - T   0  0 stop on SIGQUIT                          -
+[ 3 ] - T   0  0 stop on SIGILL                           -
+ ...
+[ 11] - T   0  0 stop on SIGXCPU                          -
+[ 12] - T   0  0 stop on SIGXFSZ                          -
+[ 13] -     2  0 stop at libc`printf                      ::echo printf
+&gt;</programlisting><para>The following discussion explains the meaning of each column. A summary
+of this information is available using <command>::help events</command>.</para><variablelist><varlistentry><term>ID</term><listitem><para>The event specifier identifier. The identifier will be shown
+in square brackets [ ] if the specifier is enabled, in parentheses ( ) if
+the specifier is disabled, or in angle brackets &lt; &gt; if the target program
+is currently stopped on an event that matches the given specifier.</para>
+</listitem>
+</varlistentry><varlistentry><term>S</term><listitem><para>The event specifier state.  The state will be one of the following
+symbols:</para><variablelist><varlistentry><term>-</term><listitem><para>The event specifier is idle.  When no target program is running,
+all specifiers are idle. When the target program is running, a specifier may
+be idle if it cannot be evaluated (such as a deferred breakpoint in a shared
+object that is not yet loaded).</para>
+</listitem>
+</varlistentry><varlistentry><term>+</term><listitem><para>The event specifier is active. When the target is continued,
+events of this type will be detected by the debugger.</para>
+</listitem>
+</varlistentry><varlistentry><term>*</term><listitem><para>The event specifier is armed. This state means that the target
+is currently running with instrumentation for this type of event. This state
+is only visible if the debugger is attached to a running program with the<option>o nostop</option> option.</para>
+</listitem>
+</varlistentry><varlistentry><term>!</term><listitem><para>The event specifier was not armed due to an operating system
+                  error.  The <command>::events</command> <literal>-v</literal> option
+can be used to display more information about the reason the instrumentation
+failed.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</listitem>
+</varlistentry><varlistentry><term>TA</term><listitem><para>The Temporary, Sticky, and Automatic event specifier properties.
+One or more of the following symbols may be shown:</para><variablelist><varlistentry><term>t</term><listitem><para>The event specifier is temporary, and will be deleted the
+next time the target stops, regardless of whether it is matched.</para>
+</listitem>
+</varlistentry><varlistentry><term>T</term><listitem><para>The event specifier is sticky, and will be not be deleted
+by <command>::delete</command> <literal>all</literal> or <command>:z</command>.
+The specifier can be deleted by explicitly specifying its id number to<command>::delete</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term>d</term><listitem><para>The event specifier will be automatically disabled when the
+hit count is equal to the hit limit.</para>
+</listitem>
+</varlistentry><varlistentry><term>D</term><listitem><para>The event specifier will be automatically deleted when the
+hit count is equal to the hit limit.</para>
+</listitem>
+</varlistentry><varlistentry><term>s</term><listitem><para>The target will automatically stop when the hit count is equal
+to the hit limit.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</listitem>
+</varlistentry><varlistentry><term>HT</term><listitem><para>The current hit count.  This column displays the number of
+times the corresponding software event has occurred in the target since the
+creation of this event specifier.</para>
+</listitem>
+</varlistentry><varlistentry><term>LM</term><listitem><para>The current hit limit. This column displays the limit on the
+hit count at which the auto-disable, auto-delete, or auto-stop behavior will
+take effect. These behaviors can be configured                using the <command>::evset</command> dcmd.</para>
+</listitem>
+</varlistentry><varlistentry><term>Description</term><listitem><para>A description of the type of software event that is matched
+by the given specifier.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>The callback string to execute when the corresponding software
+event occurs. This callback is executed as if it had been typed at the command
+prompt.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>id</replaceable> <command>::evset</command> [+/-dDestT]
+[<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>] <replaceable>id</replaceable> ...</term><listitem><para>Modify the properties of one or more software event specifiers.
+The properties are set for each specifier identified by the optional expression
+preceding the dcmd and an optional list of arguments following the dcmd. The
+argument list is interpreted as a list of decimal integers, unless an explicit
+radix is specified. The <command>::evset</command> dcmd recognizes the following
+options:</para><variablelist><varlistentry><term><option>d</option></term><listitem><para>Disable the event specifier when the hit count reaches the
+hit limit. If the <literal>+d</literal> form of the option is given, this
+behavior is disabled. Once an event specifier is disabled, the debugger will
+remove any corresponding instrumentation and will ignore the corresponding
+software events until the specifier is subsequently re-enabled.  If the <option>n</option> option is not present, the specifier is disabled immediately.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>D</option></term><listitem><para>Delete the event specifier when the hit count reaches the
+hit limit. If the <literal>+D</literal> form of the option is given, this
+behavior is disabled. The <option>D</option> option takes precedence over
+the <option>d</option> option. The hit limit can be configured using the <option>n</option> option.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>e</option></term><listitem><para>Enable the event specifier. If the <literal>+e</literal> form
+of the option is given, the specifier is disabled.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>s</option></term><listitem><para>Stop the target program when the hit count reaches the hit
+limit. If the <literal>+s</literal> form of the option is given, this behavior
+is disabled.  The <option>s</option> behavior tells the debugger to act as
+if <command>::cont</command> were issued following each execution of the specifier's
+callback, except for the Nth execution, where N is the current value of the
+specifier's hit limit. The <option>s</option> option takes precedence over
+both the <option>D</option> option and the <option>d</option> option.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>-t</literal></term><listitem><para>Mark the event specifier as temporary. Temporary specifiers
+are automatically deleted the next time the target stops, regardless of whether
+it stopped as the result of a software event corresponding to the given specifier.
+If the <literal>+t</literal> form of the option is given, the temporary marker
+is removed.  The <literal>-t</literal> option takes precedence over the <literal>-T</literal> option.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>T</option></term><listitem><para>Mark the event specifier as sticky.  Sticky specifiers will
+not be deleted by <command>::delete all</command> or <command>:z</command>.
+They can be deleted by specifying the corresponding specifier ID as an explicit
+argument to <command>::delete</command>. If the <literal>+T</literal> form
+of the option is given, the sticky property is removed. The default set of
+event specifiers are all initially marked sticky.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>c</option></term><listitem><para>Execute the specified <replaceable>cmd</replaceable> string
+each time the corresponding software event occurs in the target program. The
+current callback string can be displayed using <command>::events</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>n</option></term><listitem><para>Set the current value of the hit limit to <replaceable>count</replaceable>.
+If no hit limit is currently set and the <option>n</option> option does not
+accompany <option>s</option> or <option>D</option>, the hit limit will be
+set to one.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>A summary of this information is available using <command>::help evset</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flt</replaceable> <command>::fltbp</command> [+/-dDestT]
+[<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>] <replaceable>flt</replaceable> ...</term><listitem><para>Trace the specified machine faults. The faults are identified
+using an optional fault number preceding the dcmd, or a list of fault names
+or numbers (see <filename>&lt;sys/fault.h&gt;</filename>) following the dcmd.
+The <option>d</option>, <option>D</option>, <option>e</option>, <option>s</option>, <option>t</option>, <option>T</option>, <option>c</option>, and <option>n</option> options
+have the same meaning as they do for the <command>::evset</command> dcmd.
+The <command>::fltbp</command> command applies to user process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>signal</replaceable> <command>:i</command></term><listitem><para>If the target is a live user process, ignore the specified
+signal and allow it to be delivered transparently to the target. All event
+specifiers that are tracing delivery of the specified signal will be deleted
+from the list of traced events. By default, the set of ignored signals is
+initialized to the complement of the set of signals that cause a process to
+dump core by default (see the signal(3HEAD) man page), except for SIGINT,
+which is traced by default. The <command>:i</command> command applies to user
+process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>$i</command></term><listitem><para>Display the list of signals that are ignored by the debugger
+and will be handled directly by the target. More information on traced signals
+can be obtained using the <command>::events</command> dcmd. The <command>$i</command> command
+applies to user process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::kill</command></term><term><command>:k</command></term><listitem><para>Forcibly terminate the target if it is a live user process.
+The target will also be forcibly terminated when the debugger exits if it
+was created by the debugger using <command>::run</command>. The <command>::kill</command> command
+applies to user process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>$l</command></term><listitem><para>Print the LWPID of the representative thread, if the target
+is a user process.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>$L</command></term><listitem><para>Print the LWPIDs of each LWP in the target, if the target
+is a user process.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::next</command> [<replaceable>SIG</replaceable>]</term><term><command>:e</command> [<replaceable>SIG</replaceable>]</term><listitem><para>Step the target program one instruction, but step over subroutine
+calls. If an optional signal name or number (see signal(3HEAD) man page) is
+specified as an argument, the signal is immediately delivered to the target
+as part of resuming its execution. If no target program is currently running, <command>::next</command> will start a new program running as if by <command>::run</command> and
+stop at the first instruction.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::run</command> [<replaceable>args</replaceable> ...
+]</term><term><command>:r</command> [<replaceable>args</replaceable> ... ]</term><listitem><para>Start a new target program running with the specified arguments
+and attach to it. The arguments are not interpreted by the shell. If the debugger
+is already examining a live running program, it will first detach from this
+program as if by <command>::release</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term>[<replaceable>signal</replaceable>] <command>::sigbp</command> [+/-dDestT]
+[<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>] <replaceable>SIG</replaceable> ...</term><term>[<replaceable>signal</replaceable>] <command>:t</command> [+/<option>dDestT</option>] [<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>] <replaceable>SIG</replaceable> ...</term><listitem><para>Trace delivery of the specified signals.  The signals are
+identified using an optional signal number preceding the dcmd, or a list of
+signal names or numbers (see signal(3HEAD)) following the dcmd.  The <option>d</option>, <option>D</option>, <option>e</option>, <option>s</option>, <option>t</option>, <option>T</option>, <option>c</option>, and <option>n</option> options have the same
+meaning as they do for the <command>::evset</command> dcmd.  Initially, the
+set of signals that cause the process to dump core by default (see signal(3HEAD))
+and SIGINT are traced. The <command>::sigbp</command> command applies to user
+process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::step</command> [<literal>branch</literal> | <literal>over</literal> | <literal>out</literal>] [<replaceable>SIG</replaceable>]</term><term><command>:s</command> <replaceable>SIG</replaceable></term><term><command>:u</command> <replaceable>SIG</replaceable></term><listitem><para>Step the target program one instruction. If an optional signal
+name or number (see the signal(3HEAD) man page) is specified as an argument
+and the target is a user process, the signal is immediately delivered to the
+target as part of resuming its execution. If the optional <literal>branch</literal> argument
+is specified, the target program will continue until the next instruction
+that branches the control flow of the processor. The <command>::step branch</command> feature
+is only available when using <command>kmdb</command> on x86 systems with appropriate
+processor-specific features enabled. If the optional <literal>over</literal> argument
+is specified, <command>::step</command> will step over subroutine calls. 
+The <command>::step over</command> argument is the same as the <command>::next</command> dcmd.
+If the optional <literal>out</literal> argument is specified, the target program
+will continue until the representative thread returns from the current function.
+If no target program is currently running, <command>::step over</command> will
+start a new program running as if by <command>::run</command> and stop at
+the first instruction. The <command>:s</command> dcmd is the same as <command>::step</command>. The <command>:u</command> dcmd is the same as <command>::step
+out</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term>[<replaceable>syscall</replaceable>] <command>::sysbp</command> [+/<option>dDestT</option>] [<option>io</option>] [<option>c</option> <replaceable>cmd</replaceable>]
+[<option>n</option> <replaceable>count</replaceable>] <replaceable>syscall</replaceable> ...</term><listitem><para>Trace entry to or exit from the specified system calls.  The
+system calls are identified using an optional system call number preceding
+the dcmd, or a list of system call names or numbers (see <filename>&lt;sys/syscall.h&gt;</filename>) following the dcmd.  If the <option>i</option> option is specified
+(the default), the event specifiers trigger on entry into the kernel for each
+system call.  If the <option>o</option> option is specified, the event specifiers
+trigger on exit out from the kernel. The <option>d</option>, <option>D</option>, <option>e</option>, <option>s</option>, <option>t</option>, <option>T</option>, <option>c</option>, and <option>n</option> options have the same meaning as they do
+for the <command>::evset</command> dcmd. The <command>::sysbp</command> command
+applies to user process debugging only.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>addr</replaceable> [,<replaceable>len</replaceable>]<command>::wp</command> [+/<option>dDestT</option>] [<option>rwx</option>] [<option>ip</option>]
+[<option>c</option> <replaceable>cmd</replaceable>] [<option>n</option> <replaceable>count</replaceable>]</term><term><replaceable>addr</replaceable> [,<replaceable>len</replaceable>]<command>:a</command> [<replaceable>cmd</replaceable>... ]</term><term><replaceable>addr</replaceable> [,<replaceable>len</replaceable>]<command>:p</command> [<replaceable>cmd</replaceable>... ]</term><term><replaceable>addr</replaceable> [,<replaceable>len</replaceable>]<command>:w</command> [<replaceable>cmd</replaceable>...
+]</term><term></term><listitem><para>Set a watchpoint at the specified address. The length in bytes
+of the watched region may be set by specifying an optional repeat count preceding
+the dcmd. If no length is explicitly set, the default is one byte. The <command>::wp</command> dcmd allows the watchpoint to be configured to trigger on any combination
+of read (<option>r</option> option), write (<option>w</option> option), or
+execute (<option>x</option> option) access.  The <option>d</option>, <option>D</option>, <option>e</option>, <option>s</option>, <option>t</option>, <option>T</option>, <option>c</option>, and <option>n</option> options have the same meaning as they do
+for the <command>::evset</command> dcmd. When using <command>kmdb</command> on
+x86 systems only, the <option>i</option> option can be used to indicate that
+a watchpoint should be set on the address of an I/O port. When using <command>kmdb</command> only, the <option>p</option> option can be used to indicate that
+the specified address should be interpreted as a physical address. The <command>:a</command> dcmd sets a read access watchpoint at the specified address. The <command>:p</command> dcmd sets an execute access watchpoint at the specified address.
+ The <command>:w</command> dcmd sets a write access watchpoint at the specified
+address.  The arguments following the <command>:a</command>. <command>:p</command>,
+and <command>:w</command> dcmds are concatenated together to form the callback
+string.  If this string contains meta-characters, it must be quoted.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>:z</command></term><listitem><para>Delete all event specifiers from the list of traced software
+events. Event specifiers can also be deleted using <command>::delete</command>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="exec-ctrl-12"><title>Interaction With <command>exec</command></title><para>When a controlled user process performs a successful <command>exec</command>(2),
+the behavior of the debugger is controlled by the <literal>::set -o follow_exec_mode</literal> option, as described in <olink targetptr="options-2" remap="internal">Summary of
+Command-line Options</olink>. If the debugger and victim process have the
+same data model, then the <literal>stop</literal> and <literal>follow</literal> modes
+determine whether MDB automatically continues the target or returns to the
+debugger prompt following the <command>exec</command>. If the debugger and
+victim process have a different data model, then the <literal>follow</literal> behavior
+causes MDB to automatically re-exec the MDB binary with the appropriate data
+model and re-attach to the process, still stopped on return from the <command>exec</command>.  Not all debugger state is preserved across this re-exec. </para><para>If a 32-bit victim process <command>exec</command>s a 64-bit program,
+then <literal>stop</literal> will return to the command prompt, but the debugger
+will no longer be able to examine the process because it is now using the
+64-bit data model. To resume debugging, execute the <command>::release -a</command> dcmd,
+quit MDB, and then execute <command>mdb -p</command> <replaceable>pid</replaceable> to
+re-attach the 64-bit debugger to the process. </para><para>If a 64-bit victim process execs a 32-bit program, then <literal>stop</literal> will
+return to the command prompt, but the debugger will only provide limited capabilities
+for examining the new process.  All built-in dcmds will work as advertised,
+but loadable dcmds will not since they do not perform data model conversion
+of structures.  The user should release and reattach the debugger to the process
+as described above in order to restore full debugging capabilities.</para>
+</sect1><sect1 id="exec-ctrl-13"><title>Interaction with Job Control</title><para>If the debugger is attached to a user process that is stopped by job
+control (that is, it stopped in response to SIGTSTP, SIGTTIN, or SIGTTOU),
+the process may not be able to be set running again when it is continued by
+a continue dcmd.  If the victim process is a member of the same session (that
+is, it shares the same controlling terminal as MDB), MDB will attempt to bring
+the associated process group to the foreground and continue the process with
+SIGCONT to resume it from job control stop.  When MDB is detached from such
+a process, it will restore the process group to the background before exiting.
+If the victim process is not a member of the same session, MDB cannot safely
+bring the process group to the foreground, so it will continue the process
+with respect to the debugger but the process will remain stopped by job control.
+MDB will print a warning in this case, and the user must issue a <command>fg</command> command
+from the appropriate shell in order to resume the process.</para>
+</sect1><sect1 id="exec-ctrl-14"><title>Process Attach and Release</title><para>When MDB attaches to a running user process, the process is stopped
+and remains stopped until one of the continue dcmds is applied, or the debugger
+quits.  If the <literal>-o nostop</literal> option is enabled prior to attaching
+the debugger to a process with <literal>-p</literal> or prior to issuing an <command>::attach</command> or <command>:A</command> command, MDB will attach to the
+process but not stop it. While the process is still running, it may be inspected
+as usual (albeit with inconsistent results) and breakpoints or other tracing
+flags may be enabled.  If the <command>:c</command> or <command>::cont</command> dcmds
+are executed while the process is running, the debugger will wait for the
+process to stop. If no traced software events occur, the user can send an
+interrupt (^C) after <command>:c</command> or <command>::cont</command> to
+force the process to stop and return control to the debugger. </para><para>MDB releases the current running process (if any) when the <command>:R</command>, <command>::release</command>, <command>:r</command>, <command>::run</command>, <command>$q</command>, or <command>::quit</command> dcmds are executed, or when the debugger
+terminates as the result of an EOF or signal. If the process was originally
+created by the debugger using <command>:r</command> or <command>::run</command>,
+it will be forcibly terminated as if by SIGKILL when it is released.  If the
+process was already running prior to attaching MDB to it, it will be set running
+again when it is released. A process may be released and left stopped and
+abandoned using the <command>::release -a</command> option.</para>
+</sect1>
+</chapter><?Pub *0000038565 0?>

@@ -1,0 +1,895 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="autoconf-17"><title>Driver Autoconfiguration</title><highlights><para>Autoconfiguration means the driver loads code and static data into memory.
+This information is then registered with the system. Autoconfiguration also
+involves attaching individual device instances that are controlled by the
+driver.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="autoconf-3" remap="internal">Driver Loading and Unloading</olink></para>
+</listitem><listitem><para><olink targetptr="autoconf-22386" remap="internal">Data Structures Required
+for Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="autoconf-95548" remap="internal">Loadable Driver Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="autoconf-60641" remap="internal">Device Configuration Concepts</olink></para>
+</listitem><listitem><para><olink targetptr="autoconf-24" remap="internal">Using Device IDs</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="autoconf-3"><title>Driver Loading and Unloading</title><para><indexterm id="autoconf-ix208"><primary>autoconfiguration</primary><secondary>overview</secondary></indexterm>The system loads driver binary
+modules from the <filename>drv</filename> subdirectory of the kernel module
+directory for autoconfiguration. See <olink targetptr="loading-5" remap="internal">Copying
+the Driver to a Module Directory</olink>.</para><para>After a module is read into memory with all symbols resolved, the system
+calls the <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point for that module. The <function>_init</function> function calls <olink targetdoc="refman9f" targetptr="mod-install-9f" remap="external"><citerefentry><refentrytitle>mod_install</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which actually
+loads the module.</para><note><para>During the call to <function>mod_install</function>, other threads
+are able to call <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> as
+soon as <function>mod_install</function> is called. From a programming standpoint,
+all <function>_init</function> initialization must occur before <function>mod_install</function> is called. If <function>mod_install</function> fails (that is
+a nonzero value is returned), then the initialization must be backed out.</para>
+</note><para>Upon successful completion of <function>_init</function>, the driver
+is properly registered with the system. At this point, the driver is not actively
+managing any device. Device management happens as part of device configuration.</para><para>The system unloads driver binary modules either to conserve system memory
+or at the explicit request of a user. Before deleting the driver code and
+data from memory, the <olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point of the driver is invoked. The driver is unloaded, if and only if <function>_fini</function> returns success.</para><para>The following figure provides a structural overview of a device driver.
+The shaded area highlights the driver data structures and entry points. The
+upper half of the shaded area contains data structures and entry points that
+support driver loading and unloading. The lower half is concerned with driver
+configuration.</para><figure id="autoconf-fig-4"><title id="autoconf-33281">Module Loading and
+Autoconfiguration Entry Points</title><mediaobject><imageobject><imagedata entityref="autoconf.entrypoints.epsi"/>
+</imageobject><textobject><simpara>Diagram shows structures and entry points used in autoconfiguration
+and module loading.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="autoconf-22386"><title>Data Structures Required for Drivers</title><para>To support autoconfiguration, drivers are required to statically initialize
+the following data structures:</para><itemizedlist><listitem><para><olink targetdoc="refman9s" targetptr="modlinkage-9s" remap="external"><citerefentry><refentrytitle>modlinkage</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="modldrv-9s" remap="external"><citerefentry><refentrytitle>modldrv</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9s" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><para>The data structures in Figure 5-1  are relied on by the driver. These
+structures must be provided and be initialized correctly. Without these data
+structures, the driver might not load properly. As a result, the necessary
+routines might not be loaded.  If an operation is not supported by the driver,
+the address of the <olink targetdoc="refman9f" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine
+can be used as a placeholder. In some instances, the driver supports the entry
+point and only needs to return success or failure. In such cases, the address
+of the routine <olink targetdoc="refman9f" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> can
+be used.</para><note><para>These structures should be initialized at compile-time. The driver
+should not access or change the structures at any other time.</para>
+</note><sect2 id="autoconf-5"><title><literal>modlinkage</literal> Structure</title><indexterm id="autoconf-ix209"><primary><structname>modlinkage</structname> structure</primary><secondary>description of</secondary>
+</indexterm><programlisting>static struct modlinkage xxmodlinkage = {
+    MODREV_1,       /* ml_rev */
+    &amp;xxmodldrv,     /* ml_linkage[] */
+    NULL            /* NULL termination */
+};</programlisting><para>The first field is the version number of the module that loads the subsystem.
+This field should be <literal>MODREV_1</literal>. The second field points
+to driver's <structname>modldrv</structname> structure defined next. The last
+element of the structure should always be <literal>NULL</literal>.</para>
+</sect2><sect2 id="autoconf-6"><title><literal>modldrv</literal> Structure</title><indexterm id="autoconf-ix210"><primary><structname>modldrv</structname>  structure</primary><secondary>description of</secondary>
+</indexterm><indexterm><primary>data structures</primary><secondary><structname>modldrv</structname> structure</secondary>
+</indexterm><programlisting>static struct modldrv xxmodldrv = {
+    &amp;mod_driverops,           /* drv_modops */
+    "generic driver v1.1",    /* drv_linkinfo */
+    &amp;xx_dev_ops               /* drv_dev_ops */
+};</programlisting><para>This structure describes the module in more detail. The first field
+provides information regarding installation of the module. This field should
+be set to <literal>&amp;mod_driverops</literal> for driver modules. The second
+field is a string to be displayed by <olink targetdoc="refman1m" targetptr="modinfo-1m" remap="external"><citerefentry><refentrytitle>modinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. The second field should
+contain sufficient information for identifying the version of source code
+that generated the driver binary. The last field points to the driver's <structname>dev_ops</structname> structure defined in the following section.</para>
+</sect2><sect2 id="autoconf-7"><title><literal>dev_ops</literal> Structure</title><indexterm id="autoconf-ix211"><primary><structname>dev_ops</structname> structure</primary><secondary>description of</secondary>
+</indexterm><indexterm id="autoconf-ix212"><primary>data structures</primary><secondary><structname>dev_ops</structname> structure</secondary>
+</indexterm><programlisting>static struct dev_ops xx_dev_ops = {
+    DEVO_REV,       /* devo_rev, */
+    0,              /* devo_refcnt  */
+    xxgetinfo,      /* getinfo(9E) */
+    nulldev,        /* identify(9E) */
+    xxprobe,        /* probe(9E) */
+    xxattach,       /* attach(9E) */
+    xxdetach,       /* detach(9E) */
+    nodev,          /* devo_reset */
+    &amp;xx_cb_ops,     /* devo_cb_ops */
+    NULL,           /* devo_bus_ops */
+    &amp;xxpower        /* power(9E) */
+};</programlisting><para>The <olink targetdoc="refman9s" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+enables the kernel to find the autoconfiguration entry points of the device
+driver. The <structfield>devo_rev</structfield> field identifies the revision
+number of the structure. This field must be set to <literal>DEVO_REV</literal>.
+The <structfield>devo_refcnt</structfield> field must be initialized to zero.
+The function address fields should be filled in with the address of the appropriate
+driver entry point, except in the following cases:</para><itemizedlist><listitem><para>Set the <structfield>devo_probe</structfield> field to <olink targetdoc="refman9f" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> if a <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine is not needed.</para>
+</listitem><listitem><para>Set the <function>identify</function> field to <olink targetdoc="refman9f" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The <function>identify</function> entry
+point is obsolete.</para>
+</listitem><listitem><para>Set the <literal>devo_reset</literal> field to <olink targetdoc="refman9f" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Set the <olink targetdoc="refman9e" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> field
+to <literal>NULL</literal> if a <function>power</function> routine is not
+needed. Drivers for devices that provide Power Management functionality must
+have a  <function>power</function> entry point.</para>
+</listitem>
+</itemizedlist><para>The <structfield>devo_cb_ops</structfield> member should include the
+address of the <olink targetdoc="refman9s" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+The <structfield>devo_bus_ops</structfield> field must be set to <literal>NULL</literal>.</para>
+</sect2><sect2 id="autoconf-8"><title><literal>cb_ops</literal> Structure</title><programlisting>static struct cb_ops xx_cb_ops = {
+    xxopen,         /* open(9E) */
+    xxclose,        /* close(9E) */
+    xxstrategy,     /* strategy(9E) */
+    xxprint,        /* print(9E) */
+    xxdump,         /* dump(9E) */
+    xxread,         /* read(9E) */
+    xxwrite,        /* write(9E) */
+    xxioctl,        /* ioctl(9E) */
+    xxdevmap,       /* devmap(9E) */
+    nodev,          /* mmap(9E) */
+    xxsegmap,       /* segmap(9E) */
+    xxchpoll,       /* chpoll(9E) */
+    xxprop_op,      /* prop_op(9E) */
+    NULL,           /* streamtab(9S) */
+    D_MP | D_64BIT, /* cb_flag */
+    CB_REV,         /* cb_rev */
+    xxaread,        /* aread(9E) */
+    xxawrite        /* awrite(9E) */
+};</programlisting><para><indexterm><primary><structname>cb_ops</structname> structure</primary><secondary>description of</secondary></indexterm><indexterm id="fbdyx"><primary>character device driver</primary><secondary><structname>cb_ops</structname> structure</secondary></indexterm><indexterm id="fbdzk"><primary>block driver</primary><secondary><structname>cb_ops</structname> structure</secondary></indexterm>The <olink targetdoc="refman9s" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure contains the entry
+points for the character operations and block operations of the device driver.
+Any entry points that the driver does not support should be initialized to <olink targetdoc="refman9f" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. For example, character device
+drivers should set all the block-only fields, such as <structfield>cb_stategy</structfield>,
+to  <olink targetdoc="refman9f" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.
+Note that the  <olink targetdoc="refman9e" targetptr="mmap-9e" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is maintained for compatibility with previous releases. Drivers should
+use the  <olink targetdoc="refman9e" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point for device memory mapping. If  <olink targetdoc="refman9e" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is supported, set  <olink targetdoc="refman9e" targetptr="mmap-9e" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to  <olink targetdoc="refman9f" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm id="autoconf-ix215"><primary>STREAMS</primary><secondary><structname>cb_ops</structname> structure</secondary></indexterm>The <structfield>streamtab</structfield> field
+indicates whether the driver is STREAMS-based. Only the network device drivers
+that are discussed in <olink targetptr="gld-1" remap="internal">Chapter&nbsp;19, Drivers for
+Network Devices</olink>  are STREAMS-based. All non-STREAMS-based drivers <emphasis>must</emphasis> set the <structfield>streamtab</structfield> field to <literal>NULL</literal>.</para><para>The <literal>cb_flag</literal> member contains the following flags:</para><itemizedlist><listitem><para><indexterm id="autoconf-ix216"><primary>multithreading</primary><secondary><literal>D_MP</literal> flag in <structname>cb_ops</structname> structure</secondary></indexterm>The <literal>D_MP</literal> flag indicates that the
+driver is safe for multithreading. The Solaris OS supports only thread-safe
+drivers so <literal>D_MP</literal> must be set.</para>
+</listitem><listitem><para>The <literal>D_64BIT</literal> flag causes the driver to use
+the <structfield>uio_loffset</structfield> field of the <olink targetdoc="refman9s" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. The driver should
+set the <literal>D_64BIT</literal> flag in the <structfield>cb_flag</structfield> field
+to handle 64-bit offsets properly.</para>
+</listitem><listitem><para><indexterm id="autoconf-ix217"><primary>device memory</primary><secondary><literal>D_DEVMAP</literal> flag in <structname>cb_ops</structname></secondary></indexterm>The <literal>D_DEVMAP</literal> flag supports the  <olink targetdoc="refman9e" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. For information
+on  <olink targetdoc="refman9e" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+see <olink targetptr="devmap-24338" remap="internal">Chapter&nbsp;10, Mapping Device and Kernel
+Memory</olink>.</para>
+</listitem>
+</itemizedlist><para><literal>cb_rev</literal> is the <structname>cb_ops</structname> structure
+revision number. This field must be set to <literal>CB_REV</literal>.</para>
+</sect2>
+</sect1><sect1 id="autoconf-95548"><title>Loadable Driver Interfaces</title><para>Device drivers must be dynamically loadable. Drivers should also be
+unloadable to help conserve memory resources. Drivers that can be unloaded
+are also easier to test, debug, and patch.</para><para><indexterm id="autoconf-ix218"><primary>device drivers</primary><secondary>loadable interface</secondary></indexterm>Each device driver is
+required to implement <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="refman9e" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, and <olink targetdoc="refman9e" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points to support driver
+loading and unloading. The following example shows a typical implementation
+of loadable driver interfaces.</para><example id="autoconf-ex-9"><title>Loadable Interface Section</title><programlisting>static void *statep;                /* for soft state routines */
+static struct cb_ops xx_cb_ops;     /* forward reference */
+static struct dev_ops xx_ops = {
+    DEVO_REV,
+    0,
+    xxgetinfo,
+    nulldev,
+    xxprobe,
+    xxattach,
+    xxdetach,
+    xxreset,
+    nodev,
+    &amp;xx_cb_ops,
+    NULL,
+    xxpower
+};
+
+static struct modldrv modldrv = {
+    &amp;mod_driverops,
+    "xx driver v1.0",
+    &amp;xx_ops
+};
+
+static struct modlinkage modlinkage = {
+    MODREV_1,
+    &amp;modldrv,
+    NULL
+};
+
+int
+_init(void)
+{
+    int error;
+    ddi_soft_state_init(&amp;statep, sizeof (struct xxstate),
+        <replaceable>estimated_number_of_instances</replaceable>);
+    /* further per-module initialization if necessary */
+    error = mod_install(&amp;modlinkage);
+    if (error != 0) {
+        /* undo any per-module initialization done earlier */
+        ddi_soft_state_fini(&amp;statep);
+    }
+    return (error);
+}
+
+int
+_fini(void)
+{
+    int error;
+    error = mod_remove(&amp;modlinkage);
+    if (error == 0) {
+        /* release per-module resources if any were allocated */
+        ddi_soft_state_fini(&amp;statep);
+    }
+    return (error);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+    return (mod_info(&amp;modlinkage, modinfop));
+}</programlisting>
+</example><sect2 id="autoconf-19"><title><function>_init</function> Example</title><para>The following example shows a typical <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> interface.</para><example width="70" id="autoconf-ex-38"><title><function>_init</function> Function</title><programlisting>static void *xxstatep;
+int
+_init(void)
+{
+    int error;
+    const int max_instance = 20;    /* estimated max device instances */
+
+    ddi_soft_state_init(&amp;xxstatep, sizeof (struct xxstate), max_instance);
+    error = mod_install(&amp;xxmodlinkage);
+    if (error != 0) {
+        /*
+         * Cleanup after a failure
+         */
+        ddi_soft_state_fini(&amp;xxstatep);
+    }
+    return (error);
+}</programlisting>
+</example><para><indexterm id="autoconf-ix219"><primary sortas="init(9E)"><function>_init</function> entry point</primary><secondary>example of</secondary></indexterm>The driver should
+perform any one-time resource allocation or data initialization during driver
+loading in <function>_init</function>. For example, the driver should initialize
+any mutexes global to the driver in this routine. The driver should not, however,
+use <literal>_init(9E)</literal> to allocate or initialize anything that has
+to do with a particular instance of the device. Per-instance initialization
+must be done in <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+For example, if a driver for a printer can handle more than one printer at
+the same time, that driver should allocate resources specific to each printer
+instance in <function>attach</function>.</para><note><para>Once  <olink targetdoc="refman9e" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has
+called <literal>mod_install(9F)</literal>, the driver should not change any
+of the data structures attached to the <literal>modlinkage(9S)</literal> structure
+because the system might make copies or change the data structures.</para>
+</note>
+</sect2><sect2 id="autoconf-39"><title><function>_fini</function> Example</title><para>The following example demonstrates the <function>_fini</function> routine.</para><programlisting>int
+_fini(void)
+{
+    int error;
+    error = mod_remove(&amp;modlinkage);
+    if (error != 0) {
+        return (error);
+    }
+    /*
+     * Cleanup resources allocated in _init()
+     */
+    ddi_soft_state_fini(&amp;xxstatep);
+    return (0);
+}</programlisting><para><indexterm><primary sortas="fini"><function>_fini</function> entry point</primary><secondary>example of</secondary></indexterm>Similarly, in <function>_fini</function>,
+the driver should release any resources that were allocated in <function>_init</function>.
+The driver must remove itself from the system module list.</para><note><para><function>_fini</function> might be called when the driver is
+attached to hardware instances. In this case, <olink targetdoc="refman9f" targetptr="mod-remove-9f" remap="external"><citerefentry><refentrytitle>mod_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> returns failure. Therefore,
+driver resources should not be released until <function>mod_remove</function> returns
+success.</para>
+</note>
+</sect2><sect2 id="autoconf-20"><title><function>_info</function> Example</title><para>The following example demonstrates the <olink targetdoc="refman9e" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.</para><programlisting>int
+_info(struct modinfo *modinfop)
+{
+    return (mod_info(&amp;xxmodlinkage, modinfop));
+}</programlisting><para><indexterm><primary sortas="info(9E)"><function>_info</function> entry point</primary><secondary>example of</secondary></indexterm>The driver is
+called to return module information. The entry point should be implemented
+as shown above.</para>
+</sect2>
+</sect1><sect1 id="autoconf-60641"><title>Device Configuration Concepts</title><para>For each node in the kernel device tree, the system selects a driver
+for the node based on the node name and the <literal>compatible</literal> property
+(see <olink targetptr="kernelovr-14" remap="internal">Binding a Driver to a Device</olink>).
+The same driver might bind to multiple device nodes. The driver can differentiate
+different nodes by instance numbers assigned by the system.</para><para>After a driver is selected for a device node, the driver's <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called to
+determine the presence of the device on the system. If <function>probe</function> is
+successful, the driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is invoked to set up and manage the device. The device can be opened
+if and only if <function>attach</function> returns success (see <olink targetptr="autoconf-41111" remap="internal">attach() Entry Point</olink>).</para><para>A device might be unconfigured to conserve system memory resources or
+to enable the device to be removed while the system is still running. To enable
+the device to be unconfigured, the system first checks whether the device
+instance is referenced. This check involves calling the driver's <olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point to obtain information
+known only to the driver (see <olink targetptr="autoconf-28012" remap="internal">getinfo()
+Entry Point</olink>). If the device instance is not referenced, the driver's <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine is invoked to unconfigure
+the device (see <olink targetptr="autoconf-72235" remap="internal">detach() Entry Point</olink>).</para><para><indexterm id="autoconf-ix221"><primary>entry points</primary><secondary>for device configuration</secondary></indexterm><indexterm id="autoconf-ix222"><primary>device configuration</primary><secondary>entry points</secondary></indexterm>To recap, each driver must define the following entry points that
+are used by the kernel for device configuration:</para><itemizedlist><listitem><para><olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><para>Note that <function>attach</function>, <function>detach</function>,
+and <function>getinfo</function> are required. <function>probe</function> is
+only required for devices that cannot identify themselves. For self-identifying
+devices, an explicit <function>probe</function> routine can be provided, or <olink targetdoc="refman9f" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> can be specified in the <structname>dev_ops</structname> structure for the <function>probe</function> entry point.</para><sect2 id="autoconf-10"><title>Device Instances and Instance Numbers</title><para><indexterm id="autoconf-ix224"><primary>instance numbers</primary></indexterm>The system assigns an instance number to each device. The driver
+might not reliably predict the value of the instance number assigned to a
+particular device. The driver should retrieve the particular instance number
+that has been assigned by calling <olink targetdoc="refman9f" targetptr="ddi-get-instance-9f" remap="external"><citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>Instance numbers represent the system's notion of devices. Each <literal>dev_info</literal>, that is, each node in the device tree, for a particular driver
+is assigned an instance number by the kernel. Furthermore, instance numbers
+provide a convenient mechanism for indexing data specific to a particular
+physical device. The most common use of instance numbers is <olink targetdoc="refman9f" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which uses instance numbers to retrieve soft state
+data for specific physical devices.</para><caution><para>For pseudo devices, that is, the children of pseudo nexuses,
+the instance numbers are defined in the <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file using the <literal>instance</literal> property.
+ If the <filename>driver.conf</filename> file does not contain the <literal>instance</literal> property, the behavior is undefined. For hardware device nodes,
+the system assigns instance numbers when the device is first seen by the OS.
+The instance numbers persist across system reboots and OS upgrades.</para>
+</caution>
+</sect2><sect2 id="autoconf-23"><title>Minor Nodes and Minor Numbers</title><para>Drivers are responsible for managing their minor number namespace. For
+example, the <command>sd</command> driver needs to export eight character
+minor nodes and eight block minor nodes to the file system for each disk.
+Each minor node represents either a block interface or a character interface
+to a portion of the disk. The <olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point informs the system about the mapping from minor number to device instance
+(see <olink targetptr="autoconf-28012" remap="internal">getinfo() Entry Point</olink>).</para>
+</sect2><sect2 id="autoconf-87993"><title><function>probe</function> Entry Point</title><indexterm id="autoconf-ix234"><primary>entry points</primary><secondary><function>probe</function> function</secondary>
+</indexterm><indexterm id="autoconf-ix235"><primary><function>probe</function> entry point</primary><secondary>description of</secondary>
+</indexterm><para>For non-self-identifying devices, the <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point should determine
+whether the hardware device is present on the system.</para><para>For <function>probe</function> to determine whether the instance of
+the device is present, <function>probe</function> needs to perform many tasks
+that are also commonly done by <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+In particular, <function>probe</function> might need to map the device registers.</para><para>Probing the device registers is device-specific. The driver often has
+to perform a series of tests of the hardware to assure that the hardware is
+really present. The test criteria must be rigorous enough to avoid misidentifying
+devices. For example, a device might appear to be present when in fact that
+device is not available, because a different device seems to behave like the
+expected device.</para><para>The test returns the following flags:</para><itemizedlist><listitem><para><returnvalue>DDI_PROBE_SUCCESS</returnvalue> if the probe
+was successful</para>
+</listitem><listitem><para><returnvalue>DDI_PROBE_FAILURE</returnvalue> if the probe
+failed</para>
+</listitem><listitem><para><returnvalue>DDI_PROBE_DONTCARE</returnvalue> if the probe
+was unsuccessful yet  <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> still
+needs to be called</para>
+</listitem><listitem><para><returnvalue>DDI_PROBE_PARTIAL</returnvalue> if the instance
+is not present now, but might be present in the future</para>
+</listitem>
+</itemizedlist><para>For a given device instance, <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> will not be called until <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has succeeded at least once
+on that device.</para><para><olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> must
+free all the resources that <function>probe</function> has allocated, because <function>probe</function> might be called multiple times. However, <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is not necessarily called
+even if  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has
+succeeded</para><para><olink targetdoc="refman9f" targetptr="ddi-dev-is-sid-9f" remap="external"><citerefentry><refentrytitle>ddi_dev_is_sid</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> can be used in a driver's <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine to determine whether
+the device is self-identifying. <function>ddi_dev_is_sid</function> is useful
+in drivers written for self-identifying and non-self-identifying versions
+of the same device.</para><para>The following example is a sample <function>probe</function> routine.</para><example id="autoconf-27640"><title><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxprobe(dev_info_t *dip)
+{
+    ddi_acc_handle_t dev_hdl;
+    ddi_device_acc_attr_t dev_attr;
+    Pio_csr *csrp;
+    uint8_t csrval;
+
+    /*
+     * if the device is self identifying, no need to probe
+     */
+    if (ddi_dev_is_sid(dip) == DDI_SUCCESS)
+    return (DDI_PROBE_DONTCARE);
+
+    /*
+     * Initalize the device access attributes and map in
+     * the devices CSR register (register 0)
+     */
+    dev_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+    dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+    dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+    if (ddi_regs_map_setup(dip, 0, (caddr_t *)&amp;csrp, 0, sizeof (Pio_csr),
+    &amp;dev_attr, &amp;dev_hdl) != DDI_SUCCESS)
+    return (DDI_PROBE_FAILURE);
+
+    /*
+     * Reset the device
+     * Once the reset completes the CSR should read back
+     * (PIO_DEV_READY | PIO_IDLE_INTR)
+     */
+    ddi_put8(dev_hdl, csrp, PIO_RESET);
+    csrval = ddi_get8(dev_hdl, csrp);
+
+    /*
+     * tear down the mappings and return probe success/failure
+     */
+    ddi_regs_map_free(&amp;dev_hdl);
+    if ((csrval &amp; 0xff) == (PIO_DEV_READY | PIO_IDLE_INTR))
+    return (DDI_PROBE_SUCCESS);
+    else
+    return (DDI_PROBE_FAILURE);
+}</programlisting>
+</example><para>When the driver's  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+is called, the driver does not know whether the device being probed exists
+on the bus. Therefore, the driver might attempt to access device registers
+for a nonexistent device. A bus fault might be generated on some buses as
+a result.</para><para>The following example shows a  <olink targetdoc="refman9e" targetptr="probe-9e" remap="external"><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine that uses <olink targetdoc="refman9f" targetptr="ddi-poke8-9f" remap="external"><citerefentry><refentrytitle>ddi_poke8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to check
+for the existence of the device. <function>ddi_poke8</function> cautiously
+attempts to write a value to a specified virtual address, using the parent
+nexus driver to assist in the process where necessary. If the address is not
+valid or the value cannot be written without an error occurring, an error
+code is returned. See also <olink targetdoc="refman9f" targetptr="ddi-peek-9f" remap="external"><citerefentry><refentrytitle>ddi_peek</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>In this example,  <olink targetdoc="refman9f" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is used to
+map the device registers.</para><example id="autoconf-42737"><title><citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine Using <citerefentry><refentrytitle>ddi_poke8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></title><programlisting>static int
+xxprobe(dev_info_t *dip)
+{
+    ddi_acc_handle_t dev_hdl;
+    ddi_device_acc_attr_t dev_attr;
+    Pio_csr *csrp;
+    uint8_t csrval;
+
+    /*
+     * if the device is self-identifying, no need to probe
+     */
+    if (ddi_dev_is_sid(dip) == DDI_SUCCESS)
+    return (DDI_PROBE_DONTCARE);
+
+    /*
+     * Initialize the device access attrributes and map in
+     * the device's CSR register (register 0)
+     */
+    dev_attr.devacc_attr_version - DDI_DEVICE_ATTR_V0;
+    dev_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+    dev_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+
+    if (ddi_regs_map_setup(dip, 0, (caddr_t *)&amp;csrp, 0, sizeof (Pio_csr),
+    &amp;dev_attr, &amp;dev_hdl) != DDI_SUCCESS)
+    return (DDI_PROBE_FAILURE);
+
+    /*
+     * The bus can generate a fault when probing for devices that
+     * do not exist.  Use ddi_poke8(9f) to handle any faults that
+     * might occur.
+     *
+     * Reset the device.  Once the reset completes the CSR should read
+     * back (PIO_DEV_READY | PIO_IDLE_INTR)
+     */
+    if (ddi_poke8(dip, csrp, PIO_RESET) != DDI_SUCCESS) {
+    ddi_regs_map_free(&amp;dev_hdl);
+    return (DDI_FAILURE);
+
+    csrval = ddi_get8(dev_hdl, csrp);
+    /*
+     * tear down the mappings and return probe success/failure
+     */
+    ddi_regs_map_free(&amp;dev_hdl);
+    if ((csrval &amp; 0xff) == (PIO_DEV_READY | PIO_IDLE_INTR))
+    return (DDI_PROBE_SUCCESS);
+    else
+    return (DDI_PROBE_FAILURE);
+}</programlisting>
+</example>
+</sect2><sect2 id="autoconf-41111"><title><function>attach</function> Entry Point</title><indexterm id="autoconf-ix237"><primary>entry points</primary><secondary><function>attach</function> function</secondary>
+</indexterm><indexterm id="autoconf-ix238"><primary><function>attach</function> entry point</primary><secondary>description of</secondary>
+</indexterm><para><indexterm id="autoconf-ix239"><primary>configuration entry points</primary><secondary><function>attach</function> function</secondary></indexterm>The
+kernel calls a driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point to attach an instance of a device or to resume operation for an instance
+of a device that has been suspended or has been shut down by the power management
+framework.    This section discusses only the operation of attaching device
+instances. Power management is discussed in <olink targetptr="powermgt-37437" remap="internal">Chapter&nbsp;12,
+Power Management</olink>.</para><para>A driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is called to attach each instance of a device that is bound to the driver.
+ The entry point is called with the instance of the device node to attach,
+with <literal>DDI_ATTACH</literal> specified as the <literal>cmd</literal> argument
+to <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+ The attach entry point typically includes the following types of processing:</para><itemizedlist><listitem><para>Allocating a soft-state structure for the device instance</para>
+</listitem><listitem><para><indexterm><primary>thread synchronization</primary><secondary>per instance mutex</secondary></indexterm>Initializing per-instance mutexes</para>
+</listitem><listitem><para><indexterm><primary>thread synchronization</primary><secondary>per instance mutex</secondary></indexterm>Initializing condition variables</para>
+</listitem><listitem><para>Registering the device's interrupts</para>
+</listitem><listitem><para><indexterm id="autoconf-ix241"><primary>device registers</primary><secondary>mapping</secondary></indexterm>Mapping the registers and memory
+of the device instance</para>
+</listitem><listitem><para>Creating minor device nodes for the device instance</para>
+</listitem><listitem><para>Reporting that the device instance has attached</para>
+</listitem>
+</itemizedlist><sect3 id="autoconf-33"><title>Driver Soft-State Management</title><para><indexterm><primary>state structure</primary></indexterm>To assist device
+driver writers in allocating state structures, the Solaris DDI/DKI provides
+a set of memory management routines called <emphasis>software state management
+routines</emphasis>, which are also known as the <emphasis>soft-state routines</emphasis>.
+These routines dynamically allocate, retrieve, and destroy memory items of
+a specified size, and hide the details of list management. An <emphasis>instance
+number</emphasis> identifies the desired memory item. This number is typically
+the instance number assigned by the system.</para><para>Drivers typically allocate a soft-state structure for each device instance
+that attaches to the driver by calling <olink targetdoc="refman9f" targetptr="ddi-soft-state-zalloc-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, passing
+the instance number of the device.  Because no two device nodes can have the
+same instance number, <olink targetdoc="refman9f" targetptr="ddi-soft-state-zalloc-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> fails if
+an allocation already exists for a given instance number.</para><para>A driver's character or block entry point (<olink targetdoc="refman9s" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>) references a particular
+soft state structure by first decoding the device's instance number from the <literal>dev_t</literal> argument that is passed to the entry point function. The driver
+then calls <olink targetdoc="refman9f" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, passing the per-driver soft-state list and the instance
+number that was derived. A <literal>NULL</literal> return value indicates
+that effectively the device does not exist and the appropriate code should
+be returned by the driver.</para><para>See <olink targetptr="autoconf-12" remap="internal">Creating Minor Device Nodes</olink> for
+additional information on how instance numbers and device numbers, or <literal>dev_t</literal>'s, are related.</para>
+</sect3><sect3 id="autoconf-34"><title>Lock Variable and Conditional Variable Initialization</title><para>Drivers should initialize any per-instance locks and condition variables
+during attach.  The initialization of any locks that are acquired by the driver's
+interrupt handler <emphasis>must</emphasis> be initialized prior to adding
+any interrupt handlers.  See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3, Multithreading</olink> for a description of lock initialization and usage.  See <olink targetptr="interrupt-15678" remap="internal">Chapter&nbsp;8, Interrupt Handlers</olink> for
+a discussion of interrupt handler and lock issues.</para>
+</sect3><sect3 id="autoconf-12"><title>Creating Minor Device Nodes</title><para><indexterm id="autoconf-ix257"><primary>minor device node</primary></indexterm>An important part of the attach process is the creation of <emphasis>minor nodes</emphasis> for the device instance.  A minor node contains the
+information exported by the device and the DDI framework. The system uses
+this information to create a <emphasis>special file</emphasis> for the minor
+node under <filename>/devices</filename>.</para><para>Minor nodes are created when the driver calls <olink targetdoc="refman9f" targetptr="ddi-create-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The driver
+supplies a <emphasis>minor number</emphasis>, a <emphasis>minor name</emphasis>,
+a <emphasis>minor node type</emphasis>, and whether the minor node represents
+a block or character device.</para><para>Drivers can create any number of minor nodes for a device. The Solaris
+DDI/DKI expects certain classes of devices to have minor nodes created in
+a particular format.  For example, disk drivers are expected to create 16
+minor nodes for each physical disk instance attached. Eight minor nodes are
+created, representing the <literal>a - h</literal> block device interfaces,
+with an additional eight minor nodes for the <literal>a,raw - h,raw</literal> character
+device interfaces.</para><para>The <emphasis>minor number</emphasis> passed to <olink targetdoc="refman9f" targetptr="ddi-create-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is defined
+wholly by the driver. The minor number is usually an encoding of the instance
+number of the device with a minor node identifier. In the preceding example,
+the driver creates minor numbers for each of the minor nodes by shifting the
+instance number of the device left by three bits and using the OR of that
+result with the minor node index. The values of the minor node index range
+from 0 to 7. Note that minor nodes <literal>a</literal> and <literal>a,raw</literal> share
+the same minor number. These minor nodes are distinguished by the <parameter>spec_type</parameter> argument passed to <function>ddi_create_minor_node</function>.</para><para><indexterm id="autoconf-ix258"><primary><function>ddi_create_minor_node</function> function</primary></indexterm><indexterm id="autoconf-ix259"><primary><literal>S_IFCHR</literal></primary></indexterm>The <emphasis>minor node type</emphasis> passed to <olink targetdoc="refman9f" targetptr="ddi-create-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> classifies the type of device, such as disks, tapes,
+network interfaces, frame buffers, and so forth.</para><para>The following table lists the types of possible nodes that might be
+created.</para><table frame="topbot" id="fcweu"><title>Possible Node Types</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="28.84*"/><colspec colwidth="71.16*"/><thead><row rowsep="1"><entry><para>Constant</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>DDI_NT_SERIAL</literal></para>
+</entry><entry><para>Serial port</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_SERIAL_DO</literal></para>
+</entry><entry><para>Dialout ports</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_BLOCK</literal></para>
+</entry><entry><para>Hard disks</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_BLOCK_CHAN</literal></para>
+</entry><entry><para>Hard disks with channel or target numbers</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_CD</literal></para>
+</entry><entry><para>ROM drives (CD-ROM)</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_CD_CHAN</literal></para>
+</entry><entry><para>ROM drives with channel or target numbers</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_FD</literal></para>
+</entry><entry><para>Floppy disks</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_TAPE</literal></para>
+</entry><entry><para>Tape drives</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_NET</literal></para>
+</entry><entry><para>Network devices</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_DISPLAY</literal></para>
+</entry><entry><para>Display devices</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_MOUSE</literal></para>
+</entry><entry><para>Mouse</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_KEYBOARD</literal></para>
+</entry><entry><para>Keyboard</para>
+</entry>
+</row><row><entry><para><literal>DDI_NT_AUDIO</literal></para>
+</entry><entry><para>Audio Device</para>
+</entry>
+</row><row><entry><para><literal>DDI_PSEUDO</literal></para>
+</entry><entry><para>General pseudo devices</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The node types <literal>DDI_NT_BLOCK</literal>, <literal>DDI_NT_BLOCK_CHAN</literal>, <literal>DDI_NT_CD</literal>, and <literal>DDI_NT_CD_CHAN</literal> cause <olink targetdoc="refman1m" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to identify
+the device instance as a disk and to create names in the <filename>/dev/dsk</filename> or <filename>/dev/rdsk</filename> directory.</para><para>The node type <literal>DDI_NT_TAPE</literal> causes <olink targetdoc="refman1m" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to identify
+the device instance as a tape and to create names in the <filename>/dev/rmt</filename> directory.</para><para>The node types <literal>DDI_NT_SERIAL</literal> and <literal>DDI_NT_SERIAL_DO</literal> cause <olink targetdoc="refman1m" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to
+perform these actions:</para><itemizedlist><listitem><para>Identify the device instance as a serial port</para>
+</listitem><listitem><para>Create names in the <filename>/dev/term</filename> directory</para>
+</listitem><listitem><para>Add entries to the <filename>/etc/inittab</filename> file</para>
+</listitem>
+</itemizedlist><para>Vendor-supplied strings should include an identifying value such as
+a name or stock symbol to make the strings unique. The string  can be used
+in conjunction with <olink targetdoc="refman1m" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and
+the <filename>devlinks.tab</filename> file (see the <olink targetdoc="refman1m" targetptr="devlinks-1m" remap="external"><citerefentry><refentrytitle>devlinks</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page) to create logical
+names in <filename>/dev</filename>.</para>
+</sect3><sect3 id="autoconf-14"><title>Deferred Attach</title><para><olink targetdoc="refman9e" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> might
+be called on a minor device before <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> has succeeded on the corresponding
+instance. <function>open</function> must then return <literal>ENXIO</literal>,
+which causes the system to attempt to attach the device. If the <function>attach</function> succeeds,
+the <function>open</function> is retried automatically.</para><example id="autoconf-ex-35"><title>Typical <function>attach</function> Entry
+Point</title><programlisting>/*
+ * Attach an instance of the driver.  We take all the knowledge we
+ * have about our board and check it against what has been filled in
+ * for us from our FCode or from our driver.conf(4) file.
+ */
+static int
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    int instance;
+    Pio *pio_p;
+    ddi_device_acc_attr_t   da_attr;
+    static int pio_validate_device(dev_info_t *);
+
+    switch (cmd) {
+    case DDI_ATTACH:
+    /*
+     * first validate the device conforms to a configuration this driver
+     * supports
+     */
+    if (pio_validate_device(dip) == 0)
+        return (DDI_FAILURE);
+    /*
+     * Allocate a soft state structure for this device instance
+     * Store a pointer to the device node in our soft state structure
+     * and a reference to the soft state structure in the device
+     * node.
+     */
+    instance = ddi_get_instance(dip);
+    if (ddi_soft_state_zalloc(pio_softstate, instance) != 0)
+        return (DDI_FAILURE);
+    pio_p = ddi_get_soft_state(pio_softstate, instance);
+    ddi_set_driver_private(dip, (caddr_t)pio_p);
+    pio_p-&gt;dip = dip;
+    /*
+     * Before adding the interrupt, get the interrupt block
+     * cookie associated with the interrupt specification to
+     * initialize the mutex used by the interrupt handler.
+     */
+    if (ddi_get_iblock_cookie(dip, 0, &amp;pio_p-&gt;iblock_cookie) !=
+      DDI_SUCCESS) {
+        ddi_soft_state_free(pio_softstate, instance);
+        return (DDI_FAILURE);
+    }
+
+    mutex_init(&amp;pio_p-&gt;mutex, NULL, MUTEX_DRIVER, pio_p-&gt;iblock_cookie);
+    /*
+     * Now that the mutex is initialized, add the interrupt itself.
+     */
+    if (ddi_add_intr(dip, 0, NULL, NULL, pio_intr, (caddr_t)instance) !=
+      DDI_SUCCESS) {
+        mutex_destroy(&amp;pio_p&gt;mutex);
+        ddi_soft_state_free(pio_softstate, instance);
+        return (DDI_FAILURE);
+    }
+    /*
+     * Initialize the device access attributes for the register mapping
+     */
+    dev_acc_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+    dev_acc_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+    dev_acc_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+    /*
+     * Map in the csr register (register 0)
+     */
+    if (ddi_regs_map_setup(dip, 0, (caddr_t *)&amp;(pio_p-&gt;csr), 0,
+        sizeof (Pio_csr), &amp;dev_acc_attr, &amp;pio_p-&gt;csr_handle) !=
+        DDI_SUCCESS) {
+        ddi_remove_intr(pio_p-&gt;dip, 0, pio_p-&gt;iblock_cookie);
+        mutex_destroy(&amp;pio_p-&gt;mutex);
+        ddi_soft_state_free(pio_softstate, instance);
+        return (DDI_FAILURE);
+    }
+    /*
+     * Map in the data register (register 1)
+     */
+    if (ddi_regs_map_setup(dip, 1, (caddr_t *)&amp;(pio_p-&gt;data), 0,
+        sizeof (uchar_t), &amp;dev_acc_attr, &amp;pio_p-&gt;data_handle) !=
+        DDI_SUCCESS) {
+        ddi_remove_intr(pio_p-&gt;dip, 0, pio_p-&gt;iblock_cookie);
+        ddi_regs_map_free(&amp;pio_p-&gt;csr_handle);
+        mutex_destroy(&amp;pio_p-&gt;mutex);
+        ddi_soft_state_free(pio_softstate, instance);
+        return (DDI_FAILURE);
+    }
+    /*
+     * Create an entry in /devices for user processes to open(2)
+     * This driver will create a minor node entry in /devices
+     * of the form:  /devices/..../pio@X,Y:pio
+     */
+    if (ddi_create_minor_node(dip, ddi_get_name(dip), S_IFCHR,
+        instance, DDI_PSEUDO, 0) == DDI_FAILURE) {
+        ddi_remove_intr(pio_p-&gt;dip, 0, pio_p-&gt;iblock_cookie);
+        ddi_regs_map_free(&amp;pio_p-&gt;csr_handle);
+        ddi_regs_map_free(&amp;pio_p-&gt;data_handle);
+        mutex_destroy(&amp;pio_p-&gt;mutex);
+        ddi_soft_state_free(pio_softstate, instance);
+        return (DDI_FAILURE);
+    }
+    /*
+     * reset device (including disabling interrupts)
+     */
+    ddi_put8(pio_p-&gt;csr_handle, pio_p-&gt;csr, PIO_RESET);
+    /*
+     * report the name of the device instance which has attached
+     */
+    ddi_report_dev(dip);
+    return (DDI_SUCCESS);
+
+    case DDI_RESUME:
+    return (DDI_SUCCESS);
+
+    default:
+    return (DDI_FAILURE);
+    }
+}</programlisting>
+</example><note><para>The <function>attach</function> routine must not make any assumptions
+about the order of invocations on different device instances. The system might
+invoke <function>attach</function> concurrently on different device instances.
+The system might also invoke <function>attach</function> and <function>detach</function> concurrently
+on different device instances.</para>
+</note>
+</sect3>
+</sect2><sect2 id="autoconf-72235"><title><function>detach</function> Entry Point</title><indexterm id="autoconf-ix261"><primary>entry points</primary><secondary><function>detach</function> function</secondary>
+</indexterm><indexterm id="autoconf-ix262"><primary><function>detach</function> entry point</primary><secondary>description of</secondary>
+</indexterm><para><indexterm id="autoconf-ix263"><primary>configuration entry points</primary><secondary><function>detach</function> function</secondary></indexterm>The
+kernel calls a driver's <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point to detach an instance of a device or to suspend operation for an instance
+of a device by power management.   This section discusses the operation of
+detaching device instances. Refer to <olink targetptr="powermgt-37437" remap="internal">Chapter&nbsp;12,
+Power Management</olink> for a discussion of power management issues.</para><para>A driver's <function>detach</function> entry point is called to detach
+an instance of a device that is bound to the driver.  The entry point is called
+with the instance of the device node to be detached and with <literal>DDI_DETACH</literal>,
+which is specified as the <literal>cmd</literal> argument to the entry point.</para><para>A driver is required to cancel or wait for any time outs or callbacks
+to complete, then release any resources that are allocated to the device instance
+before returning.  If for some reason a driver cannot cancel outstanding callbacks
+for free resources, the driver is required to return the device to its original
+state and return <literal>DDI_FAILURE</literal> from the entry point, leaving
+the device instance in the attached state.</para><para>There are two types of callback routines: those callbacks that can be
+canceled and those that cannot be canceled.  <olink targetdoc="refman9f" targetptr="timeout-9f" remap="external"><citerefentry><refentrytitle>timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="bufcall-9f" remap="external"><citerefentry><refentrytitle>bufcall</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> callbacks can be atomically
+cancelled by the driver during <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.
+ Other types of callbacks such as <olink targetdoc="refman9f" targetptr="scsi-init-pkt-9f" remap="external"><citerefentry><refentrytitle>scsi_init_pkt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> cannot be
+canceled. The driver must either block in <function>detach</function> until
+the callback completes or else fail the request to detach.</para><example id="autoconf-ex-15"><title>Typical <function>detach</function> Entry
+Point</title><programlisting>/*
+ * detach(9e)
+ * free the resources that were allocated in attach(9e)
+ */
+static int
+xxdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+    Pio     *pio_p;
+    int     instance;
+
+    switch (cmd) {
+    case DDI_DETACH:
+
+    instance = ddi_get_instance(dip);
+    pio_p = ddi_get_soft_state(pio_softstate, instance);
+
+    /*
+     * turn off the device
+     * free any resources allocated in attach
+     */
+    ddi_put8(pio_p-&gt;csr_handle, pio_p-&gt;csr, PIO_RESET);
+    ddi_remove_minor_node(dip, NULL);
+    ddi_regs_map_free(&amp;pio_p-&gt;csr_handle);
+    ddi_regs_map_free(&amp;pio_p-&gt;data_handle);
+    ddi_remove_intr(pio_p-&gt;dip, 0, pio_p-&gt;iblock_cookie);
+    mutex_destroy(&amp;pio_p-&gt;mutex);
+    ddi_soft_state_free(pio_softstate, instance);
+    return (DDI_SUCCESS);
+
+    case DDI_SUSPEND:
+    default:
+    return (DDI_FAILURE);
+    }
+}</programlisting>
+</example>
+</sect2><sect2 id="autoconf-28012"><title><function>getinfo</function> Entry Point</title><para><indexterm id="autoconf-ix269"><primary>configuration entry points</primary><secondary><function>getinfo</function> function</secondary></indexterm>The
+system calls <olink targetdoc="refman9e" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to
+obtain configuration information that only the driver knows. The mapping of
+minor numbers to device instances is entirely under the control of the driver.
+The system sometimes needs to ask the driver which device a particular <literal>dev_t</literal> represents.</para><para><indexterm id="autoconf-ix270"><primary><literal></literal><function>getinfo</function><literal></literal> entry point</primary></indexterm><indexterm id="autoconf-ix271"><primary><literal>DDI_INFO_DEVT2INSTANCE</literal></primary></indexterm><indexterm id="autoconf-ix272"><primary><literal>DDI_INFO_DEVT2DEVINFO</literal></primary></indexterm>The <function>getinfo</function> function
+can take either <literal>DDI_INFO_DEVT2INSTANCE</literal> or <literal>DDI_INFO_DEVT2DEVINFO</literal> as its <replaceable>infocmd</replaceable> argument. The <literal>DDI_INFO_DEVT2INSTANCE</literal> command requests the instance number of a device. The <literal>DDI_INFO_DEVT2DEVINFO</literal> command requests a pointer to the <literal>dev_info</literal> structure
+of a device.</para><para>In the <literal>DDI_INFO_DEVT2INSTANCE</literal> case, <replaceable>arg</replaceable> is
+a <literal>dev_t</literal>, and <function>getinfo</function> must translate
+the minor number in <literal>dev_t</literal> to an instance number. In the
+following example, the minor number <emphasis>is</emphasis> the instance number,
+so <function>getinfo</function> simply passes back the minor number. In this
+case, the driver must not assume that a state structure is available, since <function>getinfo</function> might be called before <function>attach</function>. The
+mapping defined by the driver between the minor device number and the instance
+number does not necessarily follow the mapping shown in the example. In all
+cases, however, the mapping must be static.</para><para>In the <literal>DDI_INFO_DEVT2DEVINFO</literal> case, <replaceable>arg</replaceable> is
+again a <literal>dev_t</literal>, so <function>getinfo</function> first decodes
+the instance number for the device. <function>getinfo</function> then passes
+back the <literal>dev_info</literal> pointer saved in the driver's soft state
+structure for the appropriate device, as shown in the following example.</para><example id="autoconf-16720"><title>Typical <function>getinfo</function> Entry
+Point</title><programlisting>/*
+ * getinfo(9e)
+ * Return the instance number or device node given a dev_t
+ */
+static int
+xxgetinfo(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+{
+    int error;
+    Pio *pio_p;
+    int instance = getminor((dev_t)arg);
+
+    switch (infocmd) {
+    /*
+     * return the device node if the driver has attached the
+     * device instance identified by the dev_t value which was passed
+     */
+    case DDI_INFO_DEVT2DEVINFO:
+    pio_p = ddi_get_soft_state(pio_softstate, instance);
+    if (pio_p == NULL) {
+        *result = NULL;
+        error = DDI_FAILURE;
+    } else {
+        mutex_enter(&amp;pio_p-&gt;mutex);
+        *result = pio_p-&gt;dip;
+        mutex_exit(&amp;pio_p-&gt;mutex);
+        error = DDI_SUCCESS;
+    }
+    break;
+    /*
+     * the driver can always return the instance number given a dev_t
+     * value, even if the instance is not attached.
+     */
+    case DDI_INFO_DEVT2INSTANCE:
+    *result = (void *)instance;
+    error = DDI_SUCCESS;
+    break;
+    default:
+    *result = NULL;
+    error = DDI_FAILURE;
+    }
+    return (error);
+}</programlisting>
+</example><note><para>The <function>getinfo</function> routine must be kept in sync
+with the minor nodes that the driver creates. If the minor nodes get out of
+sync, any hotplug operations might fail and cause a system panic.</para>
+</note>
+</sect2>
+</sect1><sect1 id="autoconf-24"><title>Using Device IDs</title><para>The Solaris DDI interfaces enable drivers to provide the <emphasis>device
+ID</emphasis>,  a persistent unique identifier for a device. The <emphasis>device
+ID</emphasis> can be used to identify or locate a device. The <emphasis>device
+ID</emphasis> is independent of the <filename>/devices</filename> name or
+device number (<literal>dev_t</literal>). Applications can use the functions
+defined in <olink targetdoc="refman3f" targetptr="libdevid-3lib" remap="external"><citerefentry><refentrytitle>libdevid</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> to read and manipulate the device IDs registered by
+the drivers.</para><para>Before a driver can export a <emphasis>device ID</emphasis>, the driver
+needs to verify the device is capable of either providing a unique ID or of
+storing a host-generated unique ID in a not normally accessible area. WWN
+(world-wide number) is an example of a unique ID that is provided by the device.
+Device NVRAM and reserved sectors are examples of non-accessible areas where
+host-generated unique IDs can be safely stored.</para><sect2 id="autoconf-27"><title>Registering Device IDs</title><para>Drivers typically initialize and register device IDs in the driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> handler.   As mentioned above,
+the driver is responsible for registering a <emphasis>device ID</emphasis> that
+is persistent.  As such, the driver might be required to handle both devices
+that can provide a unique ID directly (WWN) and devices where fabricated IDs
+are written to and read from stable storage.</para><sect3 id="autoconf-28"><title>Registering a Device-Supplied ID</title><para>If the device can supply the driver with an identifier that is unique,
+ the driver can simply initialize the <emphasis>device ID</emphasis> with
+this identifier and register the ID with the Solaris DDI.</para><programlisting>/*
+ * The device provides a guaranteed unique identifier,
+ * in this case a SCSI3-WWN.  The WWN for the device has been
+ * stored in the device's soft state.
+ */
+if (ddi_devid_init(dip, DEVID_SCSI3_WWN, un-&gt;un_wwn_len, un-&gt;un_wwn,
+    &amp;un-&gt;un_devid) != DDI_SUCCESS)
+    return (DDI_FAILURE);
+
+(void) ddi_devid_register(dip, un-&gt;un_devid);</programlisting>
+</sect3><sect3 id="autoconf-36"><title>Registering a Fabricated ID</title><para>A driver might also register device IDs for devices that do not directly
+supply a unique ID. Registering these IDs requires the device to be capable
+of storing and retrieving a small amount of data in a reserved area. The driver
+can then create a fabricated device ID and write it to the reserved area.</para><programlisting>/*
+ * the device doesn't supply a unique ID, attempt to read
+ * a fabricated ID from the device's reserved data.
+ */
+if (xxx_read_deviceid(un, &amp;devid_buf) == XXX_OK) {
+    if (ddi_devid_valid(devid_buf) == DDI_SUCCESS) {
+        devid_sz = ddi_devi_sizeof(devid_buf);
+        un-&gt;un_devid = kmem_alloc(devid_sz, KM_SLEEP);
+        bcopy(devid_buf, un-&gt;un_devid, devid_sz);
+        ddi_devid_register(dip, un-&gt;un_devid);
+        return (XXX_OK);
+    }
+}
+/*
+ * we failed to read a valid device ID from the device
+ * fabricate an ID, store it on the device, and register
+ * it with the DDI
+ */
+if (ddi_devid_init(dip, DEVID_FAB, 0, NULL, &amp;un-&gt;un_devid)
+    == DDI_FAILURE) {
+    return (XXX_FAILURE);
+}
+if (xxx_write_deviceid(un) != XXX_OK) {
+    ddi_devid_free(un-&gt;un_devid);
+    un-&gt;un_devid = NULL;
+    return (XXX_FAILURE);
+}
+ddi_devid_register(dip, un-&gt;un_devid);
+return (XXX_OK);</programlisting>
+</sect3>
+</sect2><sect2 id="autoconf-37"><title>Unregistering Device IDs</title><para>Drivers typically unregister and free any <emphasis>device IDs</emphasis> that
+are allocated as part of the <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> handling.
+ The driver first calls <olink targetdoc="refman9f" targetptr="ddi-devid-unregister-9f" remap="external"><citerefentry><refentrytitle>ddi_devid_unregister</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to unregister
+the <emphasis>device ID</emphasis> for the device instance.  The driver must
+then free the <emphasis>device ID</emphasis> handle itself by calling <olink targetdoc="refman9f" targetptr="ddi-devid-free-9f" remap="external"><citerefentry><refentrytitle>ddi_devid_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and then
+passing the handle that had been returned by <olink targetdoc="refman9f" targetptr="ddi-devid-init-9f" remap="external"><citerefentry><refentrytitle>ddi_devid_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The driver is responsible
+for managing any space allocated for WWN or Serial Number data.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000069010 0?>

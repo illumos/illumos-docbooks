@@ -1,0 +1,774 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-io"><title><literal>io</literal> Provider</title><highlights><para>The <literal>io</literal> provider makes available probes related to
+disk input and output. The <literal>io</literal> provider enables quick exploration
+of behavior observed through I/O monitoring tools such as <olink targetdoc="refman1m" targetptr="iostat-1m" remap="external"><citerefentry><refentrytitle>iostat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. For example, using the <literal>io</literal> provider, you can understand I/O by device, by I/O type, by I/O
+size, by process, by application name, by file name, or by file offset.</para>
+</highlights><sect1 id="gelrk"><title>Probes</title><para><indexterm><primary>probes</primary><secondary><literal>start</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>done</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>wait-start</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>wait-done</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary></indexterm><indexterm><primary><literal>io</literal> probe</primary></indexterm>The <literal>io</literal> probes are described in <olink targetptr="tbl-io" remap="internal">Table&nbsp;27&ndash;1</olink>.</para><table frame="topbot" id="tbl-io"><title><literal>io</literal> Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when an I/O request is about to be made either to a
+peripheral device or to an NFS server. The <literal>bufinfo_t</literal> corresponding
+to the I/O request is pointed to by <literal>args[0]</literal>. The <literal>devinfo_t</literal> of the device to which the I/O is being issued is pointed to by <literal>args[1]</literal>. The <literal>fileinfo_t</literal> of the file that corresponds
+to the I/O request is pointed to by <literal>args[2]</literal>. Note that
+file information availability depends on the filesystem making the I/O request.
+See <olink targetptr="chp-io-fileinfo" remap="internal">fileinfo_t</olink> for more information.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>done</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires after an I/O request has been fulfilled. The <literal>bufinfo_t</literal> corresponding to the I/O request is pointed to by <literal>args[0]</literal>.
+The <literal>done</literal> probe fires after the I/O completes, but before
+completion processing has been performed on the buffer. As a result <literal>B_DONE</literal> is <emphasis>not</emphasis> set in <literal>b_flags</literal> at
+the time the <literal>done</literal> probe fires. The <literal>devinfo_t</literal> of
+the device to which the I/O was issued is pointed to by <literal>args[1]</literal>.
+The <literal>fileinfo_t</literal> of the file that corresponds to the I/O
+request is pointed to by <literal>args[2]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>wait-start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before a thread begins to wait pending
+completion of a given I/O request. The <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure corresponding to the I/O request for which
+the thread will wait is pointed to by <literal>args[0]</literal>. The <literal>devinfo_t</literal> of the device to which the I/O was issued is pointed to by <literal>args[1]</literal>. The <literal>fileinfo_t</literal> of the file that corresponds
+to the I/O request is pointed to by <literal>args[2]</literal>. Some time
+after the <literal>wait-start</literal> probe fires, the <literal>wait-done</literal> probe
+will fire in the same thread.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>wait-done</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a thread is done waiting for the completion of
+a given I/O request. The <literal>bufinfo_t</literal> corresponding to the
+I/O request for which the thread will wait is pointed to by <literal>args[0]</literal>.
+The <literal>devinfo_t</literal> of the device to which the I/O was issued
+is pointed to by <literal>args[1]</literal>. The <literal>fileinfo_t</literal> of
+the file that corresponds to the I/O request is pointed to by <literal>args[2]</literal>.
+The <literal>wait-done</literal> probe fires only after the <literal>wait-start</literal> probe
+has fired in the same thread.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Note that the <literal>io</literal> probes fire for all I/O requests
+to peripheral devices, and for all file read and file write requests to an
+NFS server. Requests for metadata from an NFS server, for example, do <emphasis>not</emphasis> trigger <literal>io</literal> probes due to a <olink targetdoc="refman3a" targetptr="readdir-3c" remap="external"><citerefentry><refentrytitle>readdir</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> request.</para>
+</sect1><sect1 id="chp-io-args"><title>Arguments</title><para><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary>arguments</tertiary></indexterm>The argument types for the <literal>io</literal> probes
+are listed in <olink targetptr="tbl-io-args" remap="internal">Table&nbsp;27&ndash;2</olink>.
+The arguments are described in <olink targetptr="tbl-io" remap="internal">Table&nbsp;27&ndash;1</olink>.</para><table frame="topbot" id="tbl-io-args"><title><literal>io</literal> Probe
+Arguments</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec2" colwidth="1.20in" align="center"/><colspec colname="colspec4" colwidth="1.20in" align="center"/><colspec colname="colspec3" colwidth="1.20in" align="center"/><thead><row><entry colname="colspec0" colsep="1" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec2" rowsep="1" valign="top"><para><literal>args[0]</literal></para>
+</entry><entry colname="colspec4" rowsep="1" valign="top"><para><literal>args[1]</literal></para>
+</entry><entry colname="colspec3" rowsep="1" valign="top"><para><literal>args[2]</literal></para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0" colsep="1"><para><literal>start</literal></para>
+</entry><entry colname="colspec2"><para><literal>struct buf *</literal></para>
+</entry><entry colname="colspec4"><para><literal>devinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>fileinfo_t *</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>done</literal></para>
+</entry><entry colname="colspec2"><para><literal>struct buf *</literal></para>
+</entry><entry colname="colspec4"><para><literal>devinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>fileinfo_t *</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>wait-start</literal></para>
+</entry><entry colname="colspec2"><para><literal>struct buf *</literal></para>
+</entry><entry colname="colspec4"><para><literal>devinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>fileinfo_t *</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>wait-done</literal></para>
+</entry><entry colname="colspec2"><para><literal>struct buf *</literal></para>
+</entry><entry colname="colspec4"><para><literal>devinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>fileinfo_t *</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Each <literal>io</literal> probe has arguments consisting of a pointer
+to a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+a pointer to a <literal>devinfo_t</literal>, and a pointer to a <literal>fileinfo_t</literal>. These structures are described in greater detail in this section.</para><sect2 id="chp-io-buf"><title><literal>bufinfo_t</literal> structure</title><para><indexterm><primary><literal>bufinfo_t</literal> structure</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary><literal>bufinfo_t</literal> structure</tertiary></indexterm>The <literal>bufinfo_t</literal> structure is the abstraction that describes an I/O request.
+The buffer corresponding to an I/O request is pointed to by <literal>args[0]</literal> in
+the <literal>start</literal>, <literal>done</literal>, <literal>wait-start</literal>,
+and <literal>wait-done</literal> probes. The <literal>bufinfo_t</literal> structure
+definition is as follows:</para><programlisting>typedef struct bufinfo {
+	int b_flags;                    /* flags */
+	size_t b_bcount;                /* number of bytes */
+	caddr_t b_addr;                 /* buffer address */
+	uint64_t b_blkno;               /* expanded block # on device */
+	uint64_t b_lblkno;              /* block # on device */
+	size_t b_resid;                 /* # of bytes not transferred */
+	size_t b_bufsize;               /* size of allocated buffer */ 
+	caddr_t b_iodone;               /* I/O completion routine */
+	dev_t b_edev;                   /* extended device */
+ } bufinfo_t;</programlisting><para><indexterm><primary><literal>b_flags</literal> Values</primary></indexterm>The <literal>b_flags</literal> member indicates the state of the
+I/O buffer, and consists of a bitwise-or of different state values. The valid
+state values are in <olink targetptr="tbl-io-flags" remap="internal">Table&nbsp;27&ndash;3</olink>.</para><table frame="topbot" id="tbl-io-flags"><title><literal>b_flags</literal> Values</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><tbody><row><entry colname="colspec0"><para><literal>B_DONE</literal></para>
+</entry><entry colname="colspec1"><para>Indicates that the data transfer has completed.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_ERROR</literal></para>
+</entry><entry colname="colspec1"><para>Indicates an I/O transfer error. It is set in conjunction with the <literal>b_error</literal> field.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_PAGEIO</literal></para>
+</entry><entry colname="colspec1"><para>Indicates that the buffer is being used in a paged I/O request. See
+the description of the <literal>b_addr</literal> field for more information.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_PHYS</literal></para>
+</entry><entry colname="colspec1"><para>Indicates that the buffer is being used for physical  (direct) I/O to
+a user data area.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_READ</literal></para>
+</entry><entry colname="colspec1"><para>Indicates that data is to be read from the peripheral device into main
+memory.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_WRITE</literal></para>
+</entry><entry colname="colspec1"><para>Indicates that the data is to be transferred from main memory to the
+peripheral device.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>B_ASYNC</literal></para>
+</entry><entry colname="colspec1"><para>The I/O request is asynchronous, and will not be waited upon. The <literal>wait-start</literal> and <literal>wait-done</literal> probes don't fire for
+asynchronous I/O requests. Note that some I/Os directed to be asynchronous
+might not have <literal>B_ASYNC</literal> set: the asynchronous I/O subsystem
+might implement the asynchronous request by having a separate worker thread
+perform a synchronous I/O operation.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <literal>b_bcount</literal> field is the number of bytes to be transferred
+as part of the I/O request.</para><para>The <literal>b_addr</literal> field is the virtual address of the I/O
+request, unless <literal>B_PAGEIO</literal> is set. The address is a kernel
+virtual address unless <literal>B_PHYS</literal> is set, in which case it
+is a user virtual address. If <literal>B_PAGEIO</literal> is set, the <literal>b_addr</literal> field contains kernel private data. Exactly one of <literal>B_PHYS</literal> and <literal>B_PAGEIO</literal> can be set, or neither flag will be set.</para><para>The <literal>b_lblkno</literal> field identifies which logical block
+on the device is to be accessed. The mapping from a logical block to a physical
+block (such as the cylinder, track, and so on) is defined by the device.</para><para>The <literal>b_resid</literal> field is set to the number of bytes not
+transferred because of an error.</para><para>The <literal>b_bufsize</literal> field contains the size of the allocated
+buffer.</para><para>The <literal>b_iodone</literal> field identifies a specific routine
+in the kernel that is called when the I/O is complete.</para><para>The <literal>b_error</literal> field may hold an error code returned
+from the driver in the event of an I/O error. <literal>b_error</literal> is
+set in conjunction with the <literal>B_ERROR</literal> bit set in the <literal>b_flags</literal> member.</para><para>The <literal>b_edev</literal> field contains the major and minor device
+numbers of the device accessed. Consumers may use the D subroutines <function>getmajor</function> and <function>getminor</function> to extract the major and minor
+device numbers from the <literal>b_edev</literal> field.</para>
+</sect2><sect2 id="chp-io-devinfo"><title><literal>devinfo_t</literal></title><para><indexterm><primary><literal>devinfo_t</literal> structure</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary><literal>devinfo_t</literal> structure</tertiary></indexterm>The <literal>devinfo_t</literal> structure provides information about a device. The <literal>devinfo_t</literal> structure corresponding to the destination device of an I/O is
+pointed to by <literal>args[1]</literal> in the <literal>start</literal>, <literal>done</literal>, <literal>wait-start</literal>, and <literal>wait-done</literal> probes.
+The members of <literal>devinfo_t</literal> are as follows:</para><programlisting>typedef struct devinfo {
+	int dev_major;                  /* major number */
+	int dev_minor;                  /* minor number */
+	int dev_instance;               /* instance number */
+	string dev_name;                /* name of device */
+	string dev_statname;            /* name of device + instance/minor */
+	string dev_pathname;            /* pathname of device */
+} devinfo_t;</programlisting><para>The <literal>dev_major</literal> field is the major number of the device.
+See <olink targetdoc="refman9f" targetptr="getmajor-9f" remap="external"><citerefentry><refentrytitle>getmajor</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for
+more information.</para><para>The <literal>dev_minor</literal> field is the minor number of the device.
+See <olink targetdoc="refman9f" targetptr="getminor-9f" remap="external"><citerefentry><refentrytitle>getminor</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for
+more information.</para><para>The <literal>dev_instance</literal> field is the instance number of
+the device. The instance of a device is different from the minor number. The
+minor number is an abstraction managed by the device driver. The instance
+number is a property of the device node. You can display device node instance
+numbers with <olink targetdoc="refman1m" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><para>The <literal>dev_name</literal> field is the name of the device driver
+that manages the device. You can display device driver names with the <option>D</option> option
+to <olink targetdoc="refman1m" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><para>The <literal>dev_statname</literal> field is the name of the device
+as reported by <olink targetdoc="refman1m" targetptr="iostat-1m" remap="external"><citerefentry><refentrytitle>iostat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.
+This name also corresponds to the name of a kernel statistic as reported by <olink targetdoc="refman1m" targetptr="kstat-1m" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. This field is provided so
+that aberrant <literal>iostat</literal> or <literal>kstat</literal> output
+can be quickly correlated to actual I/O activity.</para><para>The <literal>dev_pathname</literal> field is the full path of the device.
+This path may be specified as an argument to <olink targetdoc="refman1m" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to obtain detailed device
+information. The path specified by <literal>dev_pathname</literal> includes
+components expressing the device node, the instance number, and the minor
+node. However, all three of these elements aren't necessarily expressed in
+the statistics name. For some devices, the statistics name consists of the
+device name and the instance number. For other devices, the name consists
+of the device name and the number of the minor node. As a result, two devices
+that have the same <literal>dev_statname</literal> may differ in <literal>dev_pathname</literal>.</para>
+</sect2><sect2 id="chp-io-fileinfo"><title><literal>fileinfo_t</literal></title><para><indexterm><primary><literal>fileinfo_t</literal> structure</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary><literal>fileinfo_t</literal> structure</tertiary></indexterm>The <literal>fileinfo_t</literal> structure provides information about a file. The file
+to which an I/O corresponds is pointed to by <literal>args[2]</literal> in
+the <literal>start</literal>, <literal>done</literal>, <literal>wait-start</literal>,
+and <literal>wait-done</literal> probes. The presence of file information
+is contingent upon the filesystem providing this information when dispatching
+I/O requests. Some filesystems, especially third-party filesystems, might
+not provide this information. Also, I/O requests might emanate from a filesystem
+for which no file information exists. For example, any I/O to filesystem metadata
+will not be associated with any one file. Finally, some highly optimized filesystems
+might aggregate I/O from disjoint files into a single I/O request. In this
+case, the filesystem might provide the file information either for the file
+that represents the majority of the I/O or for the file that represents <emphasis>some</emphasis> of the I/O. Alternately, the filesystem might provide no file
+information at all in this case.</para><para>The definition of the <literal>fileinfo_t</literal> structure is as
+follows:</para><programlisting>typedef struct fileinfo {
+	string fi_name;                 /* name (basename of fi_pathname) */
+	string fi_dirname;              /* directory (dirname of fi_pathname) */
+	string fi_pathname;             /* full pathname */
+	offset_t fi_offset;             /* offset within file */
+	string fi_fs;                   /* filesystem */
+	string fi_mount;                /* mount point of file system */
+} fileinfo_t;</programlisting><para>The <literal>fi_name</literal> field contains the name of the file but
+does not include any directory components. If no file information is associated
+with an I/O, the <literal>fi_name</literal> field will be set to the string <literal>&lt;none&gt;</literal>. In some rare cases, the pathname associated with a file
+might be unknown. In this case, the <literal>fi_name</literal> field will
+be set to the string <literal>&lt;unknown&gt;</literal>.</para><para>The <literal>fi_dirname</literal> field contains <emphasis>only</emphasis> the
+directory component of the file name. As with <literal>fi_name</literal>,
+this string may be set to <literal>&lt;none&gt;</literal> if no file information
+is present, or <literal>&lt;unknown&gt;</literal> if the pathname associated
+with the file is not known.</para><para>The <literal>fi_pathname</literal> field contains the full pathname
+to the file. As with <literal>fi_name</literal>, this string may be set to <literal>&lt;none&gt;</literal> if no file information is present, or <literal>&lt;unknown&gt;</literal> if
+the pathname associated with the file is not known.</para><para>The <literal>fi_offset</literal> field contains the offset within the
+file , or -1 if either file information is not present or if the offset is
+otherwise unspecified by the filesystem.</para>
+</sect2>
+</sect1><sect1 id="chp-io-examples"><title>Examples</title><para><indexterm><primary>examples</primary><secondary><literal>io</literal> probe use</secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary>example of use</tertiary></indexterm>The
+following example script displays pertinent information for every I/O as it's
+issued:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	printf("%10s %58s %2s\n", "DEVICE", "FILE", "RW");
+}
+
+io:::start
+{
+	printf("%10s %58s %2s\n", args[1]-&gt;dev_statname,
+	    args[2]-&gt;fi_pathname, args[0]-&gt;b_flags &amp; B_READ ? "R" : "W");
+}</programlisting><para>The output of the example when cold-starting Acrobat Reader on an x86
+laptop system resembles the following example:</para><screen><userinput># dtrace -s ./iosnoop.d</userinput>
+    DEVICE                                                       FILE RW
+     cmdk0                                 /opt/Acrobat4/bin/acroread  R
+     cmdk0                                 /opt/Acrobat4/bin/acroread  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                           /opt/Acrobat4/Reader/AcroVersion  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0                 /usr/lib/locale/iso_8859_1/iso_8859_1.so.3  R
+     cmdk0                 /usr/lib/locale/iso_8859_1/iso_8859_1.so.3  R
+     cmdk0                 /usr/lib/locale/iso_8859_1/iso_8859_1.so.3  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0   /opt/Acrobat4/Reader/intelsolaris/lib/libreadcore.so.4.0  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0             /opt/Acrobat4/Reader/intelsolaris/bin/acroread  R
+     cmdk0                                                  &lt;unknown&gt;  R
+     cmdk0        /opt/Acrobat4/Reader/intelsolaris/lib/libAGM.so.3.0  R
+     cmdk0                                                     &lt;none&gt;  R
+     cmdk0        /opt/Acrobat4/Reader/intelsolaris/lib/libAGM.so.3.0  R
+     cmdk0        /opt/Acrobat4/Reader/intelsolaris/lib/libAGM.so.3.0  R
+       ...</screen><para>The <literal>&lt;none&gt;</literal> entries in the output indicate that
+the I/O doesn't correspond to the data in any particular file: these I/Os
+are due to metadata of one form or another. The <literal>&lt;unknown&gt;</literal> entries
+in the output indicate that the pathname for the file is not known. This situation
+is relatively rare.</para><para>You could make the example script slightly more sophisticated by using
+an associative array to track the time spent on each I/O, as shown in the
+following example:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	printf("%10s %58s %2s %7s\n", "DEVICE", "FILE", "RW", "MS");
+}
+
+io:::start
+{
+	start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno] = timestamp;
+}
+
+io:::done
+/start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno]/
+{
+	this-&gt;elapsed = timestamp - start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno];
+	printf("%10s %58s %2s %3d.%03d\n", args[1]-&gt;dev_statname,
+	    args[2]-&gt;fi_pathname, args[0]-&gt;b_flags &amp; B_READ ? "R" : "W",
+	    this-&gt;elapsed / 10000000, (this-&gt;elapsed / 1000) % 1000);
+	start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno] = 0;
+}</programlisting><para>The output of the above example while hot-plugging a USB storage device
+into an otherwise idle x86 laptop system is shown in the following example:</para><screen><userinput># dtrace -s ./iotime.d</userinput>
+    DEVICE                                                 FILE RW      MS
+     cmdk0                                 /kernel/drv/scsa2usb  R  24.781
+     cmdk0                                 /kernel/drv/scsa2usb  R  25.208
+     cmdk0                                    /var/adm/messages  W  25.981
+     cmdk0                                 /kernel/drv/scsa2usb  R   5.448
+     cmdk0                                               &lt;none&gt;  W   4.172
+     cmdk0                                 /kernel/drv/scsa2usb  R   2.620
+     cmdk0                                    /var/adm/messages  W   0.252
+     cmdk0                                            &lt;unknown&gt;  R   3.213
+     cmdk0                                               &lt;none&gt;  W   3.011
+     cmdk0                                            &lt;unknown&gt;  R   2.197
+     cmdk0                                    /var/adm/messages  W   2.680
+     cmdk0                                               &lt;none&gt;  W   0.436
+     cmdk0                                    /var/adm/messages  W   0.542
+     cmdk0                                               &lt;none&gt;  W   0.339
+     cmdk0                                    /var/adm/messages  W   0.414
+     cmdk0                                               &lt;none&gt;  W   0.344
+     cmdk0                                    /var/adm/messages  W   0.361
+     cmdk0                                               &lt;none&gt;  W   0.315
+     cmdk0                                    /var/adm/messages  W   0.421
+     cmdk0                                               &lt;none&gt;  W   0.349
+     cmdk0                                               &lt;none&gt;  R   1.524
+     cmdk0                                            &lt;unknown&gt;  R   3.648
+     cmdk0                                 /usr/lib/librcm.so.1  R   2.553
+     cmdk0                                 /usr/lib/librcm.so.1  R   1.332
+     cmdk0                                 /usr/lib/librcm.so.1  R   0.222
+     cmdk0                                 /usr/lib/librcm.so.1  R   0.228
+     cmdk0                                 /usr/lib/librcm.so.1  R   0.927
+     cmdk0                                               &lt;none&gt;  R   1.189
+       ...
+     cmdk0                            /usr/lib/devfsadm/linkmod  R   1.110
+     cmdk0         /usr/lib/devfsadm/linkmod/SUNW_audio_link.so  R   1.763
+     cmdk0         /usr/lib/devfsadm/linkmod/SUNW_audio_link.so  R   0.161
+     cmdk0           /usr/lib/devfsadm/linkmod/SUNW_cfg_link.so  R   0.819
+     cmdk0           /usr/lib/devfsadm/linkmod/SUNW_cfg_link.so  R   0.168
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_disk_link.so  R   0.886
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_disk_link.so  R   0.185
+     cmdk0        /usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so  R   0.778
+     cmdk0        /usr/lib/devfsadm/linkmod/SUNW_fssnap_link.so  R   0.166
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_lofi_link.so  R   1.634
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_lofi_link.so  R   0.163
+     cmdk0            /usr/lib/devfsadm/linkmod/SUNW_md_link.so  R   0.477
+     cmdk0            /usr/lib/devfsadm/linkmod/SUNW_md_link.so  R   0.161
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_misc_link.so  R   0.198
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_misc_link.so  R   0.168
+     cmdk0          /usr/lib/devfsadm/linkmod/SUNW_misc_link.so  R   0.247
+     cmdk0     /usr/lib/devfsadm/linkmod/SUNW_misc_link_i386.so  R   1.735
+       ... </screen><para>You can make several observations about the mechanics of the system
+based on this output. First, note the long time to perform the first several
+I/Os, which took about 25 milliseconds each. This time might have been due
+to the <literal>cmdk0</literal> device having been power managed on the laptop.
+Second, observe the I/O due to the <olink targetdoc="refman7" targetptr="scsa2usb-7d" remap="external"><citerefentry><refentrytitle>scsa2usb</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver loading to deal with
+USB Mass Storage device. Third, note the writes to <literal>/var/adm/messages</literal> as
+the device is reported. Finally, observe the reading of the device link generators
+(the files ending in <literal>link.so</literal>) , which presumably deal with
+the new device.</para><para>The <literal>io</literal> provider enables in-depth understanding of <olink targetdoc="refman1m" targetptr="iostat-1m" remap="external"><citerefentry><refentrytitle>iostat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> output. Assume you observe <literal>iostat</literal> output similar to the following example:</para><screen>extended device statistics                   
+device       r/s    w/s   kr/s   kw/s wait actv  svc_t  %w  %b 
+cmdk0        8.0    0.0  399.8    0.0  0.0  0.0    0.8   0   1 
+sd0          0.0    0.0    0.0    0.0  0.0  0.0    0.0   0   0 
+sd2          0.0  109.0    0.0  435.9  0.0  1.0    8.9   0  97 
+nfs1         0.0    0.0    0.0    0.0  0.0  0.0    0.0   0   0 
+nfs2         0.0    0.0    0.0    0.0  0.0  0.0    0.0   0   0</screen><para>You can use the <literal>iotime.d</literal> script to see these I/Os
+as they happen, as shown in the following example:</para><screen>    DEVICE                                               FILE RW      MS
+       sd2                                  /mnt/archives.tar  W   0.856
+       sd2                                  /mnt/archives.tar  W   0.729
+       sd2                                  /mnt/archives.tar  W   0.890
+       sd2                                  /mnt/archives.tar  W   0.759
+       sd2                                  /mnt/archives.tar  W   0.884
+       sd2                                  /mnt/archives.tar  W   0.746
+       sd2                                  /mnt/archives.tar  W   0.891
+       sd2                                  /mnt/archives.tar  W   0.760
+       sd2                                  /mnt/archives.tar  W   0.889
+     cmdk0                      /export/archives/archives.tar  R   0.827
+       sd2                                  /mnt/archives.tar  W   0.537
+       sd2                                  /mnt/archives.tar  W   0.887
+       sd2                                  /mnt/archives.tar  W   0.763
+       sd2                                  /mnt/archives.tar  W   0.878
+       sd2                                  /mnt/archives.tar  W   0.751
+       sd2                                  /mnt/archives.tar  W   0.884
+       sd2                                  /mnt/archives.tar  W   0.760
+       sd2                                  /mnt/archives.tar  W   3.994
+       sd2                                  /mnt/archives.tar  W   0.653
+       sd2                                  /mnt/archives.tar  W   0.896
+       sd2                                  /mnt/archives.tar  W   0.975
+       sd2                                  /mnt/archives.tar  W   1.405
+       sd2                                  /mnt/archives.tar  W   0.724
+       sd2                                  /mnt/archives.tar  W   1.841
+     cmdk0                      /export/archives/archives.tar  R   0.549
+       sd2                                  /mnt/archives.tar  W   0.543
+       sd2                                  /mnt/archives.tar  W   0.863
+       sd2                                  /mnt/archives.tar  W   0.734
+       sd2                                  /mnt/archives.tar  W   0.859
+       sd2                                  /mnt/archives.tar  W   0.754
+       sd2                                  /mnt/archives.tar  W   0.914
+       sd2                                  /mnt/archives.tar  W   0.751
+       sd2                                  /mnt/archives.tar  W   0.902
+       sd2                                  /mnt/archives.tar  W   0.735
+       sd2                                  /mnt/archives.tar  W   0.908
+       sd2                                  /mnt/archives.tar  W   0.753</screen><para>This output appears to show that the file <literal>archives.tar</literal> is
+being read from <literal>cmdk0</literal> (in <literal>/export/archives</literal>),
+and being written to device <literal>sd2</literal> (in <literal>/mnt</literal>).
+This existence of two files named <literal>archives.tar</literal> that are
+being operated on separately in parallel seems unlikely. To investigate further,
+you can aggregate on device, application, process ID and bytes transferred,
+as shown in the following example:</para><programlisting>#pragma D option quiet
+
+io:::start
+{
+	@[args[1]-&gt;dev_statname, execname, pid] = sum(args[0]-&gt;b_bcount);
+}
+
+END
+{
+	printf("%10s %20s %10s %15s\n", "DEVICE", "APP", "PID", "BYTES");
+	printa("%10s %20s %10d %15@d\n", @);
+}</programlisting><para>Running this script for a few seconds results in output similar to the
+following example:</para><screen><userinput># dtrace -s ./whoio.d</userinput>
+<userinput>^C</userinput>
+    DEVICE                  APP        PID           BYTES
+     cmdk0                   cp        790         1515520
+       sd2                   cp        790         1527808</screen><para>This output shows that this activity <emphasis>is</emphasis> a copy
+of the file <literal>archives.tar</literal> from one device to another. This
+conclusion leads to another natural question: is one of these devices faster
+than the other? Which device acts as the limiter on the copy? To answer these
+questions, you need to know the effective throughput of each device rather
+than the number of bytes per second each device is transferring. You can determine
+the throughput with the following example script:</para><programlisting>#pragma D option quiet
+
+io:::start
+{
+	start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno] = timestamp;
+}
+
+io:::done
+/start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno]/
+{
+	/*
+	 * We want to get an idea of our throughput to this device in KB/sec.
+	 * What we have, however, is nanoseconds and bytes.  That is we want
+	 * to calculate:
+	 *
+	 *                        bytes / 1024
+	 *                  ------------------------
+	 *                  nanoseconds / 1000000000
+	 *
+	 * But we can't calculate this using integer arithmetic without losing
+	 * precision (the denomenator, for one, is between 0 and 1 for nearly
+	 * all I/Os).  So we restate the fraction, and cancel:
+	 * 
+	 *     bytes      1000000000         bytes        976562
+	 *   --------- * -------------  =  --------- * -------------  
+	 *      1024      nanoseconds          1        nanoseconds
+	 *
+	 * This is easy to calculate using integer arithmetic; this is what
+	 * we do below.
+	 */
+	this-&gt;elapsed = timestamp - start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno];
+	@[args[1]-&gt;dev_statname, args[1]-&gt;dev_pathname] =
+	    quantize((args[0]-&gt;b_bcount * 976562) / this-&gt;elapsed);
+	start[args[0]-&gt;b_edev, args[0]-&gt;b_blkno] = 0;
+}
+
+END
+{
+	printa("  %s (%s)\n%@d\n", @);
+}</programlisting><para>Running the example script for several seconds yields the following
+output:</para><screen>  sd2 (/devices/pci@0,0/pci1179,1@1d/storage@2/disk@0,0:r)
+
+           value  ------------- Distribution ------------- count    
+              32 |                                         0        
+              64 |                                         3        
+             128 |                                         1        
+             256 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  2257     
+             512 |                                         1        
+            1024 |                                         0        
+
+  cmdk0 (/devices/pci@0,0/pci-ide@1f,1/ide@0/cmdk@0,0:a)
+
+           value  ------------- Distribution ------------- count    
+             128 |                                         0        
+             256 |                                         1        
+             512 |                                         0        
+            1024 |                                         2        
+            2048 |                                         0        
+            4096 |                                         2        
+            8192 |@@@@@@@@@@@@@@@@@@                       172      
+           16384 |@@@@@                                    52       
+           32768 |@@@@@@@@@@@                              108      
+           65536 |@@@                                      34       
+          131072 |                                         0        </screen><para>The output shows that <literal>sd2</literal> is clearly the limiting
+device. The <literal>sd2</literal> throughput is between 256K/sec and 512K/sec,
+while <literal>cmdk0</literal> is delivering I/O at anywhere from 8 MB/second
+to over 64 MB/second. The script prints out both the name as seen in <literal>iostat</literal>, and the full path of the device. To find out more about the device,
+you could specify the device path to <literal>prtconf</literal>, as shown
+in the following example:</para><screen><userinput># prtconf -v /devices/pci@0,0/pci1179,1@1d/storage@2/disk@0,0</userinput>
+disk, instance #2 (driver name: sd)
+    Driver properties:
+        name='lba-access-ok' type=boolean dev=(29,128)
+        name='<emphasis>removable-media</emphasis>' type=boolean dev=none
+        name='pm-components' type=string items=3 dev=none
+            value='NAME=spindle-motor' + '0=off' + '1=on'
+        name='pm-hardware-state' type=string items=1 dev=none
+            value='needs-suspend-resume'
+        name='ddi-failfast-supported' type=boolean dev=none
+        name='ddi-kernel-ioctl' type=boolean dev=none
+    Hardware properties:
+        name='inquiry-revision-id' type=string items=1
+            value='1.04'
+        name='inquiry-product-id' type=string items=1
+            value='<emphasis>STORAGE DEVICE</emphasis>'
+        name='inquiry-vendor-id' type=string items=1
+            value='Generic'
+        name='inquiry-device-type' type=int items=1
+            value=00000000
+        name='<emphasis>usb</emphasis>' type=boolean
+        name='compatible' type=string items=1
+            value='sd'
+        name='lun' type=int items=1
+            value=00000000
+        name='target' type=int items=1
+            value=00000000</screen><para>As the emphasized terms indicate, this device is a removable USB storage
+device.</para><para>The examples in this section have explored all I/O requests. However,
+you might only be interested in one type of request. The following example
+tracks the directories in which writes are occurring, along with the applications
+performing the writes:</para><programlisting>#pragma D option quiet
+
+io:::start
+/args[0]-&gt;b_flags &amp; B_WRITE/
+{
+	@[execname, args[2]-&gt;fi_dirname] = count();
+}
+
+END
+{
+	printf("%20s %51s %5s\n", "WHO", "WHERE", "COUNT");
+	printa("%20s %51s %5@d\n", @);
+}</programlisting><para>Running this example script on a desktop workload for a period of time
+yields some interesting results, as shown in the following example output:</para><screen><userinput># dtrace -s ./whowrite.d</userinput>
+<userinput>^C</userinput>
+              WHO                                             WHERE COUNT
+               su                                          /var/adm     1
+          fsflush                                              /etc     1
+          fsflush                                                 /     1
+          fsflush                                          /var/log     1
+          fsflush                                  /export/bmc/lisa     1
+              esd   /export/bmc/.phoenix/default/78cxczuy.slt/Cache     1
+          fsflush                              /export/bmc/.phoenix     1
+              esd         /export/bmc/.phoenix/default/78cxczuy.slt     1
+               vi                                          /var/tmp     2
+               vi                                              /etc     2
+              cat                                            &lt;none&gt;     2
+             bash                                                 /     2
+               vi                                            &lt;none&gt;     3
+            xterm                                          /var/adm     3
+          fsflush                                       /export/bmc     7
+  MozillaFirebird                                            &lt;none&gt;     8
+              vim                                       /export/bmc     9
+  MozillaFirebird                                       /export/bmc    10
+          fsflush                                          /var/adm    11
+         devfsadm                                              /dev    14
+              ksh                                            &lt;none&gt;    71
+              ksh                                       /export/bmc    71
+          fsflush         /export/bmc/.phoenix/default/78cxczuy.slt   119
+  MozillaFirebird         /export/bmc/.phoenix/default/78cxczuy.slt   119
+          fsflush                                            &lt;none&gt;   211
+  MozillaFirebird   /export/bmc/.phoenix/default/78cxczuy.slt/Cache   591
+          fsflush   /export/bmc/.phoenix/default/78cxczuy.slt/Cache   666
+            sched                                            &lt;none&gt;  2385</screen><para>As the output indicates, virtually all writes are associated with the
+Mozilla Firebird cache. The writes labeled <literal>&lt;none&gt;</literal> are
+likely due to writes associated with the UFS log, writes that are themselves
+induced by other writes in the filesystem. See <olink targetdoc="refman7" targetptr="ufs-7fs" remap="external"><citerefentry><refentrytitle>ufs</refentrytitle><manvolnum>7FS</manvolnum></citerefentry></olink> for details on logging. This example shows
+how to use the <literal>io</literal> provider to discover a problem at a much
+higher layer of software. In this case, the script has revealed a configuration
+problem: the web browser would induce much less I/O (and quite likely none
+at all) if its cache were in a directory in a <olink targetdoc="refman7" targetptr="tmpfs-7fs" remap="external"><citerefentry><refentrytitle>tmpfs</refentrytitle><manvolnum>7FS</manvolnum></citerefentry></olink> filesystem.</para><para>The previous examples have used only the <literal>start</literal> and <literal>done</literal> probes. You can use the <literal>wait-start</literal> and <literal>wait-done</literal> probes to understand why applications block for I/O &ndash;
+and for how long. The following example script uses both <literal>io</literal> probes
+and <literal>sched</literal> probes (see <olink targetptr="chp-sched" remap="internal">Chapter&nbsp;26,
+sched Provider</olink>) to derive CPU time compared to I/O wait time for the
+StarOffice software:</para><programlisting>#pragma D option quiet
+
+sched:::on-cpu
+/execname == "soffice.bin"/
+{
+	self-&gt;on = vtimestamp;
+}
+
+sched:::off-cpu
+/self-&gt;on/
+{
+	@time["&lt;on cpu&gt;"] = sum(vtimestamp - self-&gt;on);
+	self-&gt;on = 0;
+}
+
+io:::wait-start
+/execname == "soffice.bin"/
+{
+	self-&gt;wait = timestamp;
+}
+
+io:::wait-done
+/self-&gt;wait/
+{
+	@io[args[2]-&gt;fi_name] = sum(timestamp - self-&gt;wait);
+	@time["&lt;I/O wait&gt;"] = sum(timestamp - self-&gt;wait);
+	self-&gt;wait = 0;
+}
+
+END
+{
+	printf("Time breakdown (milliseconds):\n");
+	normalize(@time, 1000000);
+	printa("  %-50s %15@d\n", @time);
+
+	printf("\nI/O wait breakdown (milliseconds):\n");
+	normalize(@io, 1000000);
+	printa("  %-50s %15@d\n", @io);
+}</programlisting><para>Running the example script during a cold start of the StarOffice software
+yields the following output:</para><screen>Time breakdown (milliseconds):
+  &lt;on cpu&gt;                                                      3634
+  &lt;I/O wait&gt;                                                   13114
+
+I/O wait breakdown (milliseconds):
+  soffice.tmp                                                      0
+  Office                                                           0
+  unorc                                                            0
+  sbasic.cfg                                                       0
+  en                                                               0
+  smath.cfg                                                        0
+  toolboxlayout.xml                                                0
+  sdraw.cfg                                                        0
+  swriter.cfg                                                      0
+  Linguistic.dat                                                   0
+  scalc.cfg                                                        0
+  Views.dat                                                        0
+  Store.dat                                                        0
+  META-INF                                                         0
+  Common.xml.tmp                                                   0
+  afm                                                              0
+  libsimreg.so                                                     1
+  xiiimp.so.2                                                      3
+  outline                                                          4
+  Inet.dat                                                         6
+  fontmetric                                                       6
+  ...
+  libucb1.so                                                      44
+  libj641si_g.so                                                  46
+  libX11.so.4                                                     46
+  liblng641si.so                                                  48
+  swriter.db                                                      53
+  libwrp641si.so                                                  53
+  liblocaledata_ascii.so                                          56
+  libi18npool641si.so                                             65
+  libdbtools2.so                                                  69
+  ofa64101.res                                                    74
+  libxcr641si.so                                                  82
+  libucpchelp1.so                                                 83
+  libsot641si.so                                                  86
+  libcppuhelper3C52.so                                            98
+  libfwl641si.so                                                 100
+  libsb641si.so                                                  104
+  libcomphelp2.so                                                105
+  libxo641si.so                                                  106
+  libucpfile1.so                                                 110
+  libcppu.so.3                                                   111
+  sw64101.res                                                    114
+  libdb-3.2.so                                                   119
+  libtk641si.so                                                  126
+  libdtransX11641si.so                                           127
+  libgo641si.so                                                  132
+  libfwe641si.so                                                 150
+  libi18n641si.so                                                152
+  libfwi641si.so                                                 154
+  libso641si.so                                                  173
+  libpsp641si.so                                                 186
+  libtl641si.so                                                  189
+  &lt;unknown&gt;                                                      189
+  libucbhelper1C52.so                                            195
+  libutl641si.so                                                 213
+  libofa641si.so                                                 216
+  libfwk641si.so                                                 229
+  libsvl641si.so                                                 261
+  libcfgmgr2.so                                                  368
+  libsvt641si.so                                                 373
+  libvcl641si.so                                                 741
+  libsvx641si.so                                                 885
+  libsfx641si.so                                                 993
+  &lt;none&gt;                                                        1096
+  libsw641si.so                                                 1365
+  applicat.rdb                                                  1580</screen><para>As this output shows, much of the cold StarOffice start time is due
+to waiting for I/O. (13.1 seconds waiting for I/O as opposed to 3.6 seconds
+on CPU.) Running the script on a warm start of the StarOffice software reveals
+that page caching has eliminated the I/O time , as shown in the following
+example output:</para><screen>Time breakdown (milliseconds):
+  &lt;I/O wait&gt;                                                       0
+  &lt;on cpu&gt;                                                      2860
+
+I/O wait breakdown (milliseconds):
+  temp                                                             0
+  soffice.tmp                                                      0
+  &lt;unknown&gt;                                                        0
+  Office                                                           0</screen><para>The cold start output shows that the file <literal>applicat.rdb</literal> accounts
+for more I/O wait time than any other file. This result is presumably due
+to many I/Os to the file. To explore the I/Os performed to this file, you
+can use the following D script:</para><programlisting>io:::start
+/execname == "soffice.bin" &amp;&amp; args[2]-&gt;fi_name == "applicat.rdb"/
+{
+	@ = lquantize(args[2]-&gt;fi_offset != -1 ?
+	    args[2]-&gt;fi_offset / (1000 * 1024) : -1, 0, 1000);
+}</programlisting><para>This script uses the <literal>fi_offset</literal> field of the <literal>fileinfo_t</literal> structure to understand which parts of the file are being accessed,
+at the granularity of a megabyte. Running this script during a cold start
+of the StarOffice software results in output similar to the following example:</para><screen><userinput># dtrace -s ./applicat.d</userinput>
+dtrace: script './applicat.d' matched 4 probes
+^C
+
+
+           value  ------------- Distribution ------------  count    
+             &lt; 0 |                                         0        
+               0 |@@@                                      28       
+               1 |@@                                       17       
+               2 |@@@@                                     35       
+               3 |@@@@@@@@@                                72       
+               4 |@@@@@@@@@@                               78       
+               5 |@@@@@@@@                                 65       
+               6 |                                         0</screen><para>This output indicates that only the first six megabytes of the file
+are accessed, perhaps because the file is six megabytes in size. The output
+also indicates that the entire file is not accessed. If you wanted to improve
+the cold start time of StarOffice, you might want to understand the access
+pattern of the file. If the needed sections of the file could be largely contiguous,
+one way to improve StarOffice cold start time might be to have a scout thread
+run ahead of the application, inducing the I/O to the file before it's needed.
+(This approach is particularly straightforward if the file is accessed using <olink targetdoc="refman2" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.) However, the approximately
+1.6 seconds that this strategy would gain in cold start time does
+not merit the additional complexity and maintenance burden in the application.
+Either way, the data gathered with the <literal>io</literal> provider allows
+a precise understanding of the benefit that such work could ultimately deliver.</para>
+</sect1><sect1 id="chp-io-stability"><title>Stability</title><para><indexterm><primary>stability</primary><secondary><literal>io</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>io</literal></secondary><tertiary>stability</tertiary></indexterm>The <literal>io</literal> provider
+uses DTrace's stability mechanism to describe its stabilities, as shown in
+the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="0"><para>Element</para>
+</entry><entry colsep="0"><para>Name stability</para>
+</entry><entry colsep="0"><para>Data stability</para>
+</entry><entry colsep="0"><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000056771 0?>

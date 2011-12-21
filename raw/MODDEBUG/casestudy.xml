@@ -1,0 +1,625 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()chapter(8)?><chapter id="kmem-1"><?Pub Tag atict:info tracking="off" ref="4"?><?Pub Tag
+atict:user user="ae149097" fullname="Alta Elstad"?><title>Debugging With the
+Kernel Memory Allocator</title><highlights><para>The Solaris kernel memory (kmem) allocator provides a powerful set of
+debugging features that can facilitate analysis of a kernel crash dump. This
+chapter discusses these debugging features, and the MDB dcmds and walkers
+designed specifically for the allocator. Bonwick (see <olink targetptr="preface-5" remap="internal">Related Books and Papers</olink>) provides an overview
+of the principles of the allocator itself. Refer to the header file <?Pub
+_nolinebreak?><literal>&lt;sys/kmem_impl.h&gt;</literal><?Pub /_nolinebreak?> for
+the definitions of allocator data structures. The kmem debugging features
+can be enabled on a production system to enhance problem analysis, or on development
+systems to aid in debugging kernel software and device drivers.</para><note><para>MDB exposes kernel implementation details that are subject to
+change at any time. This guide reflects the Solaris kernel implementation
+as of the date of publication of this guide. Information provided in this
+guide about the kernel memory allocator might not be correct or applicable
+to past or future Solaris releases.</para>
+</note>
+</highlights><sect1 id="casestudy-13"><title>Getting Started: Creating a Sample Crash Dump</title><para>This section shows you how to obtain a sample crash dump, and how to
+invoke MDB in order to examine it.</para><sect2 id="casestudy-15"><title>Setting <literal>kmem_flags</literal></title><para><indexterm><primary><literal>kmem_flags</literal></primary></indexterm>The
+kernel memory allocator contains many advanced debugging features, but these
+are not enabled by default because they can cause performance degradation.
+In order to follow the examples in this guide, you should turn on these features.
+You should enable these features only on a test system, as they can cause
+performance degradation or expose latent problems.</para><para>The allocator's debugging functionality is controlled by the <literal>kmem_flags</literal> tunable. To get started, make sure <literal>kmem_flags</literal> is
+set properly:</para><programlisting># mdb -k
+&gt; kmem_flags/X
+kmem_flags:
+kmem_flags:     f</programlisting><para>If <literal>kmem_flags</literal> is not set to '<literal>f</literal>',
+you should add the line:</para><programlisting>set kmem_flags=0xf</programlisting><para>to <literal>/etc/system</literal> and reboot the system. When the system
+reboots, confirm that <literal>kmem_flags</literal> is set to '<literal>f</literal>'.
+Remember to remove your <literal>/etc/system</literal> modifications before
+returning this system to production use.</para>
+</sect2><sect2 id="casestudy-16"><title>Forcing a Crash Dump</title><para><indexterm><primary><command>dumpadm</command></primary></indexterm>The
+next step is to make sure crash dumps are properly configured. First, confirm
+that <command>dumpadm</command> is configured to save kernel crash dumps and
+that <command>savecore</command> is enabled.  See <olink targetdoc="refman1m" targetptr="dumpadm-1m" remap="external"><citerefentry><refentrytitle>dumpadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> for more information on crash
+dump parameters.</para><programlisting># dumpadm
+		      Dump content: kernel pages
+		       Dump device: /dev/dsk/c0t0d0s1 (swap)
+		Savecore directory: /var/crash/testsystem
+		  Savecore enabled: yes</programlisting><para><indexterm><primary>reboot</primary></indexterm>Next, reboot the system
+using the <option>d</option> flag to <olink targetdoc="refman1m" targetptr="reboot-1m" remap="external"><citerefentry><refentrytitle>reboot</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, which forces the kernel
+to panic and save a crash dump.</para><programlisting># reboot -d
+Sep 28 17:51:18 testsystem reboot: rebooted by root
+
+panic[cpu0]/thread=70aacde0: forced crash dump initiated at user request
+
+401fbb10 genunix:uadmin+55c (1, 1, 0, 6d700000, 5, 0)
+  %l0-7: 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+         00000000
+...</programlisting><para>When the system reboots, make sure the crash dump succeeded:</para><programlisting>$ cd /var/crash/testsystem
+$ ls
+bounds    unix.0    unix.1    vmcore.0  vmcore.1</programlisting><para><indexterm><primary><command>savecore</command></primary></indexterm>If
+the dump is missing from your dump directory, it could be that the partition
+is out of space.  You can free up space and run <olink targetdoc="refman1m" targetptr="savecore-1m" remap="external"><citerefentry><refentrytitle>savecore</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> manually as root to subsequently
+save the dump. If your dump directory contains multiple crash dumps, the one
+you just created will be the <filename>unix.[n]</filename> and <filename>vmcore.[n]</filename> pair with the most recent modification time.</para>
+</sect2><sect2 id="casestudy-17"><title>Starting MDB</title><para>Now, run <command>mdb</command> on the crash dump you created, and check
+its status:</para><programlisting>$ mdb unix.1 vmcore.1
+Loading modules: [ unix krtld genunix ip nfs ipc ]
+&gt; ::status
+debugging crash dump vmcore.1 (32-bit) from testsystem
+operating system: 5.10 Generic (sun4u)
+panic message: forced crash dump initiated at user request</programlisting><para>In the examples presented in this guide, a crash dump from a 32-bit
+kernel is used.  All of the techniques presented here are applicable to a
+64-bit kernel, and care has been taken to distinguish pointers (sized differently
+on 32- and 64-bit systems) from fixed-sized quantities, which are invariant
+with respect to the kernel data model.</para><para>An UltraSPARC workstation was used to generate the example presented.
+Your results can vary depending on the architecture and model of system you
+use.</para>
+</sect2>
+</sect1><sect1 id="casestudy-18"><title>Allocator Basics</title><para>The kernel memory allocator's job is to parcel out regions of virtual
+memory to other kernel subsystems (these are commonly called <emphasis>clients</emphasis>).
+This section explains the basics of the allocator's operation and introduces
+some terms used later in this guide.</para><sect2 id="casestudy-19"><title>Buffer States</title><para>The functional domain of the kernel memory allocator is the set of <emphasis>buffers</emphasis> of virtual memory that make up the kernel heap.  These
+buffers are grouped together into sets of uniform size and purpose, known
+as <emphasis>caches</emphasis>.  Each cache contains a set of buffers.  Some
+of these buffers are currently <emphasis>free</emphasis>, which means that
+they have not yet been allocated to any client of the allocator.  The remaining
+buffers are <emphasis>allocated</emphasis>, which means that a pointer to
+that buffer has been provided to a client of the allocator.  If no client
+of the allocator holds a pointer to an allocated buffer, this buffer is said
+to be <emphasis>leaked</emphasis>, because it cannot be freed.  Leaked buffers
+indicate incorrect code that is wasting kernel resources. </para>
+</sect2><sect2 id="casestudy-20"><title>Transactions</title><para>A kmem <emphasis>transaction</emphasis> is a transition on a buffer
+between the allocated and free states.  The allocator can verify that the
+state of a buffer is valid as part of each transaction. Additionally, the
+allocator has facilities for logging transactions for post-mortem examination.</para>
+</sect2><sect2 id="casestudy-21"><title>Sleeping and Non-Sleeping Allocations</title><para><indexterm><primary><function>kmem_alloc</function></primary></indexterm>Unlike
+the Standard C Library's <olink targetdoc="refman3a" targetptr="malloc-3c" remap="external"><citerefentry><refentrytitle>malloc</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> function,
+the kernel memory allocator can block (or <emphasis>sleep</emphasis>), waiting
+until enough virtual memory is available to satisfy the client's request.
+ This is controlled by the <literal>flag</literal> parameter to <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  A call
+to <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> which has the <literal>KM_SLEEP</literal> flag set
+can never fail; it will block forever waiting for resources to become available.</para>
+</sect2><sect2 id="casestudy-22"><title>Kernel Memory Caches</title><para><indexterm><primary><structname>kmem_cache_t</structname></primary></indexterm>The kernel memory allocator divides the memory it manages into
+a set of <emphasis>caches</emphasis>.  All allocations are supplied from these
+caches, which are represented by the <structname>kmem_cache_t</structname> data
+structure.  Each cache has a fixed <emphasis>buffer size</emphasis>, which
+represents the maximum allocation size satisfied by that cache.  Each cache
+has a string name indicating the type of data it manages.</para><para><indexterm><primary><function>kmem_cache_alloc</function></primary></indexterm><indexterm><primary><function>kmem_cache_free</function></primary></indexterm>Some kernel memory caches are special purpose and are initialized
+to allocate only a particular kind of data structure.  An example of this
+is the &ldquo;thread_cache,&rdquo; which allocates only structures of type <type>kthread_t</type>.  Memory from these caches is allocated to clients by the <function>kmem_cache_alloc</function> function and freed by the <function>kmem_cache_free</function> function.</para><note><para><function>kmem_cache_alloc</function> and <function>kmem_cache_free</function> are
+not public DDI interfaces. Do NOT write code that relies on them, because
+they are subject to change or removal in future releases of Solaris.</para>
+</note><para><indexterm><primary><function>kmem_zalloc</function></primary></indexterm>Caches
+whose name begins with &ldquo;<literal>kmem_alloc_</literal>&rdquo; implement
+the kernel's general memory allocation scheme.  These caches provide memory
+to clients of <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="kmem-zalloc-9f" remap="external"><citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  Each of these caches satisfies
+requests whose size is between the buffer size of that cache and the buffer
+size of the next smallest cache.  For example, the kernel has <literal>kmem_alloc_8</literal> and <literal>kmem_alloc_16</literal> caches.  In this case, the <literal>kmem_alloc_16</literal> cache handles all client requests for 9-16 bytes of
+memory.  Remember that the size of each buffer in the <literal>kmem_alloc_16</literal> cache
+is 16 bytes, regardless of the size of the client request.  In a 14 byte request,
+two bytes of the resulting buffer are unused, since the request is satisfied
+from the <literal>kmem_alloc_16</literal> cache.</para><para>The last set of caches are those used internally by the kernel memory
+allocator for its own bookkeeping.  These include those caches whose names
+start with &ldquo;<literal>kmem_magazine_</literal>&rdquo; or &ldquo;<literal>kmem_va_</literal>&rdquo;, the <literal>kmem_slab_cache</literal>, the <literal>kmem_bufctl_cache</literal> and others.</para>
+</sect2>
+</sect1><sect1 id="casestudy-27"><title>Kernel Memory Caches</title><para><indexterm><primary>dcmds</primary><secondary sortas="kmastat"><command>::kmastat</command></secondary></indexterm>This section explains how to find and examine
+kernel memory caches.  You can learn about the various kmem caches on the
+system by issuing the <command>::kmastat</command> command.</para><programlisting>&gt; ::kmastat
+cache                        buf    buf    buf    memory     alloc alloc
+name                        size in use  total    in use   succeed  fail
+------------------------- ------ ------ ------ --------- --------- -----
+kmem_magazine_1                8     24   1020      8192        24     0
+kmem_magazine_3               16    141    510      8192       141     0
+kmem_magazine_7               32     96    255      8192        96     0
+...
+kmem_alloc_8                   8   3614   3751     90112   9834113     0
+kmem_alloc_16                 16   2781   3072     98304   8278603     0
+kmem_alloc_24                 24    517    612     24576    680537     0
+kmem_alloc_32                 32    398    510     24576    903214     0
+kmem_alloc_40                 40    482    584     32768    672089     0
+...
+thread_cache                 368    107    126     49152    669881     0
+lwp_cache                    576    107    117     73728       182     0
+turnstile_cache               36    149    292     16384    670506     0
+cred_cache                    96      6     73      8192   2677787     0
+...</programlisting><para>If you run <command>::kmastat</command> you get a feel for what a &ldquo;normal&rdquo;
+system looks like.  This will help you to spot excessively large caches on
+systems that are leaking memory.  The results of <command>::kmastat</command> will
+vary depending on the system you are running on, how many processes are running,
+and so forth.</para><para><indexterm><primary>dcmds</primary><secondary><command>::kmem_cache</command></secondary></indexterm>Another way to list the various kmem caches is with the <command>::kmem_cache</command> command:</para><programlisting>&gt; ::kmem_cache
+ADDR     NAME                      FLAG  CFLAG  BUFSIZE  BUFTOTL
+70036028 kmem_magazine_1           0020 0e0000        8     1020
+700362a8 kmem_magazine_3           0020 0e0000       16      510
+70036528 kmem_magazine_7           0020 0e0000       32      255
+...
+70039428 kmem_alloc_8              020f 000000        8     3751
+700396a8 kmem_alloc_16             020f 000000       16     3072
+70039928 kmem_alloc_24             020f 000000       24      612
+70039ba8 kmem_alloc_32             020f 000000       32      510
+7003a028 kmem_alloc_40             020f 000000       40      584
+...</programlisting><para>This command is useful because it maps cache names to addresses, and
+provides the debugging flags for each cache in the FLAG column.  It is important
+to understand that the allocator's selection of debugging features is derived
+on a per-cache basis from this set of flags.  These are set in conjunction
+with the global <literal>kmem_flags</literal> variable at cache creation time.
+ Setting <literal>kmem_flags</literal> while the system is running has no
+effect on the debugging behavior, except for subsequently created caches (which
+is rare after boot-up).</para><para><indexterm><primary>Walkers</primary><secondary>kmem_cache</secondary></indexterm>Next, walk the list of kmem caches directly using MDB's <literal>kmem_cache</literal> walker:</para><programlisting>&gt; ::walk kmem_cache
+70036028
+700362a8
+70036528
+700367a8
+...</programlisting><para><indexterm><primary>Macros</primary><secondary>kmem_cache</secondary></indexterm>This produces a list of pointers that correspond to each kmem
+cache in the kernel.  To find out about a specific cache, apply the <literal>kmem_cache</literal> macro: </para><programlisting>&gt; 0x70039928$&lt;kmem_cache
+0x70039928:     lock
+0x70039928:     owner/waiters
+                0
+0x70039930:     flags           freelist        offset
+                20f             707c86a0        24
+0x7003993c:     global_alloc    global_free     alloc_fail
+                523             0               0
+0x70039948:     hash_shift      hash_mask       hash_table
+                5               1ff             70444858
+0x70039954:     nullslab
+0x70039954:     cache           base            next
+                70039928        0               702d5de0
+0x70039960:     prev            head            tail
+                707c86a0        0               0
+0x7003996c:     refcnt          chunks
+                -1              0
+0x70039974:     constructor     destructor      reclaim
+                0               0               0
+0x70039980:     private         arena           cflags
+                0               104444f8        0
+0x70039994:     bufsize         align           chunksize
+                24              8               40
+0x700399a0:     slabsize        color           maxcolor
+                8192            24              32
+0x700399ac:     slab_create     slab_destroy    buftotal
+                3               0               612
+0x700399b8:     bufmax          rescale         lookup_depth
+                612             1               0
+0x700399c4:     kstat           next            prev
+                702c8608        70039ba8        700396a8
+0x700399d0:     name    kmem_alloc_24
+0x700399f0:     bufctl_cache    magazine_cache  magazine_size
+                70037ba8        700367a8        15
+...</programlisting><para>Important fields for debugging include 'bufsize', 'flags' and 'name'.
+The name of the <literal>kmem_cache</literal> (in this case &ldquo;<literal>kmem_alloc_24</literal>&rdquo;) indicates its purpose in the system.  Bufsize indicates
+the size of each buffer in this cache; in this case, the cache is used for
+allocations of size 24 and smaller.  'flags' indicates what debugging features
+are turned on for this cache.  You can find the debugging flags listed in <literal>&lt;sys/kmem_impl.h&gt;</literal>.  In this case 'flags' is <literal>0x20f</literal>,
+which is <literal>KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS |
+KMF_HASH</literal>.  This document explains each of the debugging features
+in subsequent sections.</para><para><indexterm><primary>Walkers</primary><secondary>kmem</secondary></indexterm><indexterm><primary>Walkers</primary><secondary>freemem</secondary></indexterm>When you are interested in looking at buffers in a particular
+cache, you can walk the allocated and freed buffers in that cache directly: </para><programlisting>&gt; 0x70039928::walk kmem
+704ba010
+702ba008
+704ba038
+702ba030
+...
+
+&gt; 0x70039928::walk freemem
+70a9ae50
+70a9ae28
+704bb730
+704bb2f8
+...</programlisting><para>MDB provides a shortcut to supplying the cache address to the kmem walker:
+a specific walker is provided for each kmem cache, and its name is the same
+as the name of the cache.  For example:</para><programlisting>&gt; ::walk kmem_alloc_24
+704ba010
+702ba008
+704ba038
+702ba030
+...
+
+&gt; ::walk thread_cache
+70b38080
+70aac060
+705c4020
+70aac1e0
+...</programlisting><para>Now you know how to iterate over the kernel memory allocator's internal
+data structures and examine the most important members of the <structname>kmem_cache</structname> data structure.</para>
+</sect1><sect1 id="casestudy-26"><title>Detecting Memory Corruption</title><para><indexterm><primary>memory corruption</primary></indexterm>One of the
+primary debugging facilities of the allocator is that it includes algorithms
+to recognize data corruption quickly. When corruption is detected, the allocator
+immediately panics the system. This section describes how the allocator recognizes
+data corruption. You must understand this to be able to debug these problems.</para><itemizedlist><para>Memory abuse typically falls into one of the following categories:</para><listitem><para>Writing past the end of a buffer</para>
+</listitem><listitem><para>Accessing uninitialized data</para>
+</listitem><listitem><para>Continuing to use a freed buffer</para>
+</listitem><listitem><para>Corrupting kernel memory</para>
+</listitem>
+</itemizedlist><para>Keep these problems in mind as you read the next three sections. They
+will help you to understand the allocator's design, and enable you to diagnose
+problems more efficiently.</para><sect2 id="casestudy-25"><title>Freed Buffer Checking: <literal>0xdeadbeef</literal></title><para><indexterm><primary><literal>0xdeadbeef</literal></primary></indexterm>When
+the <literal>KMF_DEADBEEF</literal> (<literal>0x2</literal>) bit is set in
+the flags field of a <literal>kmem_cache</literal>, the allocator tries to
+make memory corruption easy to detect by writing a special pattern into all
+freed buffers.  This pattern is <literal>0xdeadbeef</literal>.  Since a typical
+region of memory contains both allocated and freed memory, sections of each
+kind of block will be interspersed. The following example is from the <filename>kmem_alloc_24</filename> cache:</para><programlisting>0x70a9add8:     deadbeef        deadbeef
+0x70a9ade0:     deadbeef        deadbeef
+0x70a9ade8:     deadbeef        deadbeef
+0x70a9adf0:     feedface        feedface
+0x70a9adf8:     70ae3260        8440c68e
+0x70a9ae00:     5               4ef83
+0x70a9ae08:     0               0
+0x70a9ae10:     1               bbddcafe
+0x70a9ae18:     feedface        139d
+0x70a9ae20:     70ae3200        d1befaed
+0x70a9ae28:     deadbeef        deadbeef
+0x70a9ae30:     deadbeef        deadbeef
+0x70a9ae38:     deadbeef        deadbeef
+0x70a9ae40:     feedface        feedface
+0x70a9ae48:     70ae31a0        8440c54e</programlisting><para>The buffers at <literal>0x70a9add8</literal> and <literal>0x70a9ae28</literal> are
+filled with <literal>0xdeadbeefdeadbeef</literal>, which shows that these
+buffers are free. The buffer <emphasis>redzones</emphasis> are filled with <literal>0xfeedfacefeedface</literal>, which indicates they are untouched (no buffer
+overrun has occurred). See the following section for an explanation of redzones.
+At <literal>0x70a9ae00</literal> an allocated buffer is located between the
+two free buffers.</para>
+</sect2><sect2 id="casestudy-28"><title>Redzone: <literal>0xfeedface</literal></title><para><indexterm><primary>redzone</primary></indexterm><indexterm><primary><literal>0xfeedface</literal></primary></indexterm><indexterm><primary>buftag</primary></indexterm>Note the pattern <literal>0xfeedface</literal> in the buffer shown
+in the previous section. This pattern is known as the <emphasis>redzone</emphasis> indicator.
+This pattern enables the allocator (and a programmer debugging a problem)
+to determine whether the boundaries of a buffer have been violated. Following
+the redzone is some additional information. The content of that data depends
+on other factors (see <olink targetptr="casestudy-31" remap="internal">Memory Allocation Logging</olink>).
+The redzone and its suffix are collectively called the <emphasis>buftag</emphasis> region. <olink targetptr="casestudy-fig-39" remap="internal">Figure&nbsp;9&ndash;1</olink> summarizes this
+information.</para><figure id="casestudy-fig-39"><title>The Redzone</title><mediaobject><imageobject><imagedata entityref="redzone.fig1"/>
+</imageobject><textobject><simpara>Graphic described by context.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The buftag is appended to each buffer in a cache when any of the <literal>KMF_AUDIT</literal>, <literal>KMF_DEADBEEF</literal>, or <literal>KMF_REDZONE</literal> flags
+is set in that buffer's cache. The content of the buftag depends on whether <literal>KMF_AUDIT</literal> is set.</para><para>Decomposing the memory region presented above into distinct buffers
+is now simple:</para><programlisting>0x70a9add8:     deadbeef        deadbeef  \
+0x70a9ade0:     deadbeef        deadbeef   +- User Data (free)
+0x70a9ade8:     deadbeef        deadbeef  /
+0x70a9adf0:     feedface        feedface  -- REDZONE
+0x70a9adf8:     70ae3260        8440c68e  -- Debugging Data
+
+0x70a9ae00:     5               4ef83     \
+0x70a9ae08:     0               0          +- User Data (allocated)
+0x70a9ae10:     1               bbddcafe  /
+0x70a9ae18:     feedface        139d    -- REDZONE
+0x70a9ae20:     70ae3200        d1befaed  -- Debugging Data
+
+0x70a9ae28:     deadbeef        deadbeef  \
+0x70a9ae30:     deadbeef        deadbeef   +- User Data (free)
+0x70a9ae38:     deadbeef        deadbeef  /
+0x70a9ae40:     feedface        feedface  -- REDZONE
+0x70a9ae48:     70ae31a0        8440c54e  -- Debugging Data</programlisting><para>The buffers at <literal>0x70a9add8</literal> and <literal>0x70a9ae28</literal> are
+filled with <literal>0xdeadbeefdeadbeef</literal>, which shows that these
+buffers are free. The buffer redzones are filled with <literal>0xfeedfacefeedface</literal>, which indicates they are untouched (no buffer overrun has occurred).</para><variablelist><varlistentry><term><literal>0xbaddcafe</literal></term><listitem><para>Buffer is allocated but uninitialized (see <olink targetptr="casestudy-29" remap="internal">Uninitialized Data: 0xbaddcafe</olink>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0xdeadbeef</literal></term><listitem><para>Buffer is free.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0xfeedface</literal></term><listitem><para>Buffer limits were respected (no overflow).</para>
+</listitem>
+</varlistentry>
+</variablelist><para>In the allocated buffer beginning at <literal>0x70a9ae00</literal>,
+the situation is different. Recall from <olink targetptr="casestudy-18" remap="internal">Allocator
+Basics</olink> that there are two allocation types:</para><orderedlist><listitem><para><indexterm><primary><function>kmem_cache_alloc</function></primary></indexterm>The client requested memory using <olink targetdoc="refman9f" targetptr="kmem-cache-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_cache_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, in which case the size of
+the requested buffer is equal to the bufsize of the cache.</para>
+</listitem><listitem><para><indexterm><primary><function>kmem_alloc</function></primary></indexterm><indexterm><primary>redzone byte</primary></indexterm>The client
+requested memory using <olink targetdoc="refman9f" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, in which case the size of the requested buffer is
+less than or equal to the bufsize of the cache. For example, a request for
+20 bytes will be fulfilled from the <filename>kmem_alloc_24</filename> cache.
+ The allocator enforces the buffer boundary by placing a marker, the <emphasis>redzone
+byte</emphasis>, immediately following the client data:</para><programlisting>0x70a9ae00:     5               4ef83     \
+0x70a9ae08:     0               0          +- User Data (allocated)
+0x70a9ae10:     1               bbddcafe  /
+0x70a9ae18:     feedface        139d    -- REDZONE
+0x70a9ae20:     70ae3200        d1befaed  -- Debugging Data</programlisting>
+</listitem>
+</orderedlist><para>The <literal>0xfeedface</literal> value at <literal>0x70a9ae18</literal> is
+followed by a 32-bit word containing what seems to be a random value. This
+number is actually an encoded representation of the size of the buffer. To
+decode this number and find the size of the allocated buffer, use the formula:</para><programlisting>size = redzone_value / 251</programlisting><para>So, in this example, </para><programlisting>size = 0x139d / 251 = 20 bytes.</programlisting><para>This indicates that the buffer requested was of size 20 bytes. The allocator
+performs this decoding operation and finds that the redzone byte should be
+at offset 20. The redzone byte is the hex pattern <literal>0xbb</literal>,
+which is present at <literal>0x729084e4 (0x729084d0 + 0t20)</literal> as expected.</para><figure id="casestudy-fig-41"><title>Sample <literal>kmem_alloc(9F)</literal> Buffer</title><mediaobject><imageobject><imagedata entityref="redzone.fig2"/>
+</imageobject><textobject><simpara>This graphic depicts a sample kmem_alloc buffer. The
+redzone byte, uninitialized data, and debugging data are marked.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><olink targetptr="casestudy-fig-43" remap="internal">Figure&nbsp;9&ndash;3</olink> shows
+the general form of this memory layout.</para><figure id="casestudy-fig-43"><title>Redzone Byte</title><mediaobject><imageobject><imagedata entityref="redzone.fig3"/>
+</imageobject><textobject><simpara>This graphic shows the redzone byte being written after
+the end of the user data region. The redzone byte is determined by decoding
+the index.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>If the allocation size is the same as the bufsize of the cache, the
+redzone byte overwrites the first byte of the redzone itself, as shown in <olink targetptr="casestudy-fig-45" remap="internal">Figure&nbsp;9&ndash;4</olink>. </para><figure id="casestudy-fig-45"><title>Redzone Byte at the Beginning of the
+Redzone</title><mediaobject><imageobject><imagedata entityref="redzone.fig4"/>
+</imageobject><textobject><simpara>Graphic described by context.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>This overwriting results in the first 32-bit word of the redzone being <literal>0xbbedface</literal>, or <literal>0xfeedfabb</literal> depending on the endianness
+of the hardware on which the system is running.</para><note><para>Why is the allocation size encoded this way?  To encode the size,
+the allocator uses the formula (251 * size + 1). When the size decode occurs,
+the integer division discards the  remainder of '+1'.  However, the addition
+of 1 is valuable because the allocator can check whether the size is valid
+by testing whether (size % 251 == 1).  In this way, the allocator defends
+against corruption of the redzone byte index. </para>
+</note>
+</sect2><sect2 id="casestudy-29"><title>Uninitialized Data: <literal>0xbaddcafe</literal></title><para><indexterm><primary>Uninitialized Data</primary></indexterm><indexterm><primary><literal>0xbaddcafe</literal></primary></indexterm>You might be wondering
+what the suspicious <literal>0xbbddcafe</literal> at address <literal>0x729084d4</literal> was <emphasis>before</emphasis> the redzone byte got placed over the first byte in the word.
+ It was <literal>0xbaddcaf</literal>e.  When the <literal>KMF_DEADBEEF</literal> flag
+is set in the cache, allocated but <emphasis>uninitialized</emphasis> memory
+is filled with the <literal>0xbaddcafe</literal> pattern.  When the allocator
+performs an allocation, it loops across the words of the buffer and verifies
+that each word contains <literal>0xdeadbeef</literal>, then fills that word
+with <literal>0xbaddcafe</literal>.</para><para>A system can panic with a message such as: </para><programlisting>panic[cpu1]/thread=e1979420: BAD TRAP: type=e (Page Fault)
+rp=ef641e88 addr=baddcafe occurred in module "unix" due to an
+illegal access to a user address</programlisting><para>In this case, the address that caused the fault was <literal>0xbaddcafe</literal>:
+ the panicking thread has accessed some data that was never initialized. </para>
+</sect2><sect2 id="casestudy-30"><title>Associating Panic Messages With Failures</title><para>The kernel memory allocator emits panic messages corresponding to the
+failure modes described earlier.  For example, a system can panic with a message
+such as:</para><programlisting>kernel memory allocator: buffer modified after being freed
+modification occurred at offset 0x30</programlisting><para>The allocator was able to detect this case because it tried to validate
+that the buffer in question was filled with <literal>0xdeadbeef</literal>.
+ At offset <literal>0x30,</literal> this condition was not met.  Since this
+condition indicates memory corruption, the allocator panicked the system.</para><para>Another example failure message is:</para><programlisting>kernel memory allocator: redzone violation: write past end of buffer</programlisting><para>The allocator was able to detect this case because it tried to validate
+that the redzone byte (<literal>0xbb</literal>) was in the location it determined
+from the redzone size encoding.  It failed to find the signature byte in the
+correct location.  Since this indicates memory corruption, the allocator panicked
+the system.  Other allocator panic messages are discussed later. </para>
+</sect2>
+</sect1><sect1 id="casestudy-31"><title>Memory Allocation Logging</title><para>This section explains the logging features of the kernel memory allocator
+and how you can employ them to debug system crashes.</para><sect2 id="casestudy-32"><title>Buftag Data Integrity</title><para><indexterm><primary>bufctl</primary></indexterm>As explained earlier,
+the second half of each buftag contains extra information about the corresponding
+buffer.  Some of this data is debugging information, and some is data private
+to the allocator.  While this auxiliary data can take several different forms,
+it is collectively known as &ldquo;Buffer Control&rdquo; or <emphasis>bufctl</emphasis> data.</para><para>However, the allocator needs to know whether a buffer's bufctl pointer
+is valid, since this pointer might also have been corrupted by malfunctioning
+code.  The allocator confirms the integrity of its auxiliary pointer by storing
+the pointer <emphasis>and</emphasis> an encoded version of that pointer, and
+then cross-checking the two versions.  </para><para><indexterm><primary><literal>bcp</literal></primary></indexterm><indexterm><primary><literal>bxstat</literal></primary></indexterm>As shown in <olink targetptr="casestudy-fig-47" remap="internal">Figure&nbsp;9&ndash;5</olink>, these pointers
+are the <emphasis>bcp</emphasis> (buffer control pointer) and <emphasis>bxstat</emphasis> (buffer
+control XOR status).  The allocator arranges bcp and bxstat so that the expression <literal>bcp XOR bxstat</literal> equals a well-known value.</para><figure id="casestudy-fig-47"><title>Extra Debugging Data in the Buftag</title><mediaobject><imageobject><imagedata entityref="redzone.fig5"/>
+</imageobject><textobject><simpara>Graphic is described by context.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>In the event that one or both of these pointers becomes corrupted, the
+allocator can easily detect such corruption and panic the system. When a buffer
+is <emphasis>allocated</emphasis>, <literal>bcp XOR bxstat = 0xa110c8ed</literal> (&ldquo;allocated&rdquo;).
+When a buffer is free, <literal>bcp XOR bxstat = 0xf4eef4ee</literal> (&ldquo;freefree&rdquo;). </para><note><para>You might find it helpful to re-examine the example provided in <olink targetptr="casestudy-25" remap="internal">Freed Buffer Checking: 0xdeadbeef</olink>, in order
+to confirm that the buftag pointers shown there are consistent.</para>
+</note><para>In the event that the allocator finds a corrupt buftag, it panics the
+system and produces a message similar to the following: </para><programlisting>kernel memory allocator: boundary tag corrupted
+    bcp ^ bxstat = 0xffeef4ee, should be f4eef4ee</programlisting><para>Remember, if bcp is corrupt, it is still possible to retrieve its value
+by taking the value of <literal>bxstat XOR 0xf4eef4ee</literal> or <literal>bxstat
+XOR 0xa110c8ed</literal>, depending on whether the buffer is allocated or
+free.</para>
+</sect2><sect2 id="casestudy-33"><title>The <type>bufctl</type> Pointer</title><para><indexterm><primary>bufctl</primary></indexterm><indexterm><primary><structname>kmem_bufctl_t</structname></primary></indexterm><indexterm><primary><literal>kmem_bufctl_audit_t</literal></primary></indexterm>The buffer control (bufctl) pointer contained
+in the buftag region can have different meanings, depending on the cache's <literal>kmem_flags</literal>.  The behavior toggled by the <literal>KMF_AUDIT</literal> flag
+is of particular interest: when the KMF_AUDIT flag is <emphasis>not</emphasis> set,
+the kernel memory allocator allocates a <structname>kmem_bufctl_t</structname> structure
+for each buffer.  This structure contains some minimal accounting information
+about each buffer.  When the <literal>KMF_AUDIT</literal> flag <emphasis>is</emphasis> set,
+the allocator instead allocates a <literal>kmem_bufctl_audit_t</literal>,
+an extended version of the <literal>kmem_bufctl_t</literal>.  </para><para>This section presumes the <literal>KMF_AUDIT</literal> flag is set.
+For caches that do not have this bit set, the amount of available debugging
+information is reduced.</para><para>The <literal>kmem_bufctl_audit_t</literal> (<literal>bufctl_audit</literal> for
+short) contains additional information about the last transaction that occurred
+on this buffer. The following example shows how to apply the <literal>bufctl_audit</literal> macro to examine an audit record.  The buffer shown is the example
+buffer used in <olink targetptr="casestudy-26" remap="internal">Detecting Memory Corruption</olink>:</para><programlisting>&gt; 0x70a9ae00,5/KKn
+0x70a9ae00:     5               4ef83
+                0               0
+                1               bbddcafe
+                feedface        139d
+                70ae3200        d1befaed</programlisting><para><indexterm><primary>Macros</primary><secondary><literal>bufctl_audit</literal></secondary></indexterm>Using the techniques presented above, it is easy to see that <literal>0x70ae3200</literal> points to the <literal>bufctl_audit</literal> record:
+it is the first pointer following the redzone.  To examine the <literal>bufctl_audit</literal> record it points to, apply the <literal>bufctl_audit</literal> macro:</para><programlisting>&gt; 0x70ae3200$&lt;bufctl_audit
+0x70ae3200:     next            addr            slab
+                70378000        70a9ae00        707c86a0
+0x70ae320c:     cache           timestamp       thread
+                70039928        e1bd0e26afe     70aac4e0
+0x70ae321c:     lastlog         contents        stackdepth
+                7011c7c0        7018a0b0        4
+0x70ae3228:
+                kmem_zalloc+0x30
+                pid_assign+8
+                getproc+0x68
+                cfork+0x60</programlisting><para>The 'addr' field is the address of the buffer corresponding to this
+bufctl_audit record.  This is the original address: <literal>0x70a9ae00</literal>.
+The 'cache' field points at the kmem_cache that allocated this buffer. You
+can use the <command>::kmem_cache</command> dcmd to examine it as follows: </para><programlisting>&gt; 0x70039928::kmem_cache
+ADDR     NAME                      FLAG  CFLAG  BUFSIZE  BUFTOTL
+70039928 kmem_alloc_24             020f 000000       24      612</programlisting><para>The 'timestamp' field represents the time this transaction occurred.
+This time is expressed in the same manner as <olink targetdoc="refman3a" targetptr="gethrtime-3c" remap="external"><citerefentry><refentrytitle>gethrtime</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>. </para><para>'thread' is a pointer to the thread that performed the last transaction
+on this buffer.  The 'lastlog' and 'contents' pointers point to locations
+in the allocator's <emphasis>transaction logs</emphasis>.  These logs are
+discussed in detail in <olink targetptr="casestudy-38" remap="internal">Allocator Logging Facility</olink>. </para><para>Typically, the most useful piece of information provided by <literal>bufctl_audit</literal> is the stack trace recorded at the point at which the transaction
+took place.  In this case, the transaction was an allocation called as part
+of executing <olink targetdoc="refman2" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="casestudy-34"><title>Advanced Memory Analysis</title><para>This section describes facilities for performing advanced memory analysis,
+including locating memory leaks and sources of data corruption.</para><sect2 id="casestudy-35"><title>Finding Memory Leaks</title><para><indexterm><primary>dcmds</primary><secondary sortas="findleaks"><command>::findleaks</command></secondary></indexterm>The <command>::findleaks</command> dcmd
+provides powerful and efficient detection of memory leaks in kernel crash
+dumps where the full set of kmem debug features has been enabled.  The first
+execution of <command>::findleaks</command> processes the dump for memory
+leaks (this can take a few minutes), and then coalesces the leaks by the allocation
+stack trace.  The findleaks report shows a bufctl address and the topmost
+stack frame for each memory leak that was identified:</para><programlisting>&gt; ::findleaks
+CACHE     LEAKED   BUFCTL CALLER
+70039ba8       1 703746c0 pm_autoconfig+0x708
+70039ba8       1 703748a0 pm_autoconfig+0x708
+7003a028       1 70d3b1a0 sigaddq+0x108
+7003c7a8       1 70515200 pm_ioctl+0x187c
+------------------------------------------------------
+   Total       4 buffers, 376 bytes</programlisting><para><indexterm><primary>Macros</primary><secondary><literal>bufctl_audit</literal></secondary></indexterm>Using the bufctl pointers, you can obtain the complete stack backtrace
+of the allocation by applying the <literal>bufctl_audit</literal> macro: </para><programlisting>&gt; 70d3b1a0$&lt;bufctl_audit
+0x70d3b1a0:     next            addr            slab
+                70a049c0        70d03b28        70bb7480
+0x70d3b1ac:     cache           timestamp       thread
+                7003a028        13f7cf63b3      70b38380
+0x70d3b1bc:     lastlog         contents        stackdepth
+                700d6e60        0               5
+0x70d3b1c8:
+                kmem_alloc+0x30
+                sigaddq+0x108
+                sigsendproc+0x210
+                sigqkill+0x90
+                kill+0x28</programlisting><para>The programmer can usually use the <literal>bufctl_audit</literal> information
+and the allocation stack trace to quickly track down the code path that leaks
+the given buffer.</para>
+</sect2><sect2 id="casestudy-36"><title>Finding References to Data</title><para><indexterm><primary>dcmds</primary><secondary><command>::whatis</command></secondary></indexterm><indexterm><primary>dcmds</primary><secondary><command>::kgrep</command></secondary></indexterm>When trying to diagnose a memory corruption problem, you should
+know what other kernel entities hold a copy of a particular pointer. This
+is important because it can reveal which thread accessed a data structure
+after it was freed.  It can also make it easier to understand what kernel
+entities are sharing knowledge of a particular (valid) data item.  The <command>::whatis</command> and <command>::kgrep</command> dcmds can be used to answer these
+questions.  You can apply <command>::whatis</command> to a value of interest: </para><programlisting>&gt; 0x705d8640::whatis
+705d8640 is 705d8640+0, allocated from streams_mblk</programlisting><para>In this case, <literal>0x705d8640</literal> is revealed to be a pointer
+to a STREAMS <structname>mblk</structname> structure.  To see the entire allocation
+tree, use <command>::whatis</command> <option>a</option> instead:</para><programlisting>&gt; 0x705d8640::whatis -a
+705d8640 is 705d8640+0, allocated from streams_mblk
+705d8640 is 705d8000+640, allocated from kmem_va_8192
+705d8640 is 705d8000+640 from kmem_default vmem arena
+705d8640 is 705d2000+2640 from kmem_va vmem arena
+705d8640 is 705d2000+2640 from heap vmem arena</programlisting><para>This reveals that the allocation also appears in the <literal>kmem_va_8192</literal> cache. The <literal>kmem_va_8192</literal> cache is a
+kmem cache that is fronting the <literal>kmem_va</literal> vmem arena.  It
+also shows the full stack of vmem allocations.</para><para>The complete list of kmem caches and vmem arenas is displayed by the <command>::kmastat</command> dcmd.  You can use <command>::kgrep</command> to locate
+other kernel addresses that contain a pointer to this <structname>mblk</structname>.
+This illustrates the hierarchical nature of memory allocations in the system;
+in general, you can determine the type of object referred to by the given
+address from the name of the most specific kmem cache. </para><programlisting>&gt; 0x705d8640::kgrep
+400a3720
+70580d24
+7069d7f0
+706a37ec
+706add34</programlisting><para>and investigate them by applying <command>::whatis</command> again:</para><programlisting>&gt; 400a3720::whatis
+400a3720 is in thread 7095b240's stack
+
+&gt; 706add34::whatis
+706add34 is 706add20+14, allocated from streams_dblk_120</programlisting><para>Here one pointer is located on the stack of a known kernel thread, and
+another is the <literal>mblk</literal> pointer inside of the corresponding
+STREAMS <structname>dblk</structname> structure.</para>
+</sect2><sect2 id="casestudy-37"><title>Finding Corrupt Buffers With <command>::kmem_verify</command></title><para><indexterm><primary>dcmds</primary><secondary sortas="kmemverify"><command>::kmem_verify</command></secondary></indexterm>MDB's <command>::kmem_verify</command> dcmd
+implements most of the same checks that the kmem allocator does at runtime.
+ <command>::kmem_verify</command> can be invoked in order to scan every kmem
+cache with appropriate <literal>kmem_flags</literal>, or to examine a particular
+cache. </para><para>Here is an example of using <command>::kmem_verify</command> to isolate
+a problem: </para><programlisting>&gt; ::kmem_verify
+Cache Name                      Addr     Cache Integrity
+kmem_alloc_8                    70039428 clean
+kmem_alloc_16                   700396a8 clean
+kmem_alloc_24                   70039928 1 corrupt buffer
+kmem_alloc_32                   70039ba8 clean
+kmem_alloc_40                   7003a028 clean
+kmem_alloc_48                   7003a2a8 clean
+...</programlisting><para>It is easy to see here that the <filename>kmem_alloc_24</filename> cache
+contains what <command>::kmem_verify</command> believes to be a problem. 
+With an explicit cache argument, the <command>::kmem_verify</command> dcmd
+provides more detailed information about the problem:</para><programlisting>&gt; 70039928::kmem_verify
+Summary for cache 'kmem_alloc_24'
+  buffer 702babc0 (free) seems corrupted, at 702babc0</programlisting><para>The next step is to examine the buffer which <command>::kmem_verify</command> believes
+to be corrupt: </para><programlisting>&gt; 0x702babc0,5/KKn
+0x702babc0:     0               deadbeef
+                deadbeef        deadbeef
+                deadbeef        deadbeef
+                feedface        feedface
+                703785a0        84d9714e</programlisting><para>The reason that <command>::kmem_verify</command> flagged this buffer
+is now clear: The first word in the buffer (at <literal>0x702babc0</literal>)
+should probably be filled with the <literal>0xdeadbeef</literal> pattern,
+not with a <literal>0</literal>.  At this point, examining the <literal>bufctl_audit</literal> for this buffer might yield clues about what code recently wrote
+to the buffer, indicating where and when it was freed.</para><para>Another useful technique in this situation is to use <command>::kgrep</command> to
+search the address space for references to address <literal>0x702babc0</literal>,
+in order to discover what threads or data structures are still holding references
+to this freed data. </para>
+</sect2><sect2 id="casestudy-38"><title>Allocator Logging Facility</title><para><indexterm><primary>transaction log</primary></indexterm><indexterm><primary>contents log</primary></indexterm>When <literal>KMF_AUDIT</literal> is
+set for a cache, the kernel memory allocator maintains a log that records
+the recent history of its activity.  This <emphasis>transaction log</emphasis> records <literal>bufctl_audit</literal> records. If the <literal>KMF_AUDIT</literal> and the <literal>KMF_CONTENTS</literal> flags are both set, the allocator generates a <emphasis>contents
+log</emphasis> that records portions of the actual contents of allocated and
+freed buffers.  The structure and use of the contents log is outside the scope
+of this document. The transaction log is discussed in this section. </para><para><indexterm><primary>Walkers</primary><secondary>kmem_log</secondary></indexterm>MDB provides several facilities for displaying the transaction
+log.  The simplest is <command>::walk kmem_log</command>, which prints out
+the transaction in the log as a series of <literal>bufctl_audit_t</literal> pointers: </para><programlisting>&gt; ::walk kmem_log
+70128340
+701282e0
+70128280
+70128220
+701281c0
+...
+&gt; 70128340$&lt;bufctl_audit
+0x70128340:     next            addr            slab
+                70ac1d40        70bc4ea8        70bb7c00
+0x7012834c:     cache           timestamp       thread
+                70039428        e1bd7abe721     70aacde0
+0x7012835c:     lastlog         contents        stackdepth
+                701282e0        7018f340        4
+0x70128368:
+                kmem_cache_free+0x24
+                nfs3_sync+0x3c
+                vfs_sync+0x84
+                syssync+4</programlisting><para><indexterm><primary>dcmds</primary><secondary sortas="kmem_log"><command>::kmem_log</command></secondary></indexterm>A more elegant way to view the entire transaction
+log is by using the <command>::kmem_log</command> command:</para><programlisting>&gt; ::kmem_log
+CPU ADDR     BUFADDR         TIMESTAMP THREAD
+  0 70128340 70bc4ea8      e1bd7abe721 70aacde0
+  0 701282e0 70bc4ea8      e1bd7aa86fa 70aacde0
+  0 70128280 70bc4ea8      e1bd7aa27dd 70aacde0
+  0 70128220 70bc4ea8      e1bd7a98a6e 70aacde0
+  0 701281c0 70d03738      e1bd7a8e3e0 70aacde0
+  ...
+  0 70127140 70cf78a0      e1bd78035ad 70aacde0
+  0 701270e0 709cf6c0      e1bd6d2573a 40033e60
+  0 70127080 70cedf20      e1bd6d1e984 40033e60
+  0 70127020 70b09578      e1bd5fc1791 40033e60
+  0 70126fc0 70cf78a0      e1bd5fb6b5a 40033e60
+  0 70126f60 705ed388      e1bd5fb080d 40033e60
+  0 70126f00 705ed388      e1bd551ff73 70aacde0
+  ...</programlisting><para>The output of <command>::kmem_log</command> is sorted in descending
+order by timestamp. The <literal>ADDR</literal> column is the <structname>bufctl_audit</structname> structure corresponding to that transaction; <literal>BUFADDR</literal> points
+to the actual buffer. </para><para>These figures represent <emphasis>transactions</emphasis> on buffers
+(both allocations and frees). When a particular buffer is corrupted, it can
+be helpful to locate that buffer in the transaction log, then determine in
+which other transactions the transacting thread was involved.  This can help
+to assemble a picture of the sequence of events that occurred prior to and
+after the allocation (or free) of a buffer.</para><para><indexterm><primary>dcmds</primary><secondary sortas="bufctl"><command>::bufctl</command></secondary></indexterm>You can employ the <command>::bufctl</command> command
+to filter the output of walking the transaction log.  The <command>::bufctl
+-a</command> command filters the buffers in the transaction log by buffer
+address.  This example filters on buffer <literal>0x70b09578</literal>:</para><programlisting>&gt; ::walk kmem_log | ::bufctl -a 0x70b09578
+ADDR     BUFADDR   TIMESTAMP   THREAD   CALLER
+70127020 70b09578  e1bd5fc1791 40033e60 biodone+0x108
+70126e40 70b09578  e1bd55062da 70aacde0 pageio_setup+0x268
+70126de0 70b09578  e1bd52b2317 40033e60 biodone+0x108
+70126c00 70b09578  e1bd497ee8e 70aacde0 pageio_setup+0x268
+70120480 70b09578  e1bd21c5e2a 70aacde0 elfexec+0x9f0
+70120060 70b09578  e1bd20f5ab5 70aacde0 getelfhead+0x100
+7011ef20 70b09578  e1bd1e9a1dd 70aacde0 ufs_getpage_miss+0x354
+7011d720 70b09578  e1bd1170dc4 70aacde0 pageio_setup+0x268
+70117d80 70b09578  e1bcff6ff27 70bc2480 elfexec+0x9f0
+70117960 70b09578  e1bcfea4a9f 70bc2480 getelfhead+0x100
+...</programlisting><para>This example illustrates that a particular buffer can be used in numerous
+transactions.</para><note><para>Remember that the kmem transaction log is an incomplete record
+of the transactions made by the kernel memory allocator. Older entries in
+the log are evicted as needed in order to keep the size of the log constant.</para>
+</note><para><indexterm><primary>dcmds</primary><secondary sortas="allocdby"><command>::allocdby</command></secondary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="freedby"><command>::freedby</command></secondary></indexterm>The <command>::allocdby</command> and <command>::freedby</command> dcmds provide a convenient
+way to summarize transactions associated with a particular thread.  Here is
+an example of listing the recent allocations performed by thread <literal>0x70aacde0</literal>: </para><programlisting>&gt; 0x70aacde0::allocdby
+BUFCTL      TIMESTAMP CALLER
+70d4d8c0  e1edb14511a allocb+0x88
+70d4e8a0  e1edb142472 dblk_constructor+0xc
+70d4a240  e1edb13dd4f allocb+0x88
+70d4e840  e1edb13aeec dblk_constructor+0xc
+70d4d860  e1ed8344071 allocb+0x88
+70d4e7e0  e1ed8342536 dblk_constructor+0xc
+70d4a1e0  e1ed82b3a3c allocb+0x88
+70a53f80  e1ed82b0b91 dblk_constructor+0xc
+70d4d800  e1e9b663b92 allocb+0x88</programlisting><para>By examining <literal>bufctl_audit</literal> records, you can understand
+the recent activities of a particular thread.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000053410 0?>

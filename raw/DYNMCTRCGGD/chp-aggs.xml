@@ -1,0 +1,658 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-aggs"><title>Aggregations</title><highlights><para>When instrumenting the system to answer performance-related questions,
+it is useful to consider how data can be aggregated to answer a specific question
+rather than thinking in terms of data gathered by individual probes. For example,
+if you wanted to know the number of system calls by user ID, you would not
+necessarily care about the datum collected at <emphasis>each</emphasis> system
+call. You simply want to see a table of user IDs and system calls. Historically,
+you would answer this question by gathering data at each system call, and
+postprocessing the data using a tool like <olink targetdoc="refman1" targetptr="awk-1" remap="external"><citerefentry><refentrytitle>awk</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> or <olink targetdoc="refman1" targetptr="perl-1" remap="external"><citerefentry><refentrytitle>perl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.
+However, in DTrace the aggregating of data is a first-class operation. This
+chapter describes the DTrace facilities for manipulating <firstterm>aggregations</firstterm>.</para>
+</highlights><sect1 id="chp-aggs-1"><title>Aggregating Functions</title><para>An <firstterm>aggregating function</firstterm> is one that has the following
+property:</para><literallayout><literal>f(f(x</literal><subscript>0</subscript><literal>) U f(x</literal><subscript>1</subscript><literal>) U ... U f(x</literal><subscript>n</subscript><literal>)) = f(x</literal><subscript>0</subscript> <literal>U x</literal><subscript>1</subscript> <literal>U ... U x</literal><subscript>n</subscript><literal>)</literal></literallayout><para>where <replaceable>x</replaceable><subscript><replaceable>n</replaceable></subscript> is
+a set of arbitrary data. That is, applying an aggregating function to subsets
+of the whole and then applying it again to the results gives the same result
+as applying it to the whole itself. For example, consider a function <literal>SUM</literal> that yields the summation of a given data set. If the raw data
+consists of {2, 1, 2, 5, 4, 3, 6, 4, 2}, the result of applying <literal>SUM</literal> to
+the entire set is {29}. Similarly, the result of applying <literal>SUM</literal> to
+the subset consisting of the first three elements is {5}, the result of applying <literal>SUM</literal> to the set consisting of the subsequent three elements is {12},
+and the result of of applying <literal>SUM</literal> to the remaining three
+elements is also {12}. <literal>SUM</literal> is an aggregating function because
+applying it to the set of these results, {5, 12, 12}, yields the same result,
+{29}, as applying <literal>SUM</literal> to the original data.</para><para>Not all functions are aggregating functions. An example of a non-aggregating
+function is the function <literal>MEDIAN</literal> that determines the median
+element of the set. (The median is defined to be that element of a set for
+which as many elements in the set are greater than it as are less than it.)
+The <literal>MEDIAN</literal> is derived by sorting the set and selecting
+the middle element. Returning to the original raw data, if <literal>MEDIAN</literal> is
+applied to the set consisting of the first three elements, the result is {2}.
+(The sorted set is {1, 2, 2}; {2} is the set consisting of the middle element.)
+Likewise, applying <literal>MEDIAN</literal> to the next three elements yields
+{4} and applying <literal>MEDIAN</literal> to the final three elements yields
+{4}. Applying <literal>MEDIAN</literal> to each of the subsets thus yields
+the set {2, 4, 4}. Applying <literal>MEDIAN</literal> to this set yields the
+result {4}. However, sorting the original set yields {1, 2, 2, 2, 3, 4, 4,
+5, 6}. Applying <literal>MEDIAN</literal> to this set thus yields {3}. Because
+these results do not match, <literal>MEDIAN</literal> is not an aggregating
+function.</para><para>Many common functions for understanding a set of data are aggregating
+functions. These functions include counting the number of elements in the
+set, computing the minimum value of the set, computing the maximum value of
+the set, and summing all elements in the set. Determining the arithmetic mean
+of the set can be constructed from the function to count the number of elements
+in the set and the function to sum the number the elements in the set.</para><para>However, several useful functions are not aggregating functions. These
+functions include computing the mode (the most common element) of a set, the
+median value of the set, or the standard deviation of the set.</para><para>Applying aggregating functions to data as it is traced has a number
+of advantages:</para><itemizedlist><listitem><para>The entire data set need not be stored. Whenever a new element
+is to be added to the set, the aggregating function is calculated given the
+set consisting of the current intermediate result and the new element. After
+the new result is calculated, the new element may be discarded. This process
+reduces the amount of storage required by a factor of the number of data points,
+which is often quite large.</para>
+</listitem><listitem><para>Data collection does not induce pathological scalability problems.
+Aggregating functions enable intermediate results to be kept <emphasis>per-CPU</emphasis> instead
+of in a shared data structure. DTrace then applies the aggregating function
+to the set consisting of the per-CPU intermediate results to produce the final
+system-wide result.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="chp-aggs-2"><title>Aggregations</title><para><indexterm><primary>aggregators</primary></indexterm>DTrace stores the
+results of aggregating functions in objects called <firstterm>aggregations</firstterm>.
+The aggregation results are indexed using a tuple of expressions similar to
+those used for associative arrays. In D, the syntax for an aggregation is:</para><programlisting>@<replaceable>name</replaceable>[ <replaceable>keys</replaceable> ] = <replaceable>aggfunc</replaceable> ( <replaceable>args</replaceable> );</programlisting><para>where <replaceable>name</replaceable> is the name of the aggregation, <replaceable>keys</replaceable> is a comma-separated list of D expressions, <replaceable>aggfunc</replaceable> is one of the DTrace aggregating functions, and <replaceable>args</replaceable> is
+a comma-separated list of arguments appropriate for the aggregating function.
+The aggregation <replaceable>name</replaceable> is a D identifier that is
+prefixed with the special character <literal>@</literal>. All aggregations
+named in your D programs are global variables; there are no thread- or clause-local
+aggregations. The aggregation names are kept in a separate identifier namespace
+from other D global variables. Remember that <literal>a</literal> and <literal>@a</literal> are not the same variable if you reuse names. The special aggregation
+name <literal>@</literal> can be used to name an anonymous aggregation in
+simple D programs. The D compiler treats this name as an alias for the aggregation
+name <literal>@_</literal>.</para><para><indexterm><primary><literal>count</literal></primary></indexterm><indexterm><primary><literal>sum</literal></primary></indexterm><indexterm><primary><literal>avg</literal></primary></indexterm><indexterm><primary><literal>min</literal></primary></indexterm><indexterm><primary><literal>max</literal></primary></indexterm><indexterm><primary><literal>lquantize</literal></primary></indexterm><indexterm><primary><literal>quantize</literal></primary></indexterm>The DTrace aggregating functions are
+shown in the following table. Most aggregating functions take just a single
+argument that represents the new datum.</para><table frame="topbot" id="chp-aggs-tbl-4"><title>DTrace Aggregating Functions</title><tgroup cols="3" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="8.88in"?><colspec colwidth="20.45*"/><colspec colwidth="20.45*"/><colspec colwidth="58.10*"/><thead><row rowsep="1"><entry><para>Function Name</para>
+</entry><entry><para>Arguments</para>
+</entry><entry><para>Result</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>count</literal></para>
+</entry><entry><para>none</para>
+</entry><entry><para>The number of times called.</para>
+</entry>
+</row><row><entry><para><literal>sum</literal></para>
+</entry><entry><para>scalar expression</para>
+</entry><entry><para>The total value of the specified expressions.</para>
+</entry>
+</row><row><entry><para><literal>avg</literal></para>
+</entry><entry><para>scalar expression</para>
+</entry><entry><para>The arithmetic average of the specified expressions.</para>
+</entry>
+</row><row><entry><para><literal>min</literal></para>
+</entry><entry><para>scalar expression</para>
+</entry><entry><para>The smallest value among the specified expressions.</para>
+</entry>
+</row><row><entry><para><literal>max</literal></para>
+</entry><entry><para>scalar expression</para>
+</entry><entry><para>The largest value among the specified expressions.</para>
+</entry>
+</row><row><entry><para><literal>lquantize</literal></para>
+</entry><entry><para>scalar expression, lower bound, upper bound, step value</para>
+</entry><entry><para>A linear frequency distribution, sized by the specified range, of the
+values of the specified expressions. Increments the value in the <emphasis>highest</emphasis> bucket that is <emphasis>less</emphasis> than the specified expression.</para>
+</entry>
+</row><row><entry><para><literal>quantize</literal></para>
+</entry><entry><para>scalar expression</para>
+</entry><entry><para>A power-of-two frequency distribution of the values of the specified
+expressions. Increments the value in the <emphasis>highest</emphasis> power-of-two
+bucket that is <emphasis>less</emphasis> than the specified expression.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>For example, to count the number of <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls in the system,
+you could use an informative string as a key and the <function>count</function> aggregating
+function:</para><programlisting>syscall::write:entry
+{
+	@counts["write system calls"] = count();
+}</programlisting><para><indexterm><primary><literal>dtrace</literal></primary></indexterm>The <command>dtrace</command> command prints aggregation results by default when the process
+terminates, either as the result of an explicit <literal>END</literal> action
+or when the user presses Control-C. The following example output shows the
+result of running this command, waiting for a few seconds, and pressing Control-C:</para><screen><userinput># dtrace -s writes.d</userinput>
+dtrace: script './writes.d' matched 1 probe
+<userinput>^C</userinput>
+
+  write system calls                                              179
+#</screen><para><indexterm><primary><literal>execname</literal></primary></indexterm>You
+can count system calls per process name using the <literal>execname</literal> variable
+as the key to an aggregation:</para><programlisting>syscall::write:entry
+{
+	@counts[execname] = count();
+}</programlisting><para>The following example output shows the result of running this command,
+waiting for a few seconds, and pressing Control-C:</para><screen><userinput># dtrace -s writesbycmd.d</userinput>
+dtrace: script './writesbycmd.d' matched 1 probe
+<userinput>^C</userinput>
+
+  dtrace                                                            1
+  cat                                                               4
+  sed                                                               9
+  head                                                              9
+  grep                                                             14
+  find                                                             15
+  tail                                                             25
+  mountd                                                           28
+  expr                                                             72
+  sh                                                              291
+  tee                                                             814
+  def.dir.flp                                                    1996
+  make.bin                                                       2010
+#</screen><para>Alternatively, you might want to further examine writes organized by
+both executable name and file descriptor. The file descriptor is the first
+argument to <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>,
+so the following example uses a key consisting of both <literal>execname</literal> and <literal>arg0</literal>:</para><programlisting>syscall::write:entry
+{
+	@counts[execname, arg0] = count();
+}</programlisting><para>Running this command results in a table with both executable name and
+file descriptor, as shown in the following example:</para><screen><userinput># dtrace -s writesbycmdfd.d</userinput>
+dtrace: script './writesbycmdfd.d' matched 1 probe
+<userinput>^C</userinput>
+
+  cat                                                               1      58
+  sed                                                               1      60
+  grep                                                              1      89
+  tee                                                               1     156
+  tee                                                               3     156
+  make.bin                                                          5     164
+  acomp                                                             1     263
+  macrogen                                                          4     286
+  cg                                                                1     397
+  acomp                                                             3     736
+  make.bin                                                          1     880
+  iropt                                                             4    1731
+#</screen><para>The following example displays the average time spent in the write system
+call, organized by process name. This example uses the <function>avg</function> aggregating
+function, specifying the expression to average as the argument. The example
+averages the wall clock time spent in the system call:</para><programlisting>syscall::write:entry
+{
+	self-&gt;ts = timestamp;
+}
+
+syscall::write:return
+/self-&gt;ts/
+{
+	@time[execname] = avg(timestamp - self-&gt;ts);
+	self-&gt;ts = 0;
+}</programlisting><para>The following example output shows the result of running this command,
+waiting for a few seconds, and pressing Control-C:</para><screen><userinput># dtrace -s writetime.d</userinput>
+dtrace: script './writetime.d' matched 2 probes
+<userinput>^C</userinput>
+
+  iropt                                                         31315
+  acomp                                                         37037
+  make.bin                                                      63736
+  tee                                                           68702
+  date                                                          84020
+  sh                                                            91632
+  dtrace                                                       159200
+  ctfmerge                                                     321560
+  install                                                      343300
+  mcs                                                          394400
+  get                                                          413695
+  ctfconvert                                                   594400
+  bringover                                                   1332465
+  tail                                                        1335260
+#</screen><para>The average can be useful, but often does not provide sufficient detail
+to understand the distribution of data points. To understand the distribution
+in further detail, use the <function>quantize</function> aggregating function
+as shown in the following example:</para><programlisting>syscall::write:entry
+{
+	self-&gt;ts = timestamp;
+}
+
+syscall::write:return
+/self-&gt;ts/
+{
+	@time[execname] = quantize(timestamp - self-&gt;ts);
+	self-&gt;ts = 0;
+}</programlisting><para>Because each line of output becomes a frequency distribution diagram,
+the output of this script is substantially longer than previous ones. The
+following example shows a selection of sample output:</para><screen>  lint                                              
+           value  ------------- Distribution ------------- count    
+            8192 |                                         0        
+           16384 |                                         2        
+           32768 |                                         0        
+           65536 |@@@@@@@@@@@@@@@@@@@                      74       
+          131072 |@@@@@@@@@@@@@@@                          59       
+          262144 |@@@                                      14       
+          524288 |                                         0        
+
+  acomp                                             
+           value  ------------- Distribution ------------- count    
+            4096 |                                         0        
+            8192 |@@@@@@@@@@@@                             840      
+           16384 |@@@@@@@@@@@                              750      
+           32768 |@@                                       165      
+           65536 |@@@@@@                                   460      
+          131072 |@@@@@@                                   446      
+          262144 |                                         16       
+          524288 |                                         0        
+         1048576 |                                         1        
+         2097152 |                                         0        
+
+  iropt                                             
+           value  ------------- Distribution ------------- count    
+            4096 |                                         0        
+            8192 |@@@@@@@@@@@@@@@@@@@@@@@                  4149     
+           16384 |@@@@@@@@@@                               1798     
+           32768 |@                                        332      
+           65536 |@                                        325      
+          131072 |@@                                       431      
+          262144 |                                         3        
+          524288 |                                         2        
+         1048576 |                                         1        
+         2097152 |                                         0        </screen><para>Notice that the rows for the frequency distribution are <emphasis>always</emphasis> power-of-two
+values. Each rows indicates the count of the number of elements <emphasis>greater
+than or equal to</emphasis> the corresponding value, but <emphasis>less than</emphasis> the
+next larger row value. For example, the above output shows that <literal>iropt</literal> had
+4,149 writes taking between 8,192 nanoseconds and 16,383 nanoseconds, inclusive.</para><para>While <function>quantize</function> is useful for getting quick insight
+into the data, you might want to examine a distribution across linear values
+instead. To display a linear value distribution, use the <function>lquantize</function> aggregating
+function. The <function>lquantize</function> function takes three arguments
+in addition to a D expression: a lower bound, an upper bound, and a step.
+For example, if you wanted to look at the distribution of writes by file descriptor,
+a power-of-two quantization would not be effective. Instead, use a linear
+quantization with a small range, as shown in the following example:</para><programlisting>syscall::write:entry
+{
+	@fds[execname] = lquantize(arg0, 0, 100, 1);
+}</programlisting><para>Running this script for several seconds yields a large amount of information.
+The following example shows a selection of typical output:</para><screen>  mountd                                            
+           value  ------------- Distribution ------------- count    
+              11 |                                         0        
+              12 |@                                        4        
+              13 |                                         0        
+              14 |@@@@@@@@@@@@@@@@@@@@@@@@@                70       
+              15 |                                         0        
+              16 |@@@@@@@@@@@@                             34       
+              17 |                                         0        
+
+  xemacs-20.4                                       
+           value  ------------- Distribution ------------- count    
+               6 |                                         0        
+               7 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  521      
+               8 |                                         0        
+               9 |                                         1        
+              10 |                                         0        
+
+  make.bin                                          
+           value  ------------- Distribution ------------- count    
+               0 |                                         0        
+               1 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  3596     
+               2 |                                         0        
+               3 |                                         0        
+               4 |                                         42       
+               5 |                                         50       
+               6 |                                         0        
+
+  acomp                                             
+           value  ------------- Distribution ------------- count    
+               0 |                                         0        
+               1 |@@@@@                                    1156     
+               2 |                                         0        
+               3 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@         6635     
+               4 |@                                        297      
+               5 |                                         0        
+
+  iropt                                             
+           value  ------------- Distribution ------------- count    
+               2 |                                         0        
+               3 |                                         299      
+               4 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@  20144    
+               5 |                                         0        </screen><para>You can also use the <function>lquantize</function> aggregating function
+to aggregate on time since some point in the past. This technique allows you
+to observe a change in behavior over time. The following example displays
+the change in system call behavior over the lifetime of a process executing
+the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command:</para><programlisting>syscall::exec:return,
+syscall::exece:return
+/execname == "date"/
+{
+	self-&gt;start = vtimestamp;
+}
+
+syscall:::entry
+/self-&gt;start/
+{
+	/*
+	 * We linearly quantize on the current virtual time minus our
+	 * process's start time.  We divide by 1000 to yield microseconds
+	 * rather than nanoseconds.  The range runs from 0 to 10 milliseconds
+	 * in steps of 100 microseconds; we expect that no date(1) process
+	 * will take longer than 10 milliseconds to complete.
+	 */
+	@a["system calls over time"] =
+	    lquantize((vtimestamp - self-&gt;start) / 1000, 0, 10000, 100);
+}
+
+syscall::rexit:entry
+/self-&gt;start/
+{
+	self-&gt;start = 0;
+}</programlisting><para>The preceding script provides greater insight into system call behavior
+when many <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> processes
+are executed. To see this result, run <command>sh -c 'while true; do date
+&gt;/dev/null; done'</command> in one window, while executing the D script in
+another. The script produces a profile of the system call behavior of the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command:</para><screen><userinput># dtrace -s dateprof.d</userinput>
+dtrace: script './dateprof.d' matched 218 probes
+<userinput>^C</userinput>
+
+  system calls over time
+           value  ------------- Distribution ------------- count    
+             &lt; 0 |                                         0        
+               0 |@@                                       20530    
+             100 |@@@@@@                                   48814    
+             200 |@@@                                      28119    
+             300 |@                                        14646    
+             400 |@@@@@                                    41237    
+             500 |                                         1259     
+             600 |                                         218      
+             700 |                                         116      
+             800 |@                                        12783    
+             900 |@@@                                      28133    
+            1000 |                                         7897     
+            1100 |@                                        14065    
+            1200 |@@@                                      27549    
+            1300 |@@@                                      25715    
+            1400 |@@@@                                     35011    
+            1500 |@@                                       16734    
+            1600 |                                         498      
+            1700 |                                         256      
+            1800 |                                         369      
+            1900 |                                         404      
+            2000 |                                         320      
+            2100 |                                         555      
+            2200 |                                         54       
+            2300 |                                         17       
+            2400 |                                         5        
+            2500 |                                         1        
+            2600 |                                         7        
+            2700 |                                         0        </screen><para>This output provides a rough idea of the different phases of the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command with respect to the
+services required of the kernel. To better understand these phases, you might
+want to understand which system calls are being called when. If so, you could
+change the D script to aggregate on the variable <literal>probefunc</literal> instead
+of a constant string.</para>
+</sect1><sect1 id="chp-aggs-7"><title>Printing Aggregations</title><para><indexterm><primary>aggregator</primary><secondary>output</secondary></indexterm>By default, multiple aggregations are displayed in the order they
+are introduced in the D program. You can override this behavior using the <function>printa</function> function to print the aggregations. The <function>printa</function> function
+also enables you to precisely format the aggregation data using a format string,
+as described in <olink targetptr="chp-fmt" remap="internal">Chapter&nbsp;12, Output Formatting</olink>.</para><para>If an aggregation is not formatted with a <function>printa</function> statement
+in your D program, the <command>dtrace</command> command will snapshot the
+aggregation data and print the results once after tracing has completed using
+the default aggregation format. If a given aggregation is formatted using
+a <function>printa</function> statement, the default behavior is disabled.
+You can achieve equivalent results by adding the statement <literal>printa(@</literal><replaceable>aggregation-name</replaceable><literal>)</literal> to a <literal>dtrace:::END</literal> probe
+clause in your program. The default output format for the <function>avg</function>, <function>count</function>, <function>min</function>, <function>max</function>, and <function>sum</function> aggregating functions displays an integer decimal value corresponding
+to the aggregated value for each tuple. The default output format for the <function>lquantize</function> and <function>quantize</function> aggregating functions
+displays an ASCII table of the results. Aggregation tuples are printed as
+if <function>trace</function> had been applied to each tuple element.</para>
+</sect1><sect1 id="chp-aggs-normalization"><title>Data Normalization</title><para><indexterm><primary>aggregator</primary><secondary>normalization</secondary></indexterm>When aggregating data over some period of time, you might want
+to <emphasis>normalize</emphasis> the data with respect to some constant factor.
+This technique enables you to compare disjoint data more easily. For example,
+when aggregating system calls, you might want to output system calls as a
+per-second rate instead of as an absolute value over the course of the run.
+The DTrace <function>normalize</function> action enables you to normalize
+data in this way. The parameters to <function>normalize</function> are an
+aggregation and a normalization factor. The output of the aggregation shows
+each value divided by the normalization factor.</para><para>The following example shows how to aggregate data by system call:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	/*
+	 * Get the start time, in nanoseconds.
+	 */
+	start = timestamp;
+}
+
+syscall:::entry
+{
+	@func[execname] = count();
+}
+
+END
+{
+	/*
+	 * Normalize the aggregation based on the number of seconds we have
+	 * been running.  (There are 1,000,000,000 nanoseconds in one second.)
+	 */	
+	normalize(@func, (timestamp - start) / 1000000000);
+}</programlisting><para>Running the above script for a brief period of time results in the following
+output on a desktop machine:</para><screen><userinput># dtrace -s ./normalize.d</userinput>
+ <userinput>^C</userinput>
+  syslogd                                                           0
+  rpc.rusersd                                                       0
+  utmpd                                                             0
+  xbiff                                                             0
+  in.routed                                                         1
+  sendmail                                                          2
+  echo                                                              2
+  FvwmAuto                                                          2
+  stty                                                              2
+  cut                                                               2
+  init                                                              2
+  pt_chmod                                                          3
+  picld                                                             3
+  utmp_update                                                       3
+  httpd                                                             4
+  xclock                                                            5
+  basename                                                          6
+  tput                                                              6
+  sh                                                                7
+  tr                                                                7
+  arch                                                              9
+  expr                                                             10
+  uname                                                            11
+  mibiisa                                                          15
+  dirname                                                          18
+  dtrace                                                           40
+  ksh                                                              48
+  java                                                             58
+  xterm                                                           100
+  nscd                                                            120
+  fvwm2                                                           154
+  prstat                                                          180
+  perfbar                                                         188
+  Xsun                                                           1309
+  .netscape.bin                                                  3005</screen><para><function>normalize</function> sets the normalization factor for the
+specified aggregation, but this action does not modify the underlying data. <function>denormalize</function> takes only an aggregation. Adding the denormalize action
+to the preceding example returns both raw system call counts and per-second
+rates:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	start = timestamp;
+}
+
+syscall:::entry
+{
+	@func[execname] = count();
+}
+
+END
+{
+	this-&gt;seconds = (timestamp - start) / 1000000000;
+	printf("Ran for %d seconds.\n", this-&gt;seconds);
+
+	printf("Per-second rate:\n");
+	normalize(@func, this-&gt;seconds);
+	printa(@func);
+
+	printf("\nRaw counts:\n");
+	denormalize(@func);
+	printa(@func);
+}</programlisting><para>Running the above script for a brief period of time produces output
+similar to the following example:</para><screen><userinput># dtrace -s ./denorm.d</userinput>
+<userinput>^C</userinput>
+Ran for 14 seconds.
+Per-second rate:
+
+  syslogd                                                           0
+  in.routed                                                         0
+  xbiff                                                             1
+  sendmail                                                          2
+  elm                                                               2
+  picld                                                             3
+  httpd                                                             4
+  xclock                                                            6
+  FvwmAuto                                                          7
+  mibiisa                                                          22
+  dtrace                                                           42
+  java                                                             55
+  xterm                                                            75
+  adeptedit                                                       118
+  nscd                                                            127
+  prstat                                                          179
+  perfbar                                                         184
+  fvwm2                                                           296
+  Xsun                                                            829
+
+Raw counts:
+
+  syslogd                                                           1
+  in.routed                                                         4
+  xbiff                                                            21
+  sendmail                                                         30
+  elm                                                              36
+  picld                                                            43
+  httpd                                                            56
+  xclock                                                           91
+  FvwmAuto                                                        104
+  mibiisa                                                         314
+  dtrace                                                          592
+  java                                                            774
+  xterm                                                          1062
+  adeptedit                                                      1665
+  nscd                                                           1781
+  prstat                                                         2506
+  perfbar                                                        2581
+  fvwm2                                                          4156
+  Xsun                                                          11616</screen><para>Aggregations can also be renormalized. If <function>normalize</function> is
+called more than once for the same aggregation, the normalization factor will
+be the factor specified in the most recent call. The following example prints
+per-second rates over time:</para><example id="ex-renormalize.d"><title><filename>renormalize.d</filename>:
+Renormalizing an Aggregation</title><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	start = timestamp;
+}
+
+syscall:::entry
+{
+	@func[execname] = count();
+}
+
+tick-10sec
+{
+	normalize(@func, (timestamp - start) / 1000000000);
+	printa(@func);
+}</programlisting>
+</example>
+</sect1><sect1 id="chp-aggs-clear"><title>Clearing Aggregations</title><para><indexterm><primary>aggregator</primary><secondary>clearing</secondary></indexterm>When using DTrace to build simple monitoring scripts, you can
+periodically clear the values in an aggregation using the <function>clear</function> function.
+This function takes an aggregation as its only parameter. The <function>clear</function> function
+clears only the aggregation's <emphasis>values</emphasis>; the aggregation's
+keys are retained. Therefore, the presence of a key in an aggregation that
+has an associated value of zero indicates that the key <emphasis>had</emphasis> a
+non-zero value that was subsequently set to zero as part of a <function>clear</function>.
+To discard both an aggregation's values and its keys, use the <function>trunc</function>.
+See <olink targetptr="chp-aggs-trunc" remap="internal">Truncating aggregations</olink> for
+details.</para><para>The following example adds <function>clear</function> to <olink targetptr="ex-renormalize.d" remap="internal">Example&nbsp;9&ndash;1</olink>:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	last = timestamp;
+}
+
+syscall:::entry
+{
+	@func[execname] = count();
+}
+
+tick-10sec
+{
+	normalize(@func, (timestamp - last) / 1000000000);
+	printa(@func);
+	clear(@func);
+	last = timestamp;
+}</programlisting><para>While <olink targetptr="ex-renormalize.d" remap="internal">Example&nbsp;9&ndash;1</olink> shows
+the system call rate over the lifetime of the <command>dtrace</command> invocation,
+the preceding example shows the system call rate only for the most recent
+ten-second period.</para>
+</sect1><sect1 id="chp-aggs-trunc"><title>Truncating aggregations</title><para><indexterm><primary>aggregator</primary><secondary>truncating</secondary></indexterm>When looking at aggregation results, you often care only about
+the top several results. The keys and values associated with anything other
+than the highest values are not interesting. You might also wish to discard
+an entire aggregation result, removing both keys <emphasis>and</emphasis> values.
+The DTrace <function>trunc</function> function is used for both of these situations.</para><para>The parameters to <function>trunc</function> are an aggregation and
+an optional truncation value. Without the truncation value, <function>trunc</function> discards <emphasis>both</emphasis> aggregation values <emphasis>and</emphasis> aggregation keys
+for the entire aggregation. When a truncation value <replaceable>n</replaceable> is
+present, <function>trunc</function> discards aggregation values and keys <emphasis>except</emphasis> for those values and keys associated with the highest <replaceable>n</replaceable> values. That is, <literal>trunc(@foo, 10)</literal> truncates
+the aggregation named <literal>foo</literal> after the top ten values, where <literal>trunc(@foo)</literal> discards the entire aggregation. The entire aggregation
+is also discarded if <literal>0</literal> is specified as the truncation value.</para><para>To see the bottom <replaceable>n</replaceable> values instead of the
+top <replaceable>n</replaceable>, specify a negative truncation value to <function>trunc</function>. For example, <literal>trunc(@foo, -10)</literal> truncates
+the aggregation named <literal>foo</literal> after the bottom ten values.</para><para>The following example augments the system call example to only display
+the per-second system call rates of the top ten system-calling applications
+in a ten-second period:</para><programlisting>#pragma D option quiet
+
+BEGIN
+{
+	last = timestamp;
+}
+
+syscall:::entry
+{
+	@func[execname] = count();
+}
+
+tick-10sec
+{
+	trunc(@func, 10);
+	normalize(@func, (timestamp - last) / 1000000000);
+	printa(@func);
+	clear(@func);
+	last = timestamp;
+}</programlisting><para>The following example shows output from running the above script on
+a lightly loaded laptop:</para><screen>  FvwmAuto                                                          7
+  telnet                                                           13
+  ping                                                             14
+  dtrace                                                           27
+  xclock                                                           34
+  MozillaFirebird-                                                 63
+  xterm                                                           133
+  fvwm2                                                           146
+  acroread                                                        168
+  Xsun                                                            616
+
+  telnet                                                            4
+  FvwmAuto                                                          5
+  ping                                                             14
+  dtrace                                                           27
+  xclock                                                           35
+  fvwm2                                                            69
+  xterm                                                            70
+  acroread                                                        164
+  MozillaFirebird-                                                491
+  Xsun                                                           1287</screen>
+</sect1><sect1 id="chp-aggs-4"><title>Minimizing Drops</title><para><indexterm><primary>aggregator</primary><secondary>drops</secondary></indexterm>Because DTrace buffers some aggregation data in the kernel, space
+might not be available when a new key is added to an aggregation. In this
+case, the data will be dropped, a counter will be incremented, and <command>dtrace</command> will generate a message indicating an aggregation drop. This situation
+rarely occurs because DTrace keeps long-running state (consisting of the aggregation's
+key and intermediate result) at user-level where space may grow dynamically.
+In the unlikely event that aggregation drops occur, you can increase the aggregation
+buffer size with the <literal>aggsize</literal> option to reduce the likelihood
+of drops. You can also use this option to minimize the memory footprint of
+DTrace. As with any size option, <literal>aggsize</literal> may be specified
+with any size suffix. The resizing policy of this buffer is dictated by the <literal>bufresize</literal> option. For more details on buffering, see <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11, Buffers and Buffering</olink>. For more
+details on options, see <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options
+and Tunables</olink>.</para><para>An alternative method to eliminate aggregation drops is to increase
+the rate at which aggregation data is consumed at user-level. This rate defaults
+to once per second, and may be explicitly tuned with the <literal>aggrate</literal> option.
+As with any rate option, <literal>aggrate</literal> may be specified with
+any time suffix, but defaults to rate-per-second. For more details on the <literal>aggsize</literal> option, see <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16,
+Options and Tunables</olink>.</para>
+</sect1>
+</chapter><?Pub *0000044639 0?>

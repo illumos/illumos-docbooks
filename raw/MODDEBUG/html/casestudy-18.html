@@ -1,0 +1,158 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Allocator Basics - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-13.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-27.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level2"><a href="casestudy-13.html">Getting Started: Creating a Sample Crash Dump</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Allocator Basics</a></p>
+</div>
+<p class="toc level2"><a href="casestudy-27.html">Kernel Memory Caches</a></p>
+<p class="toc level2"><a href="casestudy-26.html">Detecting Memory Corruption</a></p>
+<p class="toc level2"><a href="casestudy-31.html">Memory Allocation Logging</a></p>
+<p class="toc level2"><a href="casestudy-34.html">Advanced Memory Analysis</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-18"></a><h3>Allocator Basics</h3>
+<p>The kernel memory allocator's job is to parcel out regions of virtual memory
+to other kernel subsystems (these are commonly called <b>clients</b>). This section explains the
+basics of the allocator's operation and introduces some terms used later in this
+guide.</p>
+
+<a name="casestudy-19"></a><h4>Buffer States</h4>
+<p>The functional domain of the kernel memory allocator is the set of
+<b>buffers</b> of virtual memory that make up the kernel heap.  These buffers
+are grouped together into sets of uniform size and purpose, known as <b>caches</b>.
+ Each cache contains a set of buffers.  Some of these buffers
+are currently <b>free</b>, which means that they have not yet been allocated to
+any client of the allocator.  The remaining buffers are <b>allocated</b>, which means
+that a pointer to that buffer has been provided to a client of
+the allocator.  If no client of the allocator holds a pointer to
+an allocated buffer, this buffer is said to be <b>leaked</b>, because it cannot
+be freed.  Leaked buffers indicate incorrect code that is wasting kernel resources.
+</p>
+
+<a name="casestudy-20"></a><h4>Transactions</h4>
+<p>A kmem <b>transaction</b> is a transition on a buffer between the allocated and
+free states.  The allocator can verify that the state of a buffer
+is valid as part of each transaction. Additionally, the allocator has facilities for
+logging transactions for post-mortem examination.</p>
+
+<a name="casestudy-21"></a><h4>Sleeping and Non-Sleeping Allocations</h4>
+<p><a name="indexterm-448"></a>Unlike the Standard C Library's <a href="http://docs.sun.com/doc/819-2243/malloc-3c?a=view"><tt>malloc</tt>(3C)</a> function, the kernel memory allocator can block (or
+<b>sleep</b>), waiting until enough virtual memory is available to satisfy the client's request. 
+This is controlled by the <tt>flag</tt> parameter to <a href="http://docs.sun.com/doc/819-2256/kmem-alloc-9f?a=view"><tt>kmem_alloc</tt>(9F)</a>.  A call to
+<a href="http://docs.sun.com/doc/819-2256/kmem-alloc-9f?a=view"><tt>kmem_alloc</tt>(9F)</a> which has the <tt>KM_SLEEP</tt> flag set can never fail; it will block
+forever waiting for resources to become available.</p>
+
+<a name="casestudy-22"></a><h4>Kernel Memory Caches</h4>
+<p><a name="indexterm-449"></a>The kernel memory allocator divides the memory it manages into a set of
+<b>caches</b>.  All allocations are supplied from these caches, which are represented by
+the <tt>kmem_cache_t</tt> data structure.  Each cache has a fixed <b>buffer size</b>, which represents the
+maximum allocation size satisfied by that cache.  Each cache has a string
+name indicating the type of data it manages.</p><p><a name="indexterm-450"></a><a name="indexterm-451"></a>Some kernel memory caches are special purpose and are initialized to allocate only
+a particular kind of data structure.  An example of this is the
+&ldquo;thread_cache,&rdquo; which allocates only structures of type <tt>kthread_t</tt>.  Memory from these
+caches is allocated to clients by the <tt>kmem_cache_alloc()</tt> function and freed by
+the <tt>kmem_cache_free()</tt> function.</p>
+<hr><p><b>Note - </b><tt>kmem_cache_alloc()</tt> and <tt>kmem_cache_free()</tt> are not public DDI interfaces. Do NOT write code that
+relies on them, because they are subject to change or removal in future
+releases of Solaris.</p>
+<hr>
+<p><a name="indexterm-452"></a>Caches whose name begins with &ldquo;<tt>kmem_alloc_</tt>&rdquo; implement the kernel's general memory allocation scheme. 
+These caches provide memory to clients of <a href="http://docs.sun.com/doc/819-2256/kmem-alloc-9f?a=view"><tt>kmem_alloc</tt>(9F)</a> and <a href="http://docs.sun.com/doc/819-2256/kmem-zalloc-9f?a=view"><tt>kmem_zalloc</tt>(9F)</a>.  Each of
+these caches satisfies requests whose size is between the buffer size of that
+cache and the buffer size of the next smallest cache.  For example,
+the kernel has <tt>kmem_alloc_8</tt> and <tt>kmem_alloc_16</tt> caches.  In this case, the
+<tt>kmem_alloc_16</tt> cache handles all client requests for 9-16 bytes of memory.  Remember
+that the size of each buffer in the <tt>kmem_alloc_16</tt> cache is 16 bytes,
+regardless of the size of the client request.  In a 14
+byte request, two bytes of the resulting buffer are unused, since the request
+is satisfied from the <tt>kmem_alloc_16</tt> cache.</p><p>The last set of caches are those used internally by the kernel
+memory allocator for its own bookkeeping.  These include those caches whose names start
+with &ldquo;<tt>kmem_magazine_</tt>&rdquo; or &ldquo;<tt>kmem_va_</tt>&rdquo;, the <tt>kmem_slab_cache</tt>, the <tt>kmem_bufctl_cache</tt> and others.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-13.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-27.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

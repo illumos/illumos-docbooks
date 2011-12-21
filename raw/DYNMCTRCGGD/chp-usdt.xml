@@ -1,0 +1,117 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-usdt"><title>Statically Defined Tracing for User Applications</title><highlights><para>DTrace provides a facility for user application developers to define
+customized probes in application code to augment the capabilities of the <literal>pid</literal> provider. These static probes impose little to no overhead when
+disabled and are dynamically enabled like all other DTrace probes. You can
+use static probes to describe application semantics to users of DTrace without
+exposing or requiring implementation knowledge of your applications. This
+chapter describes how to define static probes in user applications and how
+to use DTrace to enable such probes in user processes.</para>
+</highlights><sect1 id="chp-usdt-1"><title>Choosing the Probe Points</title><para><indexterm><primary>probe points</primary></indexterm><indexterm><primary>embedding probe points</primary></indexterm><indexterm><primary>statically defined tracking (SDT)</primary><see>SDT</see></indexterm>DTrace allows developers to embed
+static probe points in application code, including both complete applications
+and shared libraries. These probes can be enabled wherever the application
+or library is running, either in development or in production. You should
+define probes that have a semantic meaning that is readily understood by your
+DTrace user community. For example, you could define <literal>query-receive</literal> and <literal>query-respond</literal> probes for a web server that correspond to a client
+submitting a request and the web server responding to that request. These
+example probes are easily understood by most DTrace users and correspond to
+the highest level abstractions for the application, rather than lower level
+implementation details. DTrace users might use these probes to understand
+the time distribution of requests. If your <literal>query-receive</literal> probe
+presented the <acronym>URL</acronym> request strings as an argument, a DTrace
+user could determine which requests were generating the most disk I/O by combining
+this probe with the <literal>io</literal> provider.</para><para>You should also consider the stability of the abstractions you describe
+when choosing probe names and locations. Will this probe persist in future
+releases of the application, even if the implementation changes? Does the
+probe make sense on all system architectures or is it specific to a particular
+instruction set? This chapter will discuss the details of how these decisions
+guide your static tracing definitions.</para>
+</sect1><sect1 id="chp-usdt-2"><title>Adding Probes to an Application</title><para><indexterm><primary>binary construction with probes</primary></indexterm><indexterm><primary>constructing a binary</primary></indexterm>DTrace probes for libraries
+and executables are defined in an <acronym>ELF</acronym> section in the corresponding
+application binary. This section describes how to define your probes, add
+them to your application source code, and augment your application's build
+process to include the DTrace probe definitions.</para><sect2 id="chp-usdt-3"><title>Defining Providers and Probes</title><para>You define DTrace probes in a <literal>.d</literal> source file which
+is then used when compiling and linking your application. First, select an
+appropriate name for your user application provider. The provider name you
+choose will be appended with the process identifier for each process that
+is executing your application code. For example, if you chose the provider
+name <literal>myserv</literal> for a web server that was executing as process
+ID 1203, the DTrace provider name corresponding to this process would be <literal>myserv1203</literal>. In your <literal>.d</literal> source file, add a provider
+definition similar to the following example:</para><programlisting>provider myserv {
+	...
+};			</programlisting><para>Next, add a definition for each probe and the corresponding arguments.
+The following example defines the two probes discussed in <olink targetptr="chp-usdt-1" remap="internal">Choosing the Probe Points</olink>. The first probe
+has two arguments, both of type <literal>string</literal>, and the second
+probe has no arguments. The D compiler converts two consecutive underscores
+(<literal>__</literal>) in any probe name to a hyphen (<literal>-</literal>).</para><programlisting>provider myserv {
+	probe query__receive(string, string);
+	probe query__respond();
+};</programlisting><para>You should add stability attributes to your provider definition so that
+consumers of your probes understand the likelihood of change in future versions
+of your application. See <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink> for
+more information on the DTrace stability attributes. Stability attributes
+are defined as shown in the following example:</para><example id="ex-myserv.d"><title><filename>myserv.d</filename>: Statically
+Defined Application Probes</title><programlisting>#pragma D attributes Evolving/Evolving/Common provider myserv provider
+#pragma D attributes Private/Private/Unknown provider myserv module
+#pragma D attributes Private/Private/Unknown provider myserv function
+#pragma D attributes Evolving/Evolving/Common provider myserv name
+#pragma D attributes Evolving/Evolving/Common provider myserv args
+
+provider myserv {
+	probe query__receive(string, string);
+	probe query__respond();
+};</programlisting>
+</example><note><para>D scripts that use non-integer arguments from user added probes
+must use the <function>copyin</function> and <function>copyinstr</function> functions
+to retrieve those arguments. Please see <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33,
+User Process Tracing</olink> for more information.</para>
+</note>
+</sect2><sect2 id="chp-usdt-4"><title>Adding Probes to Application Code</title><para>Now that you have defined your probes in a <literal>.d</literal> file,
+you need to augment your source code to indicate the locations that should
+trigger your probes. Consider the following example C application source code:</para><programlisting>void
+main_look(void)
+{
+	...
+	query = wait_for_new_query();
+	process_query(query)
+	...
+}</programlisting><para>To add a probe site, add a reference to the <literal>DTRACE_PROBE()</literal> macro
+defined in <literal>&lt;sys/sdt.h&gt;</literal> as shown in the following example:</para><programlisting>#include &lt;sys/sdt.h&gt;
+...
+
+void
+main_look(void)
+{
+	...
+	query = wait_for_new_query();
+	DTRACE_PROBE2(myserv, query__receive, query-&gt;clientname, query-&gt;msg);
+	process_query(query)
+	...
+}</programlisting><para>The suffix <literal>2</literal> in the macro name <literal>DTRACE_PROBE2</literal> refers
+the number of arguments that are passed to the probe. The first two arguments
+to the probe macro are the provider name and probe name and must correspond
+to your D provider and probe definitions. The remaining macro arguments are
+the arguments assigned to the DTrace <literal>arg0..9</literal> variables
+when the probes fires. Your application source code can contain
+multiple references to the same provider and probe name. If multiple references
+to the same probe are present in your source code, any of the macro references
+will cause the probe to fire.</para>
+</sect2><sect2 id="chp-usdt-5"><title>Building Applications with Probes</title><para>You must augment the build process for your application to include the
+DTrace provider and probe definitions. A typical build process takes each
+source file and compiles it to create a corresponding object file. The compiled
+object files are then linked together to create the finished application binary,
+as shown in the following example:</para><screen>cc -c src1.c
+cc -c src2.c
+...
+cc -o myserv src1.o src2.o ...</screen><para>To include DTrace probe definitions in your application, add appropriate
+Makefile rules to your build process to execute the <command>dtrace</command> command
+as shown in the following example:</para><screen>cc -c src1.c
+cc -c src2.c
+...
+dtrace -G -32 -s myserv.d src1.o src2.o ...
+cc -o myserv myserv.o src1.o src2.o ...</screen><para>The <literal>dtrace</literal> command shown above post-processes the
+object files generated by the preceding compiler commands and generates the
+object file <literal>myserv.o</literal> from <literal>myserv.d</literal> and
+the other object files. The <command>dtrace</command> <option>G</option> option
+is used to link provider and probe definitions with a user application. The <option>32</option> option is used to build 32&ndash;bit application binaries. The <option>64</option> option is used to build 64&ndash;bit application binaries.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000008948 0?>

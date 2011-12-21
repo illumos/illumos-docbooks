@@ -1,0 +1,223 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Detecting Memory Corruption - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-27.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-31.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level2"><a href="casestudy-13.html">Getting Started: Creating a Sample Crash Dump</a></p>
+<p class="toc level2"><a href="casestudy-18.html">Allocator Basics</a></p>
+<p class="toc level2"><a href="casestudy-27.html">Kernel Memory Caches</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Detecting Memory Corruption</a></p>
+</div>
+<p class="toc level2"><a href="casestudy-31.html">Memory Allocation Logging</a></p>
+<p class="toc level2"><a href="casestudy-34.html">Advanced Memory Analysis</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-26"></a><h3>Detecting Memory Corruption</h3>
+<p><a name="indexterm-459"></a>One of the primary debugging facilities of the allocator is that it includes
+algorithms to recognize data corruption quickly. When corruption is detected, the allocator immediately panics
+the system. This section describes how the allocator recognizes data corruption. You must
+understand this to be able to debug these problems.</p><p>Memory abuse typically falls into one of the following categories:</p>
+<ul><li><p>Writing past the end of a buffer</p></li>
+<li><p>Accessing uninitialized data</p></li>
+<li><p>Continuing to use a freed buffer</p></li>
+<li><p>Corrupting kernel memory</p></li></ul>
+<p>Keep these problems in mind as you read the next three sections.
+They will help you to understand the allocator's design, and enable you to
+diagnose problems more efficiently.</p>
+
+<a name="casestudy-25"></a><h4>Freed Buffer Checking: <tt>0xdeadbeef</tt></h4>
+<p><a name="indexterm-460"></a>When the <tt>KMF_DEADBEEF</tt> (<tt>0x2</tt>) bit is set in the flags field of a <tt>kmem_cache</tt>,
+the allocator tries to make memory corruption easy to detect by writing a
+special pattern into all freed buffers.  This pattern is <tt>0xdeadbeef</tt>.  Since
+a typical region of memory contains both allocated and freed memory, sections of
+each kind of block will be interspersed. The following example is from the
+<tt>kmem_alloc_24</tt> cache:</p><pre>0x70a9add8:     deadbeef        deadbeef
+0x70a9ade0:     deadbeef        deadbeef
+0x70a9ade8:     deadbeef        deadbeef
+0x70a9adf0:     feedface        feedface
+0x70a9adf8:     70ae3260        8440c68e
+0x70a9ae00:     5               4ef83
+0x70a9ae08:     0               0
+0x70a9ae10:     1               bbddcafe
+0x70a9ae18:     feedface        139d
+0x70a9ae20:     70ae3200        d1befaed
+0x70a9ae28:     deadbeef        deadbeef
+0x70a9ae30:     deadbeef        deadbeef
+0x70a9ae38:     deadbeef        deadbeef
+0x70a9ae40:     feedface        feedface
+0x70a9ae48:     70ae31a0        8440c54e</pre><p>The buffers at <tt>0x70a9add8</tt> and <tt>0x70a9ae28</tt> are filled with <tt>0xdeadbeefdeadbeef</tt>, which shows that
+these buffers are free. The buffer <b>redzones</b> are filled with <tt>0xfeedfacefeedface</tt>, which indicates
+they are untouched (no buffer overrun has occurred). See the following section for
+an explanation of redzones. At <tt>0x70a9ae00</tt> an allocated buffer is located between the two
+free buffers.</p>
+
+<a name="casestudy-28"></a><h4>Redzone: <tt>0xfeedface</tt></h4>
+<p><a name="indexterm-461"></a><a name="indexterm-462"></a><a name="indexterm-463"></a>Note the pattern <tt>0xfeedface</tt> in the buffer shown in the previous section. This
+pattern is known as the <b>redzone</b> indicator. This pattern enables the allocator (and
+a programmer debugging a problem) to determine whether the boundaries of a buffer
+have been violated. Following the redzone is some additional information. The content of
+that data depends on other factors (see <a href="casestudy-31.html">Memory Allocation Logging</a>). The redzone and its suffix are
+collectively called the <b>buftag</b> region. <a href="#casestudy-fig-39">Figure&nbsp;9-1</a> summarizes this information.</p><a name="casestudy-fig-39"></a><h6>Figure&nbsp;9-1 The Redzone</h6><img src="figures/redzone.fig1.gif" alt="Graphic described by context."></img><p>The buftag is appended to each buffer in a cache when any
+of the <tt>KMF_AUDIT</tt>, <tt>KMF_DEADBEEF</tt>, or <tt>KMF_REDZONE</tt> flags is set in that buffer's cache.
+The content of the buftag depends on whether <tt>KMF_AUDIT</tt> is set.</p><p>Decomposing the memory region presented above into distinct buffers is now simple:</p><pre>0x70a9add8:     deadbeef        deadbeef  \
+0x70a9ade0:     deadbeef        deadbeef   +- User Data (free)
+0x70a9ade8:     deadbeef        deadbeef  /
+0x70a9adf0:     feedface        feedface  -- REDZONE
+0x70a9adf8:     70ae3260        8440c68e  -- Debugging Data
+
+0x70a9ae00:     5               4ef83     \
+0x70a9ae08:     0               0          +- User Data (allocated)
+0x70a9ae10:     1               bbddcafe  /
+0x70a9ae18:     feedface        139d    -- REDZONE
+0x70a9ae20:     70ae3200        d1befaed  -- Debugging Data
+
+0x70a9ae28:     deadbeef        deadbeef  \
+0x70a9ae30:     deadbeef        deadbeef   +- User Data (free)
+0x70a9ae38:     deadbeef        deadbeef  /
+0x70a9ae40:     feedface        feedface  -- REDZONE
+0x70a9ae48:     70ae31a0        8440c54e  -- Debugging Data</pre><p>The buffers at <tt>0x70a9add8</tt> and <tt>0x70a9ae28</tt> are filled with <tt>0xdeadbeefdeadbeef</tt>, which shows that
+these buffers are free. The buffer redzones are filled with <tt>0xfeedfacefeedface</tt>, which indicates
+they are untouched (no buffer overrun has occurred).</p><dl><dt><tt>0xbaddcafe</tt></dt>
+<dd><p>Buffer is allocated but uninitialized (see <a href="#casestudy-29">Uninitialized Data: <tt>0xbaddcafe</tt></a>).</p></dd>
+<dt><tt>0xdeadbeef</tt></dt>
+<dd><p>Buffer is free.</p></dd>
+<dt><tt>0xfeedface</tt></dt>
+<dd><p>Buffer limits were respected (no overflow).</p></dd>
+</dl>
+<p>In the allocated buffer beginning at <tt>0x70a9ae00</tt>, the situation is different. Recall from
+<a href="casestudy-18.html">Allocator Basics</a> that there are two allocation types:</p>
+<ol><li><p><a name="indexterm-464"></a>The client requested memory using <a href="http://docs.sun.com/doc/819-2256/kmem-cache-alloc-9f?a=view"><tt>kmem_cache_alloc</tt>(9F)</a>, in which case the size of the requested buffer is equal to the bufsize of the cache.</p></li>
+<li><p><a name="indexterm-465"></a><a name="indexterm-466"></a>The client requested memory using <a href="http://docs.sun.com/doc/819-2256/kmem-alloc-9f?a=view"><tt>kmem_alloc</tt>(9F)</a>, in which case the size of the requested buffer is less than or equal to the bufsize of the cache. For example, a request for 20 bytes will be fulfilled from the <tt>kmem_alloc_24</tt> cache.  The allocator enforces the buffer boundary by placing a marker, the <b>redzone byte</b>, immediately following the client data:</p><pre>0x70a9ae00:     5               4ef83     \
+0x70a9ae08:     0               0          +- User Data (allocated)
+0x70a9ae10:     1               bbddcafe  /
+0x70a9ae18:     feedface        139d    -- REDZONE
+0x70a9ae20:     70ae3200        d1befaed  -- Debugging Data</pre></li></ol>
+<p>The <tt>0xfeedface</tt> value at <tt>0x70a9ae18</tt> is followed by a 32-bit word containing what
+seems to be a random value. This number is actually an encoded representation
+of the size of the buffer. To decode this number and find the
+size of the allocated buffer, use the formula:</p><pre>size = redzone_value / 251</pre><p>So, in this example, </p><pre>size = 0x139d / 251 = 20 bytes.</pre><p>This indicates that the buffer requested was of size 20 bytes. The
+allocator performs this decoding operation and finds that the redzone byte should be at
+offset 20. The redzone byte is the hex pattern <tt>0xbb</tt>, which is present
+at <tt>0x729084e4 (0x729084d0 + 0t20)</tt> as expected.</p><a name="casestudy-fig-41"></a><h6>Figure&nbsp;9-2 Sample <tt>kmem_alloc(9F)</tt> Buffer</h6><img src="figures/redzone.fig2.gif" alt="This graphic depicts a sample kmem_alloc buffer. The redzone byte, uninitialized data, and debugging data are marked."></img><p><a href="#casestudy-fig-43">Figure&nbsp;9-3</a> shows the general form of this memory layout.</p><a name="casestudy-fig-43"></a><h6>Figure&nbsp;9-3 Redzone Byte</h6><img src="figures/redzone.fig3.gif" alt="This graphic shows the redzone byte being written after the end of the user data region. The redzone byte is determined by decoding the index."></img><p>If the allocation size is the same as the bufsize of the
+cache, the redzone byte overwrites the first byte of the redzone itself, as
+shown in <a href="#casestudy-fig-45">Figure&nbsp;9-4</a>. </p><a name="casestudy-fig-45"></a><h6>Figure&nbsp;9-4 Redzone Byte at the Beginning of the Redzone</h6><img src="figures/redzone.fig4.gif" alt="Graphic described by context."></img><p>This overwriting results in the first 32-bit word of the redzone being
+<tt>0xbbedface</tt>, or <tt>0xfeedfabb</tt> depending on the endianness of the hardware on which the
+system is running.</p>
+<hr><p><b>Note - </b>Why is the allocation size encoded this way?  To encode the
+size, the allocator uses the formula (251 * size + 1). When the
+size decode occurs, the integer division discards the  remainder of '+1'. 
+However, the addition of 1 is valuable because the allocator can check whether
+the size is valid by testing whether (size % 251 == 1). 
+In this way, the allocator defends against corruption of the redzone byte index.
+</p>
+<hr>
+
+
+<a name="casestudy-29"></a><h4>Uninitialized Data: <tt>0xbaddcafe</tt></h4>
+<p><a name="indexterm-467"></a><a name="indexterm-468"></a>You might be wondering what the suspicious <tt>0xbbddcafe</tt> at address <tt>0x729084d4</tt> was <b>before</b>
+the redzone byte got placed over the first byte in the word. 
+It was <tt>0xbaddcaf</tt>e.  When the <tt>KMF_DEADBEEF</tt> flag is set in the cache,
+allocated but <b>uninitialized</b> memory is filled with the <tt>0xbaddcafe</tt> pattern.  When the
+allocator performs an allocation, it loops across the words of the buffer and
+verifies that each word contains <tt>0xdeadbeef</tt>, then fills that word with <tt>0xbaddcafe</tt>.</p><p>A system can panic with a message such as: </p><pre>panic[cpu1]/thread=e1979420: BAD TRAP: type=e (Page Fault)
+rp=ef641e88 addr=baddcafe occurred in module "unix" due to an
+illegal access to a user address</pre><p>In this case, the address that caused the fault was <tt>0xbaddcafe</tt>:  the
+panicking thread has accessed some data that was never initialized. </p>
+
+<a name="casestudy-30"></a><h4>Associating Panic Messages With Failures</h4>
+<p>The kernel memory allocator emits panic messages corresponding to the failure modes described
+earlier.  For example, a system can panic with a message such as:</p><pre>kernel memory allocator: buffer modified after being freed
+modification occurred at offset 0x30</pre><p>The allocator was able to detect this case because it tried to
+validate that the buffer in question was filled with <tt>0xdeadbeef</tt>.  At offset <tt>0x30,</tt>
+this condition was not met.  Since this condition indicates memory corruption, the
+allocator panicked the system.</p><p>Another example failure message is:</p><pre>kernel memory allocator: redzone violation: write past end of buffer</pre><p>The allocator was able to detect this case because it tried to
+validate that the redzone byte (<tt>0xbb</tt>) was in the location it determined from the
+redzone size encoding.  It failed to find the signature byte in
+the correct location.  Since this indicates memory corruption, the allocator panicked the system.
+ Other allocator panic messages are discussed later. </p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-27.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-31.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

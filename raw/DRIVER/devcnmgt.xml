@@ -1,0 +1,482 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="devcnmgt-19679"><title>Device Context Management</title><highlights><para>Some device drivers, such as drivers for graphics hardware, provide
+user processes with direct access to the device. These devices often require
+that only one process at a time accesses the device.</para><para>This chapter describes the set of interfaces that enable device drivers
+to manage access to such devices. The chapter provides information on the
+following subjects:</para><itemizedlist><listitem><para><olink targetptr="devcnmgt-1" remap="internal">Introduction to Device Context</olink></para>
+</listitem><listitem><para><olink targetptr="devcnmgt-2" remap="internal">Context Management Model</olink></para>
+</listitem><listitem><para><olink targetptr="devcnmgt-7" remap="internal">Context Management Operation</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="devcnmgt-1"><title>Introduction to Device Context</title><para>This section introduces device context and the context management model.</para><sect2 id="devcnmgt-1a"><title>What Is a Device Context?</title><para><indexterm id="devcnmgt-ix454"><primary>device context management</primary></indexterm><indexterm id="devcnmgt-ix455"><primary>hardware context</primary></indexterm><indexterm><primary>context management</primary><see>device context management</see></indexterm>The <emphasis>context</emphasis> of a device is
+the current state of the device hardware. The device driver manages the device
+context for a process on behalf of the process. The driver must maintain a
+separate device context for each process that accesses the device. The device
+driver has the responsibility to restore the correct device context when a
+process accesses the device.</para>
+</sect2><sect2 id="devcnmgt-2"><title>Context Management Model</title><para><indexterm id="devcnmgt-ix456"><primary>graphics devices</primary><secondary>device context management of</secondary></indexterm><indexterm id="devcnmgt-ix457"><primary>memory mapping</primary><secondary>device context management of</secondary></indexterm>Frame buffers provide a good example
+of device context management. An accelerated frame buffer enables user processes
+ to directly manipulate the control registers of the device through memory-mapped
+access. Because these processes do not use traditional system calls, a process
+that accesses the device need not call the device driver.  However, the device
+driver must be notified when a process is about to access a device. The driver
+needs to restore the correct device context and needs to provide any necessary
+synchronization.</para><para>To resolve this problem, the device context management interfaces enable
+a device driver to be notified when a user process accesses memory-mapped
+regions of the device, and to control accesses to the device's hardware. Synchronization
+and management of the various device contexts are the responsibility of the
+device driver. When a user process accesses a mapping, the device driver must
+restore the correct device context for that process.</para><para>A device driver is notified whenever a user process performs any of
+the following actions:</para><itemizedlist><listitem><para>Accesses a mapping</para>
+</listitem><listitem><para>Duplicates a mapping</para>
+</listitem><listitem><para>Frees a mapping</para>
+</listitem><listitem><para><indexterm><primary>device context management</primary><secondary>model</secondary></indexterm>Creates a mapping</para>
+</listitem>
+</itemizedlist><para>The following figure shows multiple user processes that have memory-mapped
+a device. The driver has granted process B access to the device, and process
+B no longer notifies the driver of accesses. However, the driver <emphasis>is</emphasis> still
+notified if either process A or process C accesses the device.</para><figure id="devcnmgt-fig-3"><title id="devcnmgt-23624">Device Context Management</title><mediaobject><imageobject><imagedata entityref="devcnmgt.view.epsi"/>
+</imageobject><textobject><simpara>Diagram shows three processes, A, B, and C, with Process
+B having sole access to the device.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>At some point in the future, process A accesses the device. The device
+driver is notified  and blocks future access to the device by process B. The
+driver then saves the device context for process B. The driver restores the
+device context of process A. The driver then grants access to process A, as
+illustrated in the following figure. At this point, the device driver is notified
+if either process B or process C accesses the device.</para><figure id="devcnmgt-fig-4"><title id="devcnmgt-37970">Device Context Switched
+to User Process A</title><mediaobject><imageobject><imagedata entityref="devcnmgt.contextswitch.epsi"/>
+</imageobject><textobject><simpara>Diagram continues example in previous figure with sole
+device access switched to Process A.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>On a multiprocessor machine, multiple processes could attempt to access
+the device at the same time. This situation can cause thrashing. Some devices
+require a longer time to restore a device context. To prevent more CPU time
+from being used to restore a device context than to actually use that device
+context, the minimum time that a process needs to have access to the device
+can be set using <olink targetdoc="group-refman" targetptr="devmap-set-ctx-timeout-9f" remap="external"><citerefentry><refentrytitle>devmap_set_ctx_timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm><primary>multiprocessor considerations</primary></indexterm>The
+kernel guarantees that once a device driver has granted access to a process,
+no other process is allowed to request access to the same device for the time
+interval specified by <olink targetdoc="group-refman" targetptr="devmap-set-ctx-timeout-9f" remap="external"><citerefentry><refentrytitle>devmap_set_ctx_timeout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="devcnmgt-7"><title>Context Management Operation</title><para><indexterm><primary>device context management</primary><secondary>operation</secondary></indexterm>The general steps for performing device context management
+are as follows:</para><orderedlist><listitem><para>Define a <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem><listitem><para>Allocate space to save device context if necessary.</para>
+</listitem><listitem><para>Set up user mappings to the device and driver notifications
+with <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Manage user access to the device with  <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Free the device context structure, if needed.</para>
+</listitem>
+</orderedlist><sect2 id="devcnmgt-8"><title><structname>devmap_callback_ctl</structname> Structure</title><para>The device driver must allocate and initialize a <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure to inform the system about the entry point
+routines for device context management.</para><para>This structure uses the following syntax:</para><programlisting>struct devmap_callback_ctl {    
+    int devmap_rev;
+    int (*devmap_map)(devmap_cookie_t dhp, dev_t dev,
+    uint_t flags, offset_t off, size_t len, void **pvtp);
+    int (*devmap_access)(devmap_cookie_t dhp, void *pvtp,
+    offset_t off, size_t len, uint_t type, uint_t rw);
+    int (*devmap_dup)(devmap_cookie_t dhp, void *pvtp,
+    devmap_cookie_t new_dhp, void **new_pvtp);
+    void (*devmap_unmap)(devmap_cookie_t dhp, void *pvtp,
+    offset_t off, size_t len, devmap_cookie_t new_dhp1,
+    void **new_pvtp1, devmap_cookie_t new_dhp2,
+    void **new_pvtp2);
+};</programlisting><variablelist><varlistentry><term><structfield>devmap_rev</structfield></term><listitem><para>The version number of the <structname>devmap_callback_ctl</structname> structure.
+The version number must be set to <literal>DEVMAP_OPS_REV</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devmap_map</structfield></term><listitem><para>Must be set to the address of the driver's  <olink targetdoc="group-refman" targetptr="devmap-map-9e" remap="external"><citerefentry><refentrytitle>devmap_map</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devmap_access</structfield></term><listitem><para>Must be set to the address of the driver's <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devmap_dup</structfield></term><listitem><para>Must be set to the address of the driver's  <olink targetdoc="group-refman" targetptr="devmap-dup-9e" remap="external"><citerefentry><refentrytitle>devmap_dup</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devmap_unmap</structfield></term><listitem><para>Must be set to the address of the driver's  <olink targetdoc="group-refman" targetptr="devmap-unmap-9e" remap="external"><citerefentry><refentrytitle>devmap_unmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="devcnmgt-13"><title>Entry Points for Device Context Management</title><para><indexterm><primary>device context management</primary><secondary>entry points</secondary></indexterm><indexterm><primary>entry points</primary><secondary>device context management</secondary></indexterm>The following
+entry points are used to manage device context:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="devmap-contextmgt-9e" remap="external"><citerefentry><refentrytitle>devmap_contextmgt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="devmap-dup-9e" remap="external"><citerefentry><refentrytitle>devmap_dup</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="devmap-unmap-9e" remap="external"><citerefentry><refentrytitle>devmap_unmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><sect3 id="devcnmgt-14"><title><function>devmap_map</function> Entry Point</title><para>The syntax for <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is
+as follows:</para><programlisting>int xxdevmap_map(devmap_cookie_t <replaceable>handle</replaceable>, dev_t <replaceable>dev</replaceable>, uint_t <replaceable>flags</replaceable>,
+    offset_t <replaceable>offset</replaceable>, size_t <replaceable>len</replaceable>, void **<replaceable>new-devprivate</replaceable>);</programlisting><para><indexterm id="devcnmgt-ix463"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap_map</function> function</secondary></indexterm>The <function>devmap_map</function> entry point is called after
+the driver returns from its <function>devmap</function> entry point and the
+system has established the user mapping to the device memory. The <function>devmap</function> entry point enables a driver to perform additional processing
+or to allocate mapping specific private data. For example, in order to support
+context switching, the driver has to allocate a context structure. The driver
+must then associate the context structure with the mapping.</para><para>The system expects the driver to return a pointer to the allocated private
+data in *<replaceable>new-devprivate</replaceable>. The driver must store <replaceable>offset</replaceable> and <replaceable>len</replaceable>, which define the
+range of the mapping, in its private data. Later, when the system calls  <olink targetdoc="group-refman" targetptr="devmap-unmap-9e" remap="external"><citerefentry><refentrytitle>devmap_unmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, the driver uses this information to determine how
+much of the mapping is being unmapped.</para><para><replaceable>flags</replaceable> indicates whether the driver should
+allocate a private context for the mapping. For example, a driver can allocate
+a memory region to store the device context if <replaceable>flags</replaceable> is
+set to <literal>MAP_PRIVATE</literal>. If <literal>MAP_SHARED</literal> is
+set, the driver returns a pointer to a shared region.</para><para>The following example shows a <function>devmap</function> entry point.
+The driver allocates a new context structure. The driver then saves relevant
+parameters passed in by the entry point. Next, the mapping is assigned a new
+context either through allocation or by attaching the mapping to an already
+existing shared context. The minimum time interval that the mapping should
+have access to the device is set to one millisecond.</para><example id="devcnmgt-15467"><title>Using the <function>devmap</function> Routine</title><programlisting>static int
+int xxdevmap_map(devmap_cookie_t handle, dev_t dev, uint_t flags,
+    offset_t offset, size_t len, void **new_devprivate)
+{
+    struct xxstate *xsp = ddi_get_soft_state(statep,
+                  getminor(dev));
+    struct xxctx *newctx;
+
+    /* create a new context structure */
+    newctx = kmem_alloc(sizeof (struct xxctx), KM_SLEEP);
+    newctx-&gt;xsp = xsp;
+    newctx-&gt;handle = handle;
+    newctx-&gt;offset = offset;
+    newctx-&gt;flags = flags;
+    newctx-&gt;len = len;
+    mutex_enter(&amp;xsp-&gt;ctx_lock);
+    if (flags &amp; MAP_PRIVATE) {
+        /* allocate a private context and initialize it */
+        newctx-&gt;context = kmem_alloc(XXCTX_SIZE, KM_SLEEP);
+        xxctxinit(newctx);
+    } else {
+        /* set a pointer to the shared context */
+        newctx-&gt;context = xsp-&gt;ctx_shared;
+    }
+    mutex_exit(&amp;xsp-&gt;ctx_lock);
+    /* give at least 1 ms access before context switching */
+    devmap_set_ctx_timeout(handle, drv_usectohz(1000));
+    /* return the context structure */
+    *new_devprivate = newctx;
+    return(0);
+}</programlisting>
+</example>
+</sect3><sect3 id="devcnmgt-15"><title><function>devmap_access</function> Entry Point</title><indexterm id="devcnmgt-ix464"><primary><literal>devmap_</literal> entry point</primary><secondary><function>devmap_access</function> function</secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called when an access is made to a
+mapping whose translations are invalid. Mapping translations are invalidated
+when the mapping is created with <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in response
+to  <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>,
+duplicated by  <olink targetdoc="group-refman" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>,
+or explicitly invalidated by a call to  <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The syntax for <function>devmap_access</function> is as follows:</para><programlisting>int xxdevmap_access(devmap_cookie_t <replaceable>handle</replaceable>, void *<replaceable>devprivate</replaceable>,
+    offset_t <replaceable>offset</replaceable>, size_t <replaceable>len</replaceable>, uint_t <replaceable>type</replaceable>, uint_t <replaceable>rw</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Mapping handle of the mapping that was accessed by a user
+process.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>devprivate</replaceable></term><listitem><para>Pointer to the driver private data associated with the mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>offset</replaceable></term><listitem><para>Offset within the mapping that was accessed.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length in bytes of the memory being accessed.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>type</replaceable></term><listitem><para>Type of access operation.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>rw</replaceable></term><listitem><para>Specifies the direction of access.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The system expects <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to call either <olink targetdoc="group-refman" targetptr="devmap-do-ctxmgt-9f" remap="external"><citerefentry><refentrytitle>devmap_do_ctxmgt</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="devmap-default-access-9f" remap="external"><citerefentry><refentrytitle>devmap_default_access</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to load the
+memory address translations before <function>devmap_access</function> returns.
+For mappings that support context switching, the device driver should call <function>devmap_do_ctxmgt</function>. This routine is passed all parameters from <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, as well as a pointer to the driver entry point <olink targetdoc="group-refman" targetptr="devmap-contextmgt-9e" remap="external"><citerefentry><refentrytitle>devmap_contextmgt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, which handles the context switching. For mappings
+that do not support context switching, the driver should call <olink targetdoc="group-refman" targetptr="devmap-default-access-9f" remap="external"><citerefentry><refentrytitle>devmap_default_access</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The purpose of <function>devmap_default_access</function> is
+to call <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to load the user translation.</para><para>The following example shows a <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. The mapping
+is divided into two regions. The region that starts at offset <literal>OFF_CTXMG</literal> with
+a length of <literal>CTXMGT_SIZE</literal> bytes supports context management.
+The rest of the mapping supports default access.</para><example id="devcnmgt-20766"><title>Using the <function>devmap_access</function> Routine</title><programlisting>#define OFF_CTXMG      0
+#define CTXMGT_SIZE    0x20000    
+static int
+xxdevmap_access(devmap_cookie_t handle, void *devprivate,
+    offset_t off, size_t len, uint_t type, uint_t rw)
+{
+    offset_t diff;
+    int    error;
+
+    if ((diff = off - OFF_CTXMG) &gt;= 0 &amp;&amp; diff &lt; CTXMGT_SIZE) {
+        error = devmap_do_ctxmgt(handle, devprivate, off,
+            len, type, rw, xxdevmap_contextmgt);
+    } else {
+        error = devmap_default_access(handle, devprivate,
+            off, len, type, rw);
+    }
+    return (error);
+}</programlisting>
+</example>
+</sect3><sect3 id="devcnmgt-16"><title><function>devmap_contextmgt</function> Entry
+Point</title><para>The syntax for <olink targetdoc="group-refman" targetptr="devmap-contextmgt-9e" remap="external"><citerefentry><refentrytitle>devmap_contextmgt</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is as follows:</para><programlisting>int xxdevmap_contextmgt(devmap_cookie_t <replaceable>handle</replaceable>, void *<replaceable>devprivate</replaceable>,
+    offset_t <replaceable>offset</replaceable>, size_t <replaceable>len</replaceable>, uint_t <replaceable>type</replaceable>, uint_t <replaceable>rw</replaceable>);</programlisting><para><indexterm id="devcnmgt-ix465"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap_contextmgt</function>function</secondary></indexterm><function>devmap_contextmgt</function> should call <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> with the handle of the mapping that currently has
+access to the device. This approach invalidates the translations for that
+mapping. The approach ensures that a call to <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> occurs for the current mapping
+the next time the mapping is accessed. The mapping translations for the mapping
+that caused the access event to occur need to be validated. Accordingly, the
+driver must restore the device context for the process requesting access.
+Furthermore, the driver must call <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> on the <replaceable>handle</replaceable> of
+the mapping that generated the call to this entry point.</para><para>Accesses to portions of mappings that have had their mapping translations
+validated by a call to <function>devmap_load</function> do not generate a
+call to <function>devmap_access</function>. A subsequent call to  <function>devmap_unload</function> invalidates the mapping translations. This call enables <function>devmap_access</function> to be called again.</para><para>If either  <function>devmap_load</function> or <function>devmap_unload</function> returns
+an error, <function>devmap_contextmgt</function> should immediately return
+that error. If the device driver encounters a hardware failure while restoring
+a device context, a <literal>-1</literal> should be returned. Otherwise, after
+successfully handling the access request, <function>devmap_contextmgt</function> should
+return zero. A return of other than zero from <function>devmap_contextmgt</function> causes
+a <literal>SIGBUS</literal> or <literal>SIGSEGV</literal> to be sent to the
+process.</para><para>The following example shows how to manage a one-page device context.</para><note><para><function>xxctxsave</function> and <function>xxctxrestore</function> are
+device-dependent context save and restore functions. <function>xxctxsave</function> 
+reads data from the registers and saves the data in the soft state structure. <function>xxctxrestore</function> takes data that is saved in the soft state structure
+and writes the data to device registers. Note that the read, write, and save
+are all performed with the DDI/DKI data access routines.</para>
+</note><example id="devcnmgt-40344"><title>Using the <function>devmap_contextmgt</function> Routine</title><programlisting>static int
+xxdevmap_contextmgt(devmap_cookie_t handle, void *devprivate,
+    offset_t off, size_t len, uint_t type, uint_t rw)
+{
+    int    error;
+    struct xxctx *ctxp = devprivate;
+    struct xxstate *xsp = ctxp-&gt;xsp;
+    mutex_enter(&amp;xsp-&gt;ctx_lock);
+    /* unload mapping for current context */
+    if (xsp-&gt;current_ctx != NULL) {
+        if ((error = devmap_unload(xsp-&gt;current_ctx-&gt;handle,
+            off, len)) != 0) {
+            xsp-&gt;current_ctx = NULL;
+            mutex_exit(&amp;xsp-&gt;ctx_lock);
+            return (error);
+        }
+    }
+    /* Switch device context - device dependent */
+    if (xxctxsave(xsp-&gt;current_ctx, off, len) &lt; 0) {
+        xsp-&gt;current_ctx = NULL;
+        mutex_exit(&amp;xsp-&gt;ctx_lock);
+        return (-1);
+    }
+    if (xxctxrestore(ctxp, off, len) &lt; 0){
+        xsp-&gt;current_ctx = NULL;
+        mutex_exit(&amp;xsp-&gt;ctx_lock);
+        return (-1);
+    }
+    xsp-&gt;current_ctx = ctxp;
+    /* establish mapping for new context and return */
+    error = devmap_load(handle, off, len, type, rw);
+    if (error)
+        xsp-&gt;current_ctx = NULL;
+    mutex_exit(&amp;xsp-&gt;ctx_lock);
+    return (error);
+}</programlisting>
+</example>
+</sect3><sect3 id="devcnmgt-17"><title><function>devmap_dup</function> Entry Point</title><indexterm id="devcnmgt-ix466"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap_dup</function> function</secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="devmap-dup-9e" remap="external"><citerefentry><refentrytitle>devmap_dup</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called when a device mapping is duplicated,
+for example, by a user process that calls  <olink targetdoc="group-refman" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. The driver is expected to generate new driver private
+data for the new mapping.</para><para>The syntax for<function>devmap_dup</function> is as follows:</para><programlisting>int xxdevmap_dup(devmap_cookie_t <replaceable>handle</replaceable>, void *<replaceable>devprivate</replaceable>,
+    devmap_cookie_t <replaceable>new-handle</replaceable>, void **<replaceable>new-devprivate</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Mapping handle of the mapping being duplicated.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>new-handle</replaceable></term><listitem><para>Mapping handle of the mapping that was duplicated.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>devprivate</replaceable></term><listitem><para>Pointer to the driver private data associated with the mapping
+being duplicated.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>*</literal><replaceable>new-devprivate</replaceable></term><listitem><para>Should be set to point to the new driver private data for
+the new mapping.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Mappings that have been created with <function>devmap_dup</function> by
+default have their mapping translations invalidated. Invalid mapping translations
+force a call to the  <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point the first time the mapping is accessed.</para><para>The following example shows a typical <function>devmap_dup</function> routine.</para><example id="devcnmgt-32712"><title>Using the <function>devmap_dup</function> Routine</title><programlisting>static int
+xxdevmap_dup(devmap_cookie_t handle, void *devprivate,
+    devmap_cookie_t new_handle, void **new_devprivate)
+{
+    struct xxctx *ctxp = devprivate;
+    struct xxstate *xsp = ctxp-&gt;xsp;
+    struct xxctx *newctx;
+    /* Create a new context for the duplicated mapping */
+    newctx = kmem_alloc(sizeof (struct xxctx), KM_SLEEP);
+    newctx-&gt;xsp = xsp;
+    newctx-&gt;handle = new_handle;
+    newctx-&gt;offset = ctxp-&gt;offset;
+    newctx-&gt;flags = ctxp-&gt;flags;
+    newctx-&gt;len = ctxp-&gt;len;
+    mutex_enter(&amp;xsp-&gt;ctx_lock);
+    if (ctxp-&gt;flags &amp; MAP_PRIVATE) {
+        newctx-&gt;context = kmem_alloc(XXCTX_SIZE, KM_SLEEP);
+        bcopy(ctxp-&gt;context, newctx-&gt;context, XXCTX_SIZE);
+    } else {
+        newctx-&gt;context = xsp-&gt;ctx_shared;
+    }
+    mutex_exit(&amp;xsp-&gt;ctx_lock);
+    *new_devprivate = newctx;
+    return(0);
+}</programlisting>
+</example>
+</sect3><sect3 id="devcnmgt-18"><title><function>devmap_unmap</function> Entry Point</title><indexterm id="devcnmgt-ix467"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap_unmap</function> function</secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="devmap-unmap-9e" remap="external"><citerefentry><refentrytitle>devmap_unmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called when a mapping is unmapped.
+Unmapping can be caused by a user process exiting or by calling the <literal>munmap(2)</literal> system call.</para><para>The syntax for <function>devmap_unmap</function> is as follows:</para><programlisting>void xxdevmap_unmap(devmap_cookie_t <replaceable>handle</replaceable>, void *<replaceable>devprivate</replaceable>,
+    offset_t <replaceable>off</replaceable>, size_t <replaceable>len</replaceable>, devmap_cookie_t <replaceable>new-handle1</replaceable>,
+    void **<replaceable>new-devprivate1</replaceable>, devmap_cookie_t <replaceable>new-handle2</replaceable>,
+    void **<replaceable>new-devprivate2</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>handle</replaceable></term><listitem><para>Mapping handle of the mapping being freed.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>devprivate</replaceable></term><listitem><para>Pointer to the driver private data associated with the mapping.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>off</replaceable></term><listitem><para>Offset within the logical device memory at which the unmapping
+begins.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>len</replaceable></term><listitem><para>Length in bytes of the memory being unmapped.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>new-handle1</replaceable></term><listitem><para>Handle that the system uses to describe the new region that
+ends at <replaceable>off</replaceable> - 1. The value of <replaceable>new-handle1</replaceable> can be <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>new-devprivate1</replaceable></term><listitem><para>Pointer to be filled in by the driver with the private driver
+mapping data for the new region that ends at <replaceable>off</replaceable> -1. <replaceable>new-devprivate1</replaceable> is ignored if <replaceable>new-handle1</replaceable> is <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>new-handle2</replaceable></term><listitem><para>Handle that the system uses to describe the new region that
+begins at <replaceable>off</replaceable> + <replaceable>len</replaceable>.
+The value of <replaceable>new-handle2</replaceable> can be <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>new-devprivate2</replaceable></term><listitem><para>Pointer to be filled in by the driver with the driver  private
+mapping data for the new region that begins at <replaceable>off</replaceable> + <replaceable>len</replaceable>. <replaceable>new-devprivate2</replaceable> is ignored if <replaceable>new-handle2</replaceable> is <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <function>devmap_unmap</function> routine is expected to free any
+driver private resources that were allocated when this mapping was created,
+either by <olink targetdoc="group-refman" targetptr="devmap-map-9e" remap="external"><citerefentry><refentrytitle>devmap_map</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or by  <olink targetdoc="group-refman" targetptr="devmap-dup-9e" remap="external"><citerefentry><refentrytitle>devmap_dup</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. If the mapping is only partially
+unmapped, the driver must allocate new private data for the remaining mapping
+before freeing the old private data. Calling  <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> on the handle of the freed
+mapping is not necessary, even if this handle points to the mapping with the
+valid translations. However, to prevent future  <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> problems, the device driver
+should make sure the current mapping representation is set to &ldquo;no current
+mapping&rdquo;.</para><para>The following example shows a typical <function>devmap_unmap</function> routine.</para><example id="devcnmgt-29332"><title>Using the <function>devmap_unmap</function> Routine</title><programlisting>static void
+xxdevmap_unmap(devmap_cookie_t handle, void *devprivate,
+    offset_t off, size_t len, devmap_cookie_t new_handle1,
+    void **new_devprivate1, devmap_cookie_t new_handle2,
+    void **new_devprivate2)
+{
+    struct xxctx *ctxp = devprivate;
+    struct xxstate *xsp = ctxp-&gt;xsp;
+    mutex_enter(&amp;xsp-&gt;ctx_lock);
+    /*
+     * If new_handle1 is not NULL, we are unmapping
+     * at the end of the mapping.
+     */
+    if (new_handle1 != NULL) {
+        /* Create a new context structure for the mapping */
+        newctx = kmem_alloc(sizeof (struct xxctx), KM_SLEEP);
+        newctx-&gt;xsp = xsp;
+        if (ctxp-&gt;flags &amp; MAP_PRIVATE) {
+            /* allocate memory for the private context and copy it */
+            newctx-&gt;context = kmem_alloc(XXCTX_SIZE, KM_SLEEP);
+            bcopy(ctxp-&gt;context, newctx-&gt;context, XXCTX_SIZE);
+        } else {
+            /* point to the shared context */
+            newctx-&gt;context = xsp-&gt;ctx_shared;
+        }
+        newctx-&gt;handle = new_handle1;
+        newctx-&gt;offset = ctxp-&gt;offset;
+        newctx-&gt;len = off - ctxp-&gt;offset;
+        *new_devprivate1 = newctx;
+    }
+    /*
+     * If new_handle2 is not NULL, we are unmapping
+     * at the beginning of the mapping.
+     */
+    if (new_handle2 != NULL) {
+        /* Create a new context for the mapping */
+        newctx = kmem_alloc(sizeof (struct xxctx), KM_SLEEP);
+        newctx-&gt;xsp = xsp;
+        if (ctxp-&gt;flags &amp; MAP_PRIVATE) {
+            newctx-&gt;context = kmem_alloc(XXCTX_SIZE, KM_SLEEP);
+            bcopy(ctxp-&gt;context, newctx-&gt;context, XXCTX_SIZE);
+        } else {
+            newctx-&gt;context = xsp-&gt;ctx_shared;
+        }
+        newctx-&gt;handle = new_handle2;
+        newctx-&gt;offset = off + len;
+        newctx-&gt;flags = ctxp-&gt;flags;
+        newctx-&gt;len = ctxp-&gt;len - (off + len - ctxp-&gt;off);
+        *new_devprivate2 = newctx;
+    }
+    if (xsp-&gt;current_ctx == ctxp)
+        xsp-&gt;current_ctx = NULL;
+    mutex_exit(&amp;xsp-&gt;ctx_lock);
+    if (ctxp-&gt;flags &amp; MAP_PRIVATE)
+        kmem_free(ctxp-&gt;context, XXCTX_SIZE);
+    kmem_free(ctxp, sizeof (struct xxctx));
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="devcnmgt-9"><title>Associating User Mappings With Driver Notifications</title><para><indexterm id="devcnmgt-ix458"><primary><function>mmap</function> function</primary><secondary>driver notification</secondary></indexterm><indexterm id="devcnmgt-ix459"><primary><function>segmap</function> entry point</primary><secondary>driver notification</secondary></indexterm>When a user process
+requests a mapping to a device with  <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, the driver`s  <olink targetdoc="group-refman" targetptr="segmap-9e" remap="external"><citerefentry><refentrytitle>segmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called. The
+driver must use <olink targetdoc="group-refman" targetptr="ddi-devmap-segmap-9f" remap="external"><citerefentry><refentrytitle>ddi_devmap_segmap</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="devmap-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when setting up the memory
+mapping if the driver needs to manage device contexts. Both functions call
+the driver's <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point, which uses <olink targetdoc="group-refman" targetptr="devmap-devmem-setup-9f" remap="external"><citerefentry><refentrytitle>devmap_devmem_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to associate
+the device memory with the user mapping. See <olink targetptr="devmap-24338" remap="internal">Chapter&nbsp;10,
+Mapping Device and Kernel Memory</olink> for details on how to map device
+memory.</para><para>The driver must inform the system of the <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> entry points
+to get notifications of accesses to the user mapping. The driver informs the
+system by providing a pointer to a <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+to <literal>devmap_devmem_setup(9F)</literal>. A <olink targetdoc="group-refman" targetptr="devmap-callback-ctl-9s" remap="external"><citerefentry><refentrytitle>devmap_callback_ctl</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+describes a set of entry points for context management. These entry points
+are called by the system to notify a device driver to manage events on the
+device mappings.</para><para>The system associates each mapping with a mapping handle. This handle
+is passed to each of the entry points for context management. The mapping
+handle can be used to invalidate and validate the mapping translations. If
+the driver <emphasis>invalidates</emphasis> the mapping translations, the
+driver will be notified of any future access to the mapping. If the driver <emphasis>validates</emphasis> the mapping translations, the driver will no longer be
+notified of accesses to the mapping. Mappings are always created with the
+mapping translations invalidated so that the driver will be notified on first
+access to the mapping.</para><para>The following example shows how to set up a mapping using the device
+context management interfaces.</para><example id="devcnmgt-13708"><title><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Entry Point With Context Management
+Support</title><programlisting>static struct devmap_callback_ctl xx_callback_ctl = {
+    DEVMAP_OPS_REV, xxdevmap_map, xxdevmap_access,
+    xxdevmap_dup, xxdevmap_unmap
+};
+
+static int
+xxdevmap(dev_t dev, devmap_cookie_t handle, offset_t off,
+    size_t len, size_t *maplen, uint_t model)
+{
+    struct xxstate *xsp;
+    uint_t rnumber;
+    int    error;
+    
+    /* Setup data access attribute structure */
+    struct ddi_device_acc_attr xx_acc_attr = {
+        DDI_DEVICE_ATTR_V0,
+        DDI_NEVERSWAP_ACC,
+        DDI_STRICTORDER_ACC
+    };
+    xsp = ddi_get_soft_state(statep, getminor(dev));
+    if (xsp == NULL)
+        return (ENXIO);
+    len = ptob(btopr(len));
+    rnumber = 0;
+    /* Set up the device mapping */
+    error = devmap_devmem_setup(handle, xsp-&gt;dip, &amp;xx_callback_ctl,
+        rnumber, off, len, PROT_ALL, 0, &amp;xx_acc_attr);
+    *maplen = len;
+    return (error);
+}</programlisting>
+</example>
+</sect2><sect2 id="devcnmgt-10"><title>Managing Mapping Accesses</title><para>The device driver is notified when a user process accesses an address
+in the memory-mapped region that does not have valid mapping translations.
+When the access event occurs, the mapping translations of the process that
+currently has access to the device must be invalidated. The device context
+of the process that requested access to the device must be restored. Furthermore,
+the translations of the mapping of the process requesting access must be validated.</para><para>The functions <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and  <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> are used to validate and
+invalidate mapping translations.</para><sect3 id="devcnmgt-11"><title><function>devmap_load</function> Entry Point</title><para>The syntax for <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is as follows:</para><programlisting>int devmap_load(devmap_cookie_t <replaceable>handle</replaceable>, offset_t <replaceable>offset</replaceable>,
+    size_t <replaceable>len</replaceable>, uint_t <replaceable>type</replaceable>, uint_t <replaceable>rw</replaceable>);</programlisting><para><indexterm id="devcnmgt-ix460"><primary><literal>devmap_</literal> functions</primary><secondary><function>devmap_load</function> function</secondary></indexterm><function>devmap_load</function> validates the mapping translations
+for the pages of the mapping specified by <literal>handle</literal><literal>,</literal><literal>offset</literal>, and <literal>len</literal>. By validating the mapping translations
+for these pages, the driver is telling the system not to intercept accesses
+to these pages of the mapping. Furthermore, the system must not allow accesses
+to proceed without notifying the device driver.</para><para><function>devmap_load</function> must be called with the offset and
+the handle of the mapping that generated the access event for the access to
+complete. If  <olink targetdoc="group-refman" targetptr="devmap-load-9f" remap="external"><citerefentry><refentrytitle>devmap_load</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is not called on this handle, the mapping translations
+are not validated, and the process receives a <literal>SIGBUS</literal>.</para>
+</sect3><sect3 id="devcnmgt-12"><title><function>devmap_unload</function> Entry Point</title><para>The syntax for <olink targetdoc="group-refman" targetptr="devmap-unload-9f" remap="external"><citerefentry><refentrytitle>devmap_unload</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is as follows:</para><programlisting>int devmap_unload(devmap_cookie_t <replaceable>handle</replaceable>, offset_t <replaceable>offset</replaceable>, size_t <replaceable>len</replaceable>);</programlisting><para><indexterm id="devcnmgt-ix461"><primary><literal>devmap_</literal> functions</primary><secondary><function>devmap_unload</function> function</secondary></indexterm><indexterm id="devcnmgt-ix462"><primary><literal>devmap_</literal> entry points</primary><secondary><function>devmap_access</function> function</secondary></indexterm><function>devmap_unload</function> invalidates the mapping translations
+for the pages of the mapping specified by <replaceable>handle</replaceable>, <replaceable>offset</replaceable>, and <replaceable>len</replaceable>. By invalidating
+the mapping translations for these pages, the device driver is telling the
+system to intercept accesses to these pages of the mapping. Furthermore, the
+system must notify the device driver the next time that these mapping pages
+are accessed by calling the <olink targetdoc="group-refman" targetptr="devmap-access-9e" remap="external"><citerefentry><refentrytitle>devmap_access</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para>For both functions, requests affect the entire page that contains the <replaceable>offset</replaceable> and all pages up to and including the entire page that
+contains the last byte, as indicated by <replaceable>offset</replaceable> + <replaceable>len</replaceable>. The device driver must ensure that for each page of device
+memory being mapped, only one process has valid translations at any one time.</para><para>Both functions return zero if successful. If, however, an error occurred
+in validating or invalidating the mapping translations, that error is returned
+to the device driver. The device driver must return this error to the system.</para>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000046146 0?>

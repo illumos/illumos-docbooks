@@ -1,0 +1,733 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-intro"><title>Introduction</title><highlights><para>Welcome to Dynamic Tracing in the Solaris Operating System! If you have
+ever wanted to understand the behavior of your system, DTrace is the tool
+for you. DTrace is a comprehensive dynamic tracing facility that is built
+into Solaris that can be used by administrators and developers on live production
+systems to examine the behavior of both user programs and of the operating
+system itself. DTrace enables you to explore your system to understand how
+it works, track down performance problems across many layers of software,
+or locate the cause of aberrant behavior. As you'll see, DTrace lets you create
+your own custom programs to dynamically instrument the system and provide
+immediate, concise answers to arbitrary questions you can formulate using
+the DTrace D programming language. The first section of this chapter provides
+a quick introduction to DTrace and shows you how to write your very first
+D program. The rest of the chapter introduces the complete set of rules for
+programming in D as well as tips and techniques for performing in-depth analysis
+of your system. You can share your DTrace experiences and scripts with the
+rest of the DTrace community on the web at <ulink url="http://www.sun.com/bigadmin/content/dtrace/" type="text">http://www.sun.com/bigadmin/content/dtrace/</ulink>. All of the example scripts presented in this guide can be found
+on your Solaris system in the directory <filename>/usr/demo/dtrace</filename>.</para>
+</highlights><sect1 id="chp-intro-1"><title>Getting Started</title><para>DTrace helps you understand a software system by enabling you to dynamically
+modify the operating system kernel and user processes to record additional
+data that you specify at locations of interest, called <firstterm>probes</firstterm>.
+A probe is a location or activity to which DTrace can bind a request to perform
+a set of <firstterm>actions</firstterm>, like recording a stack trace, a timestamp,
+or the argument to a function. Probes are like programmable sensors scattered
+all over your Solaris system in interesting places. If you want to figure
+out what's going on, you use DTrace to program the appropriate sensors to
+record the information that is of interest to you. Then, as each probe <firstterm>fires</firstterm>, DTrace gathers the data from your probes and reports it
+back to you. If you don't specify any actions for a probe, DTrace will just
+take note of each time the probe fires.</para><para>Every probe in DTrace has two names: a unique integer ID and a human-readable
+string name. We're going to start learning DTrace by building some very simple
+requests using the probe named <literal>BEGIN</literal>, which fires once
+each time you start a new tracing request. You can use the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility's <option>n</option> option
+to enable a probe using its string name. Type the following command:</para><screen><userinput># dtrace -n BEGIN</userinput></screen><para>After a brief pause, you will see DTrace tell you that one probe was
+enabled and you will see a line of output indicating that the <literal>BEGIN</literal> probe
+fired. Once you see this output, <command>dtrace</command> remains paused
+waiting for other probes to fire. Since you haven't enabled any other probes
+and <literal>BEGIN</literal> only fires once, press Control-C in your shell
+to exit <command>dtrace</command> and return to your shell prompt:</para><screen><userinput># dtrace -n BEGIN</userinput>
+dtrace: description 'BEGIN' matched 1 probe
+CPU     ID		      FUNCTION:NAME
+  0      1                  :BEGIN
+<userinput>^C</userinput>
+#</screen><para>The output tells you that the probe named <literal>BEGIN</literal> fired
+once and both its name and integer ID, 1, are printed. Notice that by default,
+the integer name of the CPU on which this probe fired is displayed. In this
+example, the CPU column indicates that the <command>dtrace</command> command
+was executing on CPU 0 when the probe fired.</para><para>You can construct DTrace requests using arbitrary numbers of probes
+and actions. Let's create a simple request using two probes by adding the <literal>END</literal> probe to the previous example command. The <literal>END</literal> probe
+fires once when tracing is completed. Type the following command, and then
+again press Control-C in your shell after you see the line of output for the <literal>BEGIN</literal> probe:</para><screen><userinput># dtrace -n BEGIN -n END</userinput>
+dtrace: description 'BEGIN' matched 1 probe
+dtrace: description 'END' matched 1 probe
+CPU     ID		      FUNCTION:NAME
+  0      1                  :BEGIN
+<userinput>^C</userinput>
+  0      2                    :END
+#</screen><para>As you can see, pressing Control-C to exit <command>dtrace</command> triggers
+the <literal>END</literal> probe. <command>dtrace</command> reports this probe
+firing before exiting.</para><para>Now that you understand a little bit about naming and enabling probes,
+you're ready to write the DTrace version of everyone's first program, &ldquo;Hello,
+World.&rdquo; In addition to constructing DTrace experiments on the command
+line, you can also write them in text files using the D programming language.
+In a text editor, create a new file called <filename>hello.d</filename> and
+type in your first D program:</para><example id="ex-hello.d"><title><filename>hello.d</filename>: Hello, World
+from the D Programming Language</title><programlisting>BEGIN
+{
+	trace("hello, world");
+	exit(0);
+}</programlisting>
+</example><para>After you have saved your program, you can run it using the <command>dtrace</command> <option>s</option> option. Type the following command:</para><screen><userinput># dtrace -s hello.d</userinput>
+dtrace: script 'hello.d' matched 1 probe
+CPU     ID		      FUNCTION:NAME
+  0	    1                  :BEGIN   hello, world
+#</screen><para>As you can see, <command>dtrace</command> printed the same output as
+before followed by the text &ldquo;<computeroutput>hello, world</computeroutput>&rdquo;.
+Unlike the previous example, you did not have to wait and press Control-C,
+either. These changes were the result of the <firstterm>actions</firstterm> you
+specified for your <literal>BEGIN</literal> probe in <filename>hello.d</filename>.
+Let's explore the structure of your D program in more detail in order to understand
+what happened.</para><para>Each D program consists of a series of <firstterm>clauses</firstterm>,
+each clause describing one or more probes to enable, and an optional set of
+actions to perform when the probe fires. The actions are listed as a series
+of statements enclosed in braces <literal>{ }</literal> following the probe
+name. Each statement ends with a semicolon (<literal>;</literal>). Your first
+statement uses the function <function>trace</function> to indicate that DTrace
+should record the specified argument, the string &ldquo;<literal>hello, world</literal>&rdquo;,
+when the <literal>BEGIN</literal> probe fires, and then print it out. The
+second statement uses the function <function>exit</function> to indicate that
+DTrace should cease tracing and exit the <command>dtrace</command> command.
+DTrace provides a set of useful functions like <function>trace</function> and <function>exit</function> for you to call in your D programs. To call a function, you
+specify its name followed by a parenthesized list of arguments. The complete
+set of D functions is described in <olink targetptr="chp-actsub" remap="internal">Chapter&nbsp;10,
+Actions and Subroutines</olink>.</para><para>By now, if you're familiar with the C programming language, you've probably
+realized from the name and our examples that DTrace's D programming language
+is very similar to C. Indeed, D is derived from a large subset of C combined
+with a special set of functions and variables to help make tracing easy. You'll
+learn more about these features in subsequent chapters. If you've written
+a C program before, you will be able to immediately transfer most of your
+knowledge to building tracing programs in D. If you've never written a C program
+before, learning D is still very easy. You will understand all of the syntax
+by the end of this chapter. But first, let's take a step back from language
+rules and learn more about how DTrace works, and then we'll return to learning
+how to build more interesting D programs.</para>
+</sect1><sect1 id="chp-intro-2"><title>Providers and Probes</title><para>In the preceding examples, you learned to use two simple probes named <literal>BEGIN</literal> and <literal>END</literal>. But where did these probes come
+from? DTrace probes come from a set of kernel modules called <firstterm>providers</firstterm>, each of which performs a particular kind of instrumentation
+to create probes. When you use DTrace, each provider is given an opportunity
+to publish the probes it can provide to the DTrace framework. You can then
+enable and bind your tracing actions to any of the probes that have been published.
+To list all of the available probes on your system, type the command:</para><screen><userinput># dtrace -l</userinput>
+  ID   PROVIDER            MODULE          FUNCTION NAME
+   1     dtrace                                     BEGIN
+   2     dtrace                                     END
+   3     dtrace                                     ERROR
+   4   lockstat           genunix       mutex_enter adaptive-acquire
+   5   lockstat           genunix       mutex_enter adaptive-block
+   6   lockstat           genunix       mutex_enter adaptive-spin
+   7   lockstat           genunix       mutex_exit  adaptive-release
+
+   <phrase>... many lines of output omitted ...</phrase>
+
+#</screen><para>It might take some time to display all of the output. To count up all
+your probes, you can type the command:</para><screen><userinput># dtrace -l | wc -l</userinput>
+        30122</screen><para>You might observe a different total on your machine, as the number of
+probes varies depending on your operating platform and the software you have
+installed. As you can see, there are a very large number of probes available
+to you so you can peer into every previously dark corner of the system. In
+fact, even this output isn't the complete list because, as you'll see later,
+some providers offer the ability to create new probes on-the-fly based on
+your tracing requests, making the actual number of DTrace probes virtually
+unlimited.</para><para>Now look back at the output from <userinput>dtrace -l</userinput> in
+your terminal window. Notice that each probe has the two names we mentioned
+earlier, an integer ID and a human-readable name. The human readable name
+is composed of four parts, shown as separate columns in the <command>dtrace</command> output.
+The four parts of a probe name are:</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="10.97in"?><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para>Provider</para>
+</entry><entry><para>The name of the DTrace provider that is publishing this probe. The provider
+name typically corresponds to the name of the DTrace kernel module that performs
+the instrumentation to enable the probe.</para>
+</entry>
+</row><row><entry><para>Module</para>
+</entry><entry><para>If this probe corresponds to a specific program location, the name of
+the module in which the probe is located. This name is either the name of
+a kernel module or the name of a user library.</para>
+</entry>
+</row><row><entry><para>Function</para>
+</entry><entry><para>If this probe corresponds to a specific program location, the name of
+the program function in which the probe is located.</para>
+</entry>
+</row><row><entry><para>Name</para>
+</entry><entry><para>The final component of the probe name is a name that gives you some
+idea of the probe's semantic meaning, such as <literal>BEGIN</literal> or <literal>END</literal>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>When writing out the full human-readable name of a probe, write all
+four parts of the name separated by colons like this:</para><para><replaceable>provider</replaceable>:<replaceable>module</replaceable>:<replaceable>function</replaceable>:<replaceable>name</replaceable></para><para>Notice that some of the probes in the list do not have a module and
+function, such as the <literal>BEGIN</literal> and <literal>END</literal> probes
+used earlier. Some probes leave these two fields blank because these probes
+do not correspond to any specific instrumented program function or location.
+Instead, these probes refer to a more abstract concept like the idea of the
+end of your tracing request. A probe that has a module and function as part
+of its name is known as an <firstterm>anchored probe</firstterm>, and one
+that does not is known as <firstterm>unanchored</firstterm>.</para><para>By convention, if you do not specify all of the fields of a probe name,
+then DTrace matches your request to <emphasis>all</emphasis> of the probes
+that have matching values in the parts of the name that you do specify. In
+other words, when you used the probe name <literal>BEGIN</literal> earlier,
+you were actually telling DTrace to match any probe whose name field is <literal>BEGIN</literal>, regardless of the value of the provider, module, and function
+fields. As it happens, there is only one probe matching that description,
+so the result is the same. But you now know that the true name of the <literal>BEGIN</literal> probe is <literal>dtrace:::BEGIN</literal>, which indicates that
+this probe is provided by the DTrace framework itself and is not anchored
+to any function. Therefore, the <filename>hello.d</filename> program could
+have been written as follows and would produce the same result:</para><programlisting>dtrace:::BEGIN
+{
+	trace("hello, world");
+	exit(0);
+}</programlisting><para>Now that you understand where probes originate from and how they are
+named, we're going to learn a little more about what happens when you enable
+probes and ask DTrace to do something, and then we'll return to our whirlwind
+tour of D.</para>
+</sect1><sect1 id="chp-intro-3"><title>Compilation and Instrumentation</title><para>When you write traditional programs in Solaris, you use a compiler to
+convert your program from source code into object code that you can execute.
+When you use the <command>dtrace</command> command you are invoking the compiler
+for the D language used earlier to write the <filename>hello.d</filename> program.
+Once your program is compiled, it is sent into the operating system kernel
+for execution by DTrace. There the probes that are named in your program are
+enabled and the corresponding provider performs whatever instrumentation is
+needed to activate them.</para><para>All of the instrumentation in DTrace is completely dynamic: probes are
+enabled discretely only when you are using them. No instrumented code is present
+for inactive probes, so your system does not experience any kind of performance
+degradation when you are not using DTrace. Once your experiment is complete
+and the <command>dtrace</command> command exits, all of the probes you used
+are automatically disabled and their instrumentation is removed, returning
+your system to its exact original state. No effective difference exists between
+a system where DTrace is not active and one where the DTrace software is not
+installed.</para><para>The instrumentation for each probe is performed dynamically on the live
+running operating system or on user processes you select. The system is not
+quiesced or paused in any way, and instrumentation code is added only for
+the probes that you enable. As a result, the probe effect of using DTrace
+is limited to exactly what you ask DTrace to do: no extraneous data is traced,
+no one big &ldquo;tracing switch&rdquo; is turned on in the system, and all
+of the DTrace instrumentation is designed to be as efficient as possible.
+These features enable you to use DTrace in production to solve real problems
+in real time.</para><para>The DTrace framework also provides support for an arbitrary number of
+virtual clients. You can run as many simultaneous DTrace experiments and commands
+as you like, limited only by your system's memory capacity, and the commands
+all operate independently using the same underlying instrumentation. This
+same capability also permits any number of distinct users on the system to
+take advantage of DTrace simultaneously: developers, administrators, and service
+personnel can all work together or on distinct problems on the same system
+using DTrace without interfering with one another.</para><para>Unlike programs written in C and C++ and similar to programs written
+in the <trademark>Java</trademark> programming language, DTrace D programs
+are compiled into a safe intermediate form that is used for execution when
+your probes fire. This intermediate form is validated for safety when your
+program is first examined by the DTrace kernel software. The DTrace execution
+environment also handles any run-time errors that might occur during your
+D program's execution, including dividing by zero, dereferencing invalid memory,
+and so on, and reports them to you. As a result, you can never construct an
+unsafe program that would cause DTrace to inadvertently damage the Solaris
+kernel or one of the processes running on your system. These safety features
+allow you to use DTrace in a production environment without worrying about
+crashing or corrupting your system. If you make a programming mistake, DTrace
+will report your error to you, disable your instrumentation, and you can correct
+your mistake and try again. The DTrace error reporting and debugging features
+are described later in this book.</para><para>The following diagram shows the different components of the DTrace architecture,
+including providers, probes, the DTrace kernel software, and the <command>dtrace</command> command.</para><figure id="chapter1-fig-1"><title>Overview of the DTrace Architecture and
+Components</title><mediaobject><imageobject><imagedata entityref="architecture"/>
+</imageobject><textobject><simpara>DTrace architecture: the kernel facility and providers,
+a driver interface from the kernel to a library, and the library supporting
+a set of commands.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>Now that you understand how DTrace works, let's return to the tour of
+the D programming language and start writing some more interesting programs.</para>
+</sect1><sect1 id="chp-intro-4"><title>Variables and Arithmetic Expressions</title><para>Our next example program makes use of the DTrace <literal>profile</literal> provider
+to implement a simple time-based counter. The profile provider is able to
+create new probes based on the descriptions found in your D program. If you
+create a probe named <literal>profile:::tick-</literal><replaceable>n</replaceable><literal>sec</literal> for some integer <replaceable>n</replaceable>, the profile provider
+will create a probe that fires every <replaceable>n</replaceable> seconds.
+Type the following source code and save it in a file named <filename>counter.d</filename>:</para><programlisting>/*
+ * Count off and report the number of seconds elapsed
+ */
+dtrace:::BEGIN
+{
+	i = 0;
+}
+
+profile:::tick-1sec
+{
+	i = i + 1;
+	trace(i);
+}
+
+dtrace:::END
+{
+	trace(i);
+}</programlisting><para>When executed, the program counts off the number of elapsed seconds
+until you press Control-C, and then prints the total at the end:</para><screen><userinput># dtrace -s counter.d</userinput>
+dtrace: script 'counter.d' matched 3 probes
+CPU     ID                    FUNCTION:NAME
+  0  25499                       :tick-1sec         1
+  0  25499                       :tick-1sec         2
+  0  25499                       :tick-1sec         3
+  0  25499                       :tick-1sec         4
+  0  25499                       :tick-1sec         5
+  0  25499                       :tick-1sec         6
+<userinput>^C</userinput>
+  0      2                             :END         6
+#</screen><para>The first three lines of the program are a comment to explain what the
+program does. Similar to C, C++, and the Java programming language, the D
+compiler ignores any characters between the <literal>/*</literal> and <literal>*/</literal> symbols. Comments can be used anywhere in a D program, including
+both inside and outside your probe clauses.</para><para>The <literal>BEGIN</literal> probe clause defines a new variable named <literal>i</literal> and assigns it the integer value zero using the statement:</para><programlisting>i = 0;</programlisting><para>Unlike C, C++, and the Java programming language, D variables can be
+created by simply using them in a program statement; explicit variable declarations
+are not required. When a variable is used for the first time in a program,
+the type of the variable is set based on the type of its first assignment.
+Each variable has only one type over the lifetime of the program, so subsequent
+references must conform to the same type as the initial assignment. In <filename>counter.d</filename>, the variable <literal>i</literal> is first assigned
+the integer constant zero, so its type is set to <literal>int</literal>. D
+provides the same basic integer data types as C, including:</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="10.97in"?><colspec colname="colspec0" colwidth="0.57*"/><colspec colname="colspec1" colwidth="1.43*"/><tbody><row><entry><para><literal>char</literal></para>
+</entry><entry><para>Character or single byte integer</para>
+</entry>
+</row><row><entry><para><literal>int</literal></para>
+</entry><entry><para>Default integer</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>short</literal></para>
+</entry><entry colname="colspec1"><para>Short integer</para>
+</entry>
+</row><row><entry><para><literal>long</literal></para>
+</entry><entry><para>Long integer</para>
+</entry>
+</row><row><entry><para><literal>long long</literal></para>
+</entry><entry><para>Extended long integer</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The sizes of these types are dependent on the operating system kernel's
+data model, described in <olink targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2,
+Types, Operators, and Expressions</olink>. D also provides built-in friendly
+names for signed and unsigned integer types of various fixed sizes, as well
+as thousands of other types that are defined by the operating system.</para><para>The central part of <filename>counter.d</filename> is the probe clause
+that increments the counter <literal>i</literal>:</para><programlisting>profile:::tick-1sec
+{
+	i = i + 1;
+	trace(i);
+}</programlisting><para>This clause names the probe <literal>profile:::tick-1sec</literal>,
+which tells the <literal>profile</literal> provider to create a new probe
+which fires once per second on an available processor. The clause contains
+two statements, the first assigning <literal>i</literal> to the previous value
+plus one, and the second tracing the new value of <literal>i</literal>. All
+the usual C arithmetic operators are available in D; the complete list is
+found in <olink targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2, Types, Operators,
+and Expressions</olink>. Also as in C, the <literal>++</literal> operator
+can be used as shorthand for incrementing the corresponding variable by one.
+The <function>trace</function> function takes any D expression as its argument,
+so you could write <filename>counter.d</filename> more concisely as follows:</para><programlisting>profile:::tick-1sec
+{
+	trace(++i);
+}</programlisting><para>If you want to explicitly control the type of the variable <literal>i</literal>,
+you can surround the desired type in parentheses when you assign it in order
+to <firstterm>cast</firstterm> the integer zero to a specific type. For example,
+if you wanted to determine the maximum size of a <literal>char</literal> in
+D, you could change the <literal>BEGIN</literal> clause as follows:</para><programlisting>dtrace:::BEGIN
+{
+	i = (char)0;
+}</programlisting><para>After running <filename>counter.d</filename> for a while, you should
+see the traced value grow and then wrap around back to zero. If you grow impatient
+waiting for the value to wrap, try changing the <literal>profile</literal> probe
+name to <literal>profile:::tick-100msec</literal> to make a counter that increments
+once every 100 milliseconds, or 10 times per second.</para>
+</sect1><sect1 id="chp-intro-5"><title>Predicates</title><para>One major difference between D and other programming languages such
+as C, C++, and the Java programming language is the absence of control-flow
+constructs such as if-statements and loops. D program clauses are written
+as single straight-line statement lists that trace an optional, fixed amount
+of data. D does provide the ability to conditionally trace data and modify
+control flow using logical expressions called <firstterm>predicates</firstterm> that
+can be used to prefix program clauses. A predicate expression is evaluated
+at probe firing time prior to executing any of the statements associated with
+the corresponding clause. If the predicate evaluates to true, represented
+by any non-zero value, the statement list is executed. If the predicate is
+false, represented by a zero value, none of the statements are executed and
+the probe firing is ignored.</para><para>Type the following source code for the next example and save it in a
+file named <filename>countdown.d</filename>:</para><programlisting>dtrace:::BEGIN
+{
+	i = 10;
+}
+
+profile:::tick-1sec
+/i &gt; 0/
+{
+	trace(i--);
+}
+
+profile:::tick-1sec
+/i == 0/
+{
+	trace("blastoff!");
+	exit(0);
+}</programlisting><para>This D program implements a 10-second countdown timer using predicates.
+When executed, <filename>countdown.d</filename> counts down from 10 and then
+prints a message and exits:</para><programlisting># dtrace -s countdown.d
+dtrace: script 'countdown.d' matched 3 probes
+CPU     ID                    FUNCTION:NAME
+	0  25499                       :tick-1sec        10
+	0  25499                       :tick-1sec         9
+	0  25499                       :tick-1sec         8
+	0  25499                       :tick-1sec         7
+	0  25499                       :tick-1sec         6
+	0  25499                       :tick-1sec         5
+	0  25499                       :tick-1sec         4
+	0  25499                       :tick-1sec         3
+	0  25499                       :tick-1sec         2
+	0  25499                       :tick-1sec         1
+	0  25499                       :tick-1sec   blastoff!
+# </programlisting><para>This example uses the <literal>BEGIN</literal> probe to initialize an
+integer <literal>i</literal> to 10 to begin the countdown. Next, as in the
+previous example, the program uses the <literal>tick-1sec</literal> probe
+to implement a timer that fires once per second. Notice that in <filename>countdown.d</filename>, the <literal>tick-1sec</literal> probe description is used in
+two different clauses, each with a different predicate and action list. The
+predicate is a logical expression surrounded by enclosing slashes <literal>/
+/</literal> that appears after the probe name and before the braces <literal>{
+}</literal> that surround the clause statement list.</para><para>The first predicate tests whether <literal>i</literal> is greater than
+zero, indicating that the timer is still running:</para><programlisting>profile:::tick-1sec
+/i &gt; 0/
+{
+	trace(i--);
+}</programlisting><para>The relational operator <literal>&gt;</literal> means <emphasis>greater
+than</emphasis> and returns the integer value zero for false and one for true.
+All of the C relational operators are supported in D; the complete list is
+found in <olink targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2, Types, Operators,
+and Expressions</olink>. If <literal>i</literal> is not yet zero, the script
+traces <literal>i</literal> and then decrements it by one using the <literal>--</literal> operator.</para><para>The second predicate uses the <literal>==</literal> operator to return
+true when <literal>i</literal> is exactly equal to zero, indicating that the
+countdown is complete:</para><programlisting>profile:::tick-1sec
+/i == 0/
+{
+	trace("blastoff!");
+	exit(0);
+}</programlisting><para>Similar to the first example, <filename>hello.d</filename>, <filename>countdown.d</filename> uses a sequence of characters enclosed in double quotes, called
+a <firstterm>string constant</firstterm>, to print a final message when the
+countdown is complete. The <function>exit</function> function is then used
+to exit <command>dtrace</command> and return to the shell prompt.</para><para>If you look back at the structure of <filename>countdown.d</filename>,
+you will see that by creating two clauses with the same probe description
+but different predicates and actions, we effectively created the logical flow:</para><literallayout>i = 10
+once per second,
+	if i is greater than zero
+		trace(i--);
+	otherwise if i is equal to zero
+		trace("blastoff!");
+		exit(0);</literallayout><para>When you wish to write complex programs using predicates, try to first
+visualize your algorithm in this manner, and then transform each path of your
+conditional constructs into a separate clause and predicate.</para><para>Now let's combine predicates with a new provider, the <literal>syscall</literal> provider,
+and create our first real D tracing program. The <literal>syscall</literal> provider
+permits you to enable probes on entry to or return from any Solaris system
+call. The next example uses DTrace to observe every time your shell performs
+a <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> or <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. First, open two
+terminal windows, one to use for DTrace and the other containing the shell
+process you're going to watch. In the second window, type the following command
+to obtain the process ID of this shell:</para><screen><userinput># echo $$</userinput>
+12345</screen><para>Now go back to your first terminal window and type the following D program
+and save it in a file named <filename>rw.d</filename>. As you type in the
+program, replace <replaceable>12345</replaceable> with the process ID of the
+shell that was printed in response to your <command>echo</command> command.</para><programlisting>syscall::read:entry,
+syscall::write:entry
+/pid == 12345/
+{
+
+}</programlisting><para>Notice that the body of <filename>rw.d</filename>'s probe clause is
+left empty because the program is only intended to trace notification of probe
+firings and not to trace any additional data. Once you're done typing in <filename>rw.d</filename>, use <command>dtrace</command> to start your experiment and
+then go to your second shell window and type a few commands, pressing return
+after each command. As you type, you should see <command>dtrace</command> report
+probe firings in your first window, similar to the following example:</para><screen><userinput># dtrace -s rw.d</userinput>
+dtrace: script 'rw.d' matched 2 probes
+CPU     ID                    FUNCTION:NAME
+	0     34                      write:entry 
+	0     32                       read:entry 
+	0     34                      write:entry 
+	0     32                       read:entry 
+	0     34                      write:entry 
+	0     32                       read:entry 
+	0     34                      write:entry 
+	0     32                       read:entry 
+...</screen><para>You are now watching your shell perform <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+calls to read a character from your terminal window and echo back the result!
+This example includes many of the concepts described so far and a few new
+ones as well. First, to instrument <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> in the same manner, the script
+uses a single probe clause with multiple probe descriptions by separating
+the descriptions with commas like this:</para><programlisting>syscall::read:entry,
+syscall::write:entry</programlisting><para>For readability, each probe description appears on its own line. This
+arrangement is not strictly required, but it makes for a more readable script.
+Next the script defines a predicate that matches only those system calls that
+are executed by your shell process:</para><programlisting>/pid == 12345/</programlisting><para>The predicate uses the predefined DTrace variable <literal>pid</literal>,
+which always evaluates to the process ID associated with the thread that fired
+the corresponding probe. DTrace provides many built-in variable definitions
+for useful things like the process ID. Here is a list of a few DTrace variables
+you can use to write your first D programs:</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="1"><?PubTbl tgroup dispwid="8.51in"?><colspec colname="colspec2" colwidth="27.37*"/><colspec colname="colspec3" colwidth="21.16*"/><colspec colname="colspec4" colwidth="50.47*"/><thead><row><entry rowsep="1"><para>Variable Name</para>
+</entry><entry rowsep="1"><para>Data Type</para>
+</entry><entry rowsep="1"><para>Meaning</para>
+</entry>
+</row>
+</thead><tbody><row><entry rowsep="0"><para><literal>errno</literal></para>
+</entry><entry rowsep="0"><para><literal>int</literal></para>
+</entry><entry rowsep="0"><para>Current <literal>errno</literal> value for system calls</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>execname</literal></para>
+</entry><entry rowsep="0"><para><literal>string</literal></para>
+</entry><entry rowsep="0"><para>Name of the current process's executable file</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>pid</literal></para>
+</entry><entry rowsep="0"><para><literal>pid_t</literal></para>
+</entry><entry rowsep="0"><para>Process ID of the current process</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>tid</literal></para>
+</entry><entry rowsep="0"><para><literal>id_t</literal></para>
+</entry><entry rowsep="0"><para>Thread ID of the current thread</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>probeprov</literal></para>
+</entry><entry rowsep="0"><para><literal>string</literal></para>
+</entry><entry rowsep="0"><para>Current probe description's provider field</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>probemod</literal></para>
+</entry><entry rowsep="0"><para><literal>string</literal></para>
+</entry><entry rowsep="0"><para>Current probe description's module field</para>
+</entry>
+</row><row><entry rowsep="0"><para><literal>probefunc</literal></para>
+</entry><entry rowsep="0"><para><literal>string</literal></para>
+</entry><entry rowsep="0"><para>Current probe description's function field</para>
+</entry>
+</row><row><entry colname="colspec2" rowsep="0"><para><literal>probename</literal></para>
+</entry><entry colname="colspec3" rowsep="0"><para><literal>string</literal></para>
+</entry><entry colname="colspec4" rowsep="0"><para>Current probe description's name field</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Now that you've written a real instrumentation program, try experimenting
+with it on different processes running on your system by changing the process
+ID and the system call probes that are instrumented. Then, you can make one
+more simple change and turn <filename>rw.d</filename> into a very simple version
+of a system call tracing tool like <olink targetdoc="refman1" targetptr="truss-1" remap="external"><citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.
+An empty probe description field acts as a wildcard, matching any probe, so
+change your program to the following new source code to trace <emphasis>any</emphasis> system
+call executed by your shell:</para><programlisting>syscall:::entry
+/pid == 12345/
+{
+
+}</programlisting><para>Try typing a few commands in the shell such as <command>cd</command>, <command>ls</command>, and <command>date</command> and see what your DTrace program
+reports.</para>
+</sect1><sect1 id="chp-intro-6"><title>Output Formatting</title><para>System call tracing is a powerful way to observe the behavior of most
+user processes. If you've used the Solaris <olink targetdoc="refman1" targetptr="truss-1" remap="external"><citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility before as an administrator
+or developer, you've probably learned that it's a useful tool to keep around
+for whenever there is a problem. If you've never used <command>truss</command> before,
+give it a try right now by typing this command into one of your shells:</para><screen><userinput>$ truss date</userinput></screen><para>You will see a formatted trace of all the system calls executed by <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> followed by its one line of
+output at the end. The following example improves upon the earlier <filename>rw.d</filename> program by formatting its output to look more like <olink targetdoc="refman1" targetptr="truss-1" remap="external"><citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> so you can more easily understand
+the output. Type the following program and save it in a file called <filename>trussrw.d</filename>:</para><example id="ex-trussrw.d"><title><filename>trussrw.d</filename>: Trace System
+Calls with <citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry> Output Format</title><programlisting>syscall::read:entry,
+syscall::write:entry
+/pid == $1/
+{
+	printf("%s(%d, 0x%x, %4d)", probefunc, arg0, arg1, arg2);
+}
+
+syscall::read:return,
+syscall::write:return
+/pid == $1/
+{
+	printf("\t\t = %d\n", arg1);
+}</programlisting>
+</example><para>In this example, the constant <literal>12345</literal> is replaced with
+the label <literal>$1</literal> in each predicate. This label allows you to
+specify the process of interest as an <emphasis>argument</emphasis> to the
+script: <literal>$1</literal> is replaced by the value of the first argument
+when the script is compiled. To execute <filename>trussrw.d</filename>, use
+the <command>dtrace</command> options <option>q</option> and <option>s</option>,
+followed by the process ID of your shell as the final argument. The <option>q</option> option
+indicates that <command>dtrace</command> should be quiet and suppress the
+header line and the CPU and ID columns shown in the preceding examples. As
+a result, you will only see the output for the data that you explicitly traced.
+Type the following command (replacing <literal>12345</literal> with the process
+ID of a shell process) and then press return a few times in the specified
+shell:</para><screen><userinput># dtrace -q -s trussrw.d 12345</userinput>
+	                 = 1
+write(2, 0x8089e48,    1)                = 1
+read(63, 0x8090a38, 1024)                = 0
+read(63, 0x8090a38, 1024)                = 0
+write(2, 0x8089e48,   52)                = 52
+read(0, 0x8089878,    1)                 = 1
+write(2, 0x8089e48,    1)                = 1
+read(63, 0x8090a38, 1024)                = 0
+read(63, 0x8090a38, 1024)                = 0
+write(2, 0x8089e48,   52)                = 52
+read(0, 0x8089878,    1)                 = 1
+write(2, 0x8089e48,    1)                = 1
+read(63, 0x8090a38, 1024)                = 0
+read(63, 0x8090a38, 1024)                = 0
+write(2, 0x8089e48,   52)                = 52
+read(0, 0x8089878,    1)<userinput>^C</userinput>
+#</screen><para>Now let's examine your D program and its output in more detail. First,
+a clause similar to the earlier program instruments each of the shell's calls
+to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. But for this example, a new
+function, <function>printf</function>, is used to trace data and print it
+out in a specific format:</para><programlisting>syscall::read:entry,
+syscall::write:entry
+/pid == $1/
+{
+	printf("%s(%d, 0x%x, %4d)", probefunc, arg0, arg1, arg2);
+}</programlisting><para>The <function>printf</function> function combines the ability to trace
+data, as if by the <function>trace</function> function used earlier, with
+the ability to output the data and other text in a specific format that you
+describe. The <function>printf</function> function tells DTrace to trace the
+data associated with each argument after the first argument, and then to format
+the results using the rules described by the first <function>printf</function> argument,
+known as a <firstterm>format string</firstterm>.</para><para>The format string is a regular string that contains any number of format
+conversions, each beginning with the <literal>%</literal> character, that
+describe how to format the corresponding argument. The first conversion in
+the format string corresponds to the second <function>printf</function> argument,
+the second conversion to the third argument, and so on. All of the text between
+conversions is printed verbatim. The character following the <literal>%</literal> conversion
+character describes the format to use for the corresponding argument. Here
+are the meanings of the three format conversions used in <filename>trussrw.d</filename>:</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="8.53in"?><colspec colwidth="0.50in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>%d</literal></para>
+</entry><entry><para>Print the corresponding value as a decimal integer</para>
+</entry>
+</row><row><entry><para><literal>%s</literal></para>
+</entry><entry><para>Print the corresponding value as a string</para>
+</entry>
+</row><row><entry><para><literal>%x</literal></para>
+</entry><entry><para>Print the corresponding value as a hexadecimal integer</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>DTrace <function>printf</function> works just like the C <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> library routine or the shell <olink targetdoc="refman1" targetptr="printf-1" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility. If you've never seen <function>printf</function> before, the formats and options are explained in detail
+in <olink targetptr="chp-fmt" remap="internal">Chapter&nbsp;12, Output Formatting</olink>.
+You should read this chapter carefully even if you're already familiar with <function>printf</function> from another language. In D, <function>printf</function> is
+provided as a built-in and some new format conversions are available to you
+designed specifically for DTrace.</para><para>To help you write correct programs, the D compiler validates each <function>printf</function> format string against its argument list. Try changing <literal>probefunc</literal> in the clause above to the integer <literal>123</literal>.
+If you run the modified program, you will see an error message telling you
+that the string format conversion <literal>%s</literal> is not appropriate
+for use with an integer argument:</para><screen><userinput># dtrace -q -s trussrw.d</userinput>
+dtrace: failed to compile script trussrw.d: line 4: printf( )
+	   argument #2 is incompatible with conversion #1 prototype:
+	        conversion: %s
+	         prototype: char [] or string (or use stringof)
+	          argument: int
+#</screen><para>To print the name of the read or write system call and its arguments,
+use the <function>printf</function> statement:</para><programlisting>printf("%s(%d, 0x%x, %4d)", probefunc, arg0, arg1, arg2);</programlisting><para>to trace the name of the current probe function and the first three
+integer arguments to the system call, available in the DTrace variables <literal>arg0</literal>, <literal>arg1</literal>, and <literal>arg2</literal>. For
+more information about probe arguments, see <olink targetptr="chp-variables" remap="internal">Chapter&nbsp;3,
+Variables</olink>. The first argument to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> is
+a file descriptor, printed in decimal. The second argument is a buffer address,
+formatted as a hexadecimal value. The final argument is the buffer size, formatted
+as a decimal value. The format specifier <literal>%4d</literal> is used for
+the third argument to indicate that the value should be printed using the <literal>%d</literal> format conversion with a minimum field width of 4 characters.
+If the integer is less than 4 characters wide, <function>printf</function> will
+insert extra blanks to align the output.</para><para>To print the result of the system call and complete each line of output,
+use the following clause:</para><programlisting>syscall::read:return,
+syscall::write:return
+/pid == $1/
+{
+	printf("\t\t = %d\n", arg1);
+}</programlisting><para>Notice that the <literal>syscall</literal> provider also publishes a
+probe named <literal>return</literal> for each system call in addition to <literal>entry</literal>. The DTrace variable <literal>arg1</literal> for the syscall <literal>return</literal> probes evaluates to the system call's return value. The return
+value is formatted as a decimal integer. The character sequences beginning
+with backwards slashes in the format string expand to tab (<literal>\t</literal>)
+and newline (<literal>\n</literal>) respectively. These <firstterm>escape
+sequences</firstterm> help you print or record characters that are difficult
+to type. D supports the same set of escape sequences as C, C++, and the Java
+programming language. The complete list of escape sequences is found in <olink targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2, Types, Operators, and Expressions</olink>.</para>
+</sect1><sect1 id="chp-intro-7"><title>Arrays</title><para>D permits you to define variables that are integers, as well as other
+types to represent strings and composite types called <firstterm>structs</firstterm> and <firstterm>unions</firstterm>. If you are familiar with C programming, you'll be happy
+to know you can use any type in D that you can in C. If you're not a C expert,
+don't worry: the different kinds of data types are all described in <olink targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2, Types, Operators, and Expressions</olink>.
+D also supports a special kind of variable called an <firstterm>associative
+array</firstterm>. An associative array is similar to a normal array in that
+it associates a set of keys with a set of values, but in an associative array
+the keys are not limited to integers of a fixed range.</para><para>D associative arrays can be indexed by a list of one or more values
+of any type. Together the individual key values form a <firstterm>tuple</firstterm> that
+is used to index into the array and access or modify the value corresponding
+to that key. Every tuple used with a given associative array must conform
+to the same type signature; that is, each tuple key must be of the same length
+and have the same key types in the same order. The value associated with each
+element of a given associative array is also of a single fixed type for the
+entire array. For example, the following D statement defines a new associative
+array <literal>a</literal> of value type <literal>int</literal> with the tuple
+signature <literal>[ string, int ]</literal> and stores the integer value
+456 in the array:</para><programlisting>a["hello", 123] = 456;</programlisting><para>Once an array is defined, its elements can be accessed like any other
+D variable. For example, the following D statement modifies the array element
+previously stored in <literal>a</literal> by incrementing the value from 456
+to 457:</para><programlisting>a["hello", 123]++;</programlisting><para>The values of any array elements you have not yet assigned are set to
+zero. Now let's use an associative array in a D program. Type the following
+program and save it in a file named <filename>rwtime.d</filename>:</para><example id="ex-rwtime.d"><title><filename>rwtime.d</filename>: Time <citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry> and <citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry> Calls</title><programlisting>syscall::read:entry,
+syscall::write:entry
+/pid == $1/
+{
+	ts[probefunc] = timestamp;
+}
+
+syscall::read:return,
+syscall::write:return
+/pid == $1 &amp;&amp; ts[probefunc] != 0/
+{
+	printf("%d nsecs", timestamp - ts[probefunc]);
+}</programlisting>
+</example><para>As with <filename>trussrw.d</filename>, specify the ID of shell process
+when you execute <filename>rwtime.d</filename>. If you type a few shell commands,
+you'll see the amount time elapsed during each system call. Type in the following
+command and then press return a few times in your other shell:</para><screen><userinput># dtrace -s rwtime.d `pgrep -n ksh`</userinput>
+dtrace: script 'rwtime.d' matched 4 probes
+CPU     ID                    FUNCTION:NAME
+  0     33                      read:return 22644 nsecs
+  0     33                      read:return 3382 nsecs
+  0     35                     write:return 25952 nsecs
+  0     33                      read:return 916875239 nsecs
+  0     35                     write:return 27320 nsecs
+  0     33                      read:return 9022 nsecs
+  0     33                      read:return 3776 nsecs
+  0     35                     write:return 17164 nsecs
+...
+<userinput>^C</userinput>
+#</screen><para>To trace the elapsed time for each system call, you must instrument
+both the entry to and return from <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and sample the time at each
+point. Then, on return from a given system call, you must compute the difference
+between our first and second timestamp. You could use separate variables for
+each system call, but this would make the program annoying to extend to additional
+system calls. Instead, it's easier to use an associative array indexed by
+the probe function name. Here is the first probe clause:</para><programlisting>syscall::read:entry,
+syscall::write:entry
+/pid == $1/
+{
+	ts[probefunc] = timestamp;
+}</programlisting><para>This clause defines an array named <literal>ts</literal> and assigns
+the appropriate member the value of the DTrace variable <literal>timestamp</literal>.
+This variable returns the value of an always-incrementing nanosecond counter,
+similar to the Solaris library routine <olink targetdoc="refman3a" targetptr="gethrtime-3c" remap="external"><citerefentry><refentrytitle>gethrtime</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>. Once the entry timestamp
+is saved, the corresponding return probe samples <literal>timestamp</literal> again
+and reports the difference between the current time and the saved value:</para><programlisting>syscall::read:return,
+syscall::write:return
+/pid == $1 &amp;&amp; ts[probefunc] != 0/
+{
+	printf("%d nsecs", timestamp - ts[probefunc]);
+}</programlisting><para>The predicate on the return probe requires that DTrace is tracing the
+appropriate process and that the corresponding <literal>entry</literal> probe
+has already fired and assigned <literal>ts[probefunc]</literal> a non-zero
+value. This trick eliminates invalid output when DTrace first starts. If your
+shell is already waiting in a <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call for input when you execute <command>dtrace</command>, the <literal>read:return</literal> probe will fire without a preceding <literal>read:entry</literal> for
+this first <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <literal>ts[probefunc]</literal> will evaluate to zero because it has not yet been
+assigned.</para>
+</sect1><sect1 id="chp-intro-8"><title>External Symbols and Types</title><para>DTrace instrumentation executes inside the Solaris operating system
+kernel, so in addition to accessing special DTrace variables and probe arguments,
+you can also access kernel data structures, symbols, and types. These capabilities
+enable advanced DTrace users, administrators, service personnel, and driver
+developers to examine low-level behavior of the operating system kernel and
+device drivers. The reading list at the start of this book includes books
+that can help you learn more about Solaris operating system internals.</para><para>D uses the backquote character (<literal>`</literal>) as a special scoping
+operator for accessing symbols that are defined in the operating system and
+not in your D program. For example, the Solaris kernel contains a C declaration
+of a system tunable named <literal>kmem_flags</literal> for enabling memory
+allocator debugging features. See the <olink targetdoc="soltuneparamref" remap="external"><citetitle remap="book">Solaris Tunable Parameters Reference Manual</citetitle></olink>for
+more information about <literal>kmem_flags</literal>. This tunable is declared
+in C in the kernel source code as follows:</para><programlisting>int kmem_flags;</programlisting><para>To trace the value of this variable in a D program, you can write the
+D statement:</para><programlisting>trace(`kmem_flags);</programlisting><para>DTrace associates each kernel symbol with the type used for it in the
+corresponding operating system C code, providing easy source-based access
+to the native operating system data structures. Kernel symbol names are kept
+in a separate namespace from D variable and function identifiers, so you never
+need to worry about these names conflicting with your D variables.</para><para>You have now completed a whirlwind tour of DTrace and you've learned
+many of the basic DTrace building blocks necessary to build larger and more
+complex D programs. The following chapters describe the complete set of rules
+for D and demonstrate how DTrace can make complex performance measurements
+and functional analysis of the system easy. Later, you'll see how to use DTrace
+to connect user application behavior to system behavior, giving you the capability
+to analyze your entire software stack.</para><para>You've only just begun!</para>
+</sect1>
+</chapter><?Pub *0000056213 0?>

@@ -1,0 +1,1195 @@
+<?Pub CX solbook(?><chapter id="modules-1"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Kernel Debugging Modules</title><indexterm><primary>Kernel Debugging Modules</primary>
+</indexterm><highlights><para>This chapter describes the debugger modules, dcmds, and walkers provided
+to debug the Solaris kernel.  Each kernel debugger module is named after the
+corresponding Solaris kernel module, so that it will be loaded automatically
+by MDB.  The facilities described here reflect the current Solaris kernel
+implementation and are subject to change in the future; writing shell scripts
+that depend on the output of these commands is not recommended.  In general,
+the kernel debugging facilities described in this chapter are meaningful only
+in the context of the corresponding kernel subsystem implementation.  See <olink targetptr="preface-5" remap="internal">Related Books and Papers</olink> for a list of references
+that provide more information about the Solaris kernel implementation.</para><note><para>MDB exposes kernel implementation details that are subject to
+change at any time. This guide reflects the Solaris kernel implementation
+as of the date of publication of this guide. Information provided in this
+guide about modules, dcmds, walkers, and their output formats and arguments
+might not be correct or applicable to past or future Solaris releases.</para>
+</note>
+</highlights><sect1 id="modules-22"><title>Generic Kernel Debugging Support (<literal>genunix</literal>)</title><sect2 id="modules-24"><title>Kernel Memory Allocator</title><para>This section discusses the dcmds and walkers used to debug problems
+identified by the Solaris kernel memory allocator and to examine memory and
+memory usage. The dcmds and walkers described here are discussed in more detail
+in <olink targetptr="kmem-1" remap="internal">Chapter&nbsp;9, Debugging With the Kernel Memory
+Allocator</olink>.</para><sect3 id="modules-25"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="allocdby"><command>::allocdby</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="allocdby"><command>::allocdby</command></secondary>
+</indexterm><term><replaceable>thread</replaceable> <command>::allocdby</command></term><listitem><para>Given the address of a kernel thread, print a list of memory
+allocations it has performed in reverse chronological order. </para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>bufctl</replaceable> <command>::bufctl</command> [<option>a</option> <replaceable>address</replaceable>] [<option>c</option> <replaceable>caller</replaceable>] [<option>e</option> <replaceable>earliest</replaceable>] [<option>l</option> <replaceable>latest</replaceable>] [<option>t</option> <replaceable>thread</replaceable>]</term><listitem><para><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="bufctl"><command>::bufctl</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="bufctl"><command>::bufctl</command></secondary></indexterm>Print a summary of the <replaceable>bufctl</replaceable> information for the specified bufctl <replaceable>address</replaceable>.
+ If one or more options are present, the bufctl information  is printed only
+if it matches the criteria defined by the option arguments; in this way, the
+dcmd can be used as a filter for input from a pipeline.  The <option>a</option> option
+indicates that the bufctl's corresponding buffer address must equal the specified
+address. The <option>c</option> option indicates that a program counter value
+from the specified caller         must be present in the bufctl's saved stack
+trace.  The <option>e</option> option indicates that the bufctl's timestamp
+must be greater than or equal to the specified earliest timestamp.  The <option>l</option> option indicates that the bufctl's timestamp must be less than or
+equal to the specified latest timestamp.  The <option>t</option> option indicates
+that the bufctl's thread pointer must be equal to the specified thread address.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="findleaks"><command>::findleaks</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="findleaks"><command>::findleaks</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::findleaks</command> [<option>v</option>]</term><listitem><para>The <command>::findleaks</command> dcmd provides powerful
+and efficient detection of memory leaks in kernel crash dumps where the full
+set of kmem debug features has been enabled.  The first execution of <command>::findleaks</command> processes the dump for memory leaks (this can take a few minutes),
+then coalesces the leaks by the allocation stack trace.  The findleaks  report
+shows a bufctl address and the topmost stack frame for each  memory leak that
+was identified.  </para><para>If the <option>v</option> option is specified, the dcmd prints more
+verbose messages as it executes.  If an  explicit address is specified prior
+to the dcmd, the report is filtered and only leaks whose allocation stack
+traces contain the specified function address are displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="freedby"><command>::freedby</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="freedby"><command>::freedby</command></secondary>
+</indexterm><term><replaceable>thread</replaceable> <command>::freedby</command></term><listitem><para>Given the address of a kernel thread, print a list of memory
+frees it has performed, in reverse chronological order.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kgrep"><command>::kgrep</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kgrep"><command>::kgrep</command></secondary>
+</indexterm><term><replaceable>value</replaceable> <command>::kgrep</command></term><listitem><para>Search the kernel address space for pointer-aligned addresses
+that  contain the specified pointer-sized value.  The list of addresses that
+contain matching values is then printed.  Unlike MDB's built-in search operators, <command>::kgrep</command> searches every segment of the kernel's address space  and
+searches across discontiguous segment boundaries.  On large kernels, <command>::kgrep</command> can take a considerable amount of time to execute.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::kmalog</command> [ <literal>slab</literal> | <literal>fail</literal> ]</term><listitem><para><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmalog"><command>::kmalog</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmalog"><command>::kmalog</command></secondary></indexterm>Display events in a kernel memory
+allocator transaction log.  Events  are displayed in time-reverse order, with
+the most recent event displayed first. For each event, <command>::kmalog</command> displays
+the time relative to the most recent event in T-minus notation (for example,
+T-0.000151879),   the bufctl, the buffer address, the kmem cache name, and
+the stack  trace at the time of the event.  Without arguments, <command>::kmalog</command> displays
+the kmem transaction log, which is present only if <literal>KMF_AUDIT</literal> is
+set in <literal>kmem_flags</literal>.  <command>::kmalog</command> <literal>fail</literal> displays
+the allocation failure log, which is always present; this can be useful in
+debugging drivers that don't  cope with allocation failure correctly.  <command>::kmalog</command> <literal>slab</literal> displays the slab create log, which is
+always present.  <command>::kmalog</command> <literal>slab</literal> can be
+useful when searching for memory leaks. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmastat"><command>::kmastat</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmastat"><command>::kmastat</command></secondary>
+</indexterm><term><command>::kmastat</command></term><listitem><para>Display the list of kernel memory allocator caches and virtual
+memory  arenas, along with corresponding statistics. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmausers"><command>::kmausers</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmausers"><command>::kmausers</command></secondary>
+</indexterm><term><command>::kmausers</command> [<option>ef</option>] [<replaceable>cache</replaceable> ...]</term><listitem><para>Print information about the medium and large users of the
+kernel memory         allocator that have current memory allocations. The
+output consists of one entry for each unique stack trace specifying the total
+amount of  memory and number of allocations that was made with that stack
+trace. This dcmd requires that the <literal>KMF_AUDIT</literal> flag is set
+in <literal>kmem_flags</literal>.  </para><para>If one or more cache names (for example, <literal>kmem_alloc_256</literal>)
+are specified,  the scan of memory usage is restricted to those caches.  By
+default all  caches are included.  If the <option>e</option> option is used,
+the small users of the allocator are included.  The small users are allocations
+that total  less than 1024 bytes of memory or for which there are less than
+10 allocations with the same stack trace.  If the <option>f</option> option
+is used, the  stack traces are printed for each individual allocation.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmem_cache"><command>::kmem_cache</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmem_cache"><command>::kmem_cache</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::kmem_cache</command></term><listitem><para>Format and display the <structname>kmem_cache</structname> structure
+stored at the specified address, or the complete set of active <structname>kmem_cache</structname> structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmem_log"><command>::kmem_log</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmem_log"><command>::kmem_log</command></secondary>
+</indexterm><term><command>::kmem_log</command></term><listitem><para>Display the complete set of kmem transaction logs, sorted
+in reverse  chronological order.  This dcmd uses a more concise tabular output
+ format than <command>::kmalog</command>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="kmem_verify"><command>::kmem_verify</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="kmem_verify"><command>::kmem_verify</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::kmem_verify</command></term><listitem><para>Verify the integrity of the <structname>kmem_cache</structname> structure
+stored at the  specified address, or the complete set of active <structname>kmem_cache</structname> structures. If an explicit cache address is specified, the dcmd
+displays more  verbose information regarding errors; otherwise, a summary
+report is displayed.  The <command>::kmem_verify</command> dcmd is discussed
+in more detail in  <olink targetptr="casestudy-27" remap="internal">Kernel Memory Caches</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="vmem"><command>::vmem</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="vmem"><command>::vmem</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable>] <command>::vmem</command></term><listitem><para>Format and display the <structname>vmem</structname> structure
+stored at the specified address,  or the complete set of active<structname>vmem</structname> structures.
+ This structure is  defined in <?Pub _nolinebreak?><literal>&lt;sys/vmem_impl.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="vmem_seg"><command>::vmem_seg</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="vmem_seg"><command>::vmem_seg</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::vmem_seg</command></term><listitem><para>Format and display the <structname>vmem_seg</structname> structure
+stored at the specified address.  This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/vmem_impl.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>address</replaceable> <command>::whatis</command> [<option>abv</option>]</term><listitem><para><indexterm><primary>Kernel Memory Allocator</primary><secondary>dcmds</secondary><tertiary sortas="whatis"><command>::whatis</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="whatis"><command>::whatis</command></secondary></indexterm>Report information about the specified
+address.  In particular, <command>::whatis</command> will attempt to determine
+if the address is a pointer to a kmem-managed buffer or another type of special
+memory region, such as a thread stack, and report its findings.  If the <option>a</option> option is present, the dcmd reports all matches instead of just
+the first match to its queries.  If the <option>b</option> option is present,
+the dcmd also attempts to determine if  the address is referred to by a known
+kmem <structname>bufctl</structname>.  If the <option>v</option> option is
+present, the dcmd reports its progress as it searches various  kernel data
+structures.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-26"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>allocdby</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>allocdby</secondary>
+</indexterm><term>allocdby</term><listitem><para>Given the address of a <structname>kthread_t</structname> structure
+as a starting point, iterate over the set of <structname>bufctl</structname> structures
+corresponding to memory allocations performed by this kernel thread.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>bufctl</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>bufctl</secondary>
+</indexterm><term>bufctl</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point, iterate over the set of allocated <structname>bufctl</structname>s
+associated with this cache.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>freectl</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>freectl</secondary>
+</indexterm><term>freectl</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point, iterate over the set of free <structname>bufctl</structname>s
+associated with this cache.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>freedby</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>freedby</secondary>
+</indexterm><term>freedby</term><listitem><para>Given the address of a <structname>kthread_t</structname> structure
+as a starting point, iterate over the set of <structname>bufctl</structname> structures
+corresponding to memory deallocations performed by this kernel thread.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>freemem</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>freemem</secondary>
+</indexterm><term>freemem</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point, iterate over the set of free buffers associated with
+this cache.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>kmem</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>kmem</secondary>
+</indexterm><term>kmem</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point,  iterate over the set of allocated buffers associated
+with this cache.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>kmem_cache</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>kmem_cache</secondary>
+</indexterm><term>kmem_cache</term><listitem><para>Iterate over the active set of <structname>kmem_cache_t</structname> structures.
+ This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/kmem_impl.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>kmem_cpu_cache</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>kmem_cpu_cache</secondary>
+</indexterm><term>kmem_cpu_cache</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point, iterate over the per-CPU <structname>kmem_cpu_cache_t</structname> structures
+associated with this cache.  This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/kmem_impl.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>kmem_slab</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>kmem_slab</secondary>
+</indexterm><term>kmem_slab</term><listitem><para>Given the address of a <structname>kmem_cache_t</structname> structure
+as a starting point, iterate over the set of associated <structname>kmem_slab_t</structname> structures.
+ This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/kmem_impl.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Kernel Memory Allocator</primary><secondary>Walkers</secondary><tertiary>kmem_log</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>kmem_log</secondary>
+</indexterm><term>kmem_log</term><listitem><para>Iterate over the set of <structname>bufctl</structname>s stored
+in the kmem allocator transaction log.</para>
+</listitem>
+</varlistentry><varlistentry><term>leak</term><listitem><para>Given the address of a <structname>bufctl</structname> structure,
+iterate over the set of <structname>bufctl</structname> structures corresponding
+to leaked memory buffers with similar allocation stack traces. The <command>::findleaks</command> dcmd must be applied to locate memory leaks before the leak walker
+can be used</para>
+</listitem>
+</varlistentry><varlistentry><term>leakbuf</term><listitem><para>Given the address of a <structname>bufctl</structname> structure,
+iterate over the set of buffer           addresses corresponding to leaked
+memory buffers with similar allocation stack traces. The <command>::findleaks</command> dcmd
+must be applied to locate memory leaks  before the leakbuf walker can be used. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-27"><title>File Systems</title><para><indexterm><primary>Directory Name Lookup Cache (DNLC)</primary></indexterm>The MDB file systems debugging support includes a built-in facility
+to convert vnode pointers to the corresponding file system path name.  This
+conversion is performed using the Directory Name Lookup Cache (DNLC); because
+the cache does not hold all active vnodes, some vnodes might not be able to
+be converted to path names and &ldquo;<literal>??</literal>&rdquo; is displayed
+instead of a name.</para><sect3 id="modules-51"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>File Systems</primary><secondary>dcmds</secondary><tertiary sortas="fsinfo"><command>::fsinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fsinfo"><command>::fsinfo</command></secondary>
+</indexterm><term><command>::fsinfo</command></term><listitem><para>Display a table of mounted file systems, including the <literal>vfs_t</literal> address, <literal>ops</literal> vector, and mount point of each
+file system.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>File Systems</primary><secondary>dcmds</secondary><tertiary sortas="lminfo"><command>::lminfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="lminfo"><command>::lminfo</command></secondary>
+</indexterm><term><command>::lminfo</command></term><listitem><para>Display a table of vnodes with active network locks registered
+with         the lock manager.  The pathname corresponding to each vnode is
+shown.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>File Systems</primary><secondary>dcmds</secondary><tertiary sortas="vnode2path"><command>::vnode2path</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="vnode2path"><command>::vnode2path</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::vnode2path</command> [<option>v</option>]</term><listitem><para>Display the pathname corresponding to the given vnode address.
+ If the <option>v</option> option is specified, the dcmd prints a more verbose
+display, including the vnode pointer of each intermediate path component.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-30"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>File Systems</primary><secondary>Walkers</secondary><tertiary>buf</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>buf</secondary>
+</indexterm><term>buf</term><listitem><para>Iterate over the set of active block I/O transfer structures
+(<structname>buf_t</structname> structures).  The <structname>buf</structname> structure
+is defined in <?Pub _nolinebreak?><literal>&lt;sys/buf.h&gt;</literal><?Pub /_nolinebreak?> and
+is described in more detail in <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-28"><title>Virtual Memory</title><para>This section describes the debugging support for the kernel virtual
+memory subsystem.</para><sect3 id="modules-31"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="addr2smap"><command>::addr2smap</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="addr2smap"><command>::addr2smap</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::addr2smap</command> [<replaceable>offset</replaceable>]</term><listitem><para>Print the <structname>smap</structname> structure address
+that corresponds to the given address in the kernel's segmap address space
+segment.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="as2proc"><command>::as2proc</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="as2proc"><command>::as2proc</command></secondary>
+</indexterm><term><replaceable>as</replaceable> <command>::as2proc</command></term><listitem><para>Display the <structname>proc_t</structname> address for the
+process corresponding to the <literal>as_t</literal> address <replaceable>as</replaceable>. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="addr2smap"><command>::memlist</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="addr2smap"><command>::memlist</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::memlist</command> [<option>aiv</option>]</term><listitem><para>Display the specified <structname>memlist</structname> structure
+or one of the well-known <structname>memlist</structname> structures.  If
+no <structname>memlist</structname> address and options are present or if
+the <option>i</option> option is present, the <structname>memlist</structname> representing
+physically installed memory is displayed.  If the <option>a</option> option
+is present, the <structname>memlist</structname> representing available physical
+memory is displayed.  If the <option>v</option> option is present, the memlist
+representing available virtual memory is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="addr2smap"><command>::memstat</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="addr2smap"><command>::memstat</command></secondary>
+</indexterm><term><command>::memstat</command></term><listitem><para>Display a system-wide memory usage summary.  The amount and
+percentage of system memory consumed by different classes of pages (kernel,
+anonymous memory, executables and libraries, page cache, and free lists) are
+displayed, along with the total amount of system memory.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="addr2smap"><command>::page</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="addr2smap"><command>::page</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::page</command></term><listitem><para>Display the properties of the specified <literal>page_t</literal>.
+ If no <literal>page_t</literal> address is specified, the dcmd displays the
+properties of all system pages.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="seg"><command>::seg</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="seg"><command>::seg</command></secondary>
+</indexterm><term><replaceable>seg</replaceable> <command>::seg</command></term><listitem><para>Format and display the specified address space segment (<structname>seg_t</structname> address).</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="seg"><command>::swapinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="seg"><command>::swapinfo</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::swapinfo</command></term><listitem><para>Display information on all active <structname>swapinfo</structname> structures
+or about the specified struct <structname>swapinfo</structname>.  The vnode,
+filename, and statistics for each structure are displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>dcmds</secondary><tertiary sortas="vnode2smap"><command>::vnode2smap</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="vnode2smap"><command>::vnode2smap</command></secondary>
+</indexterm><term><replaceable>vnode</replaceable> <command>::vnode2smap</command>[<replaceable>offset</replaceable>]</term><listitem><para>Print the <structname>smap</structname> structure address
+that corresponds to the given <structname>vnode_t</structname> address and
+offset.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-32"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>Walkers</secondary><tertiary>anon</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>anon</secondary>
+</indexterm><term>anon</term><listitem><para>Given the address of an <structname>anon_map</structname> structure
+as a starting point, iterate over the set of related anon structures.  The
+anon map implementation is defined in <?Pub _nolinebreak?><literal>&lt;vm/anon.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>Walkers</secondary><tertiary>memlist</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>memlist</secondary>
+</indexterm><term>memlist</term><listitem><para>Iterate over the spans of the specified <structname>memlist</structname> structure.
+ This walker can be used in conjunction with the <command>::memlist</command> dcmd
+to display each span.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>Walkers</secondary><tertiary>page</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>page</secondary>
+</indexterm><term>page</term><listitem><para>Iterate over all system <structname>page</structname> structures.
+ If an explicit address is specified for the walk, this is taken to be the
+address of a vnode and the walker iterates over only those pages associated
+with the vnode.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>Walkers</secondary><tertiary>seg</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>seg</secondary>
+</indexterm><term>seg</term><listitem><para>Given the address of an <structname>as_t</structname> structure
+as a starting point, iterate over the set of address space segments (<structname>seg</structname> structures) associated with the specified address space.
+ The <structname>seg</structname> structure is defined in <?Pub _nolinebreak?><literal>&lt;vm/seg.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Virtual Memory</primary><secondary>Walkers</secondary><tertiary>swapinfo</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>swapinfo</secondary>
+</indexterm><term>swapinfo</term><listitem><para>Iterate over the list of active <structname>swapinfo</structname> structures.
+ This walker may be used in conjunction with the <command>::swapinfo</command> dcmd.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-33"><title>CPUs and the Dispatcher</title><para>This section describes the facilities for examining the state of the
+cpu structures and the kernel dispatcher.</para><sect3 id="modules-34"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>CPUs and the Dispatcher</primary><secondary>dcmds</secondary><tertiary sortas="callout"><command>::callout</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="callout"><command>::callout</command></secondary>
+</indexterm><term><command>::callout</command></term><listitem><para>Display the callout table. The function, argument, and expiration
+time for each callout is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>CPUs and the Dispatcher</primary><secondary>dcmds</secondary><tertiary sortas="class"><command>::class</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="class"><command>::class</command></secondary>
+</indexterm><term><command>::class</command></term><listitem><para>Display the scheduling class table.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>CPUs and the Dispatcher</primary><secondary>dcmds</secondary><tertiary sortas="cpuinfo"><command>::cpuinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="cpuinfo"><command>::cpuinfo</command></secondary>
+</indexterm><term>[ <replaceable>cpuid</replaceable> ] <command>::cpuinfo</command> [<option>v</option>]</term><listitem><para>Display a table of the threads currently executing on each
+CPU.  If an optional CPU ID number or CPU structure address is specified prior
+to the dcmd name, only the information for the specified CPU is displayed.
+ If the <option>v</option> option is present, <command>::cpuinfo</command> also
+displays the runnable threads waiting to execute on each CPU as well as the
+active interrupt threads. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-35"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>CPUs and the Dispatcher</primary><secondary>Walkers</secondary><tertiary>cpu</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>cpu</secondary>
+</indexterm><term>cpu</term><listitem><para>Iterate over the set of kernel CPU structures. The <structname>cpu_t</structname> structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/cpuvar.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-36"><title>Device Drivers and DDI Framework</title><para>This section describes dcmds and walkers that are useful for kernel
+developers as well as third-party device driver developers.</para><sect3 id="modules-37"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="devbindings"><command>::binding_hash_entry</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="devbindings"><command>::binding_hash_entry</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::binding_hash_entry</command></term><listitem><para>Given the address of a kernel name-to-major number binding
+hash table entry (struct <structname>bind</structname>), display the node
+binding name, major number, and pointer to the next element.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="devbindings"><command>::devbindings</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="devbindings"><command>::devbindings</command></secondary>
+</indexterm><term><command>::devbindings</command> <replaceable>device-name</replaceable></term><listitem><para>Display the list of all instances of the named driver. The
+output consists of an entry for each instance, beginning with the pointer
+to the struct <structname>dev_info</structname> (viewable with <literal>$&lt;devinfo</literal> or <command>::devinfo</command>), the driver name, the instance
+number, and the driver and system properties associated with that instance.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="devinfo"><command>::devinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="devinfo"><command>::devinfo</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::devinfo</command> [ <option>q</option> ]</term><listitem><para>Print the system and driver properties associated with a devinfo
+node. If the <option>q</option> option is specified, only a quick summary
+of the device node is shown. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="devinfo"><command>::devinfo2driver</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="devinfo"><command>::devinfo2driver</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::devinfo2driver</command></term><listitem><para>Print the name of the driver (if any) associated with the <literal>devinfo</literal> node.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="devnames"><command>::devnames</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="devnames"><command>::devnames</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::devnames</command> [ <option>v</option> ]</term><listitem><para>Display the kernel's <literal>devnames</literal> table along
+with the <literal>dn_head</literal> pointer,  which points at the driver instance
+list.  If the <option>v</option> flag is specified, additional information
+stored at each entry in the <literal>devnames</literal> table is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="prtconf"><command>::prtconf</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="prtconf"><command>::prtconf</command></secondary>
+</indexterm><term>[ <replaceable>devinfo</replaceable> ] <command>::prtconf</command> [ <option>cpv</option> ]</term><listitem><para>Display the kernel device tree starting at the device node
+specified by <replaceable>devinfo</replaceable>.  If <replaceable>devinfo</replaceable> is
+not provided, the root of the device tree is assumed by default.  If the <option>c</option> option is specified, only children of the given device node are
+displayed.  If the <option>p</option> option is specified, only ancestors
+of the given device node are displayed.  If <option>v</option> is specified,
+the properties associated with each node are displayed. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="major2name"><command>::major2name</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="major2name"><command>::major2name</command></secondary>
+</indexterm><term>[ <replaceable>major-num</replaceable> ] <command>::major2name</command> [ <replaceable>major-num</replaceable> ]</term><listitem><para>Display the driver name corresponding to the specified major
+number. The major number can be specified as an expression preceding the dcmd
+or as a command-line argument.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="modctl2devinfo"><command>::modctl2devinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="modctl2devinfo"><command>::modctl2devinfo</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::modctl2devinfo</command></term><listitem><para>Print all of the device nodes that correspond to the specified <structname>modctl</structname> address.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="name2major"><command>::name2major</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="name2major"><command>::name2major</command></secondary>
+</indexterm><term><command>::name2major</command> <replaceable>driver-name</replaceable></term><listitem><para>Given a device driver name, display its major number.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>dcmds</secondary><tertiary sortas="softstate"><command>::softstate</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="softstate"><command>::softstate</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::softstate</command> [ <replaceable>instance-number</replaceable> ]</term><listitem><para>Given a softstate state pointer (see <olink targetdoc="refman9f" targetptr="ddi-soft-state-init-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>) and a device
+instance number, display the soft state for that instance.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-38"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>binding_hash</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>binding_hash</secondary>
+</indexterm><term>binding_hash</term><listitem><para>Given the address of an array of kernel binding hash table
+entries (struct <structname>bind</structname>  **), walk all entries in the
+hash table and return the address of each struct <structname>bind</structname>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>devinfo</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>devinfo</secondary>
+</indexterm><term>devinfo</term><listitem><para>First, iterate over the parents of the given devinfo and return
+them in order of seniority from most to least senior.  Second, return the
+given devinfo itself.  Third, iterate over the children of the given devinfo
+in order of seniority from most to least senior.  The <structname>dev_info</structname> struct
+is defined in <?Pub _nolinebreak?><literal>&lt;sys/ddi_impldefs.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>devinfo_children</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>devinfo_children</secondary>
+</indexterm><term>devinfo_children</term><listitem><para>First, return the given devinfo, then iterate over the children
+of the given devinfo in order of seniority from most to least senior. The <structname>dev_info</structname> struct is defined in <?Pub _nolinebreak?><literal>&lt;sys/ddi_impldefs.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>devinfo_parents</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>devinfo_parents</secondary>
+</indexterm><term>devinfo_parents</term><listitem><para>Iterate over the parents of the given devinfo in order of
+seniority from most to least senior, and then return the given devinfo.  The <structname>dev_info</structname> struct is defined in <?Pub _nolinebreak?><literal>&lt;sys/ddi_impldefs.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>devi_next</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>devi_next</secondary>
+</indexterm><term>devi_next</term><listitem><para>Iterate over the siblings of the given devinfo.  The <structname>dev_info</structname> struct is defined in <?Pub _nolinebreak?><literal>&lt;sys/ddi_impldefs.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>devnames</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>devnames</secondary>
+</indexterm><term>devnames</term><listitem><para>Iterate over the entries in the devnames array.  This structure
+is defined in <?Pub _nolinebreak?><literal>&lt;sys/autoconf.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>softstate</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>softstate</secondary>
+</indexterm><term>softstate</term><listitem><para>Given a softstate pointer (see <command>ddi_soft_state_init</command>(9F))
+display all non-NULL pointers to driver state structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Device Drivers and DDI Framework</primary><secondary>Walkers</secondary><tertiary>softstate_all</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>softstate_all</secondary>
+</indexterm><term>softstate_all</term><listitem><para>Given a softstate pointer (see <command>ddi_soft_state_init</command>(9F))
+display all pointers to driver state structures.  Note that the pointers for
+unused instances will be NULL.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-39"><title>STREAMS</title><para>This section describes dcmds and walkers that are useful for kernel
+developers as well as developers of third-party STREAMS modules and drivers.</para><sect3 id="modules-40"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><term><replaceable>address</replaceable> <command>::mblk2dblk</command></term><listitem><para>Given the address of an <structname>mblk_t</structname>, print
+the address of the corresponding <structname>dblk_t</structname>.</para>
+</listitem>
+</varlistentry><varlistentry><term>[<replaceable>address</replaceable>] <command>::mblk_verify</command></term><listitem><para>Verify the integrity of one or more message blocks. If an
+explicit message block address is specified, the integrity of this message
+block is checked. If no address is specified, the integrity of all active
+message blocks are checked.           This dcmd produces output for any invalid
+message block state that is detected. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="queue"><command>::queue</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="queue"><command>::queue</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::queue</command> [<option>v</option>] [<option>f</option> <replaceable>flag</replaceable>] [<option>F</option> <replaceable>flag</replaceable>] [<option>s</option> <replaceable>syncq</replaceable>]</term><listitem><para>Filter and display the specified <structname>queue_t</structname> data
+structure.  With no options, various properties of the <structname>queue_t</structname> are
+shown.  If the <option>v</option> option is present, the queue flags are decoded
+in greater detail.  If the <option>f</option>, <option>F</option>, or <option>m</option> options
+are present, the queue is displayed only if it matches the criteria defined
+by the arguments to these options; in this way, the dcmd can be used as a
+filter for input from a pipeline.  The <option>f</option> option indicates
+that the specified flag (one of the Q flag names from <?Pub _nolinebreak?><literal>&lt;sys/stream.h&gt;</literal><?Pub /_nolinebreak?>) must be present in the queue
+flags.  The <option>F</option> option indicates that the specified flag must
+be absent from the queue flags. The <option>m</option> option indicates that
+the module name associated with the queue must match the specified modname.
+The <option>s</option> option indicates that the <structname>syncq_t</structname> associated
+with the queue must match the specified <structname>syncq_t</structname> address. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="q2syncq"><command>::q2syncq</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="q2syncq"><command>::q2syncq</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::q2syncq</command></term><listitem><para>Given the address of a <structname>queue_t</structname>, print
+the address of the corresponding <structname>syncq_t</structname> data structure.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="q2otherq"><command>::q2otherq</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="q2otherq"><command>::q2otherq</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::q2otherq</command></term><listitem><para>Given the address of a <structname>queue_t</structname>, print
+the address of the peer read or write queue structure.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="q2rdq"><command>::q2rdq</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="q2rdq"><command>::q2rdq</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::q2rdq</command></term><listitem><para>Given the address of a <structname>queue_t</structname>, print
+the address of the corresponding read queue.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="q2wrq"><command>::q2wrq</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="q2wrq"><command>::q2wrq</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::q2wrq</command></term><listitem><para>Given the address of a <structname>queue_t</structname>, print
+the address of the corresponding write queue.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="stream"><command>::stream</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="stream"><command>::stream</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::stream</command></term><listitem><para>Display a visual picture of a kernel STREAM data structure,
+given the address of the <structname>stdata_t</structname> structure representing
+the STREAM head.  The read and write queue pointers, byte count, and flags
+for each module are shown, and in some cases additional information for the
+specific queue is shown in the margin.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>address</replaceable> <command>::syncq</command> [<option>v</option>] [<option>f</option> <replaceable>flag</replaceable>] [<option>F</option> <replaceable>flag</replaceable>] [<option>t</option> <replaceable>type</replaceable>] [<option>T</option> <replaceable>type</replaceable>]</term><listitem><para><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="syncq"><command>::syncq</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="syncq"><command>::syncq</command></secondary></indexterm>Filter and display the specified <structname>syncq_t</structname> data
+structure.  With no options, various properties of the <structname>syncq_t</structname> are
+shown.  If the <option>v</option> option is present, the syncq flags are decoded
+in greater detail.  If the <option>f</option>, <option>F</option>, <option>t</option>,
+or <option>T</option> options are present, the syncq is displayed only if
+it matches the criteria defined by the arguments to these options; in this
+way, the dcmd can be used as a filter for input from a pipeline. The <option>f</option> option
+indicates that the specified flag (one of the <literal>SQ_</literal> flag
+names from <?Pub _nolinebreak?><literal>&lt;sys/strsubr.h&gt;</literal><?Pub
+/_nolinebreak?>) must be present in the syncq flags. The <option>F</option> option
+indicates that the specified flag must be absent from the syncq flags.  The <option>t</option> option indicates that the specified type (one of the <literal>SQ_CI</literal> or <literal>SQ_CO</literal> type names from <?Pub _nolinebreak?><literal>&lt;sys/strsubr.h&gt;</literal><?Pub
+/_nolinebreak?>) must be present in the syncq type bits.  The <option>T</option> option
+indicates that the specified type must be absent from the syncq type bits.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>dcmds</secondary><tertiary sortas="syncq2q"><command>::syncq2q</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="syncq2q"><command>::syncq2q</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::syncq2q</command></term><listitem><para>Given the address of a <structname>syncq_t</structname>, print
+the address of the corresponding <structname>queue_t</structname> data structure.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-41"><title>Walkers</title><variablelist><varlistentry><term>b_cont</term><listitem><para>Given the address of an <structname>mblk_t</structname>, iterate
+over the set of associated message           structures by following the <literal>b_cont</literal> pointer. The <literal>b_cont</literal> pointer is used to
+link a given message block to the next associated message block that is the
+continuation of the same message. The message block is described in more detail
+in <literal>msgb</literal>(9S)</para>
+</listitem>
+</varlistentry><varlistentry><term>b_next</term><listitem><para>Given the address of an <structname>mblk_t</structname>, iterate
+over the set of associated message           structures by following the <literal>b_next</literal> pointer. The <literal>b_next</literal> pointer is used to
+link a given message block to the next associated message block on a given
+queue. The message block is described in more detail in <literal>msgb</literal>(9S).</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>Walkers</secondary><tertiary>qlink</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>qlink</secondary>
+</indexterm><term>qlink</term><listitem><para>Given the address of a <structname>queue_t</structname> structure,
+walk the list of related queues using the <literal>q_link</literal> pointer.
+ This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/stream.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>Walkers</secondary><tertiary>qnext</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>qnext</secondary>
+</indexterm><term>qnext</term><listitem><para>Given the address of a <structname>queue_t</structname> structure,
+walk the list of related queues using the <literal>q_next</literal> pointer.
+ This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/stream.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>Walkers</secondary><tertiary>readq</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>readq</secondary>
+</indexterm><term>readq</term><listitem><para>Given the address of an <structname>stdata_t</structname> structure,
+walk the list of read-side queue structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>STREAMS</primary><secondary>Walkers</secondary><tertiary>writeq</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>writeq</secondary>
+</indexterm><term>writeq</term><listitem><para>Given the address of an <structname>stdata_t</structname> structure,
+walk the list of write-side queue structures. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-77"><title>Networking</title><para>The following dcmds and walkers are provided to help debug the core
+kernel networking stack protocols.</para><sect3 id="modules-78"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><indexterm><primary>Networking</primary><secondary>dcmds</secondary><tertiary sortas="fd"><command>::mi</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fd"><command>::mi</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::mi</command> [<option>p</option>] [<option>d</option> | <option>m</option>]</term><listitem><para>Given the address of a kernel MI_O, filter and display the
+MI_O or its payload. If the <option>p</option> option is specified, then the
+address of the corresponding payload of the MI_O is displayed, otherwise the
+MI_O itself is displayed. Specifying filter <option>d</option> or <option>m</option> enables
+the dcmd to filter device or module MI_O objects respectively.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>dcmds</secondary><tertiary sortas="fd"><command>::netstat</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fd"><command>::netstat</command></secondary>
+</indexterm><term><command>::netstat</command> [<option>av</option>] [<option>f</option> <literal>inet</literal> | <literal>inet6</literal> | <literal>unix</literal>] [<option>P</option> <literal>tcp</literal> | <literal>udp</literal>]</term><listitem><para>Show network statistics and active connections.  If the <option>a</option> option is present, the state of all sockets is displayed.  If the <option>v</option> option is present, more verbose output is displayed.  If the <option>f</option> option is present, only connections associated with the specified
+address family are displayed.  If the <option>P</option> option is present,
+only connections associated with the specified protocols are displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>dcmds</secondary><tertiary sortas="fd"><command>::sonode</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fd"><command>::sonode</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::sonode</command> [<option>f</option> <literal>inet</literal> | <literal>inet6</literal> | <literal>unix</literal> | <replaceable>id</replaceable>] [<option>t</option> <literal>stream</literal> | <literal>dgram</literal> | <literal>raw</literal> | <replaceable>id</replaceable>] [<option>p</option> <replaceable>id</replaceable>]</term><listitem><para>Filters and displays sonode objects. If no address is given,
+then the list of AF_UNIX sockets is displayed, otherwise only the specified
+sonode is displayed.  If the <option>f</option> option is present, then only
+sockets of the given family will be output. If the <option>t</option> option
+is present, then only sonodes of the given type will be output. If the <option>p</option> option
+is present, then only sockets of the given protocol will be displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>dcmds</secondary><tertiary sortas="fd"><command>::tcpb</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fd"><command>::tcpb</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::tcpb</command> [<option>av</option>] [<option>P</option> <literal>v4</literal> | <literal>v6</literal>]</term><listitem><para>Filters and displays tcpb objects. If no address is specified,
+all connections are walked, otherwise only the specified tcpb is filtered/displayed.
+Specifying <option>a</option> filters for only active connections and <option>P</option> can
+be used to filter for TCP IPv4 or IPv6 connections. The <command>tcpb</command> dcmd
+is intelligent about filtering TCP connections, and if a IPv6 TCP connection
+is in a state that would still facilitate a IPv4 connection, the <option>P</option> filter
+considers the connection as both IPv4 and IPv6 in much the same way that <command>::netstat</command> does. If the dcmd is not being used as a filter and the <option>v</option> option is specified, then the output of the dcmd will be verbose.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-79"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>ar</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>ar</secondary>
+</indexterm><term>ar</term><listitem><para>Given the address of an ar, this walker walks all ar objects
+from the given ar to the final ar. If no address is specified, all ar objects
+are walked.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>icmp</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>icmp</secondary>
+</indexterm><term>icmp</term><listitem><para>Given the address of an icmp, this walker walks all icmp objects
+from the given icmp to the final icmp. If no address is specified, all icmp
+objects are walked.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>ill</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>ill</secondary>
+</indexterm><term>ill</term><listitem><para>Given the address of an interface link layer structure (ill),
+this walker walks all ill objects from the given ill to the final. If no address
+is specified, all ill objects are walked.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>ipc</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>ipc</secondary>
+</indexterm><term>ipc</term><listitem><para>Given the address of an ipc, this walker walks all ipc objects
+from the given ipc to the final ipc. If no address is specified, all ipc objects
+are walked.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>mi</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>mi</secondary>
+</indexterm><term>mi</term><listitem><para>Given the address of a MI_O, walk all the MI_O's in this MI.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>sonode</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>sonode</secondary>
+</indexterm><term>sonode</term><listitem><para>Given the address of a AF_UNIX sonode, walk the associated
+list of AF_UNIX sonodes beginning with the given sonode. If no address is
+specified, this walker walks the list of all AF_UNIX sockets.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>tcpb</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>tcpb</secondary>
+</indexterm><term>tcpb</term><listitem><para>Given the address of a tcpb, this walker walks all TCP connections
+from the given tcpb to the final TCP connection. If no address is specified,
+all tcpb objects are walked.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Networking</primary><secondary>Walkers</secondary><tertiary>udp</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>udp</secondary>
+</indexterm><term>udp</term><listitem><para>Given the address of a udp, this walker walks all udp objects
+from the given udp to the final udp. If no address is specified, all udp objects
+are walked.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-42"><title>Files, Processes, and Threads</title><para>This section describes dcmds and walkers used to format and examine
+various fundamental file, process, and thread structures in the Solaris kernel. </para><sect3 id="modules-43"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="fd"><command>::fd</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="fd"><command>::fd</command></secondary>
+</indexterm><term><replaceable>process</replaceable> <command>::fd</command> <replaceable>fd-num</replaceable></term><listitem><para>Print the <structname>file_t</structname> address corresponding
+to the file descriptor <replaceable>fd-num</replaceable> associated with the
+specified process.  The process is specified using the virtual address of
+its <structname>proc_t</structname> structure.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="findstack"><command>::findstack</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="findstack"><command>::findstack</command></secondary>
+</indexterm><term><replaceable>thread</replaceable> <command>::findstack</command> [ <replaceable>command</replaceable> ]</term><listitem><para>Print the stack trace associated with the given kernel thread,
+identified by the virtual address of its <structname>kthread_t</structname> structure.
+ The dcmd employs several different algorithms to locate the appropriate stack
+backtrace.  If an optional command string is specified, the dot variable is
+reset to the frame pointer address of the topmost stack frame, and the specified
+command is evaluated as if it had been typed at the command line.  The default
+command string is &ldquo;<literal>&lt;.$C0</literal>&rdquo;; that is, print
+a stack trace including frame pointers but no arguments.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="findstack"><command>::pgrep</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="findstack"><command>::pgrep</command></secondary>
+</indexterm><term><command>::pgrep</command> [<option>x</option>] [<option>n</option>|<option>o</option>] <replaceable>regexp</replaceable></term><listitem><para>Display process information for processes whose name matches
+the <replaceable>regexp</replaceable> regular expression pattern. The <command>::pgrep</command> dcmd is similar to the <olink targetdoc="refman1" targetptr="pgrep-1" remap="external"><citerefentry><refentrytitle>pgrep</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command.
+The <command>::pgrep</command> dcmd is used to pattern match against all processes.
+When the <option>n</option> option is used, display only the newest process
+that matches the pattern. When the <option>o</option> option is used, display
+only the oldest process that matches the pattern. When the <option>x</option> option
+is used, display only those processes whose names are exactly the same as
+the search pattern.</para><para>In <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>,
+the <replaceable>regexp</replaceable> used with <command>::pgrep</command> must
+be a plain alpha-numeric text string.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="pid2proc"><command>::pid2proc</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="pid2proc"><command>::pid2proc</command></secondary>
+</indexterm><term><replaceable>pid</replaceable> <command>::pid2proc</command></term><listitem><para>Print the <structname>proc_t</structname> address corresponding
+to the specified PID.  Recall that MDB's default base is hexadecimal, so decimal
+PIDs obtained using <olink targetdoc="refman1" targetptr="pgrep-1" remap="external"><citerefentry><refentrytitle>pgrep</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> or <olink targetdoc="refman1" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> should be prefixed with <literal>0t</literal>. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="pmap"><command>::pmap</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="pmap"><command>::pmap</command></secondary>
+</indexterm><term><replaceable>process</replaceable> <command>::pmap</command> [<option>q</option>]</term><listitem><para>Print the memory map of the process indicated by the given
+process address.  The dcmd displays output using a format similar to <olink targetdoc="refman1" targetptr="pmap-1" remap="external"><citerefentry><refentrytitle>pmap</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>. If the <option>q</option> option
+is present, the dcmd displays an abbreviated form of its output that requires
+less processing time.</para>
+</listitem>
+</varlistentry><varlistentry><term>[ <replaceable>address</replaceable> ] <command>::ps</command> [<option>fltTP</option>]</term><listitem><para><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="ps"><command>::ps</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="ps"><command>::ps</command></secondary></indexterm>Print a summary of the information related
+to the specified process, or all active system processes, similar to <olink targetdoc="refman1" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.  If the <option>f</option> option
+is specified, the full command name and initial arguments are printed. If
+the <option>l</option> option is specified, the LWPs associated with each
+process are printed.  If the <option>t</option> option is specified, the kernel
+threads associated with each process LWP are printed. If the <option>T</option> option
+is specified, the task ID associated with each process is displayed. If the <option>P</option> option is specified, the project ID associated with each      
+    process is displayed. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="ptree"><command>::ptree</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ptree"><command>::ptree</command></secondary>
+</indexterm><term><command>::ptree</command></term><listitem><para>Print a process tree, with child processes indented from their
+respective parent processes.  The dcmd displays output using a format similar
+to <olink targetdoc="refman1" targetptr="ptree-1" remap="external"><citerefentry><refentrytitle>ptree</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="ptree"><command>::task</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ptree"><command>::task</command></secondary>
+</indexterm><term><command><replaceable>address</replaceable> ::task</command></term><listitem><para>Print a list of the active kernel task structures and their
+associated ID numbers and attributes. The process task ID is described in
+more detail in <literal>settaskid</literal>(2). </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="ptree"><command>::thread</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ptree"><command>::thread</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::thread</command> [<option>bdfimps</option>]</term><listitem><para>Display properties of the specified kernel <structname>kthread_t</structname> structure.
+ If no <structname>kthread_t</structname> address is specified, the properties
+of all kernel threads are displayed.  The dcmd options are used to control
+which output columns are shown.  If no options are present, the <option>i</option> option
+is enabled by default.  If the <option>b</option> option is present, information
+relating to the thread's turnstile and blocking synchronization object is
+shown. If the <option>d</option> option is present, the thread's dispatcher
+priority, binding, and last dispatch time is shown.  If the <option>f</option> option
+is present, threads whose state is TS_FREE are elided from the output.  If
+the <option>i</option> option is present (the default), thread state, flags,
+priority, and interrupt information is shown.  If the <option>m</option> option
+is present, all of the other output options are merged together on to a single
+output line.  If the <option>p</option> option is present, the thread's process,
+LWP, and credential pointers are displayed.  If the <option>s</option> option
+is present, the thread's signal queue and masks of pending and held signals
+are shown.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>dcmds</secondary><tertiary sortas="whereopen"><command>::whereopen</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="whereopen"><command>::whereopen</command></secondary>
+</indexterm><term><replaceable>vnode</replaceable> <command>::whereopen</command></term><listitem><para>Given a <structname>vnode_t</structname> address, print the <structname>proc_t</structname> addresses of all processes that have this vnode currently
+open in their file table. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-44"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>Walkers</secondary><tertiary>file</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>file</secondary>
+</indexterm><term>file</term><listitem><para>Given the address of a <structname>proc_t</structname> structure
+as a starting point, iterate over the set of open files (<structname>file_t</structname> structures)
+associated with the specified process.  The <structname>file_t</structname> structure
+is defined in <?Pub _nolinebreak?><literal>&lt;sys/file.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>Walkers</secondary><tertiary>proc</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>proc</secondary>
+</indexterm><term>proc</term><listitem><para>Iterate over the active process (<structname>proc_t</structname>)
+structures.  This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/proc.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><term>task</term><listitem><para>Given a task pointer, iterate over the list of <structname>proc_t</structname> structures for processes that are members of the given task.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Files, Processes, and Threads</primary><secondary>Walkers</secondary><tertiary>thread</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>thread</secondary>
+</indexterm><term>thread</term><listitem><para>Iterate over a set of kernel thread (<structname>kthread_t</structname>)
+structures.  If the global walk is invoked, all kernel threads are returned
+by the walker. If a local walk is invoked using a <structname>proc_t</structname> address
+as the starting point, the set of threads associated with the specified process
+is returned. The <structname>kthread_t</structname> structure is defined in <?Pub
+_nolinebreak?><literal>&lt;sys/thread.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-45"><title>Synchronization Primitives</title><para>This section describes dcmds and walkers used to examine particular
+kernel synchronization primitives.  The semantics of each primitive are discussed
+in the corresponding (9f) section of the manual pages. </para><sect3 id="modules-46"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>dcmds</secondary><tertiary sortas="rwlock"><command>::rwlock</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="rwlock"><command>::rwlock</command></secondary>
+</indexterm><term><replaceable>rwlock</replaceable> <command>::rwlock</command></term><listitem><para>Given the address of a readers-writers lock (see <olink targetdoc="refman9f" targetptr="rwlock-9f" remap="external"><citerefentry><refentrytitle>rwlock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>), display the current state
+of the lock and the list of waiting threads.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>dcmds</secondary><tertiary sortas="rwlock"><command>::sobj2ts</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="rwlock"><command>::sobj2ts</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::sobj2ts</command></term><listitem><para>Convert the address of a synchronization object to the address
+of the corresponding turnstile and print the turnstile address.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>dcmds</secondary><tertiary sortas="rwlock"><command>::turnstile</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="rwlock"><command>::turnstile</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::turnstile</command></term><listitem><para>Display the properties of the specified <structname>turnstile_t</structname>.
+ If no <structname>turnstile_t</structname> address is specified, the dcmd
+displays the properties of all turnstiles.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>dcmds</secondary><tertiary sortas="wchaninfo"><command>::wchaninfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="wchaninfo"><command>::wchaninfo</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::wchaninfo</command> [<option>v</option>]</term><listitem><para>Given the address of a condition variable (see <olink targetdoc="refman9f" targetptr="condvar-9f" remap="external"><citerefentry><refentrytitle>condvar</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>) or semaphore (see <olink targetdoc="refman9f" targetptr="semaphore-9f" remap="external"><citerefentry><refentrytitle>semaphore</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>), display
+the current number of waiters on this object.  If no explicit address is specified,
+display all such objects that have waiting threads.  If the <option>v</option> option
+is specified, display the list of threads that are blocked on each object.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-47"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>Walkers</secondary><tertiary>blocked</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>blocked</secondary>
+</indexterm><term>blocked</term><listitem><para>Given the address of a synchronization object (such as a <olink targetdoc="refman9f" targetptr="mutex-9f" remap="external"><citerefentry><refentrytitle>mutex</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="rwlock-9f" remap="external"><citerefentry><refentrytitle>rwlock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>), iterate over the list of
+blocked kernel threads.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Synchronization Primitives</primary><secondary>Walkers</secondary><tertiary>wchan</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>wchan</secondary>
+</indexterm><term>wchan</term><listitem><para>Given the address of a condition variable (see <olink targetdoc="refman9f" targetptr="condvar-9f" remap="external"><citerefentry><refentrytitle>condvar</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>) or semaphore (see <olink targetdoc="refman9f" targetptr="semaphore-9f" remap="external"><citerefentry><refentrytitle>semaphore</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>), iterate
+over the list of blocked kernel threads.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-48"><title>Cyclics</title><para>The cyclic subsystem is a low-level kernel subsystem that provides high
+resolution, per-CPU interval timer facilities to other kernel services and
+programming interfaces.</para><sect3 id="modules-49"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Cyclics</primary><secondary>dcmds</secondary><tertiary sortas="cycinfo"><command>::cycinfo</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="cycinfo"><command>::cycinfo</command></secondary>
+</indexterm><term><command>::cycinfo</command> [<option>vV</option>]</term><listitem><para>Display the cyclic subsystem per-CPU state for each CPU. If
+the <option>v</option> option is present, a more verbose display is shown.
+If the <option>V</option> option is present, an even more verbose display
+than <option>v</option> is shown.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Cyclics</primary><secondary>dcmds</secondary><tertiary sortas="cyclic"><command>::cyclic</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="cyclic"><command>::cyclic</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::cyclic</command></term><listitem><para>Format and display the <literal>cyclic_t</literal> at the
+specified address.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Cyclics</primary><secondary>dcmds</secondary><tertiary sortas="cyccover"><command>::cyccover</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="cyccover"><command>::cyccover</command></secondary>
+</indexterm><term><command>::cyccover</command></term><listitem><para>Display cyclic subsystem code coverage information.  This
+information is available only in a DEBUG kernel.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Cyclics</primary><secondary>dcmds</secondary><tertiary sortas="cyctrace"><command>::cyctrace</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="cyctrace"><command>::cyctrace</command></secondary>
+</indexterm><term><command>::cyctrace</command></term><listitem><para>Display cyclic subsystem trace information.  This information
+is available only in a DEBUG kernel.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-50"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Cyclics</primary><secondary>Walkers</secondary><tertiary>cyccpu</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>cyccpu</secondary>
+</indexterm><term>cyccpu</term><listitem><para>Iterate over the per-CPU <structname>cyc_cpu_t</structname> structures.
+ This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/cyclic_impl.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Cyclics</primary><secondary>Walkers</secondary><tertiary>cyctrace</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>cyctrace</secondary>
+</indexterm><term>cyctrace</term><listitem><para>Iterate over the cyclic trace buffer structures.  This information
+is only available in a DEBUG kernel.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-71"><title>Task Queues</title><para>The task queue subsystem provides general-purpose asynchronous task
+scheduling for a variety of clients in the kernel.</para><sect3 id="modules-72"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Task Queues</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::taskq_entry</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::taskq_entry</command></secondary>
+</indexterm><term><replaceable>address</replaceable> <command>::taskq_entry</command></term><listitem><para>Print the contents of the specified struct <structname>taskq_entry</structname>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-73"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Task Queues</primary><secondary>Walkers</secondary><tertiary>taskq_entry</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>taskq_entry</secondary>
+</indexterm><term>taskq_entry</term><listitem><para>Given the addresss of a <structname>taskq</structname> structure,
+iterate over the list of <structname>taskq_entry</structname> structures.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-74"><title>Error Queues</title><para>The error queue subsystem provides general-purpose asynchronous error
+event processing for platform-specific error handling code.</para><sect3 id="modules-75"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Error Queues</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::errorq</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::errorq</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::errorq</command></term><listitem><para>Display a summary of information relating to the specified
+error queue. If no address is given, display information relating to all system
+error queues.  The address, name, queue length, and data element size for
+each queue are displayed, along with various queue statistics.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="modules-76"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Error Queues</primary><secondary>Walkers</secondary><tertiary>errorq</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>errorq</secondary>
+</indexterm><term>errorq</term><listitem><para>Walk the list of system error queues and return the address
+of each individual error queue.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Error Queues</primary><secondary>Walkers</secondary><tertiary>errorq_data</tertiary>
+</indexterm><indexterm><primary>Walkers</primary><secondary>errorq_data</secondary>
+</indexterm><term>errorq_data</term><listitem><para>Given the address of an error queue, return the address of
+each pending error event data buffer.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="modules-63"><title>Configuration</title><para>This section describes dcmds that can be used to examine system configuration
+data.</para><sect3 id="modules-64"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>Configuration</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::system</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::system</command></secondary>
+</indexterm><term><command>::system</command></term><listitem><para>Display the contents of the <literal>system</literal>(4) configuration
+file at the time the kernel parsed the file during system initialization.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2>
+</sect1><sect1 id="chapter1-2"><title>Interprocess Communication Debugging Support
+(<literal>ipc</literal>)</title><para>The <literal>ipc</literal> module provides debugging support for the
+implementation of the message queue, semaphore, and shared memory interprocess
+communication primitives.</para><sect2 id="chapter1-3"><title>dcmds</title><variablelist><varlistentry><term><command>::ipcs</command> [<option>l</option>]</term><listitem><para><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::ipcs</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::ipcs</command></secondary></indexterm>Display a listing of system-wide IPC identifiers, corresponding
+to known message queues, semaphores, and shared memory segments.  If the <option>l</option> option is specified, a longer listing of information is shown.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>address</replaceable> <command>::msg</command> [<option>l</option>] [<option>t</option> <replaceable>type</replaceable>]</term><listitem><para><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::msg</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::msg</command></secondary></indexterm>Display the properties of the specified message queue element
+(struct <structname>msg</structname>).  If the <option>l</option> option is
+present, the raw contents of the message are displayed in hexadecimal and
+ASCII.  If the <option>t</option> option is present, it can be used to filter
+the output and only display messages of the specified type.  This can be useful
+when piping the output of the <literal>msgqueue</literal> walker to <command>::msg</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>id</replaceable> <command>::msqid</command> [<option>k</option>]</term><listitem><para><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ipcs"><command>::msqid</command></tertiary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="ipcs"><command>::msqid</command></secondary></indexterm>Convert the specified message queue IPC identifier to a pointer
+to the corresponding kernel implementation structure and print the address
+of this kernel structure.  If the <option>k</option> option is present, the <replaceable>id</replaceable> is instead interpreted as a message queue key to match (see <literal>msgget</literal>(2)).</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="msqid_ds"><command>::msqid_ds</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="msqid_ds"><command>::msqid_ds</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::msqid_ds</command> [<option>l</option>]</term><listitem><para>Print the specified <structname>msqid_ds</structname> structure
+or a table of the active <structname>msqid_ds</structname> structures (message
+queue identifiers).  If the <option>l</option> option is specified, a longer
+listing of information is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="msqid_ds"><command>::semid</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="msqid_ds"><command>::semid</command></secondary>
+</indexterm><term><replaceable>id</replaceable> <command>::semid</command> [<option>k</option>]</term><listitem><para>Convert the specified semaphore IPC identifier to a pointer
+to       the corresponding kernel implementation structure and print the 
+     address of this kernel structure.  If the <option>k</option> option is
+present, the <replaceable>id</replaceable> is instead interpreted as a semaphore
+key to match (see <literal>semget</literal>(2)).</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="semid_ds"><command>::semid_ds</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="semid_ds"><command>::semid_ds</command></secondary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::semid_ds</command> [<option>l</option>]</term><listitem><para>Print the specified <structname>semid_ds</structname> structure
+or a table of the active <structname>semid_ds</structname> structures (semaphore
+identifiers).  If the <option>l</option> option is specified, a longer listing
+of information is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="semid_ds"><command>::shmid</command></tertiary>
+</indexterm><indexterm><primary>dcmds</primary><secondary sortas="semid_ds"><command>::shmid</command></secondary>
+</indexterm><term><replaceable>id</replaceable> <command>::shmid</command> [<option>k</option>]</term><listitem><para>Convert the specified shared memory IPC identifier to a pointer
+to the corresponding kernel implementation structure and print the address
+of this kernel structure.  If the <option>k</option> option is present, the <replaceable>id</replaceable> is instead interpreted as a shared memory key to match (see <literal>shmget</literal>(2)).</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="shmid_ds"><command>::shmid_ds</command></secondary>
+</indexterm><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="shmid_ds"><command>::shmid_ds</command></tertiary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::shmid_ds</command> [<option>l</option>]</term><listitem><para>Print the specified <structname>shmid_ds</structname> structure
+or a table of the active <structname>shmid_ds</structname> structures (shared
+memory segment identifiers).  If the <option>l</option> option is specified,
+a longer listing of information is displayed.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-62"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>msg</secondary>
+</indexterm><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>Walkers</secondary><tertiary>msg</tertiary>
+</indexterm><term>msg</term><listitem><para>Walk the active <structname>msqid_ds</structname> structures
+corresponding to message queue identifiers.  This structure is defined in <?Pub
+_nolinebreak?><literal>&lt;sys/msg.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>msgqueue</secondary>
+</indexterm><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>Walkers</secondary><tertiary>msgqueue</tertiary>
+</indexterm><term>msgqueue</term><listitem><para>Iterate over the <structname>message</structname> structures
+that are currently enqueued on the specified message queue.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>sem</secondary>
+</indexterm><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>Walkers</secondary><tertiary>sem</tertiary>
+</indexterm><term>sem</term><listitem><para>Walk the active <structname>semid_ds</structname> structures
+corresponding to semaphore identifiers.  This structure is defined in <?Pub
+_nolinebreak?><literal>&lt;sys/sem.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>shm</secondary>
+</indexterm><indexterm><primary>Interprocess Communication Debugging Support (<literal>ipc</literal>)</primary><secondary>Walkers</secondary><tertiary>shm</tertiary>
+</indexterm><term>shm</term><listitem><para>Walk the active <structname>shmid_ds</structname> structures
+corresponding to shared memory segment identifiers.  This structure is defined
+in <?Pub _nolinebreak?><literal>&lt;sys/shm.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-5"><title>Loopback File System Debugging Support (<literal>lofs</literal>)</title><para>The <literal>lofs</literal> module provides debugging support for the <olink targetdoc="refman7" targetptr="lofs-7fs" remap="external"><citerefentry><refentrytitle>lofs</refentrytitle><manvolnum>7FS</manvolnum></citerefentry></olink> file system.</para><sect2 id="modules-6"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="lnode"><command>::lnode</command></secondary>
+</indexterm><indexterm><primary>Loopback File System Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="lnode"><command>::lnode</command></tertiary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::lnode</command></term><listitem><para>Print the specified <structname>lnode_t</structname>, or a
+table of the active <structname>lnode_t</structname> structures in the kernel.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="lnode2dev"><command>::lnode2dev</command></secondary>
+</indexterm><indexterm><primary>Loopback File System Debugging Support (<literal>lofs</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="lnode2dev"><command>::lnode2dev</command></tertiary>
+</indexterm><term><replaceable>address</replaceable> <command>::lnode2dev</command></term><listitem><para>Print the <structname>dev_t</structname> (<structname>vfs_dev</structname>)
+for the underlying loopback mounted filesystem corresponding to the given <structname>lnode_t</structname> address. </para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="lnode2rdev"><command>::lnode2rdev</command></secondary>
+</indexterm><indexterm><primary>Loopback File System Debugging Support (<literal>lofs</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="lnode2rdev"><command>::lnode2rdev</command></tertiary>
+</indexterm><term><replaceable>address</replaceable> <command>::lnode2rdev</command></term><listitem><para>Print the <structname>dev_t</structname> (<structname>li_rdev</structname>)
+for the underlying loopback mounted file system corresponding to the given <structname>lnode_t</structname> address. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-7"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>lnode</secondary>
+</indexterm><indexterm><primary>Loopback File System Debugging Support (<literal>lofs</literal>)</primary><secondary>Walkers</secondary><tertiary>lnode</tertiary>
+</indexterm><term>lnode</term><listitem><para>Walk the active <structname>lnode_t</structname> structures
+in the kernel.  This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/fs/lofs_node.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-23"><title>Internet Protocol Module Debugging Support (<literal>ip</literal>)</title><para>The <literal>ip</literal> module provides debugging support for the <olink targetdoc="refman7" targetptr="ip-7p" remap="external"><citerefentry><refentrytitle>ip</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> driver</para><sect2 id="modules-2"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="ire"><command>::ire</command></secondary>
+</indexterm><indexterm><primary>Internet Protocol Module Debugging Support (<literal>ip</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ire"><command>::ire</command></tertiary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::ire</command> [<option>q</option>]</term><listitem><para>Print the specified <structname>ire_t</structname>, or a table
+of the active <structname>ire_t</structname> structures in the kernel.  If
+the <option>q</option> flag is specified, the send and receive queue pointers
+are printed instead of the source and destination addresses.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-3"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>ire</secondary>
+</indexterm><indexterm><primary>Internet Protocol Module Debugging Support (<literal>ip</literal>)</primary><secondary>Walkers</secondary><tertiary>ire</tertiary>
+</indexterm><term>ire</term><listitem><para>Walk the active <structname>ire</structname> (Internet Route
+Entry) structures in the kernel. This structure is defined in <?Pub _nolinebreak?><literal>&lt;inet/ip.h&gt;</literal><?Pub /_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-4"><title>Kernel Runtime Link Editor Debugging Support
+(<literal>krtld</literal>)</title><para>This section describes the debugging support for the kernel runtime
+link editor, which is responsible for loading kernel modules and drivers.</para><sect2 id="modules-8"><title>dcmds</title><variablelist><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="modctl"><command>::modctl</command></secondary>
+</indexterm><indexterm><primary>Kernel Runtime Link Editor Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="modctl"><command>::modctl</command></tertiary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::modctl</command></term><listitem><para>Print the specified <structname>modctl</structname>, or a
+table of the active <structname>modctl</structname> structures in the kernel.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="modhdrs"><command>::modhdrs</command></secondary>
+</indexterm><indexterm><primary>Kernel Runtime Link Editor Debugging Support (<literal>krtld</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="modhdrs"><command>::modhdrs</command></tertiary>
+</indexterm><term><replaceable>address</replaceable> <command>::modhdrs</command></term><listitem><para>Given the address of a <structname>modctl</structname> structure,
+print the module's ELF executable header and section headers.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="modinfo"><command>::modinfo</command></secondary>
+</indexterm><indexterm><primary>Kernel Runtime Link Editor Debugging Support (<literal>krtld</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="modinfo"><command>::modinfo</command></tertiary>
+</indexterm><term><command>::modinfo</command></term><listitem><para>Print information about the active kernel modules, similar
+to the output of the <?Pub _nolinebreak?><literal>/usr/sbin/modinfo</literal><?Pub
+/_nolinebreak?> command.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-9"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>modctl</secondary>
+</indexterm><indexterm><primary>Kernel Runtime Link Editor Debugging Support (<literal>krtld</literal>)</primary><secondary>Walkers</secondary><tertiary>modctl</tertiary>
+</indexterm><term>modctl</term><listitem><para>Walk the list of active modctl structures in the kernel. 
+This structure is defined in <?Pub _nolinebreak?><literal>&lt;sys/modctl.h&gt;</literal><?Pub
+/_nolinebreak?>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-65"><title>USB Framework Debugging Support (<literal>uhci</literal>)</title><para>The <literal>uchi</literal> module provides debugging support for the
+host controller interface portion of the Universal Serial Bus (USB) framework.</para><sect2 id="modules-66"><title>dcmds</title><variablelist><varlistentry><term><replaceable>address</replaceable> <command>::uhci_qh</command> [<option>bd</option>]</term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::uhci_qh</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>uhci</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::uhci_qh</command></tertiary></indexterm>Given
+the address of a USB UHCI controller Queue Head (QH) structure, print the
+contents of the structure.  If the <option>b</option> option is present iterate
+over the <literal>link_ptr</literal> chain, printing all QHs found.  If the <option>d</option> option is present, iterate over the <literal>element_ptr</literal> chain,
+printing all TDs found.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>address</replaceable> <command>::uhci_td</command> [<option>d</option>]</term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::uhci_td</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>uhci</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::uhci_td</command></tertiary></indexterm>Given
+the address of a USB UHCI controller Transaction Descriptor (TD)  structure,
+print the contents of the structure.  Note this only works for Control and
+Interrupt TDs.  If the <option>d</option> option is present, iterate over
+the <literal>element_ptr</literal> chain, printing all TDs found. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-67"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>uhci_qh</secondary>
+</indexterm><indexterm><primary>USB Framework Debugging Support (<literal>uhci</literal>)</primary><secondary>Walkers</secondary><tertiary>uhci_qh</tertiary>
+</indexterm><term>uhci_qh</term><listitem><para>Given the address of a USB UHCI controller Queue Head (QH)
+structure, iterate over the list of such structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>uhci_td</secondary>
+</indexterm><indexterm><primary>USB Framework Debugging Support (<literal>uhci</literal>)</primary><secondary>Walkers</secondary><tertiary>uhci_td</tertiary>
+</indexterm><term>uhci_td</term><listitem><para>Given the address of a USB UHCI controller Queue Head Descriptor
+(TD) structure, iterate over the list of such structures.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-68"><title>USB Framework Debugging Support (<literal>usba</literal>)</title><para>The <literal>usba</literal> module provides debugging support for the
+platform-independent Universal Serial Bus (USB) framework.</para><sect2 id="modules-69"><title>dcmds</title><variablelist><varlistentry><term><command>::usba_debug_buf</command></term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::usba_debug_buf</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::usba_debug_buf</command></tertiary></indexterm>Print the USB debugging information buffer.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>::usba_clear_debug_buf</command></term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::usba_clear_debug_buf</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::usba_clear_debug_buf</command></tertiary></indexterm>Empty the USB debugging information buffer.</para>
+</listitem>
+</varlistentry><varlistentry><term>[ <replaceable>address</replaceable> ] <command>::usba_device</command> [<option>pv</option>]</term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::usba_device</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::usba_device</command></tertiary></indexterm>Given the address of a <structname>usba_device</structname> structure,
+print summary information. If no address is supplied, this dcmd walks the
+global list of <structname>usba_device</structname> structures.  If the <option>p</option> option is present, also list information for all open pipes on this
+device.  If the <option>v</option> option is present, list verbose information
+for each device.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>address</replaceable> <command>::usb_pipe_handle</command></term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::usb_pipe_handle</command></secondary></indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::usb_pipe_handle</command></tertiary></indexterm>Given the address of a USB pipe handle structure (struct <structname>usba_ph_impl</structname>), print summary information for this handle.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-70"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>usba_list_entry</secondary>
+</indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>Walkers</secondary><tertiary>usba_list_entry</tertiary>
+</indexterm><term>usba_list_entry</term><listitem><para>Given the address of a <structname>usba_list_entry</structname> structure,
+iterate over the chain of such structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>usba_device</secondary>
+</indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>Walkers</secondary><tertiary>usba_device</tertiary>
+</indexterm><term>usba_device</term><listitem><para>Walk the global list of <structname>usba_device_t</structname> structures.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>usb_pipe_handle</secondary>
+</indexterm><indexterm><primary>USB Framework Debugging Support (<literal>usba</literal>)</primary><secondary>Walkers</secondary><tertiary>usb_pipe_handle</tertiary>
+</indexterm><term>usb_pipe_handle</term><listitem><para>Given a <structname>usba_device_t</structname> address, walk
+USB pipe handles.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-10" arch="x86"><title>x86 Platform Debugging Support (<literal>unix</literal>)</title><para>These dcmds and walkers are specific to x86 platforms.</para><sect2 id="modules-11"><title>dcmds</title><variablelist termlength="wholeline"><varlistentry><term>[ <replaceable>cpuid</replaceable> | <replaceable>address</replaceable> ] <command>::ttrace</command> [<option>x</option>]</term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::ttrace</command></secondary></indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::ttrace</command></tertiary></indexterm>Display trap trace records in reverse chronological
+order.  The trap trace facility is available only in DEBUG kernels.  If an
+explicit dot value is specified, this is interpreted as either a CPU ID number
+or a trap trace record address, depending on the precise value.  If a CPU
+ID is specified, the output is restricted to the buffer from that CPU. If
+a record address is specified, only that record is formatted. If the <option>x</option> option
+is specified, the complete raw record is displayed.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-12"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>ttrace</secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>Walkers</secondary><tertiary>ttrace</tertiary>
+</indexterm><term>ttrace</term><listitem><para>Walk the list of trap trace record addresses in reverse chronological
+order.  The trap trace facility is available only in DEBUG kernels.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="modules-19" arch="sparc"><title>sun4u Platform Debugging Support
+(<literal>unix</literal>)</title><para>These dcmds and walkers are specific to the SPARC sun4u platform.</para><sect2 id="modules-20"><title>dcmds</title><variablelist><varlistentry><term>[ <replaceable>address</replaceable> ] <command>::softint</command></term><listitem><para><indexterm><primary>dcmds</primary><secondary sortas="softint"><command>::softint</command></secondary></indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="softint"><command>::softint</command></tertiary></indexterm>Display the soft interrupt vector
+structure at the specified address, or display all the active soft interrupt
+vectors.  The pending count, PIL, argument, and handler function for each
+structure is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="ttctl"><command>::ttctl</command></secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="ttctl"><command>::ttctl</command></tertiary>
+</indexterm><term><command>::ttctl</command></term><listitem><para>Display trap trace control records.  The trap trace facility
+is available only in DEBUG kernels.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="ttrace"><command>::ttrace</command></secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="ttrace"><command>::ttrace</command></tertiary>
+</indexterm><term>[ <replaceable>cpuid</replaceable> ] <command>::ttrace</command> [<option>x</option>]</term><listitem><para>Display trap trace records in reverse chronological order.
+ The trap trace facility is available only in DEBUG kernels.  If an explicit
+dot value is specified, this is interpreted as a CPU ID number, and the output
+is restricted to the buffer from that CPU.  If the <option>x</option> option
+is specified, the complete raw record is displayed.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="xc_mbox"><command>::xc_mbox</command></secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="xc_mbox"><command>::xc_mbox</command></tertiary>
+</indexterm><term>[ <replaceable>address</replaceable> ] <command>::xc_mbox</command></term><listitem><para>Display the cross-call mailbox at the specified address, or
+format  all the cross-call mailboxes that have pending requests.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>dcmds</primary><secondary sortas="xctrace"><command>::xctrace</command></secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>dcmds</secondary><tertiary sortas="xctrace"><command>::xctrace</command></tertiary>
+</indexterm><term><command>::xctrace</command></term><listitem><para>Format and display cross-call trace records in reverse chronological
+order that are related to CPU cross-call activity.  The cross-call trace facility
+is available only in DEBUG kernels.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="modules-21"><title>Walkers</title><variablelist><varlistentry><indexterm><primary>Walkers</primary><secondary>softint</secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>Walkers</secondary><tertiary>softint</tertiary>
+</indexterm><term>softint</term><listitem><para>Iterate over the soft interrupt vector table entries.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>ttrace</secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>Walkers</secondary><tertiary>ttrace</tertiary>
+</indexterm><term>ttrace</term><listitem><para>Iterate over the trap trace record addresses in reverse chronological
+order.  The trap trace facility is only available in DEBUG kernels.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary>Walkers</primary><secondary>xc_mbox</secondary>
+</indexterm><indexterm><primary>Platform Debugging Support</primary><secondary>Walkers</secondary><tertiary>xc_mbox</tertiary>
+</indexterm><term>xc_mbox</term><listitem><para>Iterate over the mailboxes used for CPU handshake and cross-call
+(x-call) requests.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1>
+</chapter><?Pub *0000119127 0?>

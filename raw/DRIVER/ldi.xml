@@ -1,0 +1,1053 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="ldi-1"><title>Layered Driver Interface (LDI)</title><indexterm><primary>LDI</primary>
+</indexterm><indexterm><primary>Layered Driver Interface</primary><see>LDI</see>
+</indexterm><indexterm><primary>DDI/DKI</primary><seealso>LDI</seealso>
+</indexterm><highlights><para><indexterm><primary>device drivers</primary><secondary>access from within kernel</secondary></indexterm><indexterm><primary>device usage</primary><see>LDI</see></indexterm>The LDI is a set of DDI/DKI that enables a kernel module to access
+other devices in the system. The LDI also enables you to determine which devices
+are currently being used by kernel modules.</para><para>This chapter covers the following topics:</para><itemizedlist><listitem><para><olink targetptr="ldi-2" remap="internal">Kernel Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="ldi-5" remap="internal">User Interfaces</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="ewpre"><title>LDI Overview</title><para>The LDI includes two categories of interfaces:</para><itemizedlist><listitem><para><emphasis role="strong">Kernel interfaces</emphasis>. User
+applications use system calls to open, read, and write to devices that are
+managed by a device driver within the kernel. Kernel modules can use the LDI
+kernel interfaces to open, read, and write to devices that are managed by
+another device driver within the kernel. For example, a user application might
+use <olink targetdoc="group-refman" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and
+a kernel module might use <olink targetdoc="group-refman" targetptr="ldi-read-9f" remap="external"><citerefentry><refentrytitle>ldi_read</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to
+read the same device. See <olink targetptr="ldi-2" remap="internal">Kernel Interfaces</olink>.</para>
+</listitem><listitem><para><emphasis role="strong">User interfaces</emphasis>. The LDI
+user interfaces can provide information to user processes regarding which
+devices are currently being used by other devices in the kernel. See <olink targetptr="ldi-5" remap="internal">User Interfaces</olink>.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>LDI</primary><secondary>target device</secondary></indexterm><indexterm><primary>LDI</primary><secondary>device consumer</secondary></indexterm><indexterm><primary>LDI</primary><secondary>kernel device consumer</secondary></indexterm><indexterm><primary>LDI</primary><secondary>layered driver</secondary></indexterm>The following terms are commonly used in discussing the LDI:</para><itemizedlist><listitem><para><emphasis role="strong">Target Device</emphasis>. A target
+device is a device within the kernel that is managed by a device driver and
+is being accessed by a device consumer.</para>
+</listitem><listitem><para><emphasis role="strong">Device Consumer</emphasis>. A device
+consumer is a user process or kernel module that opens and accesses a target
+device. A device consumer normally performs operations such as <literal>open</literal>, <literal>read</literal>, <literal>write</literal>, or <literal>ioctl</literal> on a
+target device.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel Device Consumer</emphasis>.
+A kernel device consumer is a particular kind of device consumer. A kernel
+device consumer is a kernel module that accesses a target device. The kernel
+device consumer usually is not the device driver that manages the target device
+that is being accessed. Instead, the kernel device consumer accesses the target
+device indirectly through the device driver that manages the target device.</para>
+</listitem><listitem><para><emphasis role="strong">Layered Driver</emphasis>. A layered
+driver is a particular kind of kernel device consumer. A layered driver is
+a kernel driver that does not directly manage any piece of hardware. Instead,
+a layered driver accesses one of more target devices indirectly through the
+device drivers that manage those target devices. Volume managers and STREAMS
+multiplexers are good examples of layered drivers.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="ldi-2"><title>Kernel Interfaces</title><para><indexterm><primary>device usage</primary></indexterm><indexterm><primary>LDI</primary><secondary>device usage</secondary></indexterm>Some LDI kernel interfaces
+enable the LDI to track and report kernel device usage information. See <olink targetptr="ldi-6" remap="internal">Layered Identifiers &ndash; Kernel Device Consumers</olink>.</para><para><indexterm><primary>LDI</primary><secondary>device access</secondary></indexterm><indexterm><primary>LDI</primary><secondary>device information</secondary></indexterm>Other LDI kernel interfaces enable kernel modules to perform access
+operations such as <literal>open</literal>, <literal>read</literal>, and <literal>write</literal> a target device. These LDI kernel interfaces also enable a
+kernel device consumer to query property and event information about target
+devices. See <olink targetptr="ldi-3" remap="internal">Layered Driver Handles &ndash; Target
+Devices</olink>.</para><para><olink targetptr="euayr" remap="internal">LDI Kernel Interfaces Example</olink> shows
+an example driver that uses many of these LDI interfaces.</para><sect2 id="ldi-6"><title>Layered Identifiers &ndash; Kernel Device Consumers</title><indexterm><primary>layered identifier</primary><see>LDI</see>
+</indexterm><indexterm><primary>LDI</primary><secondary>layered identifier</secondary>
+</indexterm><indexterm><primary>LDI types</primary><secondary><literal>ldi_ident_t</literal></secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_from_dev</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_from_dip</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_from_stream</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_release</function> function</secondary>
+</indexterm><para>Layered identifiers enable the LDI to track and report kernel device
+usage information. A layered identifier (<literal>ldi_ident_t</literal>) identifies
+a kernel device consumer. Kernel device consumers must obtain a layered identifier
+prior to opening a target device using the LDI.</para><para>Layered drivers are the only supported types of kernel device consumers.
+Therefore, a layered driver must obtain a layered identifier that is associated
+with the device number, the device information node, or the stream of the
+layered driver. The layered identifier is associated with the layered driver.
+The layered identifier is not associated with the target device.</para><para>You can retrieve the kernel device usage information that is collected
+by the LDI by using the <citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry> interfaces, the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command,
+or the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. For example, the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command can show which target devices
+a layered driver is accessing or which layered drivers are accessing a particular
+target device. See <olink targetptr="ldi-5" remap="internal">User Interfaces</olink> to learn
+more about how to retrieve device usage information.</para><para>The following describes the LDI layered identifier interfaces:</para><variablelist><varlistentry><term><literal>ldi_ident_t</literal></term><listitem><para>Layered identifier. An opaque type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-ident-from-dev-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_from_dev</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocate and retrieve a layered identifier that is associated
+with a <literal>dev_t</literal> device number.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-ident-from-dip-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_from_dip</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocate and retrieve a layered identifier that is associated
+with a <literal>dev_info_t</literal> device information node.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-ident-from-stream-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_from_stream</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocate and retrieve a layered identifier that is associated
+with a stream.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-ident-release-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_release</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Release a layered identifier that was allocated with <citerefentry><refentrytitle>ldi_ident_from_dev</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <citerefentry><refentrytitle>ldi_ident_from_dip</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, or <citerefentry><refentrytitle>ldi_ident_from_stream</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="ldi-3"><title>Layered Driver Handles &ndash; Target Devices</title><indexterm><primary>layered driver handle</primary><see>LDI</see>
+</indexterm><indexterm><primary>LDI</primary><secondary>layered driver handle</secondary>
+</indexterm><indexterm><primary>LDI types</primary><secondary><literal>ldi_handle_t</literal></secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>target device</secondary>
+</indexterm><para>Kernel device consumers must use a layered driver handle (<literal>ldi_handle_t</literal>) to access a target device through LDI interfaces. The <literal>ldi_handle_t</literal> type is valid only with LDI interfaces. The LDI allocates and returns
+this handle when the LDI successfully opens a device. A kernel device consumer
+can then use this handle to access the target device through the LDI interfaces.
+The LDI deallocates the handle when the LDI closes the device. See <olink targetptr="euayr" remap="internal">LDI Kernel Interfaces Example</olink> for an example.</para><para>This section discusses how kernel device consumers can access target
+devices and retrieve different types of information. See <olink targetptr="eupzu" remap="internal">Opening and Closing Target Devices</olink> to learn how kernel device consumers
+can open and close target devices. See <olink targetptr="ldi-24" remap="internal">Accessing
+Target Devices</olink> to learn how kernel device consumers can perform operations
+such as <literal>read</literal>, <literal>write</literal>, <literal>strategy</literal>,
+and <literal>ioctl</literal> on target devices. <olink targetptr="ldi-23" remap="internal">Retrieving
+Target Device Information</olink> describes interfaces that retrieve target
+device information such as device open type and device minor name. <olink targetptr="ldi-22" remap="internal">Retrieving Target Device Property Values</olink> describes
+interfaces that retrieve values and address of target device properties. See <olink targetptr="ldi-21" remap="internal">Receiving Asynchronous Device Event Notification</olink> to
+learn how kernel device consumers can receive event notification from target
+devices.</para><sect3 id="eupzu"><title>Opening and Closing Target Devices</title><indexterm><primary>LDI functions</primary><secondary><function>ldi_open_by_dev</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_open_by_devid</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_open_by_name</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_close</function> function</secondary>
+</indexterm><indexterm><primary>functions</primary><seealso>LDI functions</seealso>
+</indexterm><para>This section describes the LDI kernel interfaces for opening and closing
+target devices. The open interfaces take a pointer to a layered driver handle.
+The open interfaces attempt to open the target device specified by the device
+number, device ID, or path name. If the open operation is successful, the
+open interfaces allocate and return a layered driver handle that can be used
+to access the target device. The close interface closes the target device
+associated with the specified layered driver handle and then frees the layered
+driver handle.</para><variablelist><varlistentry><term><literal>ldi_handle_t</literal></term><listitem><para>Layered driver handle for target device access. An opaque
+data structure that is returned when a device is successfully opened.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-open-by-dev-9f" remap="external"><citerefentry><refentrytitle>ldi_open_by_dev</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Open the device specified by the <literal>dev_t</literal> device
+number parameter.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-open-by-devid-9f" remap="external"><citerefentry><refentrytitle>ldi_open_by_devid</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Open the device specified by the <literal>ddi_devid_t</literal> device
+ID parameter. You also must specify the minor node name to open.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-open-by-name-9f" remap="external"><citerefentry><refentrytitle>ldi_open_by_name</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Open a device by path name. The path name is a null-terminated
+string in the kernel address space. The path name must be an absolute path,
+beginning with a forward slash character (<literal>/</literal>).</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-close-9f" remap="external"><citerefentry><refentrytitle>ldi_close</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Close a device that was opened with <citerefentry><refentrytitle>ldi_open_by_dev</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <citerefentry><refentrytitle>ldi_open_by_devid</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, or <citerefentry><refentrytitle>ldi_open_by_name</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. After <citerefentry><refentrytitle>ldi_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry> returns,
+the layered driver handle of the device that was closed is no longer valid.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="ldi-24"><title>Accessing Target Devices</title><indexterm><primary>LDI functions</primary><secondary><function>ldi_read</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_aread</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_write</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_awrite</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_strategy</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_dump</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_poll</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ioctl</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_devmap</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_getmsg</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_putmsg</function> function</secondary>
+</indexterm><para>This section describes the LDI kernel interfaces for accessing target
+devices. These interfaces enable a kernel device consumer to perform operations
+on the target device specified by the layered driver handle. Kernel device
+consumers can perform operations such as <literal>read</literal>, <literal>write</literal>, <literal>strategy</literal>, and <literal>ioctl</literal> on the target device.</para><variablelist><varlistentry><term><literal>ldi_handle_t</literal></term><listitem><para>Layered driver handle for target device access. An opaque
+data structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-read-9f" remap="external"><citerefentry><refentrytitle>ldi_read</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a read request to the device entry point for the target
+device. This operation is supported for block, character, and STREAMS devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-aread-9f" remap="external"><citerefentry><refentrytitle>ldi_aread</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass an asynchronous read request to the device entry point
+for the target device. This operation is supported for block and character
+devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-write-9f" remap="external"><citerefentry><refentrytitle>ldi_write</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a write request to the device entry point for the target
+device. This operation is supported for block, character, and STREAMS devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-awrite-9f" remap="external"><citerefentry><refentrytitle>ldi_awrite</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass an asynchronous write request to the device entry point
+for the target device. This operation is supported for block and character
+devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-strategy-9f" remap="external"><citerefentry><refentrytitle>ldi_strategy</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a strategy request to the device entry point for the
+target device. This operation is supported for block and character devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-dump-9f" remap="external"><citerefentry><refentrytitle>ldi_dump</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a dump request to the device entry point for the target
+device. This operation is supported for block and character devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-poll-9f" remap="external"><citerefentry><refentrytitle>ldi_poll</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a poll request to the device entry point for the target
+device. This operation is supported for block, character, and STREAMS devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-ioctl-9f" remap="external"><citerefentry><refentrytitle>ldi_ioctl</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass an <literal>ioctl</literal> request to the device entry
+point for the target device. This operation is supported for block, character,
+and STREAMS devices. The LDI supports STREAMS linking and STREAMS <literal>ioctl</literal> commands.
+See the &ldquo;STREAM IOCTLS&rdquo; section of the <citerefentry><refentrytitle>ldi_ioctl</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man page. See also
+the <literal>ioctl</literal> commands in the <olink targetdoc="group-refman" targetptr="streamio-7i" remap="external"><citerefentry><refentrytitle>streamio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-devmap-9f" remap="external"><citerefentry><refentrytitle>ldi_devmap</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Pass a <literal>devmap</literal> request to the device entry
+point for the target device. This operation is supported for block and character
+devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-getmsg-9f" remap="external"><citerefentry><refentrytitle>ldi_getmsg</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a message block from a stream.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-putmsg-9f" remap="external"><citerefentry><refentrytitle>ldi_putmsg</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Put a message block on a stream.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="ldi-23"><title>Retrieving Target Device Information</title><indexterm><primary>device information</primary><secondary>LDI</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_dev</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_otyp</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_devid</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_minor_name</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_size</function> function</secondary>
+</indexterm><indexterm><primary><function>ddi_devid_free</function> function</primary>
+</indexterm><indexterm><primary><function>kmem_free</function> function</primary>
+</indexterm><para>This section describes LDI interfaces that kernel device consumers can
+use to retrieve device information about a specified target device. A target
+device is specified by a layered driver handle. A kernel device consumer can
+receive information such as device number, device open type, device ID, device
+minor name, and device size.</para><variablelist><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-dev-9f" remap="external"><citerefentry><refentrytitle>ldi_get_dev</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the <literal>dev_t</literal> device number for the target
+device specified by the layered driver handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-otyp-9f" remap="external"><citerefentry><refentrytitle>ldi_get_otyp</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the open flag that was used to open the target device
+specified by the layered driver handle. This flag tells you whether the target
+device is a character device or a block device.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-devid-9f" remap="external"><citerefentry><refentrytitle>ldi_get_devid</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the <literal>ddi_devid_t</literal> device ID for the target
+device specified by the layered driver handle. Use <olink targetdoc="group-refman" targetptr="ddi-devid-free-9f" remap="external"><citerefentry><refentrytitle>ddi_devid_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to free the <literal>ddi_devid_t</literal> when you
+are finished using the device ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-minor-name-9f" remap="external"><citerefentry><refentrytitle>ldi_get_minor_name</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve a buffer that contains the name of the minor node
+that was opened for the target device. Use <olink targetdoc="group-refman" targetptr="kmem-free-9f" remap="external"><citerefentry><refentrytitle>kmem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to release the buffer when
+you are finished using the minor node name.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-size-9f" remap="external"><citerefentry><refentrytitle>ldi_get_size</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the partition size of the target device specified
+by the layered driver handle.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="ldi-22"><title>Retrieving Target Device Property Values</title><indexterm><primary>device information</primary><secondary>property values</secondary>
+</indexterm><indexterm><primary>properties</primary><secondary>LDI</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_exists</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_get_int</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_get_int64</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_lookup_int_array</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_lookup_int64_array</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_lookup_string</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_lookup_string_array</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_prop_lookup_byte_array</function> function</secondary>
+</indexterm><para>This section describes LDI interfaces that kernel device consumers can
+use to retrieve property information about a specified target device. A target
+device is specified by a layered driver handle. A kernel device consumer can
+receive values and addresses of properties and determine whether a property
+exists.</para><variablelist><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-exists-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_exists</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Return <literal>1</literal> if the property exists for the
+target device specified by the layered driver handle. Return <literal>0</literal> if
+the property does not exist for the specified target device.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-get-int-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_get_int</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Search for an <literal>int</literal> integer property that
+is associated with the target device specified by the layered driver handle.
+If the integer property is found, return the property value.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-get-int64-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_get_int64</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Search for an <literal>int64_t</literal> integer property
+that is associated with the target device specified by the layered driver
+handle. If the integer property is found, return the property value.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-lookup-int-array-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_lookup_int_array</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the address of an <literal>int</literal> integer
+array property value for the target device specified by the layered driver
+handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-lookup-int64-array-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_lookup_int64_array</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the address of an <literal>int64_t</literal> integer
+array property value for the target device specified by the layered driver
+handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-lookup-string-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_lookup_string</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the address of a null-terminated string property
+value for the target device specified by the layered driver handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-lookup-string-array-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_lookup_string_array</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the address of an array of strings. The string array
+is an array of pointers to null-terminated strings of property values for
+the target device specified by the layered driver handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-prop-lookup-byte-array-9f" remap="external"><citerefentry><refentrytitle>ldi_prop_lookup_byte_array</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the address of an array of bytes. The byte array
+is a property value of the target device specified by the layered driver handle.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="ldi-21"><title>Receiving Asynchronous Device Event Notification</title><indexterm><primary>events</primary><secondary>asynchronous notification</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>event notification interfaces</secondary>
+</indexterm><indexterm><primary><literal>ddi_eventcookie_t</literal></primary>
+</indexterm><indexterm><primary>LDI types</primary><secondary><literal>ldi_callback_id_t</literal></secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_get_eventcookie</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_add_event_handler</function> function</secondary>
+</indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_remove_event_handler</function> function</secondary>
+</indexterm><para>The LDI enables kernel device consumers to register for event notification
+and to receive event notification from target devices. A kernel device consumer
+can register an event handler that will be called when the event occurs. The
+kernel device consumer must open a device and receive a layered driver handle
+before the kernel device consumer can register for event notification with
+the LDI event notification interfaces.</para><para>The LDI event notification interfaces enable a kernel device consumer
+to specify an event name and to retrieve an associated kernel event cookie.
+The kernel device consumer can then pass the layered driver handle (<literal>ldi_handle_t</literal>), the cookie (<literal>ddi_eventcookie_t</literal>), and the event
+handler to <olink targetdoc="group-refman" targetptr="ldi-add-event-handler-9f" remap="external"><citerefentry><refentrytitle>ldi_add_event_handler</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to register for event notification. When registration
+completes successfully, the kernel device consumer receives a unique LDI event
+handler identifier (<literal>ldi_callback_id_t</literal>). The LDI event handler
+identifier is an opaque type that can be used only with the LDI event notification
+interfaces.</para><para>The LDI provides a framework to register for events generated by other
+devices. The LDI itself does not define any event types or provide interfaces
+for generating events.</para><para>The following describes the LDI asynchronous event notification interfaces:</para><variablelist><varlistentry><term><literal>ldi_callback_id_t</literal></term><listitem><para>Event handler identifier. An opaque type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-get-eventcookie-9f" remap="external"><citerefentry><refentrytitle>ldi_get_eventcookie</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve an event service cookie for the target device specified
+by the layered driver handle.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-add-event-handler-9f" remap="external"><citerefentry><refentrytitle>ldi_add_event_handler</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Add the callback handler specified by the <literal>ldi_callback_id_t</literal> registration identifier. The callback handler is invoked when the
+event specified by the <literal>ddi_eventcookie_t</literal> cookie occurs.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="group-refman" targetptr="ldi-remove-event-handler-9f" remap="external"><citerefentry><refentrytitle>ldi_remove_event_handler</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Remove the callback handler specified by the <literal>ldi_callback_id_t</literal> registration identifier.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="euayr"><title>LDI Kernel Interfaces Example</title><para>This section shows an example kernel device consumer that uses some
+of the LDI calls discussed in the preceding sections in this chapter. This
+section discusses the following aspects of this example module:</para><itemizedlist><listitem><para><olink targetptr="eubbk" remap="internal">Device Configuration File</olink></para>
+</listitem><listitem><para><olink targetptr="eubbe" remap="internal">Driver Source File</olink></para>
+</listitem><listitem><para><olink targetptr="euihe" remap="internal">Test the Layered Driver</olink></para>
+</listitem>
+</itemizedlist><para>This example kernel device consumer is named <literal>lyr</literal>.
+The <literal>lyr</literal> module is a layered driver that uses LDI calls
+to send data to a target device. In its <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point, the <literal>lyr</literal> driver
+opens the device that is specified by the <literal>lyr_targ</literal> property
+in the <literal>lyr.conf</literal> configuration file. In its <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point, the <literal>lyr</literal> driver
+writes all of its incoming data to the device specified by the <literal>lyr_targ</literal> property.</para><sect3 id="eubbk"><title>Device Configuration File</title><para>In the configuration file shown below, the target device that the <literal>lyr</literal> driver is writing to is the console.</para><example id="euayx"><title>Configuration File</title><programlisting>#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident	"%Z%%M%	%I%	%E% SMI"
+
+name="lyr" parent="pseudo" instance=1;
+lyr_targ="/dev/console";</programlisting>
+</example>
+</sect3><sect3 id="eubbe"><title>Driver Source File</title><indexterm><primary>state structure</primary>
+</indexterm><indexterm><primary>soft state information</primary><secondary>LDI</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>layered driver handle</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>layered identifier</secondary>
+</indexterm><para>In the driver source file shown below, the <literal>lyr_state_t</literal> structure
+holds the soft state for the <literal>lyr</literal> driver. The soft state
+includes the layered driver handle (<literal>lh</literal>) for the <literal>lyr_targ</literal> device and the layered identifier (<literal>li</literal>) for the <literal>lyr</literal> device. For more information on soft state, see <olink targetptr="fappe" remap="internal">Retrieving Driver Soft State Information</olink>.</para><para><indexterm><primary><function>ddi_prop_lookup_string</function> function</primary></indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_from_dev</function> function</secondary></indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_open_by_name</function> function</secondary></indexterm>In the <function>lyr_open</function> entry point, <olink targetdoc="group-refman" targetptr="ddi-prop-lookup-string-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_string</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> retrieves from the <literal>lyr_targ</literal> property
+the name of the target device for the <literal>lyr</literal> device to open.
+The <olink targetdoc="group-refman" targetptr="ldi-ident-from-dev-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_from_dev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function gets an LDI layered identifier for the <literal>lyr</literal> device. The <olink targetdoc="group-refman" targetptr="ldi-open-by-name-9f" remap="external"><citerefentry><refentrytitle>ldi_open_by_name</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function opens the <literal>lyr_targ</literal> device and gets a layered driver handle for the <literal>lyr_targ</literal> device.</para><para><indexterm><primary>LDI functions</primary><secondary><function>ldi_close</function> function</secondary></indexterm><indexterm><primary>LDI functions</primary><secondary><function>ldi_ident_release</function> function</secondary></indexterm><indexterm><primary><function>ddi_prop_free</function> function</primary></indexterm>Note
+that if any failure occurs in <function>lyr_open</function>, the <olink targetdoc="group-refman" targetptr="ldi-close-9f" remap="external"><citerefentry><refentrytitle>ldi_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ldi-ident-release-9f" remap="external"><citerefentry><refentrytitle>ldi_ident_release</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="ddi-prop-free-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> calls undo everything that
+was done. The <citerefentry><refentrytitle>ldi_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function closes the <literal>lyr_targ</literal> device.
+The <citerefentry><refentrytitle>ldi_ident_release</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function releases the <literal>lyr</literal> layered identifier.
+The <citerefentry><refentrytitle>ddi_prop_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function frees resources allocated when the <literal>lyr_targ</literal> device
+name was retrieved. If no failure occurs, the <citerefentry><refentrytitle>ldi_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry> and <citerefentry><refentrytitle>ldi_ident_release</refentrytitle><manvolnum>9F</manvolnum></citerefentry> functions are called in the <function>lyr_close</function> entry
+point.</para><para><indexterm><primary>LDI functions</primary><secondary><function>ldi_write</function> function</secondary></indexterm>In the last line of the driver module, the <olink targetdoc="group-refman" targetptr="ldi-write-9f" remap="external"><citerefentry><refentrytitle>ldi_write</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+is called. The <citerefentry><refentrytitle>ldi_write</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function takes the data written to the <literal>lyr</literal> device
+in the <function>lyr_write</function> entry point and writes that data to
+the <literal>lyr_targ</literal> device. The <citerefentry><refentrytitle>ldi_write</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function uses the
+layered driver handle for the <literal>lyr_targ</literal> device to write
+the data to the <literal>lyr_targ</literal> device.</para><example id="euayy"><title>Driver Source File</title><programlisting>#include &lt;sys/types.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/open.h&gt;
+#include &lt;sys/cred.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+#include &lt;sys/sunldi.h&gt;
+
+typedef struct lyr_state {
+    ldi_handle_t    lh;
+    ldi_ident_t     li;
+    dev_info_t      *dip;
+    minor_t     minor;
+    int         flags;
+    kmutex_t    lock;
+} lyr_state_t;
+
+#define LYR_OPENED      0x1     /* lh is valid */
+#define LYR_IDENTED     0x2     /* li is valid */
+
+static int lyr_info(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int lyr_attach(dev_info_t *, ddi_attach_cmd_t);
+static int lyr_detach(dev_info_t *, ddi_detach_cmd_t);
+static int lyr_open(dev_t *, int, int, cred_t *);
+static int lyr_close(dev_t, int, int, cred_t *);
+static int lyr_write(dev_t, struct uio *, cred_t *);
+
+static void *lyr_statep;
+
+static struct cb_ops lyr_cb_ops = {
+    lyr_open,       /* open */
+    lyr_close,      /* close */
+    nodev,      /* strategy */
+    nodev,      /* print */
+    nodev,      /* dump */
+    nodev,      /* read */
+    lyr_write,      /* write */
+    nodev,      /* ioctl */
+    nodev,      /* devmap */
+    nodev,      /* mmap */
+    nodev,      /* segmap */
+    nochpoll,       /* poll */
+    ddi_prop_op,    /* prop_op */
+    NULL,       /* streamtab  */
+    D_NEW | D_MP,   /* cb_flag */
+    CB_REV,     /* cb_rev */
+    nodev,      /* aread */
+    nodev       /* awrite */
+};
+
+static struct dev_ops lyr_dev_ops = {
+    DEVO_REV,       /* devo_rev, */
+    0,          /* refcnt  */
+    lyr_info,       /* getinfo */
+    nulldev,    /* identify */
+    nulldev,    /* probe */
+    lyr_attach,     /* attach */
+    lyr_detach,     /* detach */
+    nodev,      /* reset */
+    &amp;lyr_cb_ops,    /* cb_ops */
+    NULL,       /* bus_ops */
+    NULL        /* power */
+};
+
+static struct modldrv modldrv = {
+    &amp;mod_driverops,
+    "LDI example driver",
+    &amp;lyr_dev_ops
+};
+
+static struct modlinkage modlinkage = {
+    MODREV_1,
+    &amp;modldrv,
+    NULL
+};
+
+int
+_init(void)
+{
+    int rv;
+
+    if ((rv = ddi_soft_state_init(&amp;lyr_statep, sizeof (lyr_state_t),
+        0)) != 0) {
+        cmn_err(CE_WARN, "lyr _init: soft state init failed\n");
+        return (rv);
+    }
+    if ((rv = mod_install(&amp;modlinkage)) != 0) {
+        cmn_err(CE_WARN, "lyr _init: mod_install failed\n");
+        goto FAIL;
+    }
+    return (rv);
+    /*NOTEREACHED*/
+FAIL:
+    ddi_soft_state_fini(&amp;lyr_statep);
+    return (rv);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+    return (mod_info(&amp;modlinkage, modinfop));
+}
+
+int
+_fini(void)
+{
+    int rv;
+
+    if ((rv = mod_remove(&amp;modlinkage)) != 0) {
+        return(rv);
+    }
+    ddi_soft_state_fini(&amp;lyr_statep);
+    return (rv);
+}
+/*
+ * 1:1 mapping between minor number and instance
+ */
+static int
+lyr_info(dev_info_t *dip, ddi_info_cmd_t infocmd, void *arg, void **result)
+{
+    int inst;
+    minor_t minor;
+    lyr_state_t *statep;
+    char *myname = "lyr_info";
+
+    minor = getminor((dev_t)arg);
+    inst = minor;
+    switch (infocmd) {
+    case DDI_INFO_DEVT2DEVINFO:
+        statep = ddi_get_soft_state(lyr_statep, inst);
+        if (statep == NULL) {
+            cmn_err(CE_WARN, "%s: get soft state "
+                "failed on inst %d\n", myname, inst);
+            return (DDI_FAILURE);
+        }
+        *result = (void *)statep-&gt;dip;
+        break;
+    case DDI_INFO_DEVT2INSTANCE:
+        *result = (void *)inst;
+        break;
+    default:
+        break;
+    }
+
+    return (DDI_SUCCESS);
+}
+
+static int
+lyr_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    int inst;
+    lyr_state_t *statep;
+    char *myname = "lyr_attach";
+
+    switch (cmd) {
+    case DDI_ATTACH:
+        inst = ddi_get_instance(dip);
+
+        if (ddi_soft_state_zalloc(lyr_statep, inst) != DDI_SUCCESS) {
+            cmn_err(CE_WARN, "%s: ddi_soft_state_zallac failed "
+                "on inst %d\n", myname, inst);
+            goto FAIL;
+        }
+        statep = (lyr_state_t *)ddi_get_soft_state(lyr_statep, inst);
+        if (statep == NULL) {
+            cmn_err(CE_WARN, "%s: ddi_get_soft_state failed on "
+                "inst %d\n", myname, inst);
+            goto FAIL;
+        }
+        statep-&gt;dip = dip;
+        statep-&gt;minor = inst;
+        if (ddi_create_minor_node(dip, "node", S_IFCHR, statep-&gt;minor,
+            DDI_PSEUDO, 0) != DDI_SUCCESS) {
+            cmn_err(CE_WARN, "%s: ddi_create_minor_node failed on "
+                "inst %d\n", myname, inst);
+            goto FAIL;
+        }
+        mutex_init(&amp;statep-&gt;lock, NULL, MUTEX_DRIVER, NULL);
+        return (DDI_SUCCESS);
+    case DDI_RESUME:
+    case DDI_PM_RESUME:
+    default:
+        break;
+    }
+    return (DDI_FAILURE);
+    /*NOTREACHED*/
+FAIL:
+    ddi_soft_state_free(lyr_statep, inst);
+    ddi_remove_minor_node(dip, NULL);
+    return (DDI_FAILURE);
+}
+
+static int
+lyr_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+    int inst;
+    lyr_state_t *statep;
+    char *myname = "lyr_detach";
+
+    inst = ddi_get_instance(dip);
+    statep = ddi_get_soft_state(lyr_statep, inst);
+    if (statep == NULL) {
+        cmn_err(CE_WARN, "%s: get soft state failed on "
+            "inst %d\n", myname, inst);
+        return (DDI_FAILURE);
+    }
+    if (statep-&gt;dip != dip) {
+        cmn_err(CE_WARN, "%s: soft state does not match devinfo "
+            "on inst %d\n", myname, inst);
+        return (DDI_FAILURE);
+    }
+    switch (cmd) {
+    case DDI_DETACH:
+        mutex_destroy(&amp;statep-&gt;lock);
+        ddi_soft_state_free(lyr_statep, inst);
+        ddi_remove_minor_node(dip, NULL);
+        return (DDI_SUCCESS);
+    case DDI_SUSPEND:
+    case DDI_PM_SUSPEND:
+    default:
+        break;
+    }
+    return (DDI_FAILURE);
+}
+/*
+ * on this driver's open, we open the target specified by a property and store
+ * the layered handle and ident in our soft state.  a good target would be
+ * "/dev/console" or more interestingly, a pseudo terminal as specified by the
+ * tty command
+ */
+/*ARGSUSED*/
+static int
+lyr_open(dev_t *devtp, int oflag, int otyp, cred_t *credp)
+{
+    int rv, inst = getminor(*devtp);
+    lyr_state_t *statep;
+    char *myname = "lyr_open";
+    dev_info_t *dip;
+    char *lyr_targ = NULL;
+
+    statep = (lyr_state_t *)ddi_get_soft_state(lyr_statep, inst);
+    if (statep == NULL) {
+        cmn_err(CE_WARN, "%s: ddi_get_soft_state failed on "
+            "inst %d\n", myname, inst);
+        return (EIO);
+    }
+    dip = statep-&gt;dip;
+    /*
+     * our target device to open should be specified by the "lyr_targ"
+     * string property, which should be set in this driver's .conf file
+     */
+    if (ddi_prop_lookup_string(DDI_DEV_T_ANY, dip, DDI_PROP_NOTPROM,
+        "lyr_targ", &amp;lyr_targ) != DDI_PROP_SUCCESS) {
+        cmn_err(CE_WARN, "%s: ddi_prop_lookup_string failed on "
+            "inst %d\n", myname, inst);
+        return (EIO);
+    }
+    /*
+     * since we only have one pair of lh's and li's available, we don't
+     * allow multiple on the same instance
+     */
+    mutex_enter(&amp;statep-&gt;lock);
+    if (statep-&gt;flags &amp; (LYR_OPENED | LYR_IDENTED)) {
+        cmn_err(CE_WARN, "%s: multiple layered opens or idents "
+            "from inst %d not allowed\n", myname, inst);
+        mutex_exit(&amp;statep-&gt;lock);
+        ddi_prop_free(lyr_targ);
+        return (EIO);
+    }
+    rv = ldi_ident_from_dev(*devtp, &amp;statep-&gt;li);
+    if (rv != 0) {
+        cmn_err(CE_WARN, "%s: ldi_ident_from_dev failed on inst %d\n",
+            myname, inst);
+        goto FAIL;
+    }
+    statep-&gt;flags |= LYR_IDENTED;
+    rv = ldi_open_by_name(lyr_targ, FREAD | FWRITE, credp, &amp;statep-&gt;lh,
+        statep-&gt;li);
+    if (rv != 0) {
+        cmn_err(CE_WARN, "%s: ldi_open_by_name failed on inst %d\n",
+            myname, inst);
+        goto FAIL;
+    }
+    statep-&gt;flags |= LYR_OPENED;
+    cmn_err(CE_CONT, "\n%s: opened target '%s' successfully on inst %d\n",
+        myname, lyr_targ, inst);
+    rv = 0;
+
+FAIL:
+    /* cleanup on error */
+    if (rv != 0) {
+        if (statep-&gt;flags &amp; LYR_OPENED)
+            (void)ldi_close(statep-&gt;lh, FREAD | FWRITE, credp);
+        if (statep-&gt;flags &amp; LYR_IDENTED)
+            ldi_ident_release(statep-&gt;li);
+        statep-&gt;flags &amp;= ~(LYR_OPENED | LYR_IDENTED);
+    }
+    mutex_exit(&amp;statep-&gt;lock);
+    if (lyr_targ != NULL)
+        ddi_prop_free(lyr_targ);
+    return (rv);
+}
+/*
+ * on this driver's close, we close the target indicated by the lh member
+ * in our soft state and release the ident, li as well.  in fact, we MUST do
+ * both of these at all times even if close yields an error because the
+ * device framework effectively closes the device, releasing all data
+ * associated with it and simply returning whatever value the target's
+ * close(9E) returned.  therefore, we must as well.
+ */
+/*ARGSUSED*/
+static int
+lyr_close(dev_t devt, int oflag, int otyp, cred_t *credp)
+{
+    int rv, inst = getminor(devt);
+    lyr_state_t *statep;
+    char *myname = "lyr_close";
+    statep = (lyr_state_t *)ddi_get_soft_state(lyr_statep, inst);
+    if (statep == NULL) {
+        cmn_err(CE_WARN, "%s: ddi_get_soft_state failed on "
+            "inst %d\n", myname, inst);
+        return (EIO);
+    }
+    mutex_enter(&amp;statep-&gt;lock);
+    rv = ldi_close(statep-&gt;lh, FREAD | FWRITE, credp);
+    if (rv != 0) {
+        cmn_err(CE_WARN, "%s: ldi_close failed on inst %d, but will ",
+            "continue to release ident\n", myname, inst);
+    }
+    ldi_ident_release(statep-&gt;li);
+    if (rv == 0) {
+        cmn_err(CE_CONT, "\n%s: closed target successfully on "
+            "inst %d\n", myname, inst);
+    }
+    statep-&gt;flags &amp;= ~(LYR_OPENED | LYR_IDENTED);
+    mutex_exit(&amp;statep-&gt;lock);
+    return (rv);
+}
+/*
+ * echo the data we receive to the target
+ */
+/*ARGSUSED*/
+static int
+lyr_write(dev_t devt, struct uio *uiop, cred_t *credp)
+{
+    int rv, inst = getminor(devt);
+    lyr_state_t *statep;
+    char *myname = "lyr_write";
+
+    statep = (lyr_state_t *)ddi_get_soft_state(lyr_statep, inst);
+    if (statep == NULL) {
+        cmn_err(CE_WARN, "%s: ddi_get_soft_state failed on "
+            "inst %d\n", myname, inst);
+        return (EIO);
+    }
+    return (ldi_write(statep-&gt;lh, uiop, credp));
+}</programlisting>
+</example>
+</sect3><task id="ewpri"><title>How to Build and Load the Layered Driver</title><procedure><step><para>Compile the driver.</para><para>Use the <option>D_KERNEL</option> option
+to indicate that this is a kernel module.</para><itemizedlist><listitem><para>If you are compiling for a SPARC architecture, use the <option>xarch=v9</option> option:</para><screen>% <userinput>cc -c -D_KERNEL -xarch=v9 lyr.c</userinput></screen>
+</listitem><listitem><para>If you are compiling for a 32-bit x86 architecture, use the
+following command:</para><screen>% <userinput>cc -c -D_KERNEL lyr.c</userinput></screen>
+</listitem>
+</itemizedlist>
+</step><step><para>Link the driver.</para><screen>% <userinput>ld -r -o lyr lyr.o</userinput></screen>
+</step><step><para>Install the configuration file.</para><para>As user <literal>root</literal>,
+copy the configuration file to the kernel driver area of the machine:</para><screen># <userinput>cp lyr.conf /usr/kernel/drv</userinput></screen>
+</step><step><para>Install the driver binary.</para><itemizedlist><listitem><para>As user <literal>root</literal>, copy the driver binary to
+the <literal>sparcv9</literal> driver area on a SPARC architecture:</para><screen># <userinput>cp lyr /usr/kernel/drv/sparcv9</userinput></screen>
+</listitem><listitem><para>As user <literal>root</literal>, copy the driver binary to
+the <literal>drv</literal> driver area on a 32-bit x86 architecture:</para><screen># <userinput>cp lyr /usr/kernel/drv</userinput></screen>
+</listitem>
+</itemizedlist>
+</step><step><para><indexterm><primary><command>add_drv</command> command</primary></indexterm>Load the driver.</para><para>As user <literal>root</literal>,
+use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to load the driver.</para><screen># <userinput>add_drv lyr</userinput></screen><para>List the pseudo devices to confirm that the <literal>lyr</literal> device
+now exists:</para><screen># <userinput>ls /devices/pseudo | grep lyr</userinput>
+lyr@1
+lyr@1:node</screen>
+</step>
+</procedure>
+</task><sect3 id="euihe"><title>Test the Layered Driver</title><para>To test the <literal>lyr</literal> driver, write a message to the <literal>lyr</literal> device and verify that the message displays on the <literal>lyr_targ</literal> device.</para><example id="exegr"><title>Write a Short Message to the Layered Device</title><para>In this example, the <literal>lyr_targ</literal> device is the console
+of the system where the <literal>lyr</literal> device is installed.</para><para>If the display you are viewing is also the display for the console device
+of the system where the <literal>lyr</literal> device is installed, note that
+writing to the console will corrupt your display. The console messages will
+appear outside your window system. You will need to redraw or refresh your
+display after testing the <literal>lyr</literal> driver.</para><para>If the display you are viewing is not the display for the console device
+of the system where the <literal>lyr</literal> device is installed, log into
+or otherwise gain a view of the display of the target console device.</para><para>The following command writes a very brief message to the <literal>lyr</literal> device:</para><screen># <userinput>echo "\n\n\t===&gt; Hello World!! &lt;===\n" &gt; /devices/pseudo/lyr@1:node</userinput></screen><para>You should see the following messages displayed on the target console:</para><programlisting>console login:
+
+    ===&gt; Hello World!! &lt;===
+
+lyr: 
+lyr_open: opened target '/dev/console' successfully on inst 1
+lyr: 
+lyr_close: closed target successfully on inst 1</programlisting><para><indexterm><primary><function>cmn_err</function> function</primary></indexterm>The messages from <function>lyr_open</function> and <function>lyr_close</function> come from the <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> calls
+in the <function>lyr_open</function> and <function>lyr_close</function> entry
+points.</para>
+</example><example id="exegt"><title>Write a Longer Message to the Layered Device</title><para>The following command writes a longer message to the <literal>lyr</literal> device:</para><screen># <userinput>cat lyr.conf &gt; /devices/pseudo/lyr@1:node</userinput></screen><para>You should see the following messages displayed on the target console:</para><programlisting>lyr: 
+lyr_open: opened target '/dev/console' successfully on inst 1
+#
+# Copyright 2004 Sun Microsystems, Inc.  All rights reserved.
+# Use is subject to license terms.
+#
+#pragma ident   "%Z%%M% %I%     %E% SMI"
+
+name="lyr" parent="pseudo" instance=1;
+lyr_targ="/dev/console";
+lyr: 
+lyr_close: closed target successfully on inst 1</programlisting>
+</example><example id="exegu"><title>Change the Target Device</title><para><indexterm><primary><command>modinfo</command> command</primary></indexterm><indexterm><primary><command>update_drv</command> command</primary></indexterm>To change the target device, edit <literal>/usr/kernel/drv/lyr.conf</literal> and
+change the value of the <literal>lyr_targ</literal> property to be a path
+to a different target device. For example, the target device could be the
+output of a <literal>tty</literal> command in a local terminal. An example
+of such a device path is <literal>/dev/pts/4</literal>.</para><para>Make sure the <literal>lyr</literal> device is not in use before you
+update the driver to use the new target device.</para><screen># <userinput>modinfo -c | grep lyr</userinput>
+174          3 lyr                              UNLOADED/UNINSTALLED</screen><para>Use the <olink targetdoc="group-refman" targetptr="update-drv-1m" remap="external"><citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to reload the <literal>lyr.conf</literal> configuration
+file:</para><screen># <userinput>update_drv lyr</userinput></screen><para>Write a message to the <literal>lyr</literal> device again and verify
+that the message displays on the new <literal>lyr_targ</literal> device.</para>
+</example>
+</sect3>
+</sect2>
+</sect1><sect1 id="ldi-5"><title>User Interfaces</title><indexterm><primary>device layering</primary><see>LDI</see>
+</indexterm><indexterm><primary>LDI</primary><secondary>device layering</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>device usage</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary><literal>libdevinfo</literal> interfaces</secondary>
+</indexterm><indexterm><primary><literal>libdevinfo</literal> device information library</primary>
+</indexterm><para>The LDI includes user-level library and command interfaces to report
+device layering and usage information. <olink targetptr="ldi-18" remap="internal">Device Information
+Library Interfaces</olink> discusses the <olink targetdoc="group-refman" targetptr="libdevinfo-3lib" remap="external"><citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> interfaces for reporting
+device layering information. <olink targetptr="ldi-14" remap="internal">Print System Configuration
+Command Interfaces</olink> discusses the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> interfaces for reporting
+kernel device usage information. <olink targetptr="ldi-15" remap="internal">Device User Command
+Interfaces</olink> discusses the <olink targetdoc="group-refman" targetptr="fuser-1m" remap="external"><citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> interfaces for reporting
+device consumer information.</para><sect2 id="ldi-18"><title>Device Information Library Interfaces</title><indexterm><primary>lnode</primary>
+</indexterm><indexterm><primary>device information</primary><secondary>lnode</secondary>
+</indexterm><para>The LDI includes <olink targetdoc="group-refman" targetptr="libdevinfo-3lib" remap="external"><citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> interfaces that report
+a snapshot of device layering information. Device layering occurs when one
+device in the system is a consumer of another device in the system. Device
+layering information is reported only if both the consumer and the target
+are bound to a device node that is contained within the snapshot.</para><para>Device layering information is reported by the <citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry> interfaces as a directed graph. An <emphasis>lnode</emphasis> is
+an abstraction that represents a vertex in the graph and is bound to a device
+node. You can use <citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry> interfaces to access properties
+of an lnode, such as the name and device number of the node.</para><para>The edges in the graph are represented by a link. A link has a source
+lnode that represents the device consumer. A link also has a target lnode
+that represents the target device.</para><para><indexterm><primary>device information</primary><secondary><literal>DINFOLYR</literal></secondary></indexterm><indexterm><primary>device information</primary><secondary><literal>di_lnode_t</literal></secondary></indexterm><indexterm><primary>device information</primary><secondary><literal>di_node_t</literal></secondary></indexterm><indexterm><primary>device information</primary><secondary><literal>di_link_t</literal></secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_walk_link</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_walk_lnode</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_next_by_node</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_next_by_lnode</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_to_lnode</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_spectype</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_lnode_next</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_lnode_name</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_lnode_devinfo</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_lnode_devt</function> function</secondary></indexterm>The following describes the <citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry> device layering information interfaces:</para><variablelist><varlistentry><term><literal>DINFOLYR</literal></term><listitem><para>Snapshot flag that enables you to capture device layering
+information.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>di_link_t</literal></term><listitem><para>A directed link between two endpoints. Each endpoint is a <literal>di_lnode_t</literal>. An opaque structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>di_lnode_t</literal></term><listitem><para>The endpoint of a link. An opaque structure. A <literal>di_lnode_t</literal> is bound to a <literal>di_node_t</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>di_node_t</literal></term><listitem><para>Represents a device node. An opaque structure. A <literal>di_node_t</literal> is not necessarily bound to a <literal>di_lnode_t</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-walk-link-3devinfo" remap="external"><citerefentry><refentrytitle>di_walk_link</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Walk all links in the snapshot.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-walk-lnode-3devinfo" remap="external"><citerefentry><refentrytitle>di_walk_lnode</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Walk all lnodes in the snapshot.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-next-by-node-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_next_by_node</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a handle to the next link where the specified <literal>di_node_t</literal> node is either the source or the target.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-next-by-lnode-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_next_by_lnode</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a handle to the next link where the specified <literal>di_lnode_t</literal> lnode is either the source or the target.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-to-lnode-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_to_lnode</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the lnode that corresponds to the specified endpoint of
+a <literal>di_link_t</literal> link.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-spectype-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_spectype</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the link spectype. The spectype indicates how the target
+device is being accessed. The target device is represented by the target lnode.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-next-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_next</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a handle to the next occurrence of the specified <literal>di_lnode_t</literal> lnode associated with the specified <literal>di_node_t</literal> device
+node.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-name-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_name</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the name that is associated with the specified lnode.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-devinfo-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_devinfo</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a handle to the device node that is associated with the
+specified lnode.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-devt-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_devt</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the device number of the device node that is associated
+with the specified lnode.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The device layering information returned by the LDI can be quite complex.
+Therefore, the LDI provides interfaces to help you traverse the device tree
+and the device usage graph. These interfaces enable the consumer of a device
+tree snapshot to associate custom data pointers with different structures
+within the snapshot. For example, as an application traverses lnodes, the
+application can update the custom pointer associated with each lnode to mark
+which lnodes already have been seen.</para><para><indexterm><primary>device information</primary><secondary><function>di_lnode_private_set</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_lnode_private_get</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_private_set</function> function</secondary></indexterm><indexterm><primary>device information</primary><secondary><function>di_link_private_get</function> function</secondary></indexterm>The following describes the <citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry> node and link marking interfaces:</para><variablelist><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-private-set-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_private_set</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Associate the specified data with the specified lnode. This
+association enables you to traverse lnodes in the snapshot.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-lnode-private-get-3devinfo" remap="external"><citerefentry><refentrytitle>di_lnode_private_get</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve a pointer to data that was associated with an lnode
+through a call to <citerefentry><refentrytitle>di_lnode_private_set</refentrytitle><manvolnum>3DEVINFO</manvolnum></citerefentry>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-private-set-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_private_set</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Associate the specified data with the specified link. This
+association enables you to traverse links in the snapshot.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman" targetptr="di-link-private-get-3devinfo" remap="external"><citerefentry><refentrytitle>di_link_private_get</refentrytitle><manvolnum>3DEVINFO</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve a pointer to data that was associated with a link
+through a call to <citerefentry><refentrytitle>di_link_private_set</refentrytitle><manvolnum>3DEVINFO</manvolnum></citerefentry>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="ldi-14"><title>Print System Configuration Command Interfaces</title><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying kernel device usage information</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary><command>prtconf</command> command</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>device usage</secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+is enhanced to display kernel device usage information. The default <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> output
+is not changed. Device usage information is displayed when you specify the
+verbose option (<option>v</option>) with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. Usage information
+about a particular device is displayed when you specify a path to that device
+on the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command line.</para><variablelist><varlistentry><term><command>prtconf -v</command></term><listitem><para>Display device minor node and device usage information. Show
+kernel consumers and the minor nodes each kernel consumer currently has open.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>prtconf</command> <replaceable>path</replaceable></term><listitem><para>Display device usage information for the device specified
+by <replaceable>path</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>prtconf -a</command> <replaceable>path</replaceable></term><listitem><para>Display device usage information for the device specified
+by <replaceable>path</replaceable> and all device nodes that are ancestors
+of <replaceable>path</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>prtconf -c</command> <replaceable>path</replaceable></term><listitem><para>Display device usage information for the device specified
+by <replaceable>path</replaceable> and all device nodes that are children
+of <replaceable>path</replaceable>.</para>
+</listitem>
+</varlistentry>
+</variablelist><example id="exegp"><title>Device Usage Information</title><para>When you want usage information about a particular device, the value
+of the <replaceable>path</replaceable> parameter can be any valid device path.</para><screen><userinput>% prtconf /dev/cfg/c0</userinput>
+SUNW,isptwo, instance #0</screen>
+</example><example id="exegs"><title>Ancestor Node Usage Information</title><para>To display usage information about a particular device and all device
+nodes that are ancestors of that particular device, specify the <option>a</option> flag
+with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. Ancestors include all nodes up to the root of the
+device tree. If you specify the <option>a</option> flag with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command,
+then you must also specify a device <replaceable>path</replaceable> name.</para><screen><userinput>% prtconf -a /dev/cfg/c0</userinput>
+SUNW,Sun-Fire
+    ssm, instance #0
+        pci, instance #0
+            pci, instance #0
+                SUNW,isptwo, instance #0</screen>
+</example><example id="exegw"><title>Child Node Usage Information</title><para>To display usage information about a particular device and all device
+nodes that are children of that particular device, specify the <option>c</option> flag
+with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. If you specify the <option>c</option> flag with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command,
+then you must also specify a device <replaceable>path</replaceable> name.</para><screen><userinput>% prtconf -c /dev/cfg/c0</userinput>
+SUNW,isptwo, instance #0
+    sd (driver not attached)
+    st (driver not attached)
+    sd, instance #1
+    sd, instance #0
+    sd, instance #6
+    st, instance #1 (driver not attached)
+    st, instance #0 (driver not attached)
+    st, instance #2 (driver not attached)
+    st, instance #3 (driver not attached)
+    st, instance #4 (driver not attached)
+    st, instance #5 (driver not attached)
+    st, instance #6 (driver not attached)
+    ses, instance #0 (driver not attached)
+    ...</screen>
+</example><example id="exego"><title>Layering and Device Minor Node Information &ndash;
+Keyboard</title><para>To display device layering and device minor node information about a
+particular device, specify the <option>v</option> flag with the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command.</para><screen><userinput>% prtconf -v /dev/kbd</userinput>
+conskbd, instance #0
+    System properties:
+        ...
+    Device Layered Over:
+        mod=kb8042 dev=(101,0)
+            dev_path=/isa/i8042@1,60/keyboard@0
+    Device Minor Nodes:
+        dev=(103,0)
+            dev_path=/pseudo/conskbd@0:kbd
+                spectype=chr type=minor
+                dev_link=/dev/kbd
+        dev=(103,1)
+            dev_path=/pseudo/conskbd@0:conskbd
+                spectype=chr type=internal
+            Device Minor Layered Under:
+                mod=wc accesstype=chr
+                    dev_path=/pseudo/wc@0</screen><para>This example shows that the <literal>/dev/kbd</literal> device is layered
+on top of the hardware keyboard device (<literal>/isa/i8042@1,60/keyboard@0</literal>).
+This example also shows that the <literal>/dev/kbd</literal> device has two
+device minor nodes. The first minor node has a <literal>/dev</literal> link
+that can be used to access the node. The second minor node is an internal
+node that is not accessible through the file system. The second minor node
+has been opened by the <literal>wc</literal> driver, which is the workstation
+console. Compare the output from this example to the output from <olink targetptr="exegq" remap="internal">Example&nbsp;14&ndash;12</olink>.</para>
+</example><example id="exegn"><title>Layering and Device Minor Node Information &ndash;
+Network Device</title><para>This example shows which devices are using the currently plumbed network
+device.</para><screen><userinput>% prtconf -v /dev/iprb0</userinput>
+pci1028,145, instance #0
+    Hardware properties:
+        ...
+    Interrupt Specifications:
+        ...
+    Device Minor Nodes:
+        dev=(27,1)
+            dev_path=/pci@0,0/pci8086,244e@1e/pci1028,145@c:iprb0
+                spectype=chr type=minor
+                alias=/dev/iprb0
+        dev=(27,4098)
+            dev_path=&lt;clone&gt;
+            Device Minor Layered Under:
+                mod=udp6 accesstype=chr
+                    dev_path=/pseudo/udp6@0
+        dev=(27,4097)
+            dev_path=&lt;clone&gt;
+            Device Minor Layered Under:
+                mod=udp accesstype=chr
+                    dev_path=/pseudo/udp@0
+        dev=(27,4096)
+            dev_path=&lt;clone&gt;
+            Device Minor Layered Under:
+                mod=udp accesstype=chr
+                    dev_path=/pseudo/udp@0</screen><para>This example shows that the <literal>iprb0</literal> device has been
+linked under <literal>udp</literal> and <literal>udp6</literal>. Notice that
+no paths are shown to the minor nodes that <literal>udp</literal> and <literal>udp6</literal> are using. No paths are shown in this case because the minor nodes
+were created through <literal>clone</literal> opens of the <literal>iprb</literal> driver,
+and therefore there are no file system paths by which these nodes can be accessed.
+Compare the output from this example to the output from <olink targetptr="exegv" remap="internal">Example&nbsp;14&ndash;11</olink>.</para>
+</example>
+</sect2><sect2 id="ldi-15"><title>Device User Command Interfaces</title><indexterm><primary><command>fuser</command> command</primary><secondary>display device usage information</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary><command>fuser</command> command</secondary>
+</indexterm><indexterm><primary>LDI</primary><secondary>device usage</secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="fuser-1m" remap="external"><citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+is enhanced to display device usage information. The <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command
+displays device usage information only if <replaceable>path</replaceable> represents
+a device minor node. The <option>d</option> flag is valid for the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command
+only if you specify a <replaceable>path</replaceable> that represents a device
+minor node.</para><variablelist><varlistentry><term><command>fuser</command> <replaceable>path</replaceable></term><listitem><para>Display information about application device consumers and
+kernel device consumers if <replaceable>path</replaceable> represents a device
+minor node.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>fuser -d</command> <replaceable>path</replaceable></term><listitem><para>Display all users of the underlying device that is associated
+with the device minor node represented by <replaceable>path</replaceable>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Kernel device consumers are reported in one of the following four formats.
+Kernel device consumers always are surrounded by square brackets (<literal>[]</literal>).</para><screen>        [<replaceable>kernel_module_name</replaceable>]
+        [<replaceable>kernel_module_name</replaceable>,dev_path=<replaceable>path</replaceable>]
+        [<replaceable>kernel_module_name</replaceable>,dev=(<replaceable>major</replaceable>,<replaceable>minor</replaceable>)]
+        [<replaceable>kernel_module_name</replaceable>,dev=(<replaceable>major</replaceable>,<replaceable>minor</replaceable>),dev_path=<replaceable>path</replaceable>]</screen><para>When the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command displays file or device users, the output consists
+of a process ID on <literal>stdout</literal> followed by a character on <literal>stderr</literal>. The character on <literal>stderr</literal> describes how
+the file or device is being used. All kernel consumer information is displayed
+to <literal>stderr</literal>. No kernel consumer information is displayed
+to <literal>stdout</literal>.</para><para>If you do not use the <option>d</option> flag, then the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command
+reports consumers of only the device minor node that is specified by <replaceable>path</replaceable>. If you use the <option>d</option> flag, then the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command
+reports consumers of the device node that underlies the minor node specified
+by <replaceable>path</replaceable>. The following example illustrates the
+difference in report output in these two cases.</para><example id="exegv"><title>Consumers of Underlying Device Nodes</title><para>Most network devices clone their minor node when the device is opened.
+If you request device usage information for the clone minor node, the usage
+information might show that no process is using the device. If instead you
+request device usage information for the underlying device node, the usage
+information might show that a process is using the device. In this example,
+no device consumers are reported when only a device <replaceable>path</replaceable> is
+passed to the <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. When the <option>d</option> flag is used, the output
+shows that the device is being accessed by <literal>udp</literal> and <literal>udp6</literal>.</para><screen><userinput>% fuser /dev/iprb0</userinput>
+/dev/iprb0:
+<userinput>% fuser -d /dev/iprb0</userinput>
+/dev/iprb0:  [udp,dev_path=/pseudo/udp@0] [udp6,dev_path=/pseudo/udp6@0]</screen><para>Compare the output from this example to the output from <olink targetptr="exegn" remap="internal">Example&nbsp;14&ndash;10</olink>.</para>
+</example><example id="exegq"><title>Consumer of the Keyboard Device</title><para>In this example, a kernel consumer is accessing <literal>/dev/kbd</literal>.
+The kernel consumer that is accessing the <literal>/dev/kbd</literal> device
+is the workstation console driver.</para><screen><userinput>% fuser -d /dev/kbd</userinput>
+/dev/kbd:  [genunix] [wc,dev_path=/pseudo/wc@0]</screen><para>Compare the output from this example to the output from <olink targetptr="exego" remap="internal">Example&nbsp;14&ndash;9</olink>.</para>
+</example>
+</sect2>
+</sect1>
+</chapter><?Pub *0000083196 0?>

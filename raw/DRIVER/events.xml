@@ -1,0 +1,369 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="events-1"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag
+atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Managing Events and Queueing
+Tasks</title><highlights><itemizedlist><para>Drivers use events to respond to state changes. This chapter provides
+the following information on events:</para><listitem><para><olink targetptr="esbjb" remap="internal">Introduction to Events</olink></para>
+</listitem><listitem><para><olink targetptr="esqad" remap="internal">Using ddi_log_sysevent() to Log Events</olink></para>
+</listitem><listitem><para><olink targetptr="esqag" remap="internal">Defining Event Attributes</olink></para>
+</listitem>
+</itemizedlist><itemizedlist><para>Drivers use task queues to manage resource dependencies between tasks.
+This chapter provides the following information about task queues:</para><listitem><para><olink targetptr="gbsgo" remap="internal">Introduction to Task Queues</olink></para>
+</listitem><listitem><para><olink targetptr="gbtdk" remap="internal">Task Queue Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="gbtcs" remap="internal">Using Task Queues</olink></para>
+</listitem><listitem><para><olink targetptr="gbtdm" remap="internal">Observing Task Queues</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="events"><title>Managing Events</title><para>A system often needs to respond to a condition change such as a user
+action or system request. For example, a device might issue a warning when
+a component begins to overheat, or might start a movie player when a DVD is
+inserted into a drive. Device drivers can use a special message called an <emphasis>event</emphasis> to inform the system that a change in state has taken place.</para><sect2 id="esbjb"><title>Introduction to Events</title><indexterm><primary>events</primary><secondary>description of</secondary>
+</indexterm><para>An <emphasis>event</emphasis> is a message that a device driver sends
+to interested entities to indicate that a change of state has taken place.
+Events are implemented in the Solaris OS as user-defined, name-value pair
+structures that are managed using the <literal>nvlist*</literal> functions.
+(See the <olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page. Events are organized by vendor, class, and
+subclass. For example, you could define a class for monitoring environmental
+conditions. An environmental class could have subclasses to indicate changes
+in temperature, fan status, and power.</para><para>When a change in state occurs, the device notifies the driver. The driver
+then uses the <olink targetdoc="group-refman" targetptr="ddi-log-sysevent-9f" remap="external"><citerefentry><refentrytitle>ddi_log_sysevent</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to log this event in a queue called <literal>sysevent</literal>. The <literal>sysevent</literal> queue passes events to the user
+level for handling by either the <literal>syseventd</literal> daemon or <literal>syseventconfd</literal> daemon. These daemons send notifications to any applications
+that have subscribed for notification of the specified event.</para><para>Two methods for designers of user-level applications deal with events:</para><itemizedlist><listitem><para>An application can use the routines in <olink targetdoc="group-refman" targetptr="libsysevent-3lib" remap="external"><citerefentry><refentrytitle>libsysevent</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> to subscribe with the <literal>syseventd</literal> daemon
+for notification when a specific event occurs.</para>
+</listitem><listitem><para>A developer can write a separate user-level application to
+respond to an event. This type of application needs to be registered with <olink targetdoc="group-refman" targetptr="syseventadm-1m" remap="external"><citerefentry><refentrytitle>syseventadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. When <literal>syseventconfd</literal> encounters
+the specified event, the application is run and deals with the event accordingly.</para>
+</listitem>
+</itemizedlist><para>This process is illustrated in the following figure.</para><figure id="esbjc"><title>Event Plumbing</title><mediaobject><imageobject><imagedata entityref="EventPlumbing"/>
+</imageobject><textobject><simpara>Diagram shows how events are logged into the sysevent
+queue for notification of user-level applications.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="esqad"><title>Using <function>ddi_log_sysevent</function> to Log
+Events</title><para><indexterm><primary><function>ddi_log_sysevent</function> function</primary></indexterm><indexterm><primary><function>ddi_log_sysevent</function> function</primary></indexterm>Device drivers use the <olink targetdoc="group-refman" targetptr="ddi-log-sysevent-9f" remap="external"><citerefentry><refentrytitle>ddi_log_sysevent</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> interface to generate and
+log events with the system.</para><sect3 id="esqaf"><title><function>ddi_log_sysevent</function> Syntax</title><para><function>ddi_log_sysevent</function> uses the following syntax:</para><programlisting>int ddi_log_sysevent(dev_info_t <replaceable>*dip</replaceable>, char <replaceable>*vendor</replaceable>, char *class, 
+    char <replaceable>*subclass</replaceable>, nvlist_t <replaceable>*attr-list</replaceable>, sysevent_id_t <replaceable>*eidp</replaceable>, int <replaceable>sleep-flag</replaceable>);</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>dip</replaceable></term><listitem><para>A pointer to the <replaceable>dev_info</replaceable> node
+for this driver.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>vendor</replaceable></term><listitem><para>A pointer to a string that defines the driver's vendor. Third-party
+drivers should use their company's stock symbol or a similarly enduring identifier.
+ Sun-supplied drivers use <literal>DDI_VENDOR_SUNW</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>class</replaceable></term><listitem><para>A pointer to a string defining the event's class. <parameter>class</parameter> is a driver-specific value. An example of a class might be a
+string that represents a set of environmental conditions that affect a device.
+This value must be understood by the event consumer.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>subclass</replaceable></term><listitem><para>A driver-specific string that represents a subset of the <parameter>class</parameter> argument. For example, within a class that represents environmental
+conditions, an event subclass might refer to the device's temperature. This
+value must be intelligible to the event consumer.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>attr-list</replaceable></term><listitem><para>A pointer to an <structname>nvlist_t</structname> structure
+that lists name-value attributes associated with the event.   Name-value attributes
+are driver-defined and can refer to a specific attribute or condition of the
+device.</para><para>For example, consider a device that reads both CD-ROMs and DVDs. That
+device could have an attribute with the name <literal>disc_type</literal> and
+the value equal to either <literal>cd_rom</literal> or <literal>dvd</literal>.</para><para>As with <parameter>class</parameter> and <parameter>subclass</parameter>,
+an event consumer must be able to interpret the name-value pairs.</para><para>For more information on name-value pairs and the <structname>nvlist_t</structname> structure,
+see <olink targetptr="esqag" remap="internal">Defining Event Attributes</olink>, as well as
+the <olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para><para>If the event has no attributes, then this argument should be set to <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>eidp</replaceable></term><listitem><para>The address of a <structname>sysevent_id_t</structname> structure.
+ The <structname>sysevent_id_t</structname> structure is used to provide a
+unique identification for the event. <citerefentry><refentrytitle>ddi_log_sysevent</refentrytitle><manvolnum>9F</manvolnum></citerefentry> returns this structure
+with a system-provided event sequence number and time stamp.  See the <olink targetdoc="group-refman" targetptr="ddi-log-sysevent-9f" remap="external"><citerefentry><refentrytitle>ddi_log_sysevent</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for more information on the <structname>sysevent_id_t</structname> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>sleep-flag</replaceable></term><listitem><para>A flag that indicates how the caller wants to handle the
+possibility of resources not being available. If
+<replaceable>sleep-flag</replaceable> is set to <literal>DDI_SLEEP</literal>,
+the driver blocks until the resources become available. With
+<literal>DDI_NOSLEEP</literal>, an allocation will not sleep and cannot be
+guaranteed to succeed. If <literal>DDI_ENOMEM</literal> is returned, the driver
+would need to retry the operation at a later time.</para><para>Even with <literal>DDI_SLEEP</literal>, other error returns are possible
+with this interface, such as system busy, the <literal>syseventd</literal>
+daemon not responding, or trying to log an event in interrupt context.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="esqap"><title>Sample Code for Logging Events</title><para>A device driver performs the following tasks to log events:</para><itemizedlist><listitem><para>Allocate memory for the attribute list using <olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para>Add name-value pairs to the attribute list</para>
+</listitem><listitem><para>Use the <olink targetdoc="group-refman" targetptr="ddi-log-sysevent-9f" remap="external"><citerefentry><refentrytitle>ddi_log_sysevent</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to log the event
+in the <literal>sysevent</literal> queue</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="nvlist-free-9f" remap="external"><citerefentry><refentrytitle>nvlist_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when the attribute list is no longer needed</para>
+</listitem>
+</itemizedlist><para>The following example demonstrates how to use <function>ddi_log_sysevent</function>.</para><example id="esqew"><title>Calling <function>ddi_log_sysevent</function></title><programlisting>char *vendor_name = "DDI_VENDOR_JGJG"
+char *my_class = "JGJG_event";
+char *my_subclass = "JGJG_alert";
+nvlist_t *nvl;
+/* ... */
+nvlist_alloc(&amp;nvl, nvflag, kmflag);
+/* ... */
+(void) nvlist_add_byte_array(nvl, propname, (uchar_t *)propval, proplen + 1); 
+/* ... */
+if (ddi_log_sysevent(dip, vendor_name, my_class, 
+    my_subclass, nvl, NULL, DDI_SLEEP)!= DDI_SUCCESS)
+    cmn_err(CE_WARN, "error logging system event"); 
+nvlist_free(nvl);</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="esqag"><title>Defining Event Attributes</title><indexterm><primary>events</primary><secondary>attributes</secondary>
+</indexterm><para>Event attributes are defined as a list of name-value pairs. The Solaris
+DDI provides routines and structures for storing information in name-value
+pairs. Name-value pairs are retained in an <structname>nvlist_t</structname> structure,
+which is opaque to the driver. The value for a name-value pair can be a Boolean,
+an <literal>int</literal>, a byte, a string, an <literal>nvlist</literal>,
+or an array of these data types.  An <literal>int</literal> can be defined
+as 16 bits, 32 bits, or 64 bits and can be signed or unsigned.</para><para>The steps in creating a list of name-value pairs are as follows.</para><orderedlist><listitem><para><indexterm><primary><structname>nvlist_alloc</structname> structure</primary><secondary>description of</secondary></indexterm>Create an <structname>nvlist_t</structname> structure with <olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The <function>nvlist_alloc</function> interface takes three arguments:</para><itemizedlist><listitem><para><replaceable>nvlp</replaceable> &ndash; Pointer to a pointer
+to an <structname>nvlist_t</structname> structure</para>
+</listitem><listitem><para><replaceable>nvflag</replaceable> &ndash; Flag to indicate
+the uniqueness of the names of the pairs. If this flag is set to <literal>NV_UNIQUE_NAME_TYPE</literal>, any existing pair that matches the name and type of a new pair
+is removed from the list. If the flag is set to <literal>NV_UNIQUE_NAME</literal>,
+then any existing pair with a duplicate name is removed, regardless of its
+type.  Specifying <literal>NV_UNIQUE_NAME_TYPE</literal> allows a list to
+contain two or more pairs with the same name as long as their types are different,
+whereas with <literal>NV_UNIQUE_NAME</literal> only one instance of a pair
+name can be in the list. If the flag is not set, then no uniqueness checking
+is done and the consumer of the list is responsible for dealing with duplicates.</para>
+</listitem><listitem><para><replaceable>kmflag</replaceable> &ndash; Flag to indicate
+the allocation policy for kernel memory. If this argument is set to <literal>KM_SLEEP</literal>, then the driver blocks until the requested memory is available
+for allocation. <literal>KM_SLEEP</literal> allocations might sleep but are
+guaranteed to succeed. <literal>KM_NOSLEEP</literal> allocations are guaranteed
+not to sleep but might return <literal>NULL</literal> if no memory is currently
+available.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Populate the <literal>nvlist</literal> with name-value pairs.
+For example, to add a string, use <olink targetdoc="group-refman" targetptr="nvlist-add-string-9f" remap="external"><citerefentry><refentrytitle>nvlist_add_string</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. To add an array of 32-bit
+integers, use <olink targetdoc="group-refman" targetptr="nvlist-add-int32-array-9f" remap="external"><citerefentry><refentrytitle>nvlist_add_int32_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The <olink targetdoc="group-refman" targetptr="nvlist-add-boolean-9f" remap="external"><citerefentry><refentrytitle>nvlist_add_boolean</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page contains a complete list of interfaces for
+adding pairs.</para>
+</listitem>
+</orderedlist><para>To deallocate a list, use <olink targetdoc="group-refman" targetptr="nvlist-free-9f" remap="external"><citerefentry><refentrytitle>nvlist_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The following code sample illustrates the creation of a name-value list.</para><example id="properties-ex-16"><title>Creating and Populating a Name-Value
+Pair List</title><programlisting>nvlist_t*
+create_nvlist()
+    {
+    int err;
+    char *str = "child";
+    int32_t ints[] = {0, 1, 2};
+    nvlist_t *nvl;
+
+    err = nvlist_alloc(&amp;nvl, NV_UNIQUE_NAME, 0);    /* allocate list */
+    if (err)
+        return (NULL);
+    if ((nvlist_add_string(nvl, "name", str) != 0) ||
+        (nvlist_add_int32_array(nvl, "prop", ints, 3) != 0)) {
+        nvlist_free(nvl);
+        return (NULL);
+    }
+    return (nvl);
+}</programlisting>
+</example><para>Drivers can retrieve the elements of an <literal>nvlist</literal> by
+using a lookup function for that type, such as <olink targetdoc="group-refman" targetptr="nvlist-lookup-int32-array-9f" remap="external"><citerefentry><refentrytitle>nvlist_lookup_int32_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which takes
+as an argument the name of the pair to be searched for.</para><note><para>These interfaces work only if either <literal>NV_UNIQUE_NAME</literal> or <literal>NV_UNIQUE_NAME_TYPE</literal> is specified when <olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is called.  Otherwise, ENOTSUP
+is returned, because the list cannot contain multiple pairs with the same
+name.</para>
+</note><para>A list of name-value list pairs can be placed in contiguous memory.
+This approach is useful for passing the list to an entity that has subscribed
+for notification. The first step is to get the size of the memory block that
+is needed for the list with <olink targetdoc="group-refman" targetptr="nvlist-size-9f" remap="external"><citerefentry><refentrytitle>nvlist_size</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The next step is to pack
+the list into the buffer with <olink targetdoc="group-refman" targetptr="nvlist-pack-9f" remap="external"><citerefentry><refentrytitle>nvlist_pack</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The consumer receiving
+the buffer's content can unpack the buffer with <olink targetdoc="group-refman" targetptr="nvlist-unpack-9f" remap="external"><citerefentry><refentrytitle>nvlist_unpack</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The functions for manipulating name-value pairs are available to both
+user-level and kernel-level developers. You can find identical man pages for
+these functions in both <olink targetdoc="refman3f" remap="external"><citetitle remap="book">man pages section 3: Library Interfaces and Headers</citetitle></olink> and in <olink targetdoc="refman9f" remap="external"><citetitle remap="book">man pages section 9: DDI and DKI Kernel Functions</citetitle></olink>. For a list of functions that operate
+on name-value pairs, see the following table.</para><table frame="topbot" pgwide="100" id="esqgw"><title>Functions for Using Name-Value
+Pairs</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="28.12*"/><colspec colwidth="61.35*"/><thead><row rowsep="1"><entry><para>Man Page</para>
+</entry><entry><para>Purpose / Functions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="nvlist-add-boolean-9f" remap="external"><citerefentry><refentrytitle>nvlist_add_boolean</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Add name-value pairs to the list. Functions include:</para><para><function>nvlist_add_boolean</function>, <function>nvlist_add_boolean_value</function>, <function>nvlist_add_byte</function>, <function>nvlist_add_int8</function>, <function>nvlist_add_uint8</function>, <function>nvlist_add_int16</function>, <function>nvlist_add_uint16</function>, <function>nvlist_add_int32</function>, <function>nvlist_add_uint32</function>, <function>nvlist_add_int64</function>, <function>nvlist_add_uint64</function>, <function>nvlist_add_string</function>, <function>nvlist_add_nvlist</function>, <function>nvlist_add_nvpair</function>, <function>nvlist_add_boolean_array</function>, <function>nvlist_add_int8_array, nvlist_add_uint8_array</function>, <function>nvlist_add_nvlist_array</function>, <function>nvlist_add_byte_array</function>, <function>nvlist_add_int16_array</function>, <function>nvlist_add_uint16_array</function>, <function>nvlist_add_int32_array</function>, <function>nvlist_add_uint32_array</function>, <function>nvlist_add_int64_array</function>, <function>nvlist_add_uint64_array</function>, <function>nvlist_add_string_array</function></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="nvlist-alloc-9f" remap="external"><citerefentry><refentrytitle>nvlist_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Manipulate the name-value list buffer. Functions include:</para><para><function>nvlist_alloc</function>, <function>nvlist_free</function>, <function>nvlist_size</function>, <function>nvlist_pack</function>, <function>nvlist_unpack</function>, <function>nvlist_dup</function>, <function>nvlist_merge</function></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="nvlist-lookup-boolean-9f" remap="external"><citerefentry><refentrytitle>nvlist_lookup_boolean</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Search for name-value pairs. Functions include:</para><para><function>nvlist_lookup_boolean</function>, <function>nvlist_lookup_boolean_value</function>, <function>nvlist_lookup_byte</function>, <function>nvlist_lookup_int8</function>, <function>nvlist_lookup_int16</function>, <function>nvlist_lookup_int32</function>, <function>nvlist_lookup_int64</function>, <function>nvlist_lookup_uint8</function>, <function>nvlist_lookup_uint16</function>, <function>nvlist_lookup_uint32</function>, <function>nvlist_lookup_uint64</function>, <function>nvlist_lookup_string</function>, <function>nvlist_lookup_nvlist</function>, <function>nvlist_lookup_boolean_array,
+nvlist_lookup_byte_array</function>, <function>nvlist_lookup_int8_array</function>, <function>nvlist_lookup_int16_array</function>, <function>nvlist_lookup_int32_array</function>, <function>nvlist_lookup_int64_array</function>, <function>nvlist_lookup_uint8_array</function>, <function>nvlist_lookup_uint16_array</function>, <function>nvlist_lookup_uint32_array</function>, <function>nvlist_lookup_uint64_array</function>, <function>nvlist_lookup_string_array</function>, <function>nvlist_lookup_nvlist_array</function>, <function>nvlist_lookup_pairs</function></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="nvlist-next-nvpair-9f" remap="external"><citerefentry><refentrytitle>nvlist_next_nvpair</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Get name-value pair data. Functions include:</para><para><function>nvlist_next_nvpair</function>, <function>nvpair_name</function>, <function>nvpair_type</function></para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="nvlist-remove-9f" remap="external"><citerefentry><refentrytitle>nvlist_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Remove name-value pairs. Functions include:</para><para><function>nv_remove</function>, <function>nv_remove_all</function></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="task_queues"><title>Queueing Tasks</title><indexterm><primary>task queues</primary>
+</indexterm><indexterm><primary>scheduling tasks</primary>
+</indexterm><indexterm><primary>threads</primary><secondary>task queues</secondary>
+</indexterm><para>This section discusses how to use <emphasis>task queues</emphasis> to
+postpone processing of some tasks and delegate their execution to another
+kernel thread.</para><sect2 id="gbsgo"><title>Introduction to Task Queues</title><para>A common operation in kernel programming is to schedule a task to be
+performed at a later time, by a different thread. The following examples give
+some reasons that you might want a different thread to perform a task at a
+later time:</para><itemizedlist><listitem><para>Your current code path is time critical. The additional task
+you want to perform is not time critical.</para>
+</listitem><listitem><para>The additional task might require grabbing a lock that another
+thread is currently holding.</para>
+</listitem><listitem><para>You cannot block in your current context. The additional task
+might need to block, for example to wait for memory.</para>
+</listitem><listitem><para>A condition is preventing your code path from completing,
+but your current code path cannot sleep or fail. You need to queue the current
+task to execute after the condition disappears.</para>
+</listitem><listitem><para>You need to launch multiple tasks in parallel.</para>
+</listitem>
+</itemizedlist><para>In each of these cases, a task is executed in a different <emphasis>context</emphasis>. A different context is usually a different kernel thread with
+a different set of locks held and possibly a different priority. Task queues
+provide a generic kernel API for scheduling asynchronous tasks.</para><para><indexterm><primary>task queues</primary><secondary>definition</secondary></indexterm>A <emphasis>task queue</emphasis> is a list of tasks with one
+or more threads to service the list. If a task queue has a single service
+thread, all tasks are guaranteed to execute in the order in which they are
+added to the list. If a task queue has more than one service thread, the order
+in which the tasks will execute is not known.</para><note><para>If the task queue has more than one service thread, make sure
+that the execution of one task does not depend on the execution of any other
+task. Dependencies between tasks can cause a deadlock to occur.</para>
+</note>
+</sect2><sect2 id="gbtdk"><title>Task Queue Interfaces</title><indexterm><primary>task queues</primary><secondary>interfaces</secondary>
+</indexterm><para>The following DDI interfaces manage task queues. These interfaces are
+defined in the  <filename>sys/sunddi.h</filename> header file. See the <olink targetdoc="group-refman" targetptr="taskq-9f" remap="external"><citerefentry><refentrytitle>taskq</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for more information
+about these interfaces.</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="37.65*"/><colspec colwidth="62.35*"/><tbody><row><entry><para><literal>ddi_taskq_t</literal></para>
+</entry><entry><para>Opaque handle</para>
+</entry>
+</row><row><entry><para><literal>TASKQ_DEFAULTPRI</literal></para>
+</entry><entry><para>System default priority</para>
+</entry>
+</row><row><entry><para><literal>DDI_SLEEP</literal></para>
+</entry><entry><para>Can block for memory</para>
+</entry>
+</row><row><entry><para><literal>DDI_NOSLEEP</literal></para>
+</entry><entry><para>Cannot block for memory</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_create</function></para>
+</entry><entry><para>Create a task queue</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_destroy</function></para>
+</entry><entry><para>Destroy a task queue</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_dispatch</function></para>
+</entry><entry><para>Add a task to a task queue</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_wait</function></para>
+</entry><entry><para>Wait for pending tasks to complete</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_suspend</function></para>
+</entry><entry><para>Suspend a task queue</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_suspended</function></para>
+</entry><entry><para>Check whether a task queue is suspended</para>
+</entry>
+</row><row><entry><para><function>ddi_taskq_resume</function></para>
+</entry><entry><para>Resume a suspended task queue</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2><sect2 id="gbtcs"><title>Using Task Queues</title><para>The typical usage in drivers is to create task queues at <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. Most <function>taskq_dispatch</function> invocations are from interrupt context.</para><para>To study task queues used in Solaris drivers, go to <ulink url="http://www.opensolaris.org/os/" type="url"></ulink>. In the left margin
+menu, click Source Browser. In the Symbol field of the search area, enter <literal>ddi_taskq_create</literal>. In the Project list, select <literal>onnv</literal>.
+Click the Search button. In your search results you should see the USB generic
+serial driver (<filename>usbser.c</filename>), the 1394 mass storage HBA FireWire
+driver (<filename>scsa1394/hba.c</filename>), and the SCSI HBA driver for
+Dell PERC 3DC/4SC/4DC/4Di RAID devices (<filename>amr.c</filename>).</para><para>Click the file name <filename>amr.c</filename>. The <function>ddi_taskq_create</function> function is called in the <function>amr_attach</function> entry
+point. The <function>ddi_taskq_destroy</function> function is called in the <function>amr_detach</function> entry point and also in the error handling section of
+the <function>amr_attach</function> entry point. The <function>ddi_taskq_dispatch</function> function is called in the <function>amr_done</function> function,
+which is called in the <function>amr_intr</function> function. The <function>amr_intr</function> function is an interrupt-handling function that is an argument
+to the <olink targetdoc="group-refman" targetptr="ddi-add-intr-9f" remap="external"><citerefentry><refentrytitle>ddi_add_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function in the <function>amr_attach</function> entry
+point.</para>
+</sect2><sect2 id="gbtdm"><title>Observing Task Queues</title><para>This section describes two techniques that you can use to monitor the
+system resources that are consumed by a task queue. Task queues export
+statistics on the use of system time by task queue threads. Task queues also
+use DTrace SDT probes to determine when a task queue starts and finishes
+execution of a task.</para><sect3 id="gbvex"><title>Task Queue Kernel Statistics Counters</title><indexterm><primary>kstats</primary><secondary>task queues</secondary>
+</indexterm><para>Every task queue has an associated set of <literal>kstat</literal> counters.
+Examine the output of the following <olink targetdoc="group-refman" targetptr="kstat-1m" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command:</para><screen>$ <userinput>kstat -c taskq</userinput>
+module: unix                            instance: 0     
+name:   ata_nexus_enum_tq               class:    taskq
+        crtime                          53.877907833
+        executed                        0
+        maxtasks                        0
+        nactive                         1
+        nalloc                          0
+        priority                        60
+        snaptime                        258059.249256749
+        tasks                           0
+        threads                         1
+        totaltime                       0
+
+module: unix                            instance: 0     
+name:   callout_taskq                   class:    taskq
+        crtime                          0
+        executed                        13956358
+        maxtasks                        4
+        nactive                         4
+        nalloc                          0
+        priority                        99
+        snaptime                        258059.24981709
+        tasks                           13956358
+        threads                         2
+        totaltime                       120247890619</screen><para>The <command>kstat</command> output shown above includes the following
+information:</para><itemizedlist><listitem><para>The name of the task queue and its instance number</para>
+</listitem><listitem><para>The number of scheduled (<literal>tasks</literal>) and executed
+(<literal>executed</literal>) tasks</para>
+</listitem><listitem><para>The number of kernel threads processing the task queue (<literal>threads</literal>) and their priority (<literal>priority</literal>)</para>
+</listitem><listitem><para>The total time (in nanoseconds) spent processing all the tasks
+(<literal>totaltime</literal>)</para>
+</listitem>
+</itemizedlist><para>The following example shows how you can use the <command>kstat</command> command
+to observe how a counter (number of scheduled tasks) increases over time:</para><screen>$ <userinput>kstat -p unix:0:callout_taskq:tasks 1 5</userinput>
+unix:0:callout_taskq:tasks      13994642
+
+unix:0:callout_taskq:tasks      13994711
+
+unix:0:callout_taskq:tasks      13994784
+
+unix:0:callout_taskq:tasks      13994855
+
+unix:0:callout_taskq:tasks      13994926</screen>
+</sect3><sect3 id="gbveq"><title>Task Queue DTrace SDT Probes</title><indexterm><primary>DTrace</primary><secondary>task queues</secondary>
+</indexterm><para>Task queues provide several useful SDT probes. All the probes described
+in this section have the following two arguments:</para><itemizedlist><listitem><para>The task queue pointer returned by <function>ddi_taskq_create</function></para>
+</listitem><listitem><para>The pointer to the <literal>taskq_ent_t</literal> structure.
+Use this pointer in your D script to extract the function and the argument.</para>
+</listitem>
+</itemizedlist><para>You can use these probes to collect precise timing information about
+individual task queues and individual tasks being executed through them. For
+example, the following script prints the functions that were scheduled through
+task queues for every 10 seconds:</para><screen># <userinput>!/usr/sbin/dtrace -qs</userinput>
+
+sdt:genunix::taskq-enqueue
+{
+  this-&gt;tq  = (taskq_t *)arg0;
+  this-&gt;tqe = (taskq_ent_t *) arg1;
+  @[this-&gt;tq-&gt;tq_name,
+    this-&gt;tq-&gt;tq_instance,
+    this-&gt;tqe-&gt;tqent_func] = count();
+}
+
+tick-10s
+{
+  printa ("%s(%d): %a called %@d times\n", @);
+  trunc(@);
+}</screen><para>On a particular machine, the above D script produced the following output:</para><screen>callout_taskq(1): genunix`callout_execute called 51 times
+callout_taskq(0): genunix`callout_execute called 701 times
+kmem_taskq(0): genunix`kmem_update_timeout called 1 times
+kmem_taskq(0): genunix`kmem_hash_rescale called 4 times
+callout_taskq(1): genunix`callout_execute called 40 times
+USB_hid_81_pipehndl_tq_1(14): usba`hcdi_cb_thread called 256 times
+callout_taskq(0): genunix`callout_execute called 702 times
+kmem_taskq(0): genunix`kmem_update_timeout called 1 times
+kmem_taskq(0): genunix`kmem_hash_rescale called 4 times
+callout_taskq(1): genunix`callout_execute called 28 times
+USB_hid_81_pipehndl_tq_1(14): usba`hcdi_cb_thread called 228 times
+callout_taskq(0): genunix`callout_execute called 706 times
+callout_taskq(1): genunix`callout_execute called 24 times
+USB_hid_81_pipehndl_tq_1(14): usba`hcdi_cb_thread called 141 times
+callout_taskq(0): genunix`callout_execute called 708 times</screen>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000034609 0?>

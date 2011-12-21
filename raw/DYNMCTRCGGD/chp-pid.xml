@@ -1,0 +1,108 @@
+<?Pub UDT _bookmark _target?><chapter id="chp-pid"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag atict:user
+user="palecur" fullname="Paul Echeverri"?><title><literal>pid</literal> Provider</title><highlights><para>The <literal>pid</literal> provider allows for tracing of the entry
+and return of a function in a user process as well as any instruction as specified
+by an absolute address or function offset. The <literal>pid</literal> provider
+has no probe effect when probes are not enabled. When probes are enabled,
+the probes only induce probe effect on those processes that are traced.</para><note><para>When the compiler inlines a function, the <literal>pid</literal> provider's
+probe does not fire. To avoid inlining a function at compile time, consult
+the documentation for your compiler.</para>
+</note><note><para>The <literal>pid</literal> provider behaves unpredictably when
+it probes a function that uses function pointers to call a sub-function. You
+can explicitly place probes at the addresses of the function's entry and return
+to analyze such functions.</para>
+</note>
+</highlights><sect1 id="chp-pid-names"><title>Naming <literal>pid</literal> Probes</title><indexterm><primary><literal>pid</literal>probes</primary>
+</indexterm><para><indexterm><primary>probes</primary><secondary><literal>pid</literal></secondary></indexterm>The <literal>pid</literal> provider actually defines a <emphasis>class</emphasis> of providers. Each process can potentially have its own associated <literal>pid</literal> provider. A process with ID 123, for example, would be traced
+by using the <literal>pid123</literal> provider. For probes from one of these
+providers, the module portion of the probe description refers to an object
+loaded in the corresponding process's address space. The following example
+uses <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to display
+a list of objects:</para><screen><userinput>$ mdb -p 1234</userinput>
+Loading modules: [ ld.so.1 libc.so.1 ]
+<userinput>&gt; ::objects</userinput>
+    BASE    LIMIT     SIZE NAME
+   10000    34000    24000 /usr/bin/csh
+ff3c0000 ff3e8000    28000 /lib/ld.so.1
+ff350000 ff37a000    2a000 /lib/libcurses.so.1
+ff200000 ff2be000    be000 /lib/libc.so.1
+ff3a0000 ff3a2000     2000 /lib/libdl.so.1
+ff320000 ff324000     4000 /platform/sun4u/lib/libc_psr.so.1</screen><para>In the probe description, you name the object by the name of the file,
+not its full path name. You can also omit the <literal>.1</literal> or <literal>so.1</literal> suffix. All of the following examples name the same probe:</para><programlisting>pid123:libc.so.1:strcpy:entry
+pid123:libc.so:strcpy:entry
+pid123:libc:strcpy:entry</programlisting><para>The first example is the actual name of the probe. The other examples
+are convenient aliases that are replaced with the full load object name internally.</para><para>For the load object of the executable, you can use the alias <literal>a.out</literal>. The following two probe descriptions name the same probe:</para><programlisting>pid123:csh:main:return
+pid123:a.out:main:return</programlisting><para><indexterm><primary><literal>pid</literal> probes</primary><secondary>example of use</secondary></indexterm><indexterm><primary>examples</primary><secondary>of <literal>pid</literal> probe use</secondary></indexterm>As with all anchored DTrace
+probes, the function field of the probe description names a function in the
+module field. A user application binary might have several names for the same
+function. For example, <literal>mutex_lock</literal> might be an alternate
+name for the function <literal>pthread_mutex_lock</literal> in <literal>libc.so.1</literal>. DTrace chooses one canonical name for such functions and uses
+that name internally. The following example shows how DTrace internally remaps
+module and function names to a canonical form:</para><screen><userinput># dtrace -q -n pid101267:libc:mutex_lock:entry'{ \</userinput>
+    <userinput>printf("%s:%s:%s:%s\n", probeprov, probemod, probefunc, probename); }'</userinput>
+pid101267:libc.so.1:pthread_mutex_lock:entry
+<userinput>^C</userinput></screen><para>This automatic renaming means that the names of the probes you enable
+may be slightly different than those actually enabled. The canonical name
+will always be consistent between runs of DTrace on systems running the same
+Solaris release.</para><para>See <olink targetptr="chp-user" remap="internal">Chapter&nbsp;33, User Process Tracing</olink> for
+examples of how to use the <literal>pid</literal> provider effectively.</para>
+</sect1><sect1 id="chp-pid-fb"><title>Function Boundary Probes</title><para><indexterm><primary>probes</primary><secondary>function boundary</secondary></indexterm><indexterm><primary><literal>pid</literal> probes</primary><secondary>and function boundaries</secondary></indexterm>The <literal>pid</literal> provider
+enables you to trace function entry and return in user programs just as the <acronym>FBT</acronym> provider provides that capability for the kernel. Most of the
+examples in this manual that use the <acronym>FBT</acronym> provider to trace
+kernel function calls can be modified slightly to apply to user processes.</para><sect2 id="chp-pid-entry"><title><literal>entry</literal> Probes</title><para><indexterm><primary>probes</primary><secondary><literal>entry</literal></secondary></indexterm><indexterm><primary><literal>entry</literal> probes</primary></indexterm>An <literal>entry</literal> probe fires when the traced function
+is invoked. The arguments to entry probes are the values of the arguments
+to the traced function.</para>
+</sect2><sect2 id="chp-pid-return"><title><literal>return</literal> Probes</title><para><indexterm><primary>probes</primary><secondary><literal>return</literal></secondary></indexterm><indexterm><primary><literal>return</literal> probes</primary></indexterm>A <literal>return</literal> probes fires when the traced function
+returns or makes a tail call to another function. The value for <literal>arg0</literal> is
+the offset in the function of the return instruction; <literal>arg1</literal> holds
+the return value.</para><note><para>Using <literal>arg</literal><replaceable>N</replaceable> returns
+the raw unfiltered values as type <literal>int64_t</literal>. The <literal>pid</literal> provider
+does not support the <literal>args[</literal><replaceable>N</replaceable><literal>]</literal> format.</para>
+</note>
+</sect2>
+</sect1><sect1 id="chp-pid-offsets"><title>Function Offset Probes</title><para><indexterm><primary>probes</primary><secondary>function offset</secondary></indexterm><indexterm><primary>function offset probes</primary></indexterm>The <literal>pid</literal> provider lets you trace any instruction in a function. For example
+to trace the instruction 4 bytes into a function <function>main</function>,
+you could use a command similar to the following example:</para><programlisting>pid123:a.out:main:4</programlisting><para>Every time the program executes the instruction at address <literal>main+4</literal>,
+this probe will be activated. The arguments for offset probes are undefined.
+The <literal>uregs[]</literal> array will help you examine process state at
+these probe sites. See <olink targetptr="chp-user-uregs" remap="internal">uregs[] Array</olink> for
+more information.</para>
+</sect1><sect1 id="chp-pid-stability"><title>Stability</title><para><indexterm><primary>probes</primary><secondary><literal>pid</literal></secondary></indexterm><indexterm><primary><literal>entry</literal> probes</primary></indexterm>The <literal>pid</literal> provider uses DTrace's stability mechanism
+to describe its stabilities, as shown in the following table. For more information
+about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39,
+Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para><acronym>Unknown</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000009481 0?>

@@ -1,0 +1,151 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-post"><title>Postmortem Tracing</title><highlights><para>This chapter describes the DTrace facilities for <emphasis>postmortem</emphasis> extraction
+and processing of the in-kernel data of DTrace consumers. In the event of
+a system crash, the information that has been recorded with DTrace may provide
+the crucial clues to root-cause the system failure. DTrace data may be extracted
+and processed from the system crash dump to aid you in understanding fatal
+system failures. By coupling these postmortem capabilities of DTrace with
+its ring buffering buffer policy (see <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11,
+Buffers and Buffering</olink>), DTrace can be used as an operating system
+analog to the <firstterm>black box</firstterm> flight data recorder present
+on commercial aircraft.</para><para>To extract DTrace data from a specific crash dump, you should begin
+by running the Solaris Modular Debugger, <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, on the crash dump of interest. The MDB module containing
+the DTrace functionality will be loaded automatically. To learn more about
+MDB, refer to the <olink targetdoc="moddebug" remap="external"><citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink>.</para>
+</highlights><sect1 id="chp-post-1"><title>Displaying DTrace Consumers</title><para><indexterm><primary>trace data</primary><secondary>extracting</secondary></indexterm><indexterm><primary>extracting DTrace data</primary></indexterm><indexterm><primary>displaying consumers</primary></indexterm>To extract DTrace data
+from a DTrace consumer, you must first determine the DTrace consumer of interest
+by running the <literal>::dtrace_state</literal> MDB dcmd:</para><screen><userinput>&gt; ::dtrace_state</userinput>
+    ADDR MINOR     PROC NAME                 FILE
+ccaba400     2        - &lt;anonymous&gt;             -
+ccab9d80     3 d1d6d7e0 intrstat         cda37078
+cbfb56c0     4 d71377f0 dtrace           ceb51bd0
+ccabb100     5 d713b0c0 lockstat         ceb51b60
+d7ac97c0     6 d713b7e8 dtrace           ceb51ab8</screen><para>This command displays a table of DTrace state structures. Each row of
+the table consists of the following information:</para><itemizedlist><listitem><para>The address of the state structure</para>
+</listitem><listitem><para>The minor number associated with the <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> device</para>
+</listitem><listitem><para>The address of the process structure that corresponds to the
+DTrace consumer</para>
+</listitem><listitem><para>The name of the DTrace consumer (or <literal>&lt;anonymous&gt;</literal> for
+anonymous consumers)</para>
+</listitem><listitem><para>The name of the file structure that corresponds to the open <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> device</para>
+</listitem>
+</itemizedlist><para>To obtain further information about a specific DTrace consumer, specify
+the address of its process structure to the <literal>::ps</literal> dcmd:</para><screen><userinput>&gt; d71377f0::ps</userinput>
+S    PID   PPID   PGID    SID    UID      FLAGS     ADDR NAME
+R 100647 100642 100647 100638      0 0x00004008 d71377f0 dtrace</screen>
+</sect1><sect1 id="chp-post-2"><title>Displaying Trace Data</title><para><indexterm><primary>displaying trace data</primary></indexterm><indexterm><primary>trace data</primary><secondary>displaying</secondary></indexterm>Once
+you determine the consumer of interest, you can retrieve the data corresponding
+to any unconsumed buffers by specifying the address of the state structure
+to the <literal>::dtrace</literal> dcmd. The following example shows the output
+of the <literal>::dtrace</literal> dcmd on an anonymous enabling of <literal>syscall:::entry</literal> with the action <literal>trace(execname)</literal>:</para><screen><userinput>&gt; ::dtrace_state</userinput>
+    ADDR MINOR     PROC NAME                 FILE
+cbfb7a40     2        - &lt;anonymous&gt;             -
+
+<userinput>&gt; cbfb7a40::dtrace</userinput>
+CPU     ID                    FUNCTION:NAME
+  0    344                resolvepath:entry   init                           
+  0     16                      close:entry   init                           
+  0    202                      xstat:entry   init                           
+  0    202                      xstat:entry   init                           
+  0     14                       open:entry   init                           
+  0    206                     fxstat:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    190                     munmap:entry   init                           
+  0    344                resolvepath:entry   init                           
+  0    216                    memcntl:entry   init                           
+  0     16                      close:entry   init                           
+  0    202                      xstat:entry   init                           
+  0     14                       open:entry   init                           
+  0    206                     fxstat:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    186                       mmap:entry   init                           
+  0    190                     munmap:entry   init
+...</screen><para>The <literal>::dtrace</literal> dcmd handles errors in the same way
+that <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> does:
+if drops, errors, speculative drops, or the like were encountered while the
+consumer was executing, <literal>::dtrace</literal> will emit a message corresponding
+to the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>message.</para><para>The order of events as displayed by <literal>::dtrace</literal> is always
+oldest to youngest within a given CPU. The CPU buffers themselves are displayed
+in numerical order. If an ordering is required for events on different CPUs,
+trace the <literal>timestamp</literal> variable.</para><para>You can display only the data for a specific CPU by specifying the <option>c</option> option to <literal>::dtrace</literal>:</para><screen><userinput>&gt; cbfb7a40::dtrace -c 1</userinput>
+CPU     ID                    FUNCTION:NAME
+  1     14                       open:entry   init
+  1    206                     fxstat:entry   init
+  1    186                       mmap:entry   init
+  1    344                resolvepath:entry   init
+  1     16                      close:entry   init
+  1    202                      xstat:entry   init
+  1    202                      xstat:entry   init
+  1     14                       open:entry   init
+  1    206                     fxstat:entry   init 
+  1    186                       mmap:entry   init  
+...</screen><para>Notice that <literal>::dtrace</literal> only processes <emphasis>in-kernel</emphasis> DTrace
+data. Data that has been consumed from the kernel and processed (through <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> or other means) will not
+be available to be processed with <command>::dtrace</command>. To assure that
+the most amount of data possible is available at the time of failure, use
+a ring buffer buffering policy. See <olink targetptr="chp-buf" remap="internal">Chapter&nbsp;11,
+Buffers and Buffering</olink> for more information on buffer policies.</para><para>The following example creates a very small (16K) ring buffer and records
+all system calls and the process making them:</para><screen><userinput># dtrace -P syscall'{trace(curpsinfo-&gt;pr_psargs)}' -b 16k -x bufpolicy=ring</userinput>
+dtrace: description 'syscall:::entry' matched 214 probes</screen><para>Looking at a crash dump taken when the above command was running results
+in output similar to the following example:</para><screen><userinput>&gt; ::dtrace_state</userinput>
+    ADDR MINOR     PROC NAME                 FILE
+cdccd400     3 d15e80a0 dtrace           ced065f0
+
+<userinput>&gt; cdccd400::dtrace</userinput>
+CPU     ID                    FUNCTION:NAME
+  0    139                    getmsg:return   mibiisa -r -p 25216            
+  0    138                     getmsg:entry   mibiisa -r -p 25216            
+  0    139                    getmsg:return   mibiisa -r -p 25216            
+  0    138                     getmsg:entry   mibiisa -r -p 25216            
+  0    139                    getmsg:return   mibiisa -r -p 25216            
+  0    138                     getmsg:entry   mibiisa -r -p 25216            
+  0    139                    getmsg:return   mibiisa -r -p 25216            
+  0    138                     getmsg:entry   mibiisa -r -p 25216            
+  0    139                    getmsg:return   mibiisa -r -p 25216            
+  0    138                     getmsg:entry   mibiisa -r -p 25216            
+  0     17                     close:return   mibiisa -r -p 25216            
+...
+  0     96                      ioctl:entry   mibiisa -r -p 25216            
+  0     97                     ioctl:return   mibiisa -r -p 25216            
+  0     96                      ioctl:entry   mibiisa -r -p 25216            
+  0     97                     ioctl:return   mibiisa -r -p 25216            
+  0     96                      ioctl:entry   mibiisa -r -p 25216            
+  0     97                     ioctl:return   mibiisa -r -p 25216            
+  0     96                      ioctl:entry   mibiisa -r -p 25216            
+  0     97                     ioctl:return   mibiisa -r -p 25216            
+  0     16                      close:entry   mibiisa -r -p 25216            
+  0     17                     close:return   mibiisa -r -p 25216            
+  0    124                   lwp_park:entry   mibiisa -r -p 25216            
+  1     68                     access:entry   mdb -kw                        
+  1     69                    access:return   mdb -kw                        
+  1    202                      xstat:entry   mdb -kw                        
+  1    203                     xstat:return   mdb -kw                        
+  1     14                       open:entry   mdb -kw                        
+  1     15                      open:return   mdb -kw                        
+  1    206                     fxstat:entry   mdb -kw                        
+  1    207                    fxstat:return   mdb -kw                        
+  1    186                       mmap:entry   mdb -kw                        
+...
+  1     13                     write:return   mdb -kw                        
+  1     10                       read:entry   mdb -kw                        
+  1     11                      read:return   mdb -kw                        
+  1     12                      write:entry   mdb -kw                        
+  1     13                     write:return   mdb -kw                        
+  1     96                      ioctl:entry   mdb -kw                        
+  1     97                     ioctl:return   mdb -kw                        
+  1    364                    pread64:entry   mdb -kw                        
+  1    365                   pread64:return   mdb -kw                        
+  1    366                   pwrite64:entry   mdb -kw                        
+  1    367                  pwrite64:return   mdb -kw                        
+  1    364                    pread64:entry   mdb -kw                        
+  1    365                   pread64:return   mdb -kw                        
+  1     38                        brk:entry   mdb -kw                        
+  1     39                       brk:return   mdb -kw                        
+&gt;</screen><para>Note that CPU 1's youngest records include a series of <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls by an <command>mdb
+-kw</command> process. This result is likely related to the reason for the
+system failure because a user can modify running kernel data or text with <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> when run with the <option>k</option> and <option>w</option> options. In this case, the DTrace data provides at least an interesting
+avenue of investigation, if not the root cause of the failure.</para>
+</sect1>
+</chapter><?Pub *0000047119 0?>

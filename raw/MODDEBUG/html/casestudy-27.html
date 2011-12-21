@@ -1,0 +1,220 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Kernel Memory Caches - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-18.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-26.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level2"><a href="casestudy-13.html">Getting Started: Creating a Sample Crash Dump</a></p>
+<p class="toc level2"><a href="casestudy-18.html">Allocator Basics</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Kernel Memory Caches</a></p>
+</div>
+<p class="toc level2"><a href="casestudy-26.html">Detecting Memory Corruption</a></p>
+<p class="toc level2"><a href="casestudy-31.html">Memory Allocation Logging</a></p>
+<p class="toc level2"><a href="casestudy-34.html">Advanced Memory Analysis</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-27"></a><h3>Kernel Memory Caches</h3>
+<p><a name="indexterm-453"></a>This section explains how to find and examine kernel memory caches.  You
+can learn about the various kmem caches on the system by issuing the
+<tt>::kmastat</tt> command.</p><pre>&gt; ::kmastat
+cache                        buf    buf    buf    memory     alloc alloc
+name                        size in use  total    in use   succeed  fail
+------------------------- ------ ------ ------ --------- --------- -----
+kmem_magazine_1                8     24   1020      8192        24     0
+kmem_magazine_3               16    141    510      8192       141     0
+kmem_magazine_7               32     96    255      8192        96     0
+...
+kmem_alloc_8                   8   3614   3751     90112   9834113     0
+kmem_alloc_16                 16   2781   3072     98304   8278603     0
+kmem_alloc_24                 24    517    612     24576    680537     0
+kmem_alloc_32                 32    398    510     24576    903214     0
+kmem_alloc_40                 40    482    584     32768    672089     0
+...
+thread_cache                 368    107    126     49152    669881     0
+lwp_cache                    576    107    117     73728       182     0
+turnstile_cache               36    149    292     16384    670506     0
+cred_cache                    96      6     73      8192   2677787     0
+...</pre><p>If you run <tt>::kmastat</tt> you get a feel for what a &ldquo;normal&rdquo; system
+looks like.  This will help you to spot excessively large caches
+on systems that are leaking memory.  The results of <tt>::kmastat</tt> will vary depending
+on the system you are running on, how many processes are running, and
+so forth.</p><p><a name="indexterm-454"></a>Another way to list the various kmem caches is with the <tt>::kmem_cache</tt>
+command:</p><pre>&gt; ::kmem_cache
+ADDR     NAME                      FLAG  CFLAG  BUFSIZE  BUFTOTL
+70036028 kmem_magazine_1           0020 0e0000        8     1020
+700362a8 kmem_magazine_3           0020 0e0000       16      510
+70036528 kmem_magazine_7           0020 0e0000       32      255
+...
+70039428 kmem_alloc_8              020f 000000        8     3751
+700396a8 kmem_alloc_16             020f 000000       16     3072
+70039928 kmem_alloc_24             020f 000000       24      612
+70039ba8 kmem_alloc_32             020f 000000       32      510
+7003a028 kmem_alloc_40             020f 000000       40      584
+...</pre><p>This command is useful because it maps cache names to addresses, and provides
+the debugging flags for each cache in the FLAG column.  It
+is important to understand that the allocator's selection of debugging features is derived on
+a per-cache basis from this set of flags.  These are set
+in conjunction with the global <tt>kmem_flags</tt> variable at cache creation time.  Setting <tt>kmem_flags</tt>
+while the system is running has no effect on the debugging behavior, except
+for subsequently created caches (which is rare after boot-up).</p><p><a name="indexterm-455"></a>Next, walk the list of kmem caches directly using MDB's <tt>kmem_cache</tt> walker:</p><pre>&gt; ::walk kmem_cache
+70036028
+700362a8
+70036528
+700367a8
+...</pre><p><a name="indexterm-456"></a>This produces a list of pointers that correspond to each kmem cache in
+the kernel.  To find out about a specific cache, apply the
+<tt>kmem_cache</tt> macro: </p><pre>&gt; 0x70039928$&lt;kmem_cache
+0x70039928:     lock
+0x70039928:     owner/waiters
+                0
+0x70039930:     flags           freelist        offset
+                20f             707c86a0        24
+0x7003993c:     global_alloc    global_free     alloc_fail
+                523             0               0
+0x70039948:     hash_shift      hash_mask       hash_table
+                5               1ff             70444858
+0x70039954:     nullslab
+0x70039954:     cache           base            next
+                70039928        0               702d5de0
+0x70039960:     prev            head            tail
+                707c86a0        0               0
+0x7003996c:     refcnt          chunks
+                -1              0
+0x70039974:     constructor     destructor      reclaim
+                0               0               0
+0x70039980:     private         arena           cflags
+                0               104444f8        0
+0x70039994:     bufsize         align           chunksize
+                24              8               40
+0x700399a0:     slabsize        color           maxcolor
+                8192            24              32
+0x700399ac:     slab_create     slab_destroy    buftotal
+                3               0               612
+0x700399b8:     bufmax          rescale         lookup_depth
+                612             1               0
+0x700399c4:     kstat           next            prev
+                702c8608        70039ba8        700396a8
+0x700399d0:     name    kmem_alloc_24
+0x700399f0:     bufctl_cache    magazine_cache  magazine_size
+                70037ba8        700367a8        15
+...</pre><p>Important fields for debugging include 'bufsize', 'flags' and 'name'. The name of the
+<tt>kmem_cache</tt> (in this case &ldquo;<tt>kmem_alloc_24</tt>&rdquo;) indicates its purpose in the system. 
+Bufsize indicates the size of each buffer in this cache; in this case,
+the cache is used for allocations of size 24 and smaller.  'flags'
+indicates what debugging features are turned on for this cache.  You can
+find the debugging flags listed in <tt>&lt;sys/kmem_impl.h&gt;</tt>.  In this case 'flags'
+is <tt>0x20f</tt>, which is <tt>KMF_AUDIT | KMF_DEADBEEF | KMF_REDZONE | KMF_CONTENTS | KMF_HASH</tt>.  This document explains each of the debugging
+features in subsequent sections.</p><p><a name="indexterm-457"></a><a name="indexterm-458"></a>When you are interested in looking at buffers in a particular cache, you
+can walk the allocated and freed buffers in that cache directly: </p><pre>&gt; 0x70039928::walk kmem
+704ba010
+702ba008
+704ba038
+702ba030
+...
+
+&gt; 0x70039928::walk freemem
+70a9ae50
+70a9ae28
+704bb730
+704bb2f8
+...</pre><p>MDB provides a shortcut to supplying the cache address to the kmem
+walker: a specific walker is provided for each kmem cache, and its name
+is the same as the name of the cache.  For example:</p><pre>&gt; ::walk kmem_alloc_24
+704ba010
+702ba008
+704ba038
+702ba030
+...
+
+&gt; ::walk thread_cache
+70b38080
+70aac060
+705c4020
+70aac1e0
+...</pre><p>Now you know how to iterate over the kernel memory allocator's internal data
+structures and examine the most important members of the <tt>kmem_cache</tt> data structure.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-18.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-26.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

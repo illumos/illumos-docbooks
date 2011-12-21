@@ -1,0 +1,153 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Getting Started: Creating a Sample Crash Dump - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="kmem-1.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-18.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Getting Started: Creating a Sample Crash Dump</a></p>
+</div>
+<p class="toc level2"><a href="casestudy-18.html">Allocator Basics</a></p>
+<p class="toc level2"><a href="casestudy-27.html">Kernel Memory Caches</a></p>
+<p class="toc level2"><a href="casestudy-26.html">Detecting Memory Corruption</a></p>
+<p class="toc level2"><a href="casestudy-31.html">Memory Allocation Logging</a></p>
+<p class="toc level2"><a href="casestudy-34.html">Advanced Memory Analysis</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-13"></a><h3>Getting Started: Creating a Sample Crash Dump</h3>
+<p>This section shows you how to obtain a sample crash dump, and
+how to invoke MDB in order to examine it.</p>
+
+<a name="casestudy-15"></a><h4>Setting <tt>kmem_flags</tt></h4>
+<p><a name="indexterm-444"></a>The kernel memory allocator contains many advanced debugging features, but these are not enabled
+by default because they can cause performance degradation. In order to follow the
+examples in this guide, you should turn on these features. You should enable
+these features only on a test system, as they can cause performance degradation
+or expose latent problems.</p><p>The allocator's debugging functionality is controlled by the <tt>kmem_flags</tt> tunable. To get
+started, make sure <tt>kmem_flags</tt> is set properly:</p><pre># mdb -k
+&gt; kmem_flags/X
+kmem_flags:
+kmem_flags:     f</pre><p>If <tt>kmem_flags</tt> is not set to '<tt>f</tt>', you should add the line:</p><pre>set kmem_flags=0xf</pre><p>to <tt>/etc/system</tt> and reboot the system. When the system reboots, confirm that <tt>kmem_flags</tt>
+is set to '<tt>f</tt>'. Remember to remove your <tt>/etc/system</tt> modifications before returning this system
+to production use.</p>
+
+<a name="casestudy-16"></a><h4>Forcing a Crash Dump</h4>
+<p><a name="indexterm-445"></a>The next step is to make sure crash dumps are properly configured. First,
+confirm that <tt>dumpadm</tt> is configured to save kernel crash dumps and that <tt>savecore</tt> is
+enabled.  See <a href="http://docs.sun.com/doc/819-2240/dumpadm-1m?a=view"><tt>dumpadm</tt>(1M)</a> for more information on crash dump parameters.</p><pre># dumpadm
+              Dump content: kernel pages
+               Dump device: /dev/dsk/c0t0d0s1 (swap)
+        Savecore directory: /var/crash/testsystem
+          Savecore enabled: yes</pre><p><a name="indexterm-446"></a>Next, reboot the system using the <tt>-d</tt> flag to <a href="http://docs.sun.com/doc/819-2240/reboot-1m?a=view"><tt>reboot</tt>(1M)</a>, which forces the
+kernel to panic and save a crash dump.</p><pre># reboot -d
+Sep 28 17:51:18 testsystem reboot: rebooted by root
+
+panic[cpu0]/thread=70aacde0: forced crash dump initiated at user request
+
+401fbb10 genunix:uadmin+55c (1, 1, 0, 6d700000, 5, 0)
+  %l0-7: 00000000 00000000 00000000 00000000 00000000 00000000 00000000
+         00000000
+...</pre><p>When the system reboots, make sure the crash dump succeeded:</p><pre>$ cd /var/crash/testsystem
+$ ls
+bounds    unix.0    unix.1    vmcore.0  vmcore.1</pre><p><a name="indexterm-447"></a>If the dump is missing from your dump directory, it could be that
+the partition is out of space.  You can free up space and
+run <a href="http://docs.sun.com/doc/819-2240/savecore-1m?a=view"><tt>savecore</tt>(1M)</a> manually as root to subsequently save the dump. If your dump
+directory contains multiple crash dumps, the one you just created will be the
+<tt>unix.[n]</tt> and <tt>vmcore.[n]</tt> pair with the most recent modification time.</p>
+
+<a name="casestudy-17"></a><h4>Starting MDB</h4>
+<p>Now, run <tt>mdb</tt> on the crash dump you created, and check its status:</p><pre>$ mdb unix.1 vmcore.1
+Loading modules: [ unix krtld genunix ip nfs ipc ]
+&gt; ::status
+debugging crash dump vmcore.1 (32-bit) from testsystem
+operating system: 5.10 Generic (sun4u)
+panic message: forced crash dump initiated at user request</pre><p>In the examples presented in this guide, a crash dump from a
+32-bit kernel is used.  All of the techniques presented here are applicable
+to a 64-bit kernel, and care has been taken to distinguish pointers (sized
+differently on 32- and 64-bit systems) from fixed-sized quantities, which are invariant with respect
+to the kernel data model.</p><p>An UltraSPARC workstation was used to generate the example presented. Your results can
+vary depending on the architecture and model of system you use.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="kmem-1.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-18.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

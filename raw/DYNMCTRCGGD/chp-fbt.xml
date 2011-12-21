@@ -1,0 +1,421 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-fbt"><title><literal>fbt</literal> Provider</title><highlights><para>This chapter describes the Function Boundary Tracing (<acronym>FBT</acronym>)
+provider, which provides probes associated with the entry to and return from
+most functions in the Solaris kernel. The function is the fundamental unit
+of program text. In a well-designed system, each function performs a discrete
+and well-defined operation on a specified object or series of like objects.
+Therefore, even on the smallest Solaris systems, <acronym>FBT</acronym> will
+provide on the order of 20,000 probes.</para><para>Similar to other DTrace providers, <acronym>FBT</acronym> has no probe
+effect when it is not explicitly enabled. When enabled, <acronym>FBT</acronym> only
+induces a probe effect in probed functions. While the <acronym>FBT</acronym> implementation
+is highly specific to the instruction set architecture, <acronym>FBT</acronym> has
+been implemented on both SPARC and x86 platforms. For each instruction set,
+there are a small number of functions that do not call other functions and
+are highly optimized by the compiler (so-called <firstterm>leaf functions</firstterm>)
+that cannot be instrumented by <acronym>FBT</acronym>. Probes for these functions
+are not present in DTrace.</para><para>Effective use of <acronym>FBT</acronym> probes requires knowledge of
+the operating system implementation. Therefore, it is recommended that you
+use <acronym>FBT</acronym> only when developing kernel software or when other
+providers are not sufficient. Other DTrace providers, including <literal>syscall</literal>, <literal>sched</literal>, <literal>proc</literal>, and <literal>io</literal>, can be
+used to answer most system analysis questions without requiring operating
+system implementation knowledge.</para>
+</highlights><sect1 id="chp-fbt-6"><title>Probes</title><para><indexterm><primary>probes</primary><secondary><literal>entry</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>return</literal></secondary></indexterm><indexterm><primary>kernel boundary probes</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary></indexterm><indexterm><primary><literal>FBT</literal> probe</primary></indexterm><acronym>FBT</acronym> provides a probe at the <emphasis>boundary</emphasis> of
+most functions in the kernel. The boundary of a function is crossed by entering
+the function and by returning from the function. <acronym>FBT</acronym> thus
+provides two functions for every function in the kernel: one upon entry to
+the function, and one upon return from the function. These probes are named <literal>entry</literal> and <literal>return</literal>, respectively. The function
+name, and module name are specified as part of the probe. All <acronym>FBT</acronym> probes
+specify a function name and module name.</para>
+</sect1><sect1 id="chp-fbt-7"><title>Probe arguments</title><sect2 id="chp-fbt-8"><title><literal>entry</literal> probes</title><para>The arguments to <literal>entry</literal> probes are the same as the
+arguments to the corresponding operating system kernel function. These arguments
+may be accessed in a typed fashion by using the <literal>args[]</literal> array.
+These arguments may be accessed as <literal>int64_t</literal>'s by using the <literal>arg0</literal> .. <literal>arg</literal><replaceable>n</replaceable><literal></literal> variables. </para>
+</sect2><sect2 id="chp-fbt-9"><title><literal>return</literal> probes</title><para>While a given function only has a single point of entry, it may have
+many different points where it returns to its caller. You are usually interested
+in either the value that a function returned or the fact that the function
+returned at all rather than the specific return path taken. <acronym>FBT</acronym> therefore
+collects a function's multiple return sites into a single <literal>return</literal> probe.
+If the exact return path is of interest, you can examine the <literal>return</literal> probe <literal>args[0]</literal> value, which indicates the <emphasis>offset</emphasis> (in
+bytes) of the returning instruction in the function text.</para><para>If the function has a return value, the return value is stored in <literal>args[1]</literal>. If a function does not have a return value, <literal>args[1]</literal> is
+not defined.</para>
+</sect2>
+</sect1><sect1 id="chp-fbt-10"><title>Examples</title><para><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>example of use</tertiary></indexterm><indexterm><primary>examples</primary><secondary><literal>FBT</literal></secondary></indexterm>You can use <acronym>FBT</acronym> to easily explore the kernel's implementation. The following example
+script records the first <olink targetdoc="refman2" targetptr="ioctl-2" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> from
+any <command>xclock</command> process and then follows the subsequent code
+path through the kernel:</para><programlisting>/*
+ * To make the output more readable, we want to indent every function entry
+ * (and unindent every function return).  This is done by setting the
+ * "flowindent" option.
+ */
+#pragma D option flowindent
+
+syscall::ioctl:entry
+/execname == "xclock" &amp;&amp; guard++ == 0/
+{
+	self-&gt;traceme = 1;
+	printf("fd: %d", arg0);
+}
+
+fbt:::
+/self-&gt;traceme/
+{}
+
+syscall::ioctl:return
+/self-&gt;traceme/
+{
+	self-&gt;traceme = 0;
+	exit(0);
+}</programlisting><para>Running this script results in output similar to the following example:</para><screen><userinput># dtrace -s ./xioctl.d</userinput>
+dtrace: script './xioctl.d' matched 26254 probes
+CPU FUNCTION                                 
+  0  =&gt; ioctl                                 fd: 3
+  0    -&gt; ioctl                               
+  0      -&gt; getf                              
+  0        -&gt; set_active_fd                   
+  0        &lt;- set_active_fd                   
+  0      &lt;- getf                              
+  0      -&gt; fop_ioctl                         
+  0        -&gt; sock_ioctl                      
+  0          -&gt; strioctl                      
+  0            -&gt; job_control_type            
+  0            &lt;- job_control_type            
+  0            -&gt; strcopyout                  
+  0              -&gt; copyout                   
+  0              &lt;- copyout                   
+  0            &lt;- strcopyout                  
+  0          &lt;- strioctl                      
+  0        &lt;- sock_ioctl                      
+  0      &lt;- fop_ioctl                         
+  0      -&gt; releasef                          
+  0        -&gt; clear_active_fd                 
+  0        &lt;- clear_active_fd                 
+  0        -&gt; cv_broadcast                    
+  0        &lt;- cv_broadcast                    
+  0      &lt;- releasef                          
+  0    &lt;- ioctl                               
+  0  &lt;= ioctl</screen><para>The output shows that an <literal>xclock</literal> process called <function>ioctl</function> on a file descriptor that appears to be associated with a
+socket.</para><para>You can also use <acronym>FBT</acronym> when trying to understand kernel
+drivers. For example, the <olink targetdoc="refman7" targetptr="ssd-7d" remap="external"><citerefentry><refentrytitle>ssd</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver
+has many code paths by which <literal>EIO</literal> may be returned. <acronym>FBT</acronym> can be easily used to determine the precise code path that resulted
+in an error condition, as shown in the following example:</para><programlisting>fbt:ssd::return
+/arg1 == EIO/
+{
+	printf("%s+%x returned EIO.", probefunc, arg0);
+}</programlisting><para>For more information on any one return of <literal>EIO</literal>, one
+may wish to speculatively trace all <literal>fbt</literal> probes, and then <function>commit</function>(or <function>discard</function>) based on the return value
+of a specific function. See <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13, Speculative
+Tracing</olink> for details on speculative tracing.</para><para>Alternatively, you can use <acronym>FBT</acronym> to understand the
+functions called within a specified module. The following example lists all
+of the functions called in <acronym>UFS</acronym>:</para><screen><userinput># dtrace -n fbt:ufs::entry'{@a[probefunc] = count()}'</userinput>
+dtrace: description 'fbt:ufs::entry' matched 353 probes
+<userinput>^C</userinput>
+  ufs_ioctl                                                         1
+  ufs_statvfs                                                       1
+  ufs_readlink                                                      1
+  ufs_trans_touch                                                   1
+  wrip                                                              1
+  ufs_dirlook                                                       1
+  bmap_write                                                        1
+  ufs_fsync                                                         1
+  ufs_iget                                                          1
+  ufs_trans_push_inode                                              1
+  ufs_putpages                                                      1
+  ufs_putpage                                                       1
+  ufs_syncip                                                        1
+  ufs_write                                                         1
+  ufs_trans_write_resv                                              1
+  ufs_log_amt                                                       1
+  ufs_getpage_miss                                                  1
+  ufs_trans_syncip                                                  1
+  getinoquota                                                       1
+  ufs_inode_cache_constructor                                       1
+  ufs_alloc_inode                                                   1
+  ufs_iget_alloced                                                  1
+  ufs_iget_internal                                                 2
+  ufs_reset_vnode                                                   2
+  ufs_notclean                                                      2
+  ufs_iupdat                                                        2
+  blkatoff                                                          3
+  ufs_close                                                         5
+  ufs_open                                                          5
+  ufs_access                                                        6
+  ufs_map                                                           8
+  ufs_seek                                                         11
+  ufs_addmap                                                       15
+  rdip                                                             15
+  ufs_read                                                         15
+  ufs_rwunlock                                                     16
+  ufs_rwlock                                                       16
+  ufs_delmap                                                       18
+  ufs_getattr                                                      19
+  ufs_getpage_ra                                                   24
+  bmap_read                                                        25
+  findextent                                                       25
+  ufs_lockfs_begin                                                 27
+  ufs_lookup                                                       46
+  ufs_iaccess                                                      51
+  ufs_imark                                                        92
+  ufs_lockfs_begin_getpage                                        102
+  bmap_has_holes                                                  102
+  ufs_getpage                                                     102
+  ufs_itimes_nolock                                               107
+  ufs_lockfs_end                                                  125
+  dirmangled                                                      498
+  dirbadname                                                      498</screen><para>If you know the purpose or arguments of a kernel function, you can use <acronym>FBT</acronym> to understand how or why the function is being called. For example, <olink targetdoc="refman9f" targetptr="putnext-9f" remap="external"><citerefentry><refentrytitle>putnext</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> takes a pointer to a <olink targetdoc="refman9s" targetptr="queue-9s" remap="external"><citerefentry><refentrytitle>queue</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure as its first member.
+The <literal>q_qinfo</literal> member of the <literal>queue</literal> structure
+is a pointer to a <olink targetdoc="refman9s" targetptr="qinit-9s" remap="external"><citerefentry><refentrytitle>qinit</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+The <literal>qi_minfo</literal> member of the <literal>qinit</literal> structure
+has a pointer to a <olink targetdoc="refman9s" targetptr="module-info-9s" remap="external"><citerefentry><refentrytitle>module_info</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure, which contains the module name in its <literal>mi_idname</literal> member. The following example puts this information together
+by using the <acronym>FBT</acronym> probe in <literal>putnext</literal> to
+track <olink targetdoc="refman9f" targetptr="putnext-9f" remap="external"><citerefentry><refentrytitle>putnext</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> calls
+by module name:</para><programlisting>fbt::putnext:entry
+{
+	@calls[stringof(args[0]-&gt;q_qinfo-&gt;qi_minfo-&gt;mi_idname)] = count();
+}</programlisting><para>Running the above script results in output similar to the following
+example:</para><screen><userinput># dtrace -s ./putnext.d</userinput>
+<userinput>^C</userinput>
+
+  iprb                                                              1
+  rpcmod                                                            1
+  pfmod                                                             1
+  timod                                                             2
+  vpnmod                                                            2
+  pts                                                              40
+  conskbd                                                          42
+  kb8042                                                           42
+  tl                                                               58
+  arp                                                             108
+  tcp                                                             126
+  ptm                                                             249
+  ip                                                              313
+  ptem                                                            340
+  vuid2ps2                                                        361
+  ttcompat                                                        412
+  ldterm                                                          413
+  udp                                                             569
+  strwhead                                                        624
+  mouse8042                                                       726</screen><para>You can also use <acronym>FBT</acronym> to determine the time spent
+in a particular function. The following example shows how to determine the
+callers of the DDI delaying routines <olink targetdoc="refman9f" targetptr="drv-usecwait-9f" remap="external"><citerefentry><refentrytitle>drv_usecwait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="delay-9f" remap="external"><citerefentry><refentrytitle>delay</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><programlisting>fbt::delay:entry,
+fbt::drv_usecwait:entry
+{
+	self-&gt;in = timestamp
+}
+
+fbt::delay:return,
+fbt::drv_usecwait:return
+/self-&gt;in/
+{
+	@snoozers[stack()] = quantize(timestamp - self-&gt;in);
+	self-&gt;in = 0;
+}</programlisting><para>This example script is particularly interesting to run during boot. <olink targetptr="chp-anon" remap="internal">Chapter&nbsp;36, Anonymous Tracing</olink> describes
+the procedure for performing anonymous tracing during system boot. Upon reboot,
+you might see output similar to the following example:</para><screen><userinput># dtrace -ae</userinput>
+
+              ata`ata_wait+0x34
+              ata`ata_id_common+0xf5
+              ata`ata_disk_id+0x20
+              ata`ata_drive_type+0x9a
+              ata`ata_init_drive+0xa2
+              ata`ata_attach+0x50
+              genunix`devi_attach+0x75
+              genunix`attach_node+0xb2
+              genunix`i_ndi_config_node+0x97
+              genunix`i_ddi_attachchild+0x4b
+              genunix`devi_attach_node+0x3d
+              genunix`devi_config_one+0x1d0
+              genunix`ndi_devi_config_one+0xb0
+              devfs`dv_find+0x125
+              devfs`devfs_lookup+0x40
+              genunix`fop_lookup+0x21
+              genunix`lookuppnvp+0x236
+              genunix`lookuppnat+0xe7
+              genunix`lookupnameat+0x87
+              genunix`cstatat_getvp+0x134
+
+           value  ------------- Distribution ------------- count    
+            2048 |                                         0        
+            4096 |@@@@@@@@@@@@@@@@@@@@@                    4105     
+            8192 |@@@@                                     783      
+           16384 |@@@@@@@@@@@@@@                           2793     
+           32768 |                                         16       
+           65536 |                                         0
+
+
+              kb8042`kb8042_wait_poweron+0x29
+              kb8042`kb8042_init+0x22
+              kb8042`kb8042_attach+0xd6
+              genunix`devi_attach+0x75
+              genunix`attach_node+0xb2
+              genunix`i_ndi_config_node+0x97
+              genunix`i_ddi_attachchild+0x4b
+              genunix`devi_attach_node+0x3d
+              genunix`devi_config_one+0x1d0
+              genunix`ndi_devi_config_one+0xb0
+              genunix`resolve_pathname+0xa5
+              genunix`ddi_pathname_to_dev_t+0x16
+              consconfig_dacf`consconfig_load_drivers+0x14
+              consconfig_dacf`dynamic_console_config+0x6c
+              consconfig`consconfig+0x8
+              unix`stubs_common_code+0x3b
+
+           value  ------------- Distribution ------------- count    
+          262144 |                                         0        
+          524288 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@      221      
+         1048576 |@@@@                                     29       
+         2097152 |                                         0        
+
+
+              usba`hubd_enable_all_port_power+0xed
+              usba`hubd_check_ports+0x8e
+              usba`usba_hubdi_attach+0x275
+              usba`usba_hubdi_bind_root_hub+0x168
+              uhci`uhci_attach+0x191
+              genunix`devi_attach+0x75
+              genunix`attach_node+0xb2
+              genunix`i_ndi_config_node+0x97
+              genunix`i_ddi_attachchild+0x4b
+              genunix`i_ddi_attach_node_hierarchy+0x49
+              genunix`attach_driver_nodes+0x49
+              genunix`ddi_hold_installed_driver+0xe3
+              genunix`attach_drivers+0x28
+
+           value  ------------- Distribution ------------- count    
+        33554432 |                                         0        
+        67108864 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@ 3        
+       134217728 |                                         0</screen>
+</sect1><sect1 id="chp-fbt-11"><title>Tail-call Optimization</title><para><indexterm><primary><literal>FBT</literal>probes</primary><secondary>tail-call optimization</secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>and tail-call optimization</tertiary></indexterm>When one function ends by calling another function,
+the compiler can engage in <firstterm>tail-call optimization</firstterm>,
+in which the function being called reuses the caller's stack frame. This procedure
+is most commonly used in the SPARC architecture, where the compiler reuses
+the caller's register window in the function being called in order to minimize
+register window pressure.</para><para>The presence of this optimization causes the <literal>return</literal> probe
+of the calling function to fire <emphasis>before</emphasis> the <literal>entry</literal> probe
+of the called function. This ordering can lead to quite a bit of confusion.
+For example, if you wanted to record all functions called from a particular
+function and any functions that this function calls, you might use the following
+script:</para><programlisting>fbt::foo:entry
+{
+	self-&gt;traceme = 1;
+}
+
+fbt:::entry
+/self-&gt;traceme/
+{
+	printf("called %s", probefunc);
+}
+
+fbt::foo:return
+/self-&gt;traceme/
+{
+	self-&gt;traceme = 0;
+}</programlisting><para>However, if <function>foo</function> ends in an optimized tail-call,
+the tail-called function, and therefore any functions that it calls, will
+not be captured. The kernel cannot be dynamically deoptimized on the fly,
+and DTrace does not wish to engage in a lie about how code is structured.
+Therefore, you should be aware of when tail-call optimization might be used.</para><para>Tail-call optimization is likely to be used in source code similar to
+the following example:</para><programlisting>	return (bar());</programlisting><para>Or in source code similar to the following example:</para><programlisting>	(void) bar();
+	return;</programlisting><para>Conversely, function source code that ends like the following example <emphasis>cannot</emphasis> have its call to <function>bar</function> optimized, because
+the call to <function>bar</function> is not a tail-call:</para><programlisting>	bar();
+	return (rval);</programlisting><para>You can determine whether a call has been tail-call optimized using
+the following technique:</para><itemizedlist><listitem><para>While running DTrace, trace <literal>arg0</literal> of the <literal>return</literal> probe in question. <literal>arg0</literal> contains the offset
+of the returning instruction in the function.</para>
+</listitem><listitem><para>After DTrace has stopped, use <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to look at the function. If the traced offset contains
+a call to another function instead of an instruction to return from the function,
+the call has been tail-call optimized.</para>
+</listitem>
+</itemizedlist><para>Due to the instruction set architecture, tail-call optimization is far
+more common on SPARC systems than on x86 systems. The following example uses <literal>mdb</literal> to discover tail-call optimization in the kernel's <function>dup</function> function:</para><screen><userinput># dtrace -q -n fbt::dup:return'{printf("%s+0x%x", probefunc, arg0);}'</userinput></screen><para>While this command is running, run a program that performs a <olink targetdoc="refman2" targetptr="dup-2" remap="external"><citerefentry><refentrytitle>dup</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, such as a <command>bash</command> process.
+The above command should provide output similar to the following example:</para><screen>dup+0x10
+<userinput>^C</userinput></screen><para>Now examine the function with <literal>mdb</literal>:</para><screen><userinput># echo "dup::dis" | mdb -k</userinput>
+dup:                            sra       %o0, 0, %o0
+dup+4:                          mov       %o7, %g1
+dup+8:                          clr       %o2
+dup+0xc:                        clr       %o1
+dup+0x10:                       call      -0x1278       &lt;fcntl&gt;
+dup+0x14:                       mov       %g1, %o7</screen><para>The output shows that <literal>dup+0x10</literal> is a call to the <function>fcntl</function> function and not a <literal>ret</literal> instruction. Therefore,
+the call to <function>fcntl</function> is an example of tail-call optimization.</para>
+</sect1><sect1 id="chp-fbt-12"><title>Assembly Functions</title><para><indexterm><primary><literal>FBT</literal> probes</primary><secondary>unsporting functions</secondary></indexterm><indexterm><primary>unsporting functions</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>unsporting functions</tertiary></indexterm>You might observe functions
+that seem to enter but never return or vice versa. Such rare functions are
+generally hand-coded assembly routines that branch to the middle of other
+hand-coded assembly functions. These functions should not impede analysis:
+the branched-to function must still return to the caller of the branched-from
+function. That is, if you enable all <acronym>FBT</acronym> probes, you should
+see the entry to one function and the return from another function at the
+same stack depth.</para>
+</sect1><sect1 id="chp-fbt-13"><title>Instruction Set Limitations</title><para><indexterm><primary><literal>FBT</literal> probes</primary><secondary>uninstrumentable functions</secondary></indexterm><indexterm><primary>uninstrumentable functions</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>uninstrumentable functions</tertiary></indexterm>Some functions
+cannot be instrumented by <acronym>FBT</acronym>. The exact nature of uninstrumentable
+functions is specific to the instruction set architecture.</para><sect2 id="chp-fbt-14"><title>x86 Limitations</title><para>Functions that do not create a stack frame on x86 systems cannot be
+instrumented by <acronym>FBT</acronym>. Because the register set for x86 is
+extraordinarily small, most functions must put data on the stack and therefore
+create a stack frame. However, some x86 functions do not create a stack frame
+and therefore cannot be instrumented. Actual numbers vary, but typically fewer
+than five percent of functions cannot be instrumented on the x86 platform.</para>
+</sect2><sect2 id="chp-fbt-15"><title>SPARC Limitations</title><para>Leaf routines hand-coded in assembly language on SPARC systems cannot
+be instrumented by <acronym>FBT</acronym>. The majority of the kernel is written
+in C, and all functions written in C can be instrumented by <acronym>FBT</acronym>.</para>
+</sect2>
+</sect1><sect1 id="chp-fbt-16"><title>Breakpoint Interaction</title><para><indexterm><primary><literal>FBT</literal> probes</primary><secondary>and breakpoints</secondary></indexterm><indexterm><primary>breakpoints</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>breakpoints</tertiary></indexterm><acronym>FBT</acronym> works by
+dynamically modifying kernel text. Because kernel breakpoints also work by
+modifying kernel text, if a kernel breakpoint is placed at an entry or return
+site <emphasis>before</emphasis> loading DTrace, <acronym>FBT</acronym> will
+refuse to provide a probe for the function, even if the kernel breakpoint
+is subsequently removed. If the kernel breakpoint is placed <emphasis>after</emphasis> loading
+DTrace, both the kernel breakpoint and the DTrace probe will correspond to
+the same point in text. In this situation, the breakpoint will trigger first,
+and then the probe will fire when the debugger resumes the kernel. It is recommended
+that kernel breakpoints not be used concurrently with DTrace. If breakpoints
+are required, use the DTrace <function>breakpoint</function> action instead.</para>
+</sect1><sect1 id="chp-fbt-17"><title>Module Loading</title><para><indexterm><primary><literal>FBT</literal> probes</primary><secondary>and module loading</secondary></indexterm><indexterm><primary>module loading</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>module loading</tertiary></indexterm>The Solaris kernel can dynamic
+load and unload kernel modules. When <acronym>FBT</acronym> is loaded and
+a module is dynamically loaded, <acronym>FBT</acronym> automatically provides
+new probes associated with the new module. If a loaded module has <emphasis>unenabled</emphasis> <acronym>FBT</acronym> probes, the module may be unloaded; the
+corresponding probes will be destroyed as the module is unloaded. If a loaded
+module has <emphasis>enabled</emphasis> <acronym>FBT</acronym> probes, the
+module is considered busy, and cannot be unloaded.</para>
+</sect1><sect1 id="chp-fbt-18"><title>Stability</title><para><indexterm><primary><literal>FBT</literal> probes</primary><secondary>stability</secondary></indexterm><indexterm><primary>stability</primary><secondary><literal>FBT</literal> probes</secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>FBT</literal></secondary><tertiary>stability</tertiary></indexterm>The <acronym>FBT</acronym> provider uses DTrace's stability mechanism
+to describe its stabilities, as shown in the following table. For more information
+about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39,
+Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>As <acronym>FBT</acronym> exposes the kernel implementation, nothing
+about it is Stable &mdash; and the Module and Function name and data stability
+are explicitly Private. The data stability for Provider and Name are Evolving,
+but all other data stabilities are Private: they are artifacts of the current
+implementation. The dependency class for <acronym>FBT</acronym> is <acronym>ISA</acronym>:
+while <acronym>FBT</acronym> is available on all current instruction set architectures,
+there is no guarantee that <acronym>FBT</acronym> will be available on arbitrary
+future instruction set architectures.</para>
+</sect1>
+</chapter><?Pub *0000031564 0?>

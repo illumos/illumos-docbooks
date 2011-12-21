@@ -1,0 +1,133 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Debugger Module Linkage - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="api-5.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-2.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Debugger Module Linkage</a></p>
+</div>
+<p class="toc level2"><a href="api-2.html">Dcmd Definitions</a></p>
+<p class="toc level2"><a href="api-3.html">Walker Definitions</a></p>
+<p class="toc level2"><a href="api-4.html">API Functions</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="api-1"></a><h3>Debugger Module Linkage</h3>
+
+
+<a name="api-6"></a><h4><tt>_mdb_init()</tt></h4>
+<pre>const mdb_modinfo_t *_mdb_init(void);</pre><p><a name="indexterm-488"></a><a name="indexterm-489"></a>Each debugger module is required to provide, for linkage and identification purposes, a function
+named <tt>_mdb_init()</tt>. This function returns a pointer to a persistent (that is, not
+declared as an automatic variable) <tt>mdb_modinfo_t</tt> structure, as defined in <tt>&lt;sys/mdb_modapi.h&gt;</tt>:</p><pre>typedef struct mdb_modinfo {
+        ushort_t mi_dvers;               /* Debugger API version number */
+        const mdb_dcmd_t *mi_dcmds;      /* NULL-terminated list of dcmds */
+        const mdb_walker_t *mi_walkers;  /* NULL-terminated list of walks */
+} mdb_modinfo_t;</pre><p><a name="indexterm-490"></a>The <i>mi_dvers</i> member is used to identify the API version number, and should
+always be set to <tt>MDB_API_VERSION</tt>. The current version number is therefore compiled into
+each debugger module, allowing the debugger to identify and verify the application binary
+interface used by the module. The debugger does not load modules that are
+compiled for an API version that is more recent than the debugger itself.</p><p>The <i>mi_dcmds</i> and <i>mi_walkers</i> members, if not NULL, point to arrays of dcmd
+and walker definition structures, respectively. Each array must be terminated by a NULL
+element. These dcmds and walkers are installed and registered with the debugger as
+part of the module loading process. The debugger will refuse to load the
+module if one or more dcmds or walkers are defined improperly or if
+they have conflicting or invalid names. Dcmd and walker names are prohibited from
+containing characters that have special meaning to the debugger, such as quotation marks
+and parentheses.</p><p>The module can also execute code in <tt>_mdb_init()</tt> using the module API to
+determine if it is appropriate to load. For example, a module can only
+be appropriate for a particular target if certain symbols are present. If these
+symbols are not found, the module can return NULL from the <tt>_mdb_init()</tt>
+function. In this case, the debugger will refuse to load the module and
+an appropriate error message is printed.  </p>
+
+<a name="api-7"></a><h4><tt>_mdb_fini()</tt></h4>
+<pre>void _mdb_fini(void);</pre><p><a name="indexterm-491"></a>If the module performs certain tasks prior to unloading, such as freeing persistent memory
+previously allocated with <tt>mdb_alloc()</tt>, it can declare a function named <tt>_mdb_fini()</tt> for this
+purpose. This function is not required by the debugger. If declared, it is
+called once prior to unloading the module. Modules are unloaded when the user
+requests that the debugger terminate or when the user explicitly unloads a module
+using the <tt>::unload</tt> built-in dcmd. </p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="api-5.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="api-2.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

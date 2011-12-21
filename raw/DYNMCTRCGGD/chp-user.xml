@@ -1,0 +1,509 @@
+<?Pub EntList bull rArr sect?><chapter id="chp-user"><title>User Process Tracing</title><highlights><para>DTrace is an extremely powerful tool for understanding the behavior
+of user processes. DTrace can be invaluable when debugging, analyzing performance
+problems, or simply understanding the behavior of a complex application. This
+chapter focuses on the DTrace facilities relevant for tracing user process
+activity and provides examples to illustrate their use.</para>
+</highlights><sect1 id="chp-user-1"><title><function>copyin</function> and <function>copyinstr</function> Subroutines</title><para><indexterm><primary>subroutines</primary><secondary><function>copyinstr</function></secondary></indexterm><indexterm><primary>subroutines</primary><secondary><function>copyin</function></secondary></indexterm><indexterm><primary><function>copyinstr</function></primary></indexterm><indexterm><primary><function>copyin</function></primary></indexterm><indexterm><primary>user process tracing</primary></indexterm>DTrace's
+interaction with processes is a little different than most traditional debuggers
+or observability tools. Many such tools appear to execute within the scope
+of the process, letting users dereference pointers to program variables directly.
+Rather than appearing to execute within or as part of the process itself,
+DTrace probes execute in the Solaris kernel. To access process data, a probe
+needs to use the <function>copyin</function> or <function>copyinstr</function> subroutines
+to copy user process data into the address space of the kernel.</para><para>For example, consider the following <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call:</para><programlisting>ssize_t write(int fd, const void *buf, size_t nbytes);</programlisting><para>The following D program illustrates an incorrect attempt to print the
+contents of a string passed to the <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call:</para><programlisting>syscall::write:entry
+{
+	printf("%s", stringof(arg1)); /* incorrect use of arg1 */
+}</programlisting><para>If you try to run this script, DTrace will produce error messages similar
+to the following example:</para><screen>dtrace: error on enabled probe ID 1 (ID 37: syscall::write:entry): \
+    invalid address (0x10038a000) in action #1</screen><para>The <literal>arg1</literal> variable, containing the value of the <replaceable>buf</replaceable> parameter, is an address that refers to memory in the process
+executing the system call. To read the string at that address, use the <function>copyinstr</function> subroutine and record its result with the <function>printf</function> action:</para><programlisting>syscall::write:entry
+{
+	printf("%s", copyinstr(arg1)); /* correct use of arg1 */</programlisting><para>The output of this script shows all of the strings being passed to the <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call. Occasionally,
+however, you might see irregular output similar to the following example:</para><screen>  0     37                      write:entry mada&iuml;&iquest;&frac12;&iuml;&iquest;&frac12;&iuml;&iquest;&frac12;</screen><para>The <function>copyinstr</function> subroutine acts on an input argument
+that is the user address of a null-terminated ASCII string. However, buffers
+passed to the <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call might refer to binary data rather than ASCII strings. To print only as
+much of the string as the caller intended, use the <function>copyin</function> subroutine,
+which takes a size as its second argument:</para><programlisting>syscall::write:entry
+{
+	printf("%s", stringof(copyin(arg1, arg2)));
+}</programlisting><para>Notice that the <literal>stringof</literal> operator is necessary so
+that DTrace properly converts the user data retrieved using <function>copyin</function> to
+a string. The use of <literal>stringof</literal> is not necessary when using&nbsp;<function>copyinstr</function> because this function always returns type <literal>string</literal>.</para><sect2 id="chp-user-1.1"><title>Avoiding Errors</title><para>The <function>copyin</function> and <function>copyinstr</function> subroutines
+cannot read from user addresses which have not yet been touched so even a
+valid address may cause an error if the page containing that address has not
+yet been faulted in by being accessed. Consider the following example:</para><screen><userinput># dtrace -n syscall::open:entry'{ trace(copyinstr(arg0)); }'</userinput>
+dtrace: description 'syscall::open:entry' matched 1 probe
+CPU     ID                    FUNCTION:NAME
+dtrace: error on enabled probe ID 2 (ID 50: syscall::open:entry): invalid address
+(0x9af1b) in action #1 at DIF offset 52</screen><para>In the above example output, the application was functioning properly,
+and the address in <literal>arg0</literal> was valid, but it referred to a
+page that had not yet been accessed by the corresponding process. To resolve
+this issue, wait for kernel or application to use the data before tracing
+it. For example, you might wait until the system call returns to apply <function>copyinstr</function>, as shown in the following example:</para><screen><userinput># dtrace -n syscall::open:entry'{ self-&gt;file = arg0; }' \</userinput>
+<userinput>-n syscall::open:return'{ trace(copyinstr(self-&gt;file)); self-&gt;file = 0; }'</userinput>
+dtrace: description 'syscall::open:entry' matched 1 probe
+CPU     ID                    FUNCTION:NAME
+  2     51                      open:return   /dev/null                        </screen>
+</sect2>
+</sect1><sect1 id="chp-user-2"><title>Eliminating <citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry> Interference</title><para><indexterm><primary><literal>dtrace</literal> interference</primary></indexterm>If you trace every call to the <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call, you will cause
+a cascade of output. Each call to <function>write</function> causes the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to call <function>write</function> as
+it displays the output, and so on. This feedback loop is a good example of
+how the <command>dtrace</command> command can interfere with the desired data.
+You can use a simple predicate to prevent these unwanted data from being traced:</para><programlisting>syscall::write:entry
+/pid != $pid/
+{
+	printf("%s", stringof(copyin(arg1, arg2)));
+}</programlisting><para>The <literal>$pid</literal> macro variable expands to the process identifier
+of the process that enabled the probes. The <literal>pid</literal> variable
+contains the process identifier of the process whose thread was running on
+the CPU where the probe was fired. Therefore the predicate <literal>/pid !=
+$pid/</literal> ensures that the script does not trace any events related
+to the running of this script itself.</para>
+</sect1><sect1 id="chp-user-3"><title><literal>syscall</literal> Provider</title><para><indexterm><primary>probes</primary><secondary><function>syscall</function></secondary></indexterm>The <literal>syscall</literal> provider enables you to trace every
+system call entry and return. System calls can be a good starting point for
+understanding a process's behavior, especially if the process seems to be
+spending a large amount of time executing or blocked in the kernel. You can
+use the <olink targetdoc="refman1m" targetptr="prstat-1m" remap="external"><citerefentry><refentrytitle>prstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to see where processes are spending time:</para><screen><userinput>$ prstat -m -p 31337</userinput>
+   PID USERNAME USR SYS TRP TFL DFL LCK SLP LAT VCX ICX SCL SIG PROCESS/NLWP  
+ 13499 user1     53  44 0.0 0.0 0.0 0.0 2.5 0.0  4K  24  9K   0 mystery/6</screen><para>This example shows that the process is consuming a large amount of system
+time. One possible explanation for this behavior is that the process is executing
+a large number of system calls. You can use a simple D program specified on
+the command-line to see which system calls are happening most often:</para><screen><userinput># dtrace -n syscall:::entry'/pid == 31337/{ @syscalls[probefunc] = count(); }'</userinput>
+dtrace: description 'syscall:::entry' matched 215 probes
+<userinput>^C</userinput>
+
+  open                                                              1
+  lwp_park                                                          2
+  times                                                             4
+  fcntl                                                             5
+  close                                                             6
+  sigaction                                                         6
+  read                                                             10
+  ioctl                                                            14
+  sigprocmask                                                     106
+  write                                                          1092</screen><para>This report shows which system calls are being called most often, in
+this case, the <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call. You can use the <literal>syscall</literal> provider to further examine
+the source of all the <function>write</function> system calls:</para><screen><userinput># dtrace -n syscall::write:entry'/pid == 31337/{ @writes[arg2] = quantize(arg2); }'</userinput>
+dtrace: description 'syscall::write:entry' matched 1 probe
+<userinput>^C</userinput>
+
+           value  ------------- Distribution ------------- count    
+               0 |                                         0        
+               1 |@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@   1037
+               2 |@                                        3        
+               4 |                                         0        
+               8 |                                         0        
+              16 |                                         0        
+              32 |@                                        3        
+              64 |                                         0        
+             128 |                                         0        
+             256 |                                         0        
+             512 |                                         0        
+            1024 |@                                        5        
+            2048 |                                         0        </screen><para>The output shows that the process is executing many <function>write</function> system
+calls with a relatively small amount of data. This ratio could be the source
+of the performance problem for this particular process. This example illustrates
+a general methodology for investigating system call behavior.</para>
+</sect1><sect1 id="chp-user-4"><title><function>ustack</function> Action</title><para><indexterm><primary><function>ustack</function></primary></indexterm>Tracing
+a process thread's stack at the time a particular probe is activated is often
+useful for examining a problem in more detail. The <function>ustack</function> action
+traces the user thread's stack. If, for example, a process that opens many
+files occasionally fails in the <olink targetdoc="refman2" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call, you can use the <function>ustack</function> action
+to discover the code path that executes the failed <function>open</function>:</para><programlisting>syscall::open:entry
+/pid == $1/
+{
+	self-&gt;path = copyinstr(arg0);
+}
+
+syscall::open:return
+/self-&gt;path != NULL &amp;&amp; arg1 == -1/
+{
+	printf("open for '%s' failed", self-&gt;path);
+	ustack();
+}</programlisting><para>This script also illustrates the use of the <literal>$1</literal> macro
+variable which takes the value of the first operand specified on the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command-line:</para><screen><userinput># dtrace -s ./badopen.d 31337</userinput>
+dtrace: script './badopen.d' matched 2 probes
+CPU     ID                    FUNCTION:NAME
+  0     40                      open:return open for '/usr/lib/foo' failed
+              libc.so.1`__open+0x4
+              libc.so.1`open+0x6c
+              420b0
+              tcsh`dosource+0xe0
+              tcsh`execute+0x978
+              tcsh`execute+0xba0
+              tcsh`process+0x50c
+              tcsh`main+0x1d54
+              tcsh`_start+0xdc</screen><para>The <function>ustack</function> action records program counter (<acronym>PC</acronym>) values for the stack and <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> resolves those <acronym>PC</acronym> values
+to symbol names by looking though the process's symbol tables. If <command>dtrace</command> can't resolve the <acronym>PC</acronym> value to a symbol, it will
+print out the value as a hexadecimal integer.</para><para>If a process exits or is killed before the <function>ustack</function> data
+is formatted for output, <command>dtrace</command> might be unable to convert
+the <acronym>PC</acronym> values in the stack trace to symbol names, and will
+be forced to display them as hexadecimal integers. To work around this limitation,
+specify a process of interest with the <option>c</option> or <option>p</option> option
+to <literal>dtrace</literal>. See <olink targetptr="chp-dtrace1m" remap="internal">Chapter&nbsp;14,
+dtrace(1M) Utility</olink> for details on these and other options. If the
+process ID or command is not known in advance, the following example D program
+that can be used to work around the limitation:</para><programlisting>/*
+ * This example uses the open(2) system call probe, but this technique
+ * is applicable to any script using the ustack() action where the stack
+ * being traced is in a process that may exit soon.
+ */
+ syscall::open:entry
+{
+	ustack();
+	stop_pids[pid] = 1;
+}
+
+syscall::rexit:entry
+/stop_pids[pid] != 0/
+{
+	printf("stopping pid %d", pid);
+	stop();
+	stop_pids[pid] = 0;
+}</programlisting><para>The above script stops a process just before it exits if the <function>ustack</function> action has been applied to a thread in that process. This technique
+ensures that the <command>dtrace</command> command will be able to resolve
+the <acronym>PC</acronym> values to symbolic names. Notice that the value
+of <literal>stop_pids[pid]</literal> is set to 0 after it has been used to
+clear the dynamic variable. Remember to set stopped processes running again
+using the <olink targetdoc="refman1" targetptr="prun-1" remap="external"><citerefentry><refentrytitle>prun</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+or your system will accumulate many stopped processes.</para>
+</sect1><sect1 id="chp-user-uregs"><title><literal>uregs[]</literal> Array</title><para><indexterm><primary><literal>uregs[]</literal> array</primary></indexterm>The <literal>uregs[]</literal> array enables you to access individual user registers. The
+following tables list indices into the <literal>uregs[]</literal> array corresponding
+to each supported Solaris system architecture.</para><table frame="topbot" id="chp-user-tbl-uregs-sparc"><title>SPARC <literal>uregs[]</literal> Constants</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth=""/><colspec colname="colspec1" colwidth=""/><thead><row rowsep="1"><entry><para>Constant</para>
+</entry><entry><para>Register</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>R_G0..R_G7</literal></para>
+</entry><entry><para><literal>%g0..%g7</literal> global registers</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_O0..R_O7</literal></para>
+</entry><entry colname="colspec1"><para><literal>%o0..%o7</literal> out registers</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_L0..R_L7</literal></para>
+</entry><entry colname="colspec1"><para><literal>%l0..%l7</literal> local registers</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_I0..R_I7</literal></para>
+</entry><entry colname="colspec1"><para><literal>%i0..%i7</literal> in registers</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_CCR</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ccr</literal> condition code register</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_PC</literal></para>
+</entry><entry colname="colspec1"><para><literal>%pc</literal> program counter</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_NPC</literal></para>
+</entry><entry colname="colspec1"><para><literal>%npc</literal> next program counter</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_Y</literal></para>
+</entry><entry colname="colspec1"><para><literal>%y</literal> multiply/divide register</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ASI</literal></para>
+</entry><entry colname="colspec1"><para><literal>%asi</literal> address space identifier register</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_FPRS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%fprs</literal> floating-point registers state</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><table frame="topbot" id="chp-user-tbl-uregs-x86"><title>x86 <literal>uregs[]</literal> Constants</title><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="7.01in"?><colspec colname="colspec0" colwidth="0.84*"/><colspec colname="colspec1" colwidth="1.16*"/><thead><row rowsep="1"><entry><para>Constant</para>
+</entry><entry><para>Register</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>R_CS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%cs</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_GS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%gs</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ES</literal></para>
+</entry><entry colname="colspec1"><para><literal>%es</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_DS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ds</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EDI</literal></para>
+</entry><entry colname="colspec1"><para><literal>%edi</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ESI</literal></para>
+</entry><entry colname="colspec1"><para><literal>%esi</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EBP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ebp</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EAX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%eax</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ESP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%esp</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EAX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%eax</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EBX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ebx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ECX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ecx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EDX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%edx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_TRAPNO</literal></para>
+</entry><entry colname="colspec1"><para><literal>%trapno</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ERR</literal></para>
+</entry><entry colname="colspec1"><para><literal>%err</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EIP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%eip</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_CS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%cs</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_ERR</literal></para>
+</entry><entry colname="colspec1"><para><literal>%err</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_EFL</literal></para>
+</entry><entry colname="colspec1"><para><literal>%efl</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_UESP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%uesp</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_SS</literal></para>
+</entry><entry colname="colspec1"><para><literal>%ss</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>On AMD64 platforms, the <literal>uregs</literal> array has the same
+content as it does on x86 platforms, plus the additional elements listed in
+the following table:</para><table frame="topbot" id="gelsi"><title>amd64 <literal>uregs[]</literal> Constants</title><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="7.01in"?><colspec colname="colspec0" colwidth="0.84*"/><colspec colname="colspec1" colwidth="1.16*"/><thead><row rowsep="1"><entry><para>Constant</para>
+</entry><entry><para>Register</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>R_RSP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rsp</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RFL</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rfl</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RIP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rip</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RAX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rax</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RCX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rcx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RDX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rdx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RBX</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rbx</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RBP</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rbp</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RSI</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rsi</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_RDI</literal></para>
+</entry><entry colname="colspec1"><para><literal>%rdi</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R8</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r8</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R9</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r9</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R10</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r10</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R11</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r11</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R12</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r12</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R13</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r13</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R14</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r14</literal></para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R15</literal></para>
+</entry><entry colname="colspec1"><para><literal>%r15</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The aliases listed in the following table can be used on all platforms:</para><table frame="topbot" id="chp-user-tbl-uregs-common"><title>Common <literal>uregs[]</literal> Constants</title><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="7.01in"?><colspec colname="colspec0" colwidth="0.84*"/><colspec colname="colspec1" colwidth="1.16*"/><thead><row rowsep="1"><entry><para>Constant</para>
+</entry><entry><para>Register</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>R_PC</literal></para>
+</entry><entry><para>program counter register</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_SP</literal></para>
+</entry><entry colname="colspec1"><para>stack pointer register</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R0</literal></para>
+</entry><entry colname="colspec1"><para>first return code</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>R_R1</literal></para>
+</entry><entry colname="colspec1"><para>second return code</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-user-5"><title><literal>pid</literal> Provider</title><para><indexterm><primary><literal>pid</literal> provider</primary></indexterm>The <literal>pid</literal> provider enables you to trace any instruction in a process.
+Unlike most other providers, <literal>pid</literal> probes are created on
+demand based on the probe descriptions found in your D programs. As a result,
+no <literal>pid</literal> probes are listed in the output of <command>dtrace
+-l</command> until you have enabled them yourself.</para><sect2 id="chp-user-5.1"><title>User Function Boundary Tracing</title><para><indexterm><primary>function boundary testing (FBT)</primary></indexterm>The
+simplest mode of operation for the <literal>pid</literal> provider is as the
+user space analogue to the <literal>fbt</literal> provider. The following
+example program traces all function entries and returns that are made from
+a single function. The <literal>$1</literal> macro variable (the first operand
+on the command line) is the process ID for the process to trace. The <literal>$2</literal> macro
+variable (the second operand on the command line) is the name of the function
+from which to trace all function calls.</para><example id="ex-userfunc.d"><title><filename>userfunc.d</filename>: Trace
+User Function Entry and Return</title><programlisting>pid$1::$2:entry
+{
+	self-&gt;trace = 1;
+}
+
+pid$1::$2:return
+/self-&gt;trace/
+{
+	self-&gt;trace = 0;
+}
+
+pid$1:::entry,
+pid$1:::return
+/self-&gt;trace/
+{
+}</programlisting>
+</example><para>Type in the above example script and save it in a file named <filename>userfunc.d</filename>, and then <command>chmod</command> it to be executable. This script
+produces output similar to the following example:</para><screen><userinput># ./userfunc.d 15032 execute</userinput>
+dtrace: script './userfunc.d' matched 11594 probes
+  0  -&gt; execute                               
+  0    -&gt; execute                             
+  0      -&gt; Dfix                              
+  0      &lt;- Dfix                              
+  0      -&gt; s_strsave                         
+  0        -&gt; malloc                          
+  0        &lt;- malloc                          
+  0      &lt;- s_strsave                         
+  0      -&gt; set                               
+  0        -&gt; malloc                          
+  0        &lt;- malloc                          
+  0      &lt;- set                               
+  0      -&gt; set1                              
+  0        -&gt; tglob                           
+  0        &lt;- tglob                           
+  0      &lt;- set1                              
+  0      -&gt; setq                              
+  0        -&gt; s_strcmp                        
+  0        &lt;- s_strcmp                        
+...</screen><para>The <literal>pid</literal> provider can only be used on processes that
+are already running. You can use the <literal>$target</literal> macro variable
+(see <olink targetptr="chp-script" remap="internal">Chapter&nbsp;15, Scripting</olink>) and
+the <command>dtrace</command> <option>c</option> and <option>p</option> options
+to create and grab processes of interest and instrument them using DTrace.
+For example, the following D script can be used to determine the distribution
+of function calls made to <literal>libc</literal> by a particular subject
+process:</para><programlisting>pid$target:libc.so::entry
+{
+	@[probefunc] = count();
+}</programlisting><para>To determine the distribution of such calls made by the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command, save the script in
+a file named <filename>libc.d</filename> and execute the following command:</para><screen><userinput># dtrace -s libc.d -c date</userinput>
+dtrace: script 'libc.d' matched 2476 probes
+Fri Jul 30 14:08:54 PDT 2004
+dtrace: pid 109196 has exited
+
+  pthread_rwlock_unlock                                             1
+  _fflush_u                                                         1
+  rwlock_lock                                                       1
+  rw_write_held                                                     1
+  strftime                                                          1
+  _close                                                            1
+  _read                                                             1
+  __open                                                            1
+  _open                                                             1
+  strstr                                                            1
+  load_zoneinfo                                                     1
+
+...
+  _ti_bind_guard                                                   47
+  _ti_bind_clear                                                   94</screen>
+</sect2><sect2 id="chp-user-5.2"><title>Tracing Arbitrary Instructions</title><para><indexterm><primary><literal>pid</literal> provider</primary></indexterm><indexterm><primary>tracing instructions</primary></indexterm>You can use the <literal>pid</literal> provider
+to trace any instruction in any user function. Upon demand, the <literal>pid</literal> provider
+will create a probe for every instruction in a function. The name of each
+probe is the offset of its corresponding instruction in the function expressed
+as a hexadecimal integer. For example, to enable a probe associated with the
+instruction at offset 0x1c in function <literal>foo</literal> of module <literal>bar.so</literal> in the process with PID 123, you can use the following command:</para><screen><userinput># dtrace -n pid123:bar.so:foo:1c</userinput></screen><para>To enable all of the probes in the function <literal>foo</literal>,
+including the probe for each instruction, you can use the command:</para><screen><userinput># dtrace -n pid123:bar.so:foo:</userinput></screen><para>This command demonstrates an extremely powerful technique for debugging
+and analyzing user applications. Infrequent errors can be difficult to debug
+because they can be difficult to reproduce. Often, you can identify a problem
+after the failure has occurred, too late to reconstruct the code path. The
+following example demonstrates how to combine the <literal>pid</literal> provider
+with speculative tracing (see <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13,
+Speculative Tracing</olink>) to solve this problem by tracing every instruction
+in a function.</para><example id="ex-errorpath.d"><title><filename>errorpath.d</filename>: Trace
+User Function Call Error Path</title><programlisting>pid$1::$2:entry
+{
+	self-&gt;spec = speculation();
+	speculate(self-&gt;spec);
+	printf("%x %x %x %x %x", arg0, arg1, arg2, arg3, arg4);
+}
+
+pid$1::$2:
+/self-&gt;spec/
+{
+	speculate(self-&gt;spec);
+}
+
+pid$1::$2:return
+/self-&gt;spec &amp;&amp; arg1 == 0/
+{
+	discard(self-&gt;spec);
+	self-&gt;spec = 0;
+}
+
+pid$1::$2:return
+/self-&gt;spec &amp;&amp; arg1 != 0/
+{
+	commit(self-&gt;spec);
+	self-&gt;spec = 0;
+}</programlisting>
+</example><para>Executing <filename>errorpath.d</filename> results in output similar
+to the following example:</para><screen><userinput># ./errorpath.d 100461 _chdir</userinput>
+dtrace: script './errorpath.d' matched 19 probes
+CPU     ID                    FUNCTION:NAME
+  0  25253                     _chdir:entry 81e08 6d140 ffbfcb20 656c73 0
+  0  25253                     _chdir:entry
+  0  25269                         _chdir:0
+  0  25270                         _chdir:4
+  0  25271                         _chdir:8
+  0  25272                         _chdir:c
+  0  25273                        _chdir:10
+  0  25274                        _chdir:14
+  0  25275                        _chdir:18
+  0  25276                        _chdir:1c
+  0  25277                        _chdir:20
+  0  25278                        _chdir:24
+  0  25279                        _chdir:28
+  0  25280                        _chdir:2c
+  0  25268                    _chdir:return</screen>
+</sect2>
+</sect1>
+</chapter><?Pub *0000037505 0?>

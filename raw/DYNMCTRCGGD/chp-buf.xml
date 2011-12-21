@@ -1,0 +1,171 @@
+<?Pub UDT _bookmark _target?><chapter id="chp-buf"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag atict:user
+user="palecur" fullname="Paul Echeverri"?><title>Buffers and Buffering</title><highlights><para>Data buffering and management is an essential service provided by the
+DTrace framework for its clients, such as <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. This chapter explores data
+buffering in detail and describes options you can use to change DTrace's buffer
+management policies.</para>
+</highlights><sect1 id="chp-buf-1"><title>Principal Buffers</title><para>The <firstterm>principal buffer</firstterm> is present in every DTrace
+invocation and is the buffer to which tracing actions record their data by
+default. These actions include:</para><informaltable frame="none"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><tbody><row><entry><para><function>exit</function></para>
+</entry><entry><para><function>printf</function></para>
+</entry><entry><para><function>trace</function></para>
+</entry><entry><para><function>ustack</function></para>
+</entry>
+</row><row><entry><para><function>printa</function></para>
+</entry><entry><para><function>stack</function></para>
+</entry><entry><para><function>tracemem</function></para>
+</entry><entry>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The principal buffers are <emphasis>always</emphasis> allocated on a
+per-CPU basis. This policy is not tunable, but tracing and buffer allocation
+can be restricted to a single CPU by using the <literal>cpu</literal> option.</para>
+</sect1><sect1 id="chp-buf-2"><title>Principal Buffer Policies</title><para><indexterm><primary>principal buffer</primary><secondary>policies</secondary></indexterm>DTrace permits tracing in highly constrained contexts in the kernel.
+In particular, DTrace permits tracing in contexts in which kernel software
+may not reliably allocate memory. The consequence of this flexibility of context
+is that there <emphasis>always</emphasis> exists a possibility that DTrace
+will attempt to trace data when there isn't space available. DTrace must have
+a policy to deal with such situations when they arise, but you might wish
+to tune the policy based on the needs of a given experiment. Sometimes the
+appropriate policy might be to discard the new data. Other times it might
+be desirable to reuse the space containing the oldest recorded data to trace
+new data. Most often, the desired policy is to minimize the likelihood of
+running out of available space in the first place. To accommodate these varying
+demands, DTrace supports several different buffer policies. This support is
+implemented with the <literal>bufpolicy</literal> option, and can be set on
+a per-consumer basis. See <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options
+and Tunables</olink> for more details on setting options.</para><sect2 id="chp-buf-2.1"><title><literal>switch</literal> Policy</title><para><indexterm><primary><literal>switch</literal> buffer policy</primary></indexterm><indexterm><primary>principal buffer</primary><secondary>policies</secondary><tertiary><literal>switch</literal></tertiary></indexterm>By default, the
+principal buffer has a <literal>switch</literal> buffer policy. Under this
+policy, per-CPU buffers are allocated in pairs: one buffer is active and the
+other buffer is inactive. When a DTrace consumer attempts to read a buffer,
+the kernel firsts <emphasis>switches</emphasis> the inactive and active buffers.
+Buffer switching is done in such a manner that there is no window in which
+tracing data may be lost. Once the buffers are switched, the newly inactive
+buffer is copied out to the DTrace consumer. This policy assures that the
+consumer always sees a self-consistent buffer: a buffer is never simultaneously
+traced to and copied out. This technique also avoids introducing a window
+in which tracing is paused or otherwise prevented. The rate at which the buffer
+is switched and read out is controlled by the consumer with the <literal>switchrate</literal> option. As with any rate option, <literal>switchrate</literal> may
+be specified with any time suffix, but defaults to rate-per-second. For more
+details on <literal>switchrate</literal> and other options, see <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink>.</para><note><para>To process the principal buffer at user-level at a rate faster
+than the default of once per second, tune the value of <literal>switchrate</literal>.
+The system processes actions that induce user-level activity (such as <function>printa</function> and <function>system</function>) when the corresponding record
+in the principal buffer is processed. The value of <literal>switchrate</literal> dictates
+the rate at which the system processes such actions.</para>
+</note><para>Under the <literal>switch</literal> policy, if a given
+enabled probe would trace more data than there is space available in the active
+principal buffer, the data is <emphasis>dropped</emphasis> and a per-CPU drop
+count is incremented. In the event of one or more drops, <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> displays a message similar
+to the following example:</para><screen>dtrace: 11 drops on CPU 0</screen><para>If a given record is larger than the total buffer size, the record will
+be dropped regardless of buffer policy. You can reduce or eliminate drops
+by either increasing the size of the principal buffer with the <literal>bufsize</literal> option
+or by increasing the switching rate with the <literal>switchrate</literal> option.</para><para>Under the <literal>switch</literal> policy, scratch space for <function>copyin</function>, <function>copyinstr</function>, and <function>alloca</function> is
+allocated out of the active buffer.</para>
+</sect2><sect2 id="chp-buf-2.2"><title><literal>fill</literal> Policy</title><para><indexterm><primary><literal>fill</literal> buffer policy</primary></indexterm><indexterm><primary>principal buffer</primary><secondary>policies</secondary><tertiary><literal>fill</literal></tertiary></indexterm>For some problems,
+you might wish to use a single in-kernel buffer. While this approach can be
+implemented with the <literal>switch</literal> policy and appropriate D constructs
+by incrementing a variable in D and predicating an <function>exit</function> action
+appropriately, such an implementation does not eliminate the possibility of
+drops. To request a single, large in-kernel buffer, and continue tracing until
+one or more of the per-CPU buffers has filled, use the <literal>fill</literal> buffer
+policy. Under this policy, tracing continues until an enabled probe attempts
+to trace more data than can fit in the remaining principal buffer space. When
+insufficient space remains, the buffer is marked as filled and the consumer
+is notified that at least one of its per-CPU buffers has filled. Once <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> detects a single filled buffer,
+tracing is stopped, all buffers are processed and <command>dtrace</command> exits.
+No further data will be traced to a filled buffer even if the data would fit
+in the buffer.</para><para>To use the <literal>fill</literal> policy, set the <literal>bufpolicy</literal> option
+to <literal>fill</literal>. For example, the following command traces every
+system call entry into a per-CPU 2K buffer with the buffer policy set to <literal>fill</literal>:</para><screen><userinput># dtrace -n syscall:::entry -b 2k -x bufpolicy=fill</userinput></screen><sect3 id="chp-buf-fillandend"><title><literal>fill</literal> Policy and <literal>END</literal> Probes</title><para><indexterm><primary><literal>fill</literal> buffer policy</primary><secondary>and <literal>END</literal> probes</secondary></indexterm><literal>END</literal> probes
+normally do not fire until tracing has been explicitly stopped by the DTrace
+consumer. <literal>END</literal> probes are guaranteed to only fire on one
+CPU, but the CPU on which the probe fires is undefined. With <literal>fill</literal> buffers,
+tracing is explicitly stopped when at least one of the per-CPU principal buffers
+has been marked as filled. If the <literal>fill</literal> policy is selected,
+the <literal>END</literal> probe may fire on a CPU that has a filled buffer.
+To accommodate <literal>END</literal> tracing in <literal>fill</literal> buffers,
+DTrace calculates the amount of space potentially consumed by <literal>END</literal> probes
+and <emphasis>subtracts</emphasis> this space from the size of the principal
+buffer. If the net size is negative, DTrace will refuse to start, and <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> will output a corresponding
+error message:</para><screen>dtrace: END enablings exceed size of principal buffer</screen><para>The reservation mechanism ensures that a full buffer always has sufficient
+space for any <literal>END</literal> probes.</para>
+</sect3>
+</sect2><sect2 id="chp-buf-2.3"><title><literal>ring</literal> Policy</title><para><indexterm><primary><literal>ring</literal> buffer policy</primary></indexterm><indexterm><primary>principal buffer</primary><secondary>policies</secondary><tertiary><literal>ring</literal></tertiary></indexterm>The DTrace <literal>ring</literal> buffer
+policy helps you trace the events leading up to a failure. If reproducing
+the failure takes hours or days, you might wish to keep only the most recent
+data. Once a principal buffer has filled, tracing wraps around to the first
+entry, thereby overwriting older tracing data. You establish the ring buffer
+by setting the <literal>bufpolicy</literal> option to the string <literal>ring</literal>:</para><screen><userinput># dtrace -s foo.d -x bufpolicy=ring</userinput></screen><para>When used to create a ring buffer, <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> will not display any output
+until the process is terminated. At that time, the ring buffer is consumed
+and processed. <command>dtrace</command> processes each ring buffer in CPU
+order. Within a CPU's buffer, trace records will be displayed in order from
+oldest to youngest. Just as with the <literal>switch</literal> buffering policy,
+no ordering exists between records from different CPUs are made. If such an
+ordering is required, you should trace the <literal>timestamp</literal> variable
+as part of your tracing request.</para><para>The following example demonstrates the use of a <literal>#pragma option</literal> directive
+to enable ring buffering:</para><programlisting>#pragma D option bufpolicy=ring
+#pragma D option bufsize=16k
+
+syscall:::entry
+/execname == $1/
+{
+	trace(timestamp);
+}
+
+syscall::rexit:entry
+{
+	exit(0);
+}</programlisting>
+</sect2>
+</sect1><sect1 id="chp-buf-3"><title>Other Buffers</title><para>Principal buffers exist in every DTrace enabling. Beyond principal buffers,
+some DTrace consumers may have additional in-kernel data buffers: an <firstterm>aggregation
+buffer</firstterm>, discussed in <olink targetptr="chp-aggs" remap="internal">Chapter&nbsp;9,
+Aggregations</olink>, and one or more <firstterm>speculative buffers</firstterm>,
+discussed in <olink targetptr="chp-spec" remap="internal">Chapter&nbsp;13, Speculative Tracing</olink>.</para>
+</sect1><sect1 id="chp-buf-4"><title>Buffer Sizes</title><para><indexterm><primary>buffer</primary><secondary>sizes</secondary></indexterm>The size of each buffer can be tuned on a per-consumer basis.
+Separate options are provided to tune each buffer size, as shown in the following
+table:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth=""/><colspec colwidth=""/><thead><row rowsep="1"><entry><para>Buffer</para>
+</entry><entry><para>Size Option</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Principal</para>
+</entry><entry><para><literal>bufsize</literal></para>
+</entry>
+</row><row><entry><para>Speculative</para>
+</entry><entry><para><literal>specsize</literal></para>
+</entry>
+</row><row><entry><para>Aggregation</para>
+</entry><entry><para><literal>aggsize</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Each of these options is set with a value that denotes the size. As
+with any size option, the value may have an optional size suffix. See <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink> for more
+details. For example, to set the buffer size to one megabyte on the command
+line to <command>dtrace</command>, you can use <option>x</option> to set the
+option:</para><screen><userinput># dtrace -P syscall -x bufsize=1m</userinput></screen><para>Alternatively, you can use the <option>b</option> option to <command>dtrace</command>:</para><screen><userinput># dtrace -P syscall -b 1m</userinput></screen><para>Finally, you could can set <literal>bufsize</literal> using <literal>#pragma
+D option</literal>:</para><programlisting>#pragma D option bufsize=1m</programlisting><para>The buffer size you select denotes the size of the buffer on <emphasis>each</emphasis> CPU. Moreover, for the <literal>switch</literal> buffer policy, <literal>bufsize</literal> denotes the size of <emphasis>each</emphasis> buffer on
+each CPU. The buffer size defaults to four megabytes.</para>
+</sect1><sect1 id="chp-buf-5"><title>Buffer Resizing Policy</title><para><indexterm><primary>buffer policy</primary><secondary>on resizing</secondary></indexterm><indexterm><primary>buffer</primary><secondary>resizing policy</secondary></indexterm>Occasionally, the system might not have adequate free kernel memory
+to allocate a buffer of desired size either because not enough memory is available
+or because the DTrace consumer has exceeded one of the tunable limits described
+in <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink>.
+You can configure the policy for buffer allocation failure using <literal>bufresize</literal> option, which defaults to <literal>auto</literal>. Under the <literal>auto</literal> buffer resize policy, the size of a buffer is halved until
+a successful allocation occurs. <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> generates
+a message if a buffer as allocated is smaller than the requested size:</para><screen><userinput># dtrace -P syscall -b 4g</userinput>
+dtrace: description 'syscall' matched 430 probes
+dtrace: buffer size lowered to 128m
+...</screen><para>or:</para><screen><userinput># dtrace -P syscall'{@a[probefunc] = count()}' -x aggsize=1g</userinput>
+dtrace: description 'syscall' matched 430 probes
+dtrace: aggregation size lowered to 128m
+...</screen><para>Alternatively, you can require manual intervention after buffer allocation
+failure by setting <literal>bufresize</literal> to <literal>manual</literal>.
+Under this policy, a failure to allocate will cause DTrace to fail to start:</para><screen><userinput># dtrace -P syscall -x bufsize=1g -x bufresize=manual</userinput>
+dtrace: description 'syscall' matched 430 probes
+dtrace: could not enable tracing: Not enough space
+#</screen><para>The buffer resizing policy of <emphasis>all</emphasis> buffers, principal,
+speculative and aggregation, is dictated by the <literal>bufresize</literal> option.</para>
+</sect1>
+</chapter><?Pub *0000016053 0?>

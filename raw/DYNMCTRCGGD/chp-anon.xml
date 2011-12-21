@@ -1,0 +1,107 @@
+<chapter id="chp-anon"><title>Anonymous Tracing</title><highlights><para>This chapter describes <firstterm>anonymous</firstterm> tracing, tracing that is not associated with any DTrace consumer. Anonymous tracing is used in situations when no DTrace consumer processes can run. The most common use of anonymous tracing is to permit device driver developers to debug and trace activity that occurs during system boot. Any tracing that you can do interactively you can do anonymously. However, only the super user may create an anonymous enabling, and only one anonymous enabling can exist at any time.</para>
+</highlights><sect1 id="chp-anon-1"><title>Anonymous Enablings</title><para><indexterm><primary>anonymous tracing</primary></indexterm><indexterm><primary>anonymous enabling</primary></indexterm>To create an anonymous enabling, use the <option>A</option> option with a <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> invocation that specifies the desired probes, predicates, actions and options. <command>dtrace</command> will add a series of driver properties representing your request to the <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver's configuration file, typically <filename>/kernel/drv/dtrace.conf</filename>. These properties will be read by the <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver when it is loaded. The driver will enable the specified probes with the specified actions, and create an <firstterm>anonymous state</firstterm> to associate with the new enabling. Normally, the <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver is loaded on-demand, as are any drivers that act as DTrace providers. To allow tracing during boot, the <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver must be loaded as early as possible. <command>dtrace</command> adds the necessary <literal>forceload</literal> statements to <filename>/etc/system</filename> (see <olink targetdoc="refman4" targetptr="system-4" remap="external"><citerefentry><refentrytitle>system</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>) for each required DTrace provider and for <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> itself.</para><para>Thereafter, when the system boots, a message is emitted by <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> to indicate that the configuration file has been successfully processed.</para><para>All options may be set with an anonymous enabling, including buffer size, dynamic variable size, speculation size, number of speculations, and so on.</para><para>To remove an anonymous enabling, specify <option>A</option> to <command>dtrace</command> without any probe descriptions.</para>
+</sect1><sect1 id="chp-anon-2"><title>Claiming Anonymous State</title><para><indexterm><primary>anonymous tracing</primary><secondary>claiming anonymous state</secondary></indexterm>Once the machine has completely booted, any anonymous state may be claimed by specifying the <option>a</option> option with <command>dtrace</command>. By default, <option>a</option> claims the anonymous state, processes the existing data, and continues to run. To consume the anonymous state and then exit, add the <option>e</option> option.</para><para>Once anonymous state has been consumed from the kernel, it cannot be replaced: the in-kernel buffers that contained it are reused. If you attempt to claim anonymous tracing state where none exists, <command>dtrace</command> will generate a message similar to the following example:</para><screen>dtrace: could not enable tracing: No anonymous tracing state</screen><para>If drops or errors have occurred, <command>dtrace</command> will generate the appropriate messages when the anonymous state is claimed. The messages for drops and errors are the same for both anonymous and non-anonymous state.</para>
+</sect1><sect1 id="chp-anon-3"><title>Anonymous Tracing Examples</title><para><indexterm><primary>examples</primary><secondary>anonymous tracing</secondary></indexterm><indexterm><primary>anonymous tracing</primary><secondary>example of use</secondary></indexterm>The following example shows an anonymous DTrace enabling for every probe in the <olink targetdoc="refman7" targetptr="iprb-7d" remap="external"><citerefentry><refentrytitle>iprb</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> module:</para><screen><userinput># dtrace -A -m iprb</userinput>
+dtrace: saved anonymous enabling in /kernel/drv/dtrace.conf
+dtrace: added forceload directives to /etc/system
+dtrace: run update_drv(1M) or reboot to enable changes
+<userinput># reboot</userinput></screen><para>After rebooting, <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> prints a message on the console to indicate that it is enabling the specified probes:</para><screen>  ...
+  Copyright 1983-2003 Sun Microsystems, Inc.  All rights reserved.
+  Use is subject to license terms.
+  NOTICE: enabling probe 0 (:iprb::)
+  NOTICE: enabling probe 1 (dtrace:::ERROR)
+  configuring IPv4 interfaces: iprb0.
+  ...</screen><para>When the machine has rebooted, the anonymous state may be consumed by specifying the <option>a</option> option with <command>dtrace</command>:</para><screen><userinput># dtrace -a</userinput>
+  CPU     ID                    FUNCTION:NAME
+    0  22954                      _init:entry 
+    0  22955                     _init:return 
+    0  22800                  iprbprobe:entry 
+    0  22934          iprb_get_dev_type:entry 
+    0  22935         iprb_get_dev_type:return 
+    0  22801                 iprbprobe:return 
+    0  22802                 iprbattach:entry 
+    0  22874               iprb_getprop:entry 
+    0  22875              iprb_getprop:return 
+    0  22934          iprb_get_dev_type:entry 
+    0  22935         iprb_get_dev_type:return 
+    0  22870             iprb_self_test:entry 
+    0  22871            iprb_self_test:return 
+    0  22958            iprb_hard_reset:entry 
+    0  22959           iprb_hard_reset:return 
+    0  22862       iprb_get_eeprom_size:entry 
+    0  22826              iprb_shiftout:entry 
+    0  22828            iprb_raiseclock:entry 
+    0  22829           iprb_raiseclock:return 
+  ...</screen><para>The following example focuses only on those functions called from <function>iprbattach</function>. In an editor, type the following script and save it in a file named <filename>iprb.d</filename>.</para><programlisting>fbt::iprbattach:entry
+{
+	self-&gt;trace = 1;
+}
+
+fbt:::
+/self-&gt;trace/
+{}
+
+fbt::iprbattach:return
+{
+	self-&gt;trace = 0;
+}</programlisting><para>Run the following commands to clear the previous settings from the driver configuration file, install the new anonymous tracing request, and reboot:</para><screen><userinput># dtrace -AFs iprb.d</userinput>
+dtrace: cleaned up old anonymous enabling in /kernel/drv/dtrace.conf
+dtrace: cleaned up forceload directives in /etc/system
+dtrace: saved anonymous enabling in /kernel/drv/dtrace.conf
+dtrace: added forceload directives to /etc/system
+dtrace: run update_drv(1M) or reboot to enable changes
+<userinput># reboot</userinput></screen><para>After rebooting, <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> prints a different message on the console to indicate the slightly different enabling:</para><screen>  ...
+  Copyright 1983-2003 Sun Microsystems, Inc.  All rights reserved.
+  Use is subject to license terms.
+  NOTICE: enabling probe 0 (fbt::iprbattach:entry)
+  NOTICE: enabling probe 1 (fbt:::)
+  NOTICE: enabling probe 2 (fbt::iprbattach:return)
+  NOTICE: enabling probe 3 (dtrace:::ERROR)
+  configuring IPv4 interfaces: iprb0.
+  ...</screen><para>After the machine has completely booted, run the <command>dtrace</command> with the <option>a</option> option and the <option>e</option> option to consume the anonymous data and then exit.</para><screen><userinput># dtrace -ae</userinput>
+  CPU FUNCTION                                 
+    0  -&gt; iprbattach                            
+    0    -&gt; gld_mac_alloc                       
+    0      -&gt; kmem_zalloc                       
+    0        -&gt; kmem_cache_alloc                
+    0          -&gt; kmem_cache_alloc_debug        
+    0            -&gt; verify_and_copy_pattern     
+    0            &lt;- verify_and_copy_pattern     
+    0            -&gt; tsc_gethrtime               
+    0            &lt;- tsc_gethrtime               
+    0            -&gt; getpcstack                  
+    0            &lt;- getpcstack                  
+    0            -&gt; kmem_log_enter              
+    0            &lt;- kmem_log_enter              
+    0          &lt;- kmem_cache_alloc_debug        
+    0        &lt;- kmem_cache_alloc                
+    0      &lt;- kmem_zalloc                       
+    0    &lt;- gld_mac_alloc                       
+    0    -&gt; kmem_zalloc                         
+    0      -&gt; kmem_alloc                        
+    0        -&gt; vmem_alloc                      
+    0          -&gt; highbit                       
+    0          &lt;- highbit                       
+    0          -&gt; lowbit                        
+    0          &lt;- lowbit                        
+    0          -&gt; vmem_xalloc                   
+    0            -&gt; highbit                     
+    0            &lt;- highbit                     
+    0            -&gt; lowbit                      
+    0            &lt;- lowbit                      
+    0            -&gt; segkmem_alloc               
+    0              -&gt; segkmem_xalloc            
+    0                -&gt; vmem_alloc              
+    0                  -&gt; highbit               
+    0                  &lt;- highbit               
+    0                  -&gt; lowbit                
+    0                  &lt;- lowbit                
+    0                  -&gt; vmem_seg_alloc        
+    0                    -&gt; highbit             
+    0                    &lt;- highbit             
+    0                    -&gt; highbit             
+    0                    &lt;- highbit             
+    0                    -&gt; vmem_seg_create     
+  ...</screen>
+</sect1>
+</chapter>

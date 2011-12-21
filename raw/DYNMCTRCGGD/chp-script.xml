@@ -1,0 +1,114 @@
+<chapter id="chp-script"><title>Scripting</title><highlights><para>You can use the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility to create interpreter files out of D programs similar to shell scripts that you can install as reusable interactive DTrace tools. The D compiler and <command>dtrace</command> command provide a set of <firstterm>macro variables</firstterm> that are expanded by the D compiler that make it easy to create DTrace scripts. This chapter provides a reference for the macro variable facility and tips for creating persistent scripts.</para>
+</highlights><sect1 id="chp-script-1"><title>Interpreter Files</title><para><indexterm><primary>interpreter files</primary></indexterm><indexterm><primary>scripting</primary></indexterm>Similar to your shell and utilities such as <olink targetdoc="refman1" targetptr="awk-1" remap="external"><citerefentry><refentrytitle>awk</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and <olink targetdoc="refman1" targetptr="perl-1" remap="external"><citerefentry><refentrytitle>perl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> can be used to create executable interpreter files. An interpreter file begins with a line of the form:</para><para><literal>#!</literal> <replaceable>pathname</replaceable> <replaceable>arg</replaceable></para><para>where <replaceable>pathname</replaceable> is the path of the interpreter and <replaceable>arg</replaceable> is a single optional argument. When an interpreter file is executed, the system invokes the specified interpreter. If <replaceable>arg</replaceable> was specified in the interpreter file, it is passed as an argument to the interpreter. The path to the interpreter file itself and any additional arguments specified when it was executed are then appended to the interpreter argument list. Therefore, you will always need to create DTrace interpreter files with at least these arguments:</para><programlisting>#!/usr/sbin/dtrace -s</programlisting><para>When your interpreter file is executed, the argument to the <option>s</option> option will therefore be the pathname of the interpreter file itself. <command>dtrace</command> will then read, compile, and execute this file as if you had typed the following command in your shell:</para><screen># dtrace -s <replaceable>interpreter-file</replaceable></screen><para>The following example shows how to create and execute a <command>dtrace</command> interpreter file. Type the following D source code and save it in a file named <filename>interp.d</filename>:</para><programlisting>#!/usr/sbin/dtrace -s
+BEGIN
+{
+	trace("hello");
+	exit(0);
+}</programlisting><para>Mark the <filename>interp.d</filename> file as executable and execute it as follows:</para><screen><userinput># chmod a+rx interp.d</userinput>
+<userinput># ./interp.d</userinput>
+dtrace: script './interp.d' matched 1 probe
+CPU     ID                    FUNCTION:NAME
+  1      1                           :BEGIN   hello
+<userinput>#</userinput></screen><para>Remember that the <literal>#!</literal> directive must comprise the first two characters of your file with no intervening or preceding whitespace. The D compiler knows to automatically ignore this line when it processes the interpreter file.</para><para><command>dtrace</command> uses <olink targetdoc="refman3a" targetptr="getopt-3c" remap="external"><citerefentry><refentrytitle>getopt</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> to process command-line options, so you can combine multiple options in your single interpreter argument. For example, to add the <option>q</option> option to the preceding example you could change the interpreter directive to:</para><programlisting>#!/usr/sbin/dtrace -qs</programlisting><para>If you specify multiple option letters, the <option>s</option> option must always end the list of boolean options so that the next argument (the interpreter file name) is processed as the argument corresponding to the <option>s</option> option.</para><para>If you need to specify more than one option that requires an argument in your interpreter file, you will not be able to fit all your options and arguments into the single interpreter argument. Instead, use the <literal>#pragma D option</literal> directive syntax to set your options. All of the <command>dtrace</command> command-line options have <literal>#pragma</literal> equivalents that you can use, as shown in <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink>.</para>
+</sect1><sect1 id="chp-script-2"><title>Macro Variables</title><para><indexterm><primary>macro variables</primary></indexterm>The D compiler defines a set of built-in macro variables that you can use when writing D programs or interpreter files. Macro variables are identifiers that are prefixed with a dollar sign (<literal>$</literal>) and are expanded once by the D compiler when processing your input file. The D compiler provides the following macro variables:</para><table frame="topbot" id="tbl-macros"><title>D Macro Variables</title><tgroup cols="3" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="9.51in"?><colspec colname="colspec1" colwidth="0.58*"/><colspec colname="colspec0" colwidth="0.58*"/><colspec colname="colspec2" colwidth="1.84*"/><thead><row rowsep="1"><entry><para>Name</para>
+</entry><entry colname="colspec0"><para>Description</para>
+</entry><entry><para>Reference</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec1"><para><literal>$[0-9]+</literal></para>
+</entry><entry colname="colspec0"><para>macro arguments</para>
+</entry><entry colname="colspec2"><para>See <olink targetptr="chp-script-3" remap="internal">Macro Arguments</olink></para>
+</entry>
+</row><row><entry><para><literal>$egid</literal></para>
+</entry><entry colname="colspec0"><para>effective group-ID</para>
+</entry><entry><para><olink targetdoc="refman2" targetptr="getegid-2" remap="external"><citerefentry><refentrytitle>getegid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$euid</literal></para>
+</entry><entry colname="colspec0"><para>effective user-ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="geteuid-2" remap="external"><citerefentry><refentrytitle>geteuid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$gid</literal></para>
+</entry><entry colname="colspec0"><para>real group-ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getgid-2" remap="external"><citerefentry><refentrytitle>getgid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$pid</literal></para>
+</entry><entry colname="colspec0"><para>process ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getpid-2" remap="external"><citerefentry><refentrytitle>getpid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$pgid</literal></para>
+</entry><entry colname="colspec0"><para>process group ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getpgid-2" remap="external"><citerefentry><refentrytitle>getpgid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$ppid</literal></para>
+</entry><entry colname="colspec0"><para>parent process ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getppid-2" remap="external"><citerefentry><refentrytitle>getppid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$projid</literal></para>
+</entry><entry colname="colspec0"><para>project ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getprojid-2" remap="external"><citerefentry><refentrytitle>getprojid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$sid</literal></para>
+</entry><entry colname="colspec0"><para>session ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getsid-2" remap="external"><citerefentry><refentrytitle>getsid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$target</literal></para>
+</entry><entry colname="colspec0"><para>target process ID</para>
+</entry><entry colname="colspec2"><para>See <olink targetptr="chp-script-4" remap="internal">Target Process ID</olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$taskid</literal></para>
+</entry><entry colname="colspec0"><para>task ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="gettaskid-2" remap="external"><citerefentry><refentrytitle>gettaskid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry colname="colspec1"><para><literal>$uid</literal></para>
+</entry><entry colname="colspec0"><para>real user-ID</para>
+</entry><entry colname="colspec2"><para><olink targetdoc="refman2" targetptr="getuid-2" remap="external"><citerefentry><refentrytitle>getuid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Except for the <literal>$[0-9]+</literal> macro arguments and the <literal>$target</literal> macro variable, the macro variables all expand to integers corresponding to system attributes such as the process ID and user ID. The variables expand to the attribute value associated with the current <command>dtrace</command> process itself, or whatever process is running the D compiler.</para><para>Using macro variables in interpreter files enables you to create persistent D programs that do not need to be edited each time you want to use them. For example, to count all system calls except those executed by the <command>dtrace</command> command, you can use the following D program clause containing <literal>$pid</literal>:</para><programlisting>syscall:::entry
+/pid != $pid/
+{
+	@calls = count();
+}</programlisting><para>This clause always produces the desired result, even though each invocation of the <command>dtrace</command> command will have a different process ID.</para><para>Macro variables can be used anywhere an integer, identifier, or string can be used in a D program. Macro variables are expanded only once (that is, not recursively) when the input file is parsed. Each macro variable is expanded to form a separate input token, and cannot be concatenated with other text to yield a single token. For example, if <literal>$pid</literal> expands to the value 456, the D code:</para><programlisting>123$pid</programlisting><para>would expand to the two adjacent tokens 123 and 456, resulting in a syntax error, rather than the single integer token 123456.</para><para>Macro variables are expanded and concatenated with adjacent text inside of D probe descriptions at the start of your program clauses. For example, the following clause uses the DTrace <literal>pid</literal> provider to instrument the <command>dtrace</command> command:</para><programlisting>pid$pid:libc.so:printf:entry
+{
+	...
+}</programlisting><para>Macro variables are only expanded once within each probe description field; they may not contain probe description delimiters (<literal>:</literal>).</para>
+</sect1><sect1 id="chp-script-3"><title>Macro Arguments</title><para><indexterm><primary>macro arguments</primary></indexterm>The D compiler also provides a set of macro variables corresponding to any additional argument operands specified as part of the <command>dtrace</command> command invocation. These <firstterm>macro arguments</firstterm> are accessed using the built-in names <literal>$0</literal> for name of the D program file or <command>dtrace</command> command, <literal>$1</literal> for the first additional operand, <literal>$2</literal> for the second operand, and so on. If you use the <command>dtrace</command> <option>s</option> option, <literal>$0</literal> expands to the value of the name of the input file used with this option. For D programs specified on the command-line, <literal>$0</literal> expands to the value of <literal>argv[0]</literal> used to exec <command>dtrace</command> itself.</para><para>Macro arguments can expand to integers, identifiers, or strings, depending on the form of the corresponding text. As with all macro variables, macro arguments can be used anywhere integer, identifier, and string tokens can be used in a D program. All of the following examples could form valid D expressions assuming appropriate macro argument values:</para><programlisting>execname == $1    /* with a string macro argument */
+x += $1           /* with an integer macro argument */
+trace(x-&gt;$1)      /* with an identifier macro argument */</programlisting><para>Macro arguments can be used to create <command>dtrace</command> interpreter files that act like real Solaris commands and use information specified by a user or by another tool to modify their behavior. For example, the following D interpreter file traces <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls executed by a particular process ID:</para><programlisting>#!/usr/sbin/dtrace -s
+
+syscall::write:entry
+/pid == $1/
+{
+}</programlisting><para>If you make this interpreter file executable, you can specify the value of <literal>$1</literal> using an additional command-line argument to your interpreter file:</para><screen><userinput># chmod a+rx ./tracewrite</userinput>
+<userinput># ./tracewrite 12345</userinput></screen><para>The resulting command invocation counts each <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call executed by process ID 12345.</para><para>If your D program references a macro argument that is not provided on the command-line, an appropriate error message will be printed and your program will fail to compile:</para><screen><userinput># ./tracewrite</userinput>
+dtrace: failed to compile script ./tracewrite: line 4:
+  macro argument $1 is not defined</screen><para>D programs can reference unspecified macro arguments if the <literal>defaultargs</literal> option is set. If <literal>defaultargs</literal> is set, unspecified arguments will have the value <literal>0</literal>. See <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink> for more information about D compiler options. The D compiler will also produce an error message if additional arguments are specified on the command line that are not referenced by your D program.</para><para>The macro argument values must match the form of an integer, identifier, or string. If the argument does not match any of these forms, the D compiler will report an appropriate error message. When specifying string macro arguments to a DTrace interpreter file, surround the argument in an extra pair of single quotes to avoid interpretation of the double quotes and string contents by your shell:</para><screen><userinput># ./foo '"a string argument"'</userinput></screen><para>If you want your D macro arguments to be interpreted as string tokens even if they match the form of an integer or identifier, prefix the macro variable or argument name with two leading dollar signs (for example, <literal>$$1</literal>) to force the D compiler to interpret the argument value as if it were a string surrounded by double quotes. All the usual D string escape sequences (see <olink targetptr="tbl-escs" remap="internal">Table&nbsp;2&ndash;5</olink>) are expanded inside of any string macro arguments, regardless of whether they are referenced using the <literal>$</literal><replaceable>arg</replaceable><literal></literal> or <literal>$$</literal><replaceable>arg</replaceable><literal></literal> form of the macro. If the <literal>defaultargs</literal> option is set, unspecified arguments that are referenced with the <literal>$$</literal><replaceable>arg</replaceable><literal></literal> form have the value of the empty string (<literal>""</literal>).</para>
+</sect1><sect1 id="chp-script-4"><title>Target Process ID</title><para><indexterm><primary>targeting a process ID</primary></indexterm><indexterm><primary><literal>$target</literal> macro variable</primary></indexterm>Use the <literal>$target</literal> macro variable to create scripts that can be applied to a particular user process of interest that is selected on the <command>dtrace</command> command line using the <option>p</option> option or created using the <option>c</option> option. The D programs specified on the command line or using the <option>s</option> option are compiled <emphasis>after</emphasis> processes are created or grabbed and the <literal>$target</literal> variable expands to the integer process-ID of the first such process. For example, the following D script could be used to determine the distribution of system calls executed by a particular subject process:</para><programlisting>syscall:::entry
+/pid == $target/
+{
+	@[probefunc] = count();
+}</programlisting><para>To determine the number of system calls executed by the <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command, save the script in the file <filename>syscall.d</filename> and execute the following command:</para><screen><userinput># dtrace -s syscall.d -c date</userinput>
+dtrace: script 'syscall.d' matched 227 probes
+Fri Jul 30 13:46:06 PDT 2004
+dtrace: pid 109058 has exited
+
+  gtime                                                             1
+  getpid                                                            1
+  getrlimit                                                         1
+  rexit                                                             1
+  ioctl                                                             1
+  resolvepath                                                       1
+  read                                                              1
+  stat                                                              1
+  write                                                             1
+  munmap                                                            1
+  close                                                             2
+  fstat64                                                           2
+  setcontext                                                        2
+  mmap                                                              2
+  open                                                              2
+  brk                                                               4</screen>
+</sect1>
+</chapter>

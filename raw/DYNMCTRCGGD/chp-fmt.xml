@@ -1,0 +1,342 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-fmt"><title>Output Formatting</title><highlights><para>DTrace provides built-in formatting functions <function>printf</function> and <function>printa</function> that you can use from your D programs to format output.
+The D compiler provides features not found in the <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> library routine, so you should
+read this chapter even if you are already familiar with <function>printf</function>.
+This chapter also discusses the formatting behavior of the <function>trace</function> function
+and the default output format used by <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to display aggregations.</para>
+</highlights><sect1 id="chp-fmt-1"><title><function>printf</function></title><para><indexterm><primary><literal>printf</literal></primary></indexterm>The <function>printf</function> function combines the ability to trace data, as if by the <function>trace</function> function, with the ability to output the data and other text
+in a specific format that you describe. The <function>printf</function> function
+tells DTrace to trace the data associated with each argument after the first
+argument, and then to format the results using the rules described by the
+first <function>printf</function> argument, known as a <firstterm>format string</firstterm>.</para><para>The format string is a regular string that contains any number of format
+conversions, each beginning with the <literal>%</literal> character, that
+describe how to format the corresponding argument. The first conversion in
+the format string corresponds to the second <function>printf</function> argument,
+the second conversion to the third argument, and so on. All of the text between
+conversions is printed verbatim. The character following the <literal>%</literal> conversion
+character describes the format to use for the corresponding argument.</para><para>Unlike <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>,
+DTrace <function>printf</function> is a built-in function that is recognized
+by the D compiler. The D compiler provides several useful services for DTrace <function>printf</function> that are not found in the C library <function>printf</function>:</para><itemizedlist><listitem><para>The D compiler compares the arguments to the conversions in
+the format string. If an argument's type is incompatible with the format conversion,
+the D compiler provides an error message explaining the problem. </para>
+</listitem><listitem><para>The D compiler does not require the use of size prefixes with <function>printf</function> format conversions. The C <function>printf</function> routine
+requires that you indicate the size of arguments by adding prefixes such as <literal>%ld</literal> for <literal>long</literal> or <literal>%lld</literal> for <literal>long long</literal>. The D compiler knows the size and type of your arguments,
+so these prefixes are not required in your D <function>printf</function> statements.</para>
+</listitem><listitem><para>DTrace provides additional format characters that are useful
+for debugging and observability. For example, the <literal>%a</literal> format
+conversion can be used to print a pointer as a symbol name and offset.</para>
+</listitem>
+</itemizedlist><para>In order to implement these features, the format string in the DTrace <function>printf</function> function must be specified as a string constant in your
+D program. Format strings may not be dynamic variables of type <literal>string</literal>.</para><sect2 id="chp-fmt-1.1"><title>Conversion Specifications</title><para><indexterm><primary><literal>printf</literal></primary><secondary>conversion specifications</secondary></indexterm>Each conversion specification in the
+format string is introduced by the <literal>%</literal> character, after which
+the following information appears in sequence:</para><itemizedlist><listitem><para>Zero or more <firstterm>flags</firstterm> (in any order),
+that modify the meaning of the conversion specification as described in the
+next section.</para>
+</listitem><listitem><para>An optional minimum <firstterm>field width</firstterm>. If
+the converted value has fewer bytes than the field width, the value will be
+padded with spaces on the left by default, or on the right if the left-adjustment
+flag (<literal>-</literal>) is specified. The field width can also be specified
+as an asterisk (<literal>*</literal>), in which case the field width is set
+dynamically based on the value of an additional argument of type <literal>int</literal>.</para>
+</listitem><listitem><para>An optional <firstterm>precision</firstterm> that indicates
+the minimum number of digits to appear for the <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, and <literal>X</literal> conversions
+(the field is padded with leading zeroes); the number of digits to appear
+after the radix character for the <literal>e</literal>, <literal>E</literal>,
+and <literal>f</literal> conversions, the maximum number of significant digits
+for the <literal>g</literal> and <literal>G</literal> conversions; or the
+maximum number of bytes to be printed from a string by the <literal>s</literal> conversion.
+The precision takes the form of a period (<literal>.</literal>) followed by
+either an asterisk (<literal>*</literal>), described below, or a decimal digit
+string.</para>
+</listitem><listitem><para>An optional sequence of <firstterm>size prefixes</firstterm> that
+indicate the size of the corresponding argument, described in <olink targetptr="chp-fmt-1.4" remap="internal">Size Prefixes</olink>. The size prefixes are not necessary
+in D and are provided for compatibility with the C <function>printf</function> function.</para>
+</listitem><listitem><para>A <firstterm>conversion specifier</firstterm> that indicates
+the type of conversion to be applied to the argument.</para>
+</listitem>
+</itemizedlist><para>The <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> function
+also supports conversion specifications of the form <literal>%</literal><replaceable>n</replaceable><literal>$</literal> where <replaceable>n</replaceable> is
+a decimal integer; DTrace <function>printf</function> does not support this
+type of conversion specification.</para>
+</sect2><sect2 id="chp-fmt-1.2"><title>Flag Specifiers</title><para><indexterm><primary><literal>printf</literal></primary><secondary>conversion flags</secondary></indexterm>The <function>printf</function> conversion flags
+are enabled by specifying one or more of the following characters, which may
+appear in any order:</para><variablelist><varlistentry><term><literal>'</literal></term><listitem><para>The integer portion of the result of a decimal conversion
+(<literal>%i</literal>, <literal>%d</literal>, <literal>%u</literal>, <literal>%f</literal>, <literal>%g</literal>, or <literal>%G</literal>) is formatted
+with thousands grouping characters using the non-monetary grouping character.
+Some locales, including the POSIX C locale, do not provide non-monetary grouping
+characters for use with this flag.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>-</literal></term><listitem><para>The result of the conversion is left-justified within the
+field. The conversion is right-justified if this flag is not specified.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>+</literal></term><listitem><para>The result of signed conversion always begins with a sign
+(<literal>+</literal> or <literal>-</literal>). If this flag is not specified,
+the conversion begins with a sign only when a negative value is converted.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>space</literal></term><listitem><para>If the first character of a signed conversion is not a sign
+or if a signed conversion results in no characters, a space is placed before
+the result. If the <literal>space</literal> and <literal>+</literal> flags
+both appear, the space flag is ignored.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>#</literal></term><listitem><para>The value is converted to an alternate form if an alternate
+form is defined for the selected conversion. The alternate formats for conversions
+are described along with the corresponding conversion.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0</literal></term><listitem><para>For <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, <literal>X</literal>, <literal>e</literal>, <literal>E</literal>, <literal>f</literal>, <literal>g</literal>, and <literal>G</literal> conversions,
+leading zeroes (following any indication of sign or base) are used to pad
+to the field width. No space padding is performed. If the <literal>0</literal> and <literal>-</literal> flags both appear, the <literal>0</literal> flag is ignored. For <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, and <literal>X</literal> conversions, if a precision is specified,
+the <literal>0</literal> flag is ignored. If the <literal>0</literal> and <literal>'</literal> flags both appear, the grouping characters are inserted before
+the zero padding.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="chp-fmt-1.3"><title>Width and Precision Specifiers</title><para><indexterm><primary><literal>printf</literal></primary><secondary>width and precision specifiers</secondary></indexterm>The minimum field width can
+be specified as a decimal digit string following any flag specifier, in which
+case the field width is set to the specified number of columns. The field
+width can also be specified as asterisk (<literal>*</literal>) in which case
+an additional argument of type <literal>int</literal> is accessed to determine
+the field width. For example, to print an integer <literal>x</literal> in
+a field width determined by the value of the <literal>int</literal> variable <literal>w</literal>, you would write the D statement:</para><programlisting>printf("%*d", w, x);</programlisting><para>The field width can also be specified using a <literal>?</literal> character
+to indicate that the field width should be set based on the number of characters
+required to format an address in hexadecimal in the data model of the operating
+system kernel. The width is set to 8 if the kernel is using the 32&ndash;bit
+data model, or to 16 if the kernel is using the 64&ndash;bit data model.</para><para>The precision for the conversion can be specified as a decimal digit
+string following a period (<literal>.</literal>) or by an asterisk (<literal>*</literal>)
+following a period. If an asterisk is used to specify the precision, an additional
+argument of type <literal>int</literal> prior to the conversion argument is
+accessed to determine the precision. If both width and precision are specified
+as asterisks, the order of arguments to <function>printf</function> for the
+conversion should appear in the following order: width, precision, value.</para>
+</sect2><sect2 id="chp-fmt-1.4"><title>Size Prefixes</title><para><indexterm><primary><literal>printf</literal></primary><secondary>size prefixes</secondary></indexterm>Size prefixes are required in ANSI-C programs
+that use <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> in
+order to indicate the size and type of the conversion argument. The D compiler
+performs this processing for your <function>printf</function> calls automatically,
+so size prefixes are not required. Although size prefixes are provided for
+C compatibility, their use is explicitly discouraged in D programs because
+they bind your code to a particular data model when using derived types. For
+example, if a <literal>typedef</literal> is redefined to different integer
+base types depending on the data model, it is not possible to use a single
+C conversion that works in both data models without explicitly knowing the
+two underlying types and including a cast expression, or defining multiple
+format strings. The D compiler solves this problem automatically by allowing
+you to omit size prefixes and automatically determining the argument size.</para><para>The size prefixes can be placed just prior to the format conversion
+name and after any flags, widths, and precision specifiers. The size prefixes
+are as follows:</para><itemizedlist><listitem><para>An optional <literal>h</literal> specifies that a following <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, or <literal>X</literal> conversion applies to a <literal>short</literal> or <literal>unsigned short</literal>.</para>
+</listitem><listitem><para>An optional <literal>l</literal> specifies that a following <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, or <literal>X</literal> conversion applies to a <literal>long</literal> or <literal>unsigned long</literal>.</para>
+</listitem><listitem><para>An optional <literal>ll</literal> specifies that a following <literal>d</literal>, <literal>i</literal>, <literal>o</literal>, <literal>u</literal>, <literal>x</literal>, or <literal>X</literal> conversion applies to a <literal>long
+long</literal> or <literal>unsigned long long</literal>.</para>
+</listitem><listitem><para>An optional <literal>L</literal> specifies that a following <literal>e</literal>, <literal>E</literal>, <literal>f</literal>, <literal>g</literal>,
+or <literal>G</literal> conversion applies to a <literal>long double</literal>.</para>
+</listitem><listitem><para>An optional <literal>l</literal> specifies that a following <literal>c</literal> conversion applies to a <literal>wint_t</literal> argument,
+and that a following <literal>s</literal> conversion character applies to
+a pointer to a <literal>wchar_t</literal> argument.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="chp-fmt-1.5"><title>Conversion Formats</title><para><indexterm><primary><literal>printf</literal></primary><secondary>conversion formats</secondary></indexterm>Each conversion character sequence results
+in fetching zero or more arguments. If insufficient arguments are provided
+for the format string, or if the format string is exhausted and arguments
+remain, the D compiler issues an appropriate error message. If an undefined
+conversion format is specified, the D compiler issues an appropriate error
+message. The conversion character sequences are:</para><variablelist><varlistentry><term><literal>a</literal></term><listitem><para>The pointer or <literal>uintptr_t</literal> argument is printed
+as a kernel symbol name in the form <literal></literal><replaceable>module</replaceable><literal>`</literal><replaceable>symbol-name</replaceable><literal></literal> plus
+an optional hexadecimal byte offset. If the value does not fall within the
+range defined by a known kernel symbol, the value is printed as a hexadecimal
+integer.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>c</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, or <literal>int</literal> argument is printed as an ASCII character.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>C</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, or <literal>int</literal> argument is printed as an ASCII character if the character is
+a printable ASCII character. If the character is not a printable character,
+it is printed using the corresponding escape sequence as shown in <olink targetptr="tbl-escs" remap="internal">Table&nbsp;2&ndash;5</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>d</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, <literal>int</literal>, <literal>long</literal>, or <literal>long long</literal> argument
+is printed as a decimal (base 10) integer. If the argument is <literal>signed</literal>,
+it will be printed as a signed value. If the argument is <literal>unsigned</literal>,
+it will be printed as an unsigned value. This conversion has the same meaning
+as <literal>i</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>e, E</literal></term><listitem><para>The <literal>float</literal>, <literal>double</literal>, or <literal>long double</literal> argument is converted to the style <literal>[-]</literal><replaceable>d</replaceable><literal>.</literal><replaceable>ddd</replaceable><literal>e&plusmn;</literal><replaceable>dd</replaceable><literal></literal>, where there is
+one digit before the radix character and the number of digits after it is
+equal to the precision. The radix character is non-zero if the argument is
+non-zero. If the precision is not specified, the default precision value is
+6. If the precision is 0 and the <literal>#</literal> flag is not specified,
+no radix character appears. The <literal>E</literal> conversion format produces
+a number with <literal>E</literal> instead of <literal>e</literal> introducing
+the exponent. The exponent always contains at least two digits. The value
+is rounded up to the appropriate number of digits.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>f</literal></term><listitem><para>The <literal>float</literal>, <literal>double</literal>, or <literal>long double</literal> argument is converted to the style <literal>[-]</literal><replaceable>ddd</replaceable><literal>.</literal><replaceable>ddd</replaceable><literal></literal>,
+where the number of digits after the radix character is equal to the precision
+specification. If the precision is not specified, the default precision value
+is 6. If the precision is 0 and the <literal>#</literal> flag is not specified,
+no radix character appears. If a radix character appears, at least one digit
+appears before it. The value is rounded up to the appropriate number of digits.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>g, G</literal></term><listitem><para>The <literal>float</literal>, <literal>double</literal>, or <literal>long double</literal> argument is printed in the style <literal>f</literal> or <literal>e</literal> (or in style <literal>E</literal> in the case of a <literal>G</literal> conversion
+character), with the precision specifying the number of significant digits.
+If an explicit precision is 0, it is taken as 1. The style used depends on
+the value converted: style <literal>e</literal> (or <literal>E</literal>)
+is used only if the exponent resulting from the conversion is less than -4
+or greater than or equal to the precision. Trailing zeroes are removed from
+the fractional part of the result. A radix character appears only if it is
+followed by a digit. If the <literal>#</literal> flag is specified, trailing
+zeroes are not removed from the result.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>i</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, <literal>int</literal>, <literal>long</literal>, or <literal>long long</literal> argument
+is printed as a decimal (base 10) integer. If the argument is <literal>signed</literal>,
+it will be printed as a signed value. If the argument is <literal>unsigned</literal>,
+it will be printed as an unsigned value. This conversion has the same meaning
+as <literal>d</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>o</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, <literal>int</literal>, <literal>long</literal>, or <literal>long long</literal> argument
+is printed as an unsigned octal (base 8) integer. Arguments that are <literal>signed</literal> or <literal>unsigned</literal> may be used with this conversion.
+If the <literal>#</literal> flag is specified, the precision of the result
+will be increased if necessary to force the first digit of the result to be
+a zero.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>p</literal></term><listitem><para>The pointer or <literal>uintptr_t</literal> argument is printed
+as a hexadecimal (base 16) integer. D accepts pointer arguments of any type.
+If the <literal>#</literal> flag is specified, a non-zero result will have <literal>0x</literal> prepended to it.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>s</literal></term><listitem><para>The argument must be an array of <literal>char</literal> or
+a <literal>string</literal>. Bytes from the array or <literal>string</literal> are
+read up to a terminating null character or the end of the data and interpreted
+and printed as ASCII characters. If the precision is not specified, it is
+taken to be infinite, so all characters up to the first null character are
+printed. If the precision is specified, only that portion of the character
+array that will display in the corresponding number of screen columns is printed.
+If an argument of type <literal>char *</literal> is to be formatted, it should
+be cast to <literal>string</literal> or prefixed with the D <literal>stringof</literal> operator
+to indicate that DTrace should trace the bytes of the string and format them.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>S</literal></term><listitem><para>The argument must be an array of <literal>char</literal> or
+a <literal>string</literal>. The argument is processed as if by the <literal>%s</literal> conversion,
+but any ASCII characters that are not printable are replaced by the corresponding
+escape sequence described in <olink targetptr="tbl-escs" remap="internal">Table&nbsp;2&ndash;5</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>u</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, <literal>int</literal>, <literal>long</literal>, or <literal>long long</literal> argument
+is printed as an unsigned decimal (base 10) integer. Arguments that are <literal>signed</literal> or <literal>unsigned</literal> may be used with this conversion,
+and the result is always formatted as <literal>unsigned</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>wc</literal></term><listitem><para>The <literal>int</literal> argument is converted to a wide
+character (<literal>wchar_t</literal>) and the resulting wide character is
+printed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ws</literal></term><listitem><para>The argument must be an array of <literal>wchar_t</literal>.
+Bytes from the array are read up to a terminating null character or the end
+of the data and interpreted and printed as wide characters. If the precision
+is not specified, it is taken to be infinite, so all wide characters up to
+the first null character are printed. If the precision is specified, only
+that portion of the wide character array that will display in the corresponding
+number of screen columns is printed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>x, X</literal></term><listitem><para>The <literal>char</literal>, <literal>short</literal>, <literal>int</literal>, <literal>long</literal>, or <literal>long long</literal> argument
+is printed as an unsigned hexadecimal (base 16) integer. Arguments that are <literal>signed</literal> or <literal>unsigned</literal> may be used with this conversion.
+If the <literal>x</literal> form of the conversion is used, the letter digits <literal>abcdef</literal> are used. If the <literal>X</literal> form of the conversion
+is used, the letter digits <literal>ABCDEF</literal> are used. If the <literal>#</literal> flag
+is specified, a non-zero result will have <literal>0x</literal> (for <literal>%x</literal>)
+or <literal>0X</literal> (for <literal>%X</literal>) prepended to it.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>Y</literal></term><listitem><para>The <literal>uint64_t</literal> argument is interpreted to
+be the number of nanoseconds since 00:00 Universal Coordinated Time, January
+1, 1970, and is printed in the following <olink targetdoc="refman3a" targetptr="cftime-3c" remap="external"><citerefentry><refentrytitle>cftime</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> form: &ldquo;<literal>%Y
+%a %b %e %T %Z</literal>.&rdquo; The current number of nanoseconds since 00:00
+UTC, January 1, 1970 is available in the <literal>walltimestamp</literal> variable.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%</literal></term><listitem><para>Print a literal <literal>%</literal> character. No argument
+is converted. The entire conversion specification must be <literal>%%</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="chp-fmt-printa"><title><function>printa</function></title><para><indexterm><primary><literal>printa</literal></primary></indexterm>The <function>printa</function> function is used to format the results of aggregations in
+a D program. The function is invoked using one of two forms:</para><programlisting>printa(@<replaceable>aggregation-name</replaceable>);
+printa(<replaceable>format-string</replaceable>, <literal>@</literal><replaceable>aggregation-name</replaceable>);</programlisting><para>If the first form of the function is used, the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command takes a consistent
+snapshot of the aggregation data and produces output equivalent to the default
+output format used for aggregations, described in <olink targetptr="chp-aggs" remap="internal">Chapter&nbsp;9,
+Aggregations</olink>.</para><para>If the second form of the function is used, the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command takes a consistent
+snapshot of the aggregation data and produces output according to the conversions
+specified in the <replaceable>format string</replaceable>, according to the
+following rules:</para><itemizedlist><listitem><para>The format conversions must match the tuple signature used
+to create the aggregation. Each tuple element may only appear once. For example,
+if you aggregate a count using the following D statements:</para><programlisting>@a["hello", 123] = count();
+@a["goodbye", 456] = count();</programlisting><para>and then add the D statement <literal>printa(</literal><replaceable>format-string</replaceable><literal>, @a)</literal> to a probe clause, <command>dtrace</command> will
+snapshot the aggregation data and produce output as if you had entered the
+statements:</para><programlisting>printf(<replaceable>format-string</replaceable>, "hello", 123);
+printf(<replaceable>format-string</replaceable>, "goodbye", 456);</programlisting><para>and so on for each tuple defined in the aggregation.</para>
+</listitem><listitem><para>Unlike <function>printf</function>, the format string you
+use for <function>printa</function> need not include all elements of the tuple.
+That is, you can have a tuple of length 3 and only one format conversion.
+Therefore, you can omit any tuple keys from your <function>printa</function> output
+by changing your aggregation declaration to move the keys you want to omit
+to the end of the tuple and then omit corresponding conversion specifiers
+for them in the <function>printa</function> format string.</para>
+</listitem><listitem><para>The aggregation result can be included in the output by using
+the additional <literal>@</literal> format flag character, which is only valid
+when used with <function>printa</function>. The <literal>@</literal> flag
+can be combined with any appropriate format conversion specifier, and may
+appear more than once in a format string so that your tuple result can appear
+anywhere in the output and can appear more than once. The set of conversion
+specifiers that can be used with each aggregating function are implied by
+the aggregating function's result type. The aggregation result types are:</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth=""/><colspec colwidth=""/><tbody><row><entry><para><function>avg</function></para>
+</entry><entry><para><literal>uint64_t</literal></para>
+</entry>
+</row><row><entry><para><function>count</function></para>
+</entry><entry><para><literal>uint64_t</literal></para>
+</entry>
+</row><row><entry><para><function>lquantize</function></para>
+</entry><entry><para><literal>int64_t</literal></para>
+</entry>
+</row><row><entry><para><function>max</function></para>
+</entry><entry><para><literal>uint64_t</literal></para>
+</entry>
+</row><row><entry><para><function>min</function></para>
+</entry><entry><para><literal>uint64_t</literal></para>
+</entry>
+</row><row><entry><para><function>quantize</function></para>
+</entry><entry><para><literal>int64_t</literal></para>
+</entry>
+</row><row><entry><para><function>sum</function></para>
+</entry><entry><para><literal>uint64_t</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>For example, to format the results of <function>avg</function>,
+you can apply the <literal>%d</literal>, <literal>%i</literal>, <literal>%o</literal>, <literal>%u</literal>, or <literal>%x</literal> format conversions. The <function>quantize</function> and <function>lquantize</function> functions format their results
+as an ASCII table rather than as a single value.</para>
+</listitem>
+</itemizedlist><para>The following D program shows a complete example of <function>printa</function>,
+using the <literal>profile</literal> provider to sample the value of <literal>caller</literal> and then formatting the results as a simple table:</para><programlisting>profile:::profile-997
+{
+	@a[caller] = count();
+}
+
+END
+{
+	printa("%@8u %a\n", @a);
+}</programlisting><para>If you use <command>dtrace</command> to execute this program, wait a
+few seconds, and press Control-C, you will see output similar to the following
+example:</para><screen><userinput># dtrace -s printa.d</userinput>
+<userinput>^C</userinput>
+CPU     ID                    FUNCTION:NAME
+  1      2                             :END        1 0x1
+       1 ohci`ohci_handle_root_hub_status_change+0x148
+       1 specfs`spec_write+0xe0
+       1 0xff14f950
+       1 genunix`cyclic_softint+0x588
+       1 0xfef2280c
+       1 genunix`getf+0xdc
+       1 ufs`ufs_icheck+0x50
+       1 genunix`infpollinfo+0x80
+       1 genunix`kmem_log_enter+0x1e8
+       ...</screen>
+</sect1><sect1 id="chp-fmt-3"><title><function>trace</function> Default Format</title><para><indexterm><primary><literal>trace</literal></primary></indexterm>If
+the <function>trace</function> function is used to capture data rather than <function>printf</function>, the <command>dtrace</command> command formats the results
+using a default output format. If the data is 1, 2, 4, or 8 bytes in size,
+the result is formatted as a decimal integer value. If the data is any other
+size and is a sequence of printable characters if interpreted as a sequence
+of bytes, it will be printed as an ASCII string. If the data is any other
+size and is not a sequence of printable characters, it will be printed as
+a series of byte values formatted as hexadecimal integers.</para>
+</sect1>
+</chapter><?Pub *0000032060 0?>

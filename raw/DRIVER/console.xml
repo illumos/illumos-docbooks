@@ -1,0 +1,554 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(3)part(title()partintro()appendix()?><appendix id="euazz"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag
+atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Console Frame Buffer Drivers</title><highlights><para><indexterm significance="preferred"><primary>console frame buffer drivers</primary></indexterm>Drivers for frame buffers that are used for the system console
+must provide interfaces to enable the system to display text on the console.
+The Solaris OS provides enhanced visual I/O interfaces to enable the kernel
+terminal emulator to display text directly on the console frame buffer. This
+appendix describes how to add the necessary interfaces to a frame buffer driver
+to enable the driver to interact with the Solaris kernel terminal emulator.</para>
+</highlights><sect1 id="eveno"><title>Solaris Consoles and the Kernel Terminal Emulator</title><para><indexterm><primary>console frame buffer drivers</primary><secondary>kernel terminal emulator</secondary></indexterm><indexterm><primary>kernel terminal emulator</primary></indexterm><indexterm><primary>tem (terminal emulator module)</primary><seealso>kernel terminal emulator</seealso></indexterm><indexterm><primary><literal>tem-support</literal> DDI property</primary></indexterm><indexterm><primary>VGA text mode</primary></indexterm><indexterm><primary>pixel depth mode</primary></indexterm>The role of the kernel terminal emulator is to render text onto
+the console frame buffer in the proper position and representation determined
+by the frame buffer's screen height, width, and pixel depth mode. The terminal
+emulator also drives scrolling, controls a software cursor, and interprets
+ANSI terminal escape sequences. The terminal emulator accesses the console
+frame buffer in either VGA text mode or pixel mode, depending upon the graphics
+card. To be used as a Solaris console frame buffer driver, your frame buffer
+driver must be compatible with the Solaris kernel terminal emulator. The target
+platform is the most significant factor that determines whether you need to
+modify your frame buffer driver to make your driver compatible with the Solaris
+kernel terminal emulator.</para><itemizedlist><listitem><para>x86 platforms &ndash; Console frame buffer drivers do not
+need to be modified because x86 console frame buffer drivers already support
+the console frame buffer interfaces.</para>
+</listitem><listitem><para>SPARC platforms &ndash; Console frame buffer drivers should
+use the interfaces described in this appendix to enable the driver to interact
+with the Solaris kernel terminal emulator.</para>
+</listitem>
+</itemizedlist><sect2 id="ewavn"><title>x86 Platform Console Communication</title><indexterm><primary>tem (terminal emulator module)</primary>
+</indexterm><indexterm><primary>VGA text mode</primary>
+</indexterm><indexterm><primary><literal>vgatext</literal> module</primary>
+</indexterm><para>On x86 platforms, the Solaris kernel terminal emulator module (<literal>tem</literal>) uses VGA text mode exclusively to interact with the <literal>vgatext</literal> module.
+The <literal>vgatext</literal> module uses industry standard VGA text mode
+to interact with x86 compatible frame buffer devices. Because the <literal>vgatext</literal> module already supports the console frame buffer interfaces, x86
+frame buffer drivers are compatible with the kernel <literal>tem</literal> module.
+You do not need to add special  interfaces to x86 frame buffer drivers.</para><para>The remainder of this appendix applies to SPARC platforms only.</para>
+</sect2><sect2 id="ewaua"><title>SPARC Platform Console Communication</title><indexterm><primary>video mode</primary>
+</indexterm><para>SPARC frame buffer drivers typically do not operate in VGA text mode.
+SPARC frame buffer drivers typically are required to send pixel patterns that
+depict the text and images displayed. The kernel <literal>tem</literal> requires
+SPARC drivers to support specific interfaces to facilitate rendering data
+to the screen, perform scrolling, and display a text cursor. How the driver
+actually renders data sent from the <literal>tem</literal> onto the screen
+depends on the device. The driver typically draws the data into video memory
+according to the hardware and video mode.</para><para>The Solaris OS provides interfaces that enable the kernel terminal emulator
+to drive compatible console frame buffers directly. The advantages of converting
+a driver to be compatible with the kernel terminal emulator are:</para><itemizedlist><listitem><para>Dramatically improved performance, particularly for scrolling</para>
+</listitem><listitem><para>Enhanced ANSI text color capabilities</para>
+</listitem><listitem><para>The ability to start a login session on the console frame
+buffer even when the system console stream is directed out the serial port</para>
+</listitem>
+</itemizedlist><para>SPARC console frame buffer drivers are not required to be compatible
+with the kernel terminal emulator. If the console frame buffer driver is not
+compatible with the kernel terminal emulator, the system uses the FCode terminal
+emulator in the OpenBoot PROM.</para><para><indexterm><primary><literal>tem-support</literal> DDI property</primary></indexterm><indexterm><primary><literal>ioctl</literal>(9E) driver entry point</primary></indexterm>The console frame buffer is identified through
+the EEPROM <envar>screen</envar> environment variable. The system determines
+whether the console frame buffer is compatible with the kernel terminal emulator
+module by checking whether the frame buffer driver exports the <literal>tem-support</literal> DDI property. If the <literal>tem-support</literal> property is
+exported, then the system issues the <literal>VIS_DEVINIT</literal> I/O control
+(<literal>ioctl</literal>) command to the frame buffer driver during system
+boot, while configuring the console. If the <literal>tem-support</literal> DDI
+property is exported and the <literal>VIS_DEVINIT</literal> <literal>ioctl</literal> command
+succeeds and returns a compatible version number to the <literal>tem</literal>,
+the system configures the system console to utilize that frame buffer driver
+through the kernel terminal emulator. See the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man page for information
+about the I/O control driver entry point.</para><para>SPARC drivers that support the kernel terminal emulator should export
+the <literal>tem-support</literal> DDI property.  This property indicates
+that the driver supports the kernel terminal emulator. If a frame buffer driver
+exports the <literal>tem-support</literal> DDI property, then that driver
+will be handled early in the boot process, while the console is being configured.
+If a frame buffer driver does not export the <literal>tem-support</literal> property,
+then that driver might not be handled early enough in the boot process.</para><variablelist><varlistentry><term><literal>tem-support</literal></term><listitem><para>When set to 1, this DDI property indicates that this driver
+is compatible with the console                            kernel frame buffer
+interface.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The kernel terminal emulator module interacts with the console frame
+buffer driver through two major interfaces:</para><itemizedlist><listitem><para>Through <literal>ioctl</literal> interfaces during normal
+system operation</para>
+</listitem><listitem><para>Through polled I/O interfaces during standalone mode</para>
+</listitem>
+</itemizedlist><para>The following section provides detailed information.</para>
+</sect2>
+</sect1><sect1 id="ewibs"><title>Console Visual I/O Interfaces</title><para><indexterm><primary>console frame buffer drivers</primary><secondary>visual I/O interfaces</secondary></indexterm><indexterm><primary>I/O</primary><secondary>visual I/O interfaces</secondary></indexterm><indexterm><primary>visual I/O interfaces</primary></indexterm><indexterm><primary>standalone mode</primary></indexterm><indexterm><primary>video mode</primary></indexterm>The kernel
+terminal emulator interacts with the console frame buffer driver through two
+interfaces. During normal system activity (after a successful boot of the
+system), communication between the kernel terminal emulator and the console
+frame buffer driver is through <literal>ioctl</literal> interfaces. During
+standalone mode (before system boot or during debugging), communication between
+the kernel terminal emulator and the console frame buffer driver is through
+polled I/O interfaces. All activity between the kernel terminal emulator and
+the console frame buffer driver is initiated by the kernel terminal emulator,
+with the exception of a callback function used by the console frame buffer
+driver to notify the kernel terminal emulator of changes in the video mode.</para><para>The console visual I/O interfaces are documented in detail in the <olink targetdoc="group-refman" targetptr="visual-io-7i" remap="external"><citerefentry><refentrytitle>visual_io</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> man page.
+For more information on the video mode change callback function, see <olink targetptr="ewprh" remap="internal">Video Mode Change Callback Interface</olink>.</para><sect2 id="ewpql"><title>I/O Control Interfaces</title><para>During normal system activity, the kernel terminal emulator communicates
+with the console frame buffer driver through the <literal>ioctl</literal> interfaces
+listed in the following table:</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para><literal>ioctl</literal> Name</para>
+</entry><entry><para>Corresponding Data Structure</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>VIS_DEVINIT</literal></para>
+</entry><entry><para><literal>vis_devinit</literal></para>
+</entry><entry><para>Initializes the session between the terminal emulator module and the
+frame buffer. See <olink targetptr="exehb" remap="internal">VIS_DEVINIT</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_DEVFINI</literal></para>
+</entry><entry><para>Not Applicable</para>
+</entry><entry><para>Terminates the session between the terminal emulator module and the
+frame buffer. See <olink targetptr="exeht" remap="internal">VIS_DEFINI</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_CONSDISPLAY</literal></para>
+</entry><entry><para><literal>vis_consdisplay</literal></para>
+</entry><entry><para>Displays pixels as a rectangle. See <olink targetptr="exehz" remap="internal">VIS_CONSDISPLAY</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_CONSCOPY</literal></para>
+</entry><entry><para><literal>vis_conscopy</literal></para>
+</entry><entry><para>Copies a rectangle of pixels (scroll). See <olink targetptr="exeib" remap="internal">VIS_CONSCOPY</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_CONSCURSOR</literal></para>
+</entry><entry><para><literal>vis_conscursor</literal></para>
+</entry><entry><para>Displays or hides a text cursor. See <olink targetptr="exeix" remap="internal">VIS_CONSCURSOR</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_PUTCMAP</literal></para>
+</entry><entry><para><literal>vis_cmap</literal></para>
+</entry><entry><para>Sends the terminal emulator module color map to the frame buffer driver.
+See <olink targetptr="exejd" remap="internal">VIS_PUTCMAP</olink>.</para>
+</entry>
+</row><row><entry><para><literal>VIS_GETCMAP</literal></para>
+</entry><entry><para><literal>vis_cmap</literal></para>
+</entry><entry><para>Reads the terminal emulator module color map from the frame buffer.
+See <olink targetptr="exlrl" remap="internal">VIS_GETCMAP</olink>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2><sect2 id="ewpqm"><title>Polled I/O Interfaces</title><para><indexterm><primary>console frame buffer drivers</primary><secondary>polled I/O interfaces</secondary></indexterm><indexterm><primary>I/O</primary><secondary>polled I/O interfaces</secondary></indexterm><indexterm><primary>polled I/O interfaces</primary></indexterm><indexterm><primary>console frame buffer drivers</primary><secondary>standalone mode</secondary></indexterm>The polled
+I/O interfaces provide the same functionality as the <systemitem>VIS_CONSDISPLAY</systemitem>, <systemitem>VIS_CONSCOPY</systemitem>, and <systemitem>VIS_CONSCURSOR</systemitem> <literal>ioctl</literal> interfaces. The polled I/O interfaces are called only when the
+operating system is quiesced and in <emphasis>standalone</emphasis> mode.
+See <olink targetptr="gcbpn" remap="internal">Implementing Polled I/O in Console Frame Buffer
+Drivers</olink> for more information.</para><para>While in standalone mode, the kernel terminal emulator communicates
+with the console frame buffer driver through the polled I/O interfaces listed
+in the following table:</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para>Polled I/O Function</para>
+</entry><entry><para>Corresponding Data Structure</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><function>(*display)</function></para>
+</entry><entry><para><literal>vis_consdisplay</literal></para>
+</entry><entry><para>Displays pixels as a rectangle.</para>
+</entry>
+</row><row><entry><para><function>(*copy)</function></para>
+</entry><entry><para><literal>vis_conscopy</literal></para>
+</entry><entry><para>Copies a rectangle of pixels (scroll).</para>
+</entry>
+</row><row><entry><para><function>(*cursor)</function></para>
+</entry><entry><para><literal>vis_conscursor</literal></para>
+</entry><entry><para>Displays or hides a text cursor.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2><sect2 id="ewprh"><title>Video Mode Change Callback Interface</title><para><indexterm><primary>console frame buffer drivers</primary><secondary>video mode change callback interface</secondary></indexterm><indexterm><primary>video mode</primary></indexterm>The console frame buffer driver and the kernel terminal
+emulator must be in agreement about the video mode at all times. <emphasis>Video
+mode</emphasis> includes the console screen height, width, and depth in pixels.
+Video mode also includes whether communication between the kernel terminal
+emulator and the console frame buffer is in VGA text mode or pixel mode.</para><para>In order for the console frame buffer driver to notify the kernel terminal
+emulator of changes in the video mode, the console frame buffer driver is
+initialized with the address of the <function>(*modechg_cb)</function> kernel
+terminal emulator callback function described in the following table:</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para>Callback Function</para>
+</entry><entry><para>Corresponding Data Structures</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><function>(*modechg_cb)</function></para>
+</entry><entry><para><literal>vis_modechg_arg</literal></para><para><literal>vis_devinit</literal></para>
+</entry><entry><para>Keep the terminal emulator module synchronized with the driver video
+mode (screen height, width, and pixel depth).</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2>
+</sect1><sect1 id="ewibr"><title>Implementing the Visual I/O Interfaces in Console
+Frame Buffer Drivers</title><para>Except for the video mode change callback, all activity between the
+driver and the kernel terminal emulator is initiated by the <literal>tem</literal> (terminal
+emulator module). This means that the <literal>tem</literal> issues all of
+the <literal>ioctl</literal> commands described in this document. The following
+sections provide implementation details for each <literal>ioctl</literal> command.
+For more information, see the <olink targetdoc="group-refman" targetptr="visual-io-7i" remap="external"><citerefentry><refentrytitle>visual_io</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> man page and the <filename>/usr/include/sys/visual_io.h</filename> include file. See <olink targetptr="ewprh" remap="internal">Video Mode Change Callback
+Interface</olink> for detailed information about the video mode change callback
+function.</para><note><para>Each <literal>ioctl</literal> command should determine whether
+the <literal>FKIOCTL</literal> is set in the <literal>ioctl</literal> flag
+argument and return <literal>EPERM</literal> if that bit is not set.</para>
+</note><sect2 id="exehb"><title><literal>VIS_DEVINIT</literal></title><para>The <systemitem class="macro">VIS_DEVINIT</systemitem> <literal>ioctl</literal> command
+initializes the frame buffer driver as the system console device. This <literal>ioctl</literal> passes the address of a <structname>vis_devinit</structname> structure.</para><para>The <literal>tem</literal> first loads the address of its video mode
+change callback function into the <structfield>modechg_cb</structfield> field
+of the <structname>vis_devinit</structname> structure and loads its soft state
+into the <structfield>modechg_arg</structfield> field. The <literal>tem</literal> then
+issues the <literal>VIS_DEVINIT</literal> <literal>ioctl</literal> command.
+The frame buffer driver then initializes itself and returns a summary of its
+configuration back to the <literal>tem</literal> by setting the <structfield>version</structfield>, <structfield>width</structfield>, <structfield>height</structfield>, <structfield>linebytes</structfield>, <structfield>depth</structfield>, <structfield>mode</structfield>,
+and <structfield>polledio</structfield> fields in the <structname>vis_devinit</structname> structure.
+The <structname>vis_devinit</structname> structure is shown in the following
+code.</para><programlisting>struct vis_devinit {
+      /*
+       * This set of fields are used as parameters passed from the
+       * layered frame buffer driver to the terminal emulator.
+       */
+      int             version;        /* Console IO interface rev */
+      screen_size_t   width;          /* Width of the device */
+      screen_size_t   height;         /* Height of the device */
+      screen_size_t   linebytes;      /* Bytes per scan line */
+      int             depth;          /* Device depth */
+      short           mode;           /* Display mode Mode */
+      struct vis_polledio *polledio;  /* Polled output routines */
+      /*
+       * The following fields are used as parameters passed from the
+       * terminal emulator to the underlying frame buffer driver.
+       */
+      vis_modechg_cb_t modechg_cb;   /* Video mode change callback */
+      struct vis_modechg_arg *modechg_arg;  /* Mode change cb arg */
+};</programlisting><para>To implement the <systemitem class="macro">VIS_DEVINIT</systemitem> <literal>ioctl</literal> command in the console frame buffer driver, follow these general
+steps:</para><orderedlist><listitem><para>Define a <literal>struct</literal> to contain the console-specific
+state. This structure is private to the console frame buffer driver. This
+structure is referred to as <structname>consinfo</structname> in this appendix.
+The <structname>consinfo</structname> structure contains information such
+as:</para><itemizedlist><listitem><para>Current size of the blit buffer</para>
+</listitem><listitem><para>Pointer to the blit buffer</para>
+</listitem><listitem><para>Color map information</para>
+</listitem><listitem><para>Driver rendering mode information such as line pitch</para>
+</listitem><listitem><para>Background color</para>
+</listitem><listitem><para>Video memory address</para>
+</listitem><listitem><para>Terminal emulator callback address</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Allocate memory:</para><orderedlist><listitem><para>Allocate a blit buffer large enough to store a reasonable
+default sized rectangle of pixels at the highest video depth. Additional memory
+can be allocated if an incoming request exceeds the size of the buffer. The
+frame buffer driver's largest font is 12&times;22. Assuming <literal>DEFAULT_HEIGHT</literal> is 12, <literal>DEFAULT_WIDTH</literal> is 22, and the maximum
+video depth is 32, the buffer size should be 8448 bytes (<systemitem class="macro">DEFAULT_HEIGHT</systemitem> &times; <systemitem class="macro">DEFAULT_WIDTH</systemitem> &times; 32).</para>
+</listitem><listitem><para>Allocate a <structname>vis_polledio</structname> structure.</para>
+</listitem><listitem><para>Allocate a buffer to hold a cursor. This buffer should be
+the size of the largest character. This buffer will not change size.</para>
+</listitem>
+</orderedlist>
+</listitem><listitem><para>Obtain the video change callback address and callback context
+of the <literal>tem</literal> from <structfield>modechg_cb</structfield> and <structfield>modechg_ctx</structfield> and store this information in the <structname>consinfo</structname> structure.</para>
+</listitem><listitem><para>Populate the <literal>vis_polledio</literal> structure with
+entry point addresses for the polled display, copy, and cursor functions.</para>
+</listitem><listitem><para>Provide the appropriate information in the fields of the <structname>vis_devinit</structname> structure that was passed to the driver by the <literal>tem</literal>:</para><orderedlist><listitem><para>Set the <structfield>version</structfield> field to <systemitem class="macro">VIS_CONS_REV</systemitem>, which is a constant defined in the <filename>/usr/include/sys/visual_io.h</filename> header file.</para>
+</listitem><listitem><para>Set the <structfield>mode</structfield> field to <systemitem class="macro">VIS_PIXEL</systemitem>.</para>
+</listitem><listitem><para>Set the <structfield>polledio</structfield> field to the address
+of the <structname>vis_polledio</structname> structure.</para>
+</listitem><listitem><para>Set the <structfield>height</structfield> field to the video
+mode height in pixels.</para>
+</listitem><listitem><para>Set the <structfield>width</structfield> field to the video
+mode width in pixels.</para>
+</listitem><listitem><para>Set the <structfield>depth</structfield> field to the frame
+buffer pixel depth in bytes (for example, a 32-bit pixel depth would be 4
+bytes).</para>
+</listitem><listitem><para>Set the <structfield>linebytes</structfield> field to the
+value of <structfield>height</structfield> &times; <structfield>width</structfield> &times; <structfield>depth</structfield>.</para><para>This information is sent from the driver
+to the <literal>tem</literal> by using the <literal>vis_devinit</literal> 
+              structure. This information tells the terminal emulator how
+to render information and pass it to the graphics driver.</para>
+</listitem>
+</orderedlist><para><indexterm><primary>console frame buffer drivers</primary><secondary>video mode change callback interface</secondary></indexterm><indexterm><primary>video mode</primary></indexterm>Whenever the console frame buffer
+driver changes its video mode (specifically <structfield>height</structfield>, <structfield>width</structfield>, or <structfield>depth</structfield>), the driver <emphasis>must</emphasis> call the video mode change callback function of the <literal>tem</literal> to
+update the <structname>vis_devinit</structname> structure and to pass this
+structure back to the terminal emulator. The terminal emulator passes its
+mode change callback function address in the <structfield>modechg_cb</structfield> field
+of the <structname>vis_devinit</structname> structure. The mode change callback
+function has the following function signature:</para><programlisting>typedef void (*vis_modechg_cb_t)
+      (struct vis_modechg_arg *, struct vis_devinit *);</programlisting><para>As shown in the preceding <literal>typedef</literal>, the mode change
+callback function takes two arguments. The first argument is the <structfield>modechg_arg</structfield> and the second argument is the <structname>vis_devinit</structname> structure.
+The <structfield>modechg_arg</structfield> is sent from the <literal>tem</literal> to
+the driver during the <literal>VIS_DEVINIT</literal> <literal>ioctl</literal> command
+initialization. The driver must send the <structfield>modechg_arg</structfield> back
+to the <literal>tem</literal> with each video mode change callback.</para>
+</listitem><listitem><para>Initialize the context of the kernel console. Specific requirements
+vary depending upon the capability of the graphics device. This initialization
+might include such steps as setting the draw engine state, initializing the
+palette, or locating and mapping video memory or the rendering engine so that
+data can be blitted onto the screen.</para>
+</listitem><listitem><para>Return the <structname>vis_devinit</structname> structure
+to the caller.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="exeht"><title><systemitem class="macro">VIS_DEFINI</systemitem></title><para>The <systemitem class="macro">VIS_DEFINI</systemitem> <literal>ioctl</literal> command
+releases the driver's console resources and finishes the session.</para><para>To implement the <systemitem class="macro">VIS_DEVFINI</systemitem> <literal>ioctl</literal> command in the console frame buffer driver, follow these general
+steps:</para><orderedlist><listitem><para>Reset the console frame buffer driver state.</para>
+</listitem><listitem><para>Clear the polled I/O entry points and the kernel terminal
+emulator video change function callback address.</para>
+</listitem><listitem><para>Release memory.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="exehz"><title><systemitem class="macro">VIS_CONSDISPLAY</systemitem></title><indexterm><primary>blitting</primary>
+</indexterm><para>The <systemitem class="macro">VIS_CONSDISPLAY</systemitem> <literal>ioctl</literal> command
+displays a rectangle of pixels at a specified location. This display is also
+referred to as <emphasis>blitting</emphasis> a rectangle. The <structname>vis_consdisplay</structname> structure contains the information necessary to render a rectangle
+at the video depth that both the driver and the <literal>tem</literal> are
+using. The <structname>vis_consdisplay</structname> structure is shown in
+the following code.</para><programlisting>struct vis_consdisplay {
+      screen_pos_t    row;      /* Row (in pixels) to display data at */
+      screen_pos_t    col;      /* Col (in pixels) to display data at */
+      screen_size_t   width;    /* Width of data (in pixels) */
+      screen_size_t   height;   /* Height of data (in pixels) */
+      unsigned char   *data;    /* Address of pixels to display */
+      unsigned char   fg_color; /* Foreground color */
+      unsigned char   bg_color; /* Background color */
+};</programlisting><para>To implement the <systemitem class="macro">VIS_CONSDISPLAY</systemitem> <literal>ioctl</literal> command in the console frame buffer driver, follow these general
+steps:</para><orderedlist><listitem><para>Copy the <structname>vis_consdisplay</structname> structure.</para>
+</listitem><listitem><para>Validate the display parameters. Return an error if any of
+the display parameters is out of range.</para>
+</listitem><listitem><para>Calculate the size of the rectangle to be blitted into video
+memory. Validate this size against the size of the blit buffer created during <systemitem class="macro">VIS_DEVINIT</systemitem>. Allocate additional memory for the
+blit buffer if necessary.</para>
+</listitem><listitem><para>Retrieve the blit data. This data has been prepared by the
+kernel terminal emulator at the agreed upon pixel depth. That depth is the
+same pixel depth that was conveyed by the <literal>tem</literal> during <literal>VIS_DEVINIT</literal>. The pixel depth is updated whenever the device driver
+changes video modes through callback to the <literal>tem</literal>. Typical
+pixel depths are 8-bit color map indexed, and 32-bit TrueColor.</para>
+</listitem><listitem><para>Invalidate any user context so that user applications cannot
+simultaneously access the frame buffer hardware through user memory mappings.
+This step is neither allowed nor necessary in polled I/O mode because user
+applications are not running. Be sure to hold a lock so that users cannot
+restore the mapping through a page fault until the <systemitem class="macro">VIS_CONSDISPLAY</systemitem> <literal>ioctl</literal> completes.</para>
+</listitem><listitem><para>Establish the driver-specific console rendering context.</para>
+</listitem><listitem><para>If the frame buffer is running in 8-bit color indexed mode,
+restore the kernel console color map that the <literal>tem</literal> set up
+through a previous <systemitem class="macro">VIS_PUTCMAP</systemitem> <literal>ioctl</literal>. A lazy color map loading scheme is recommended to optimize performance.
+In a <emphasis>lazy</emphasis> scheme, the console frame buffer only restores
+colors it has actually used since the <literal>VIS_DEVINIT</literal> <literal>ioctl</literal> was issued.</para>
+</listitem><listitem><para>Display the data passed from the <literal>tem</literal> at
+the pixel coordinates sent by the <literal>tem</literal>. You might need to
+transform the RGB pixel data byte order.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="exeib"><title><systemitem class="macro">VIS_CONSCOPY</systemitem></title><para>The <systemitem class="macro">VIS_CONSCOPY</systemitem> <literal>ioctl</literal> command
+copies a rectangular region of pixels from one location to another location.
+One use for this <literal>ioctl</literal> is to scroll.</para><para>To implement the <systemitem class="macro">VIS_CONSCOPY</systemitem> <literal>ioctl</literal> command  in the console frame buffer driver, follow these
+general steps:</para><orderedlist><listitem><para>Copy the <structname>vis_conscopy</structname> structure.
+The <structname>vis_conscopy</structname> structure describes the source and
+target rectangle sizes and locations.</para>
+</listitem><listitem><para>Validate the display parameters. Return an error if any of
+the display parameters is out of range.</para>
+</listitem><listitem><para>Invalidate any user context so that user applications cannot
+simultaneously access the frame buffer hardware through user memory mappings.
+This step is neither allowed nor necessary in polled I/O mode because user
+applications are not running. Be sure to hold a lock so that users cannot
+restore the mapping through a page fault until the <systemitem class="macro">VIS_CONSDISPLAY</systemitem> <literal>ioctl</literal> completes.</para>
+</listitem><listitem><para>Call the function to copy the rectangle.</para><note><para>For optimal performance, use the rendering engine of the graphic
+device to implement the copy function. You need to decide how to do the context
+management within the driver to set up the rendering engine for best performance.</para>
+</note>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="exeix"><title><systemitem class="macro">VIS_CONSCURSOR</systemitem></title><para>The <systemitem class="macro">VIS_CONSCURSOR</systemitem> <literal>ioctl</literal> command
+displays or hides a cursor. The <structname>vis_conscursor</structname> structure
+is shown in the following code.</para><programlisting>struct vis_conscursor {
+      screen_pos_t    row;      /* Row to display cursor (in pixels) */
+      screen_pos_t    col;      /* Col to display cursor (in pixels) */
+      screen_size_t   width;    /* Width of cursor (in pixels) */
+      screen_size_t   height;   /* Height of cursor (in pixels) */
+      color_t         fg_color; /* Foreground color */
+      color_t         bg_color; /* Background color */
+      short           action;   /* Show or Hide cursor */
+};</programlisting><para>To implement the <systemitem class="macro">VIS_CONSCOPY</systemitem> <literal>ioctl</literal> command in the console frame buffer driver, follow these general
+steps:</para><orderedlist><listitem><para>Copy the <structname>vis_conscursor</structname> structure
+from the kernel terminal emulator.</para>
+</listitem><listitem><para>Validate the display parameters. Return an error if any of
+the display parameters are out of range.</para>
+</listitem><listitem><para>Invalidate any user context so that user applications cannot
+simultaneously access the frame buffer hardware through user memory mappings.
+This step is neither allowed nor necessary in polled I/O mode because user
+applications are not running. Be sure to hold a lock so that users cannot
+restore the mapping through a page fault until the <systemitem class="macro">VIS_CONSDISPLAY</systemitem> <literal>ioctl</literal> completes.</para>
+</listitem><listitem><para>The terminal emulator can call the <systemitem class="macro">VIS_CONSCOPY</systemitem> <literal>ioctl</literal> with one of the following two actions: <systemitem class="macro">SHOW_CURSOR</systemitem> and <systemitem class="macro">HIDE_CURSOR</systemitem>.
+The following steps describe how to implement this functionality by reading
+and writing video memory. You might also be able to use the rendering engine
+to do this work. Whether you can use the rendering engine depends on the frame
+buffer hardware.</para><para>Take these steps to implement the <systemitem class="macro">SHOW_CURSOR</systemitem> functionality:</para><orderedlist><listitem><para>Save the pixels within the rectangle where the cursor will
+be drawn. These saved pixels will be needed to hide the cursor.</para>
+</listitem><listitem><para>Scan all the pixels on the screen bounded by the rectangle
+where the cursor will be drawn. Within this rectangle, replace the pixels
+that match the specified cursor foreground color (<structfield>fg_color</structfield>)
+with white pixels. Replace the pixels that match the specified cursor background
+color (<structfield>bg_color</structfield>) with black pixels. The visual
+effect is of a black cursor over white text. This method works with any foreground
+and background color of text. Attempting to invert colors based upon color
+map position is not feasible. More sophisticated strategies, such as attempting
+color inversion using HSB coloring (Hue, Saturation, Brightness), are not
+necessary.</para>
+</listitem>
+</orderedlist><para>To implement the <systemitem class="macro">HIDE_CURSOR</systemitem> functionality,
+replace the pixels beneath the cursor rectangle with the pixels saved from
+the previous <systemitem class="macro">SHOW_CURSOR</systemitem> action.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="exejd"><title><systemitem class="macro">VIS_PUTCMAP</systemitem></title><para>The <systemitem class="macro">VIS_PUTCMAP</systemitem> <literal>ioctl</literal> command
+establishes the console color map. The terminal emulator calls this function
+to set up the color map of the kernel. The <structname>vis_cmap</structname> structure
+is shown in the following code. This structure only applies to 8-bit color
+indexed mode.</para><programlisting>struct vis_cmap {
+      int             index;  /* Index into colormap to start updating */
+      int             count;  /* Number of entries to update */
+      unsigned char   *red;   /* List of red values */
+      unsigned char   *green; /* List of green values */
+      unsigned char   *blue;  /* List of blue values */
+};</programlisting><para>The <systemitem class="macro">VIS_PUTCMAP</systemitem> <literal>ioctl</literal> command
+is similar to the <systemitem class="macro">FBIOPUTCMAP</systemitem> command.
+The <systemitem class="macro">VIS_PUTCMAP</systemitem> command is specific
+to the frame buffer terminal-emulator compatible console code.</para>
+</sect2><sect2 id="exlrl"><title><systemitem class="macro">VIS_GETCMAP</systemitem></title><para>The terminal emulator calls the <systemitem class="macro">VIS_GETCMAP</systemitem> <literal>ioctl</literal> command to retrieve the console color map.</para>
+</sect2>
+</sect1><sect1 id="gcbpn"><title>Implementing Polled I/O in Console Frame Buffer Drivers</title><indexterm><primary>console frame buffer drivers</primary><secondary>polled I/O interfaces</secondary>
+</indexterm><indexterm><primary>I/O</primary><secondary>polled I/O interfaces</secondary>
+</indexterm><indexterm><primary>polled I/O interfaces</primary>
+</indexterm><indexterm><primary>console frame buffer drivers</primary><secondary>standalone mode</secondary>
+</indexterm><para>The polled I/O interfaces are implemented as functions in the driver
+and are called directly by the kernel terminal emulator. The driver passes
+the address of its polled I/O entry points to the terminal emulator during
+the execution of the <literal>VIS_DEVINIT</literal> <literal>ioctl</literal> command.
+The <literal>VIS_DEVINIT</literal> command is initiated by the terminal emulator.</para><para>The <structname>vis_polledio</structname> structure is shown in the
+following code.</para><programlisting>typedef void * vis_opaque_arg_t;
+
+struct vis_polledio {
+      struct vis_polledio_arg *arg;
+      void    (*display)(vis_opaque_arg_t, struct vis_consdisplay *);
+      void    (*copy)(vis_opaque_arg_t, struct vis_conscopy *);
+      void    (*cursor)(vis_opaque_arg_t, struct vis_conscursor *);
+};</programlisting><para>The polled I/O interfaces provide the same functionality as the <systemitem>VIS_CONSDISPLAY</systemitem>, <systemitem>VIS_CONSCOPY</systemitem>, and <systemitem>VIS_CONSCURSOR</systemitem> <literal>ioctl</literal> interfaces. The polled
+I/O interfaces should follow the same steps that are described above for the
+respective <literal>ioctl</literal> commands. The polled I/O interfaces must
+very strictly adhere to the additional restrictions that are described in
+the remainder of this section.</para><para><indexterm><primary>standalone mode</primary></indexterm>The polled
+I/O interfaces are called only when the operating system is quiesced and in
+standalone mode. The system enters <emphasis>standalone</emphasis> mode whenever
+the user enters OpenBoot PROM or enters the <command>kmdb</command> debugger,
+or when the system panics. Only one CPU and one thread are active. All other
+CPUs and threads are stopped. Timesharing, DDI interrupts, and system services
+are turned off.</para><para>Standalone mode severely restricts driver functionality but simplifies
+driver synchronization requirements. For example, a user application cannot
+access the console frame buffer driver by way of the driver's memory mappings
+from within a polled I/O routine.</para><para>In standalone mode, the console frame buffer driver must <emphasis>not</emphasis> perform
+any of the following actions:</para><itemizedlist><listitem><para>Wait for interrupts</para>
+</listitem><listitem><para>Wait for mutexes</para>
+</listitem><listitem><para>Allocate memory</para>
+</listitem><listitem><para>Use DDI or LDI interfaces</para>
+</listitem><listitem><para>Use system services</para>
+</listitem>
+</itemizedlist><para>These restrictions are not difficult to obey since the polled I/O functions
+are relatively simple operations. For example, when working with the rendering
+engine, the console frame buffer driver can poll a bit in the device rather
+than wait for an interrupt. The driver can use pre-allocated memory to render
+blit data. DDI or LDI interfaces should not be needed.</para>
+</sect1><sect1 id="gcbpl"><title>Frame Buffer Specific Configuration Module</title><indexterm><primary><function>fbconfig</function> module</primary>
+</indexterm><indexterm><primary>console frame buffer drivers</primary><secondary>video mode change callback interface</secondary>
+</indexterm><indexterm><primary>video mode</primary>
+</indexterm><para>When the driver-specific <function>fbconfig</function> module causes
+a change in resolution or color depth, that <function>fbconfig</function> module
+must send an <literal>ioctl</literal> to the frame buffer driver. This <literal>ioctl</literal> triggers the frame buffer driver to call the terminal emulator's
+mode change callback function with the new screen size and depth. The frame
+buffer driver and the terminal emulator must agree about the video mode at
+all times. When the frame buffer driver and the terminal emulator do not agree
+about the video mode, the information on the screen is illegible and meaningless.</para>
+</sect1><sect1 id="gcbrg"><title>The X Window System Frame Buffer Specific DDX Module</title><indexterm><primary>DDX module</primary>
+</indexterm><para>When the X Window System exits to the command line, the frame buffer's
+DDX module must send an <literal>ioctl</literal> to the frame buffer driver.
+This <literal>ioctl</literal> triggers the frame buffer driver to call the
+terminal emulator's mode change callback function. This communication keeps
+the frame buffer driver and the terminal emulator in agreement about the video
+mode if the X Window System starts and then changes the video resolution before
+ exiting. The frame buffer driver and the terminal emulator must agree about
+the video mode at all times. When the frame buffer driver and the terminal
+emulator do not agree about the video mode, the information on the screen
+is illegible and meaningless.</para>
+</sect1><sect1 id="ewibu"><title>Developing, Testing, and Debugging Console Frame
+Buffer Drivers</title><para><indexterm><primary>console frame buffer drivers</primary><secondary>debugging</secondary></indexterm><indexterm><primary>debugging</primary><secondary>console frame buffer drivers</secondary></indexterm><indexterm><primary>testing</primary><secondary>console frame buffer drivers</secondary></indexterm>Debugging a
+console frame buffer driver on an active system can be problematic.</para><itemizedlist><listitem><para>Errors that are encountered in the early stages of booting
+the system do not generate a core dump.</para>
+</listitem><listitem><para>Error or informative messages might not be displayed correctly
+on the screen.</para>
+</listitem><listitem><para>USB keyboard input might fail.</para>
+</listitem>
+</itemizedlist><para>This section offers some suggestions to help you develop, test, and
+debug console frame buffer drivers.</para><sect2 id="gcdeo"><title>Testing the I/O Control Interfaces</title><para>To test the <literal>ioctl</literal> commands, create additional <literal>ioctl</literal> entry points that are callable from a user application. Be sure
+to copy in the arguments appropriately. Use the <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines to transfer data to and from user address
+space. Then write an application to validate rendering, scrolling, and cursor
+behavior. This way, these <literal>ioctl</literal> commands do not affect
+your console while you develop and test the commands.</para><para>To ensure that the <literal>ioctl</literal> commands are working correctly,
+boot the system and log in. Check whether you get expected behavior when you
+execute commands such as <command>prstat</command>(1M), <command>ls</command>(1), <command>vi</command>(1), and <command>man</command>(1).</para><para>Execute the following script to validate that ANSI color is working
+correctly:</para><programlisting>#!/bin/bash
+printf "\n\n\n\e[37;40m             Color List       \e[m\n\n"
+printf "\e[30m Color 30 black\e[m\n"
+printf "\e[31m Color 31 red\e[m\n"
+printf "\e[32m Color 32 green\e[m\n"
+printf "\e[33m Color 33 yellow\e[m\n"
+printf "\e[34m Color 34 blue\e[m\n"
+printf "\e[35m Color 35 purple\e[m\n"
+printf "\e[36m Color 36 cyan\e[m\n"
+printf "\e[37m Color 37 white\e[m\n\n"
+printf "\e[40m Backlight 40 black \e[m\n"
+printf "\e[41m Backlight 41 red   \e[m\n"
+printf "\e[34;42m Backlight 42 green \e[m\n"
+printf "\e[43m Backlight 43 yellow\e[m\n"
+printf "\e[37;44m Backlight 44 blue  \e[m\n"
+printf "\e[45m Backlight 45 purple\e[m\n"
+printf "\e[30;46m Backlight 46 cyan  \e[m\n"
+printf "\e[30;47m Backlight 47 white \e[m\n\n"</programlisting>
+</sect2><sect2 id="gcdds"><title>Testing the Polled I/O Interfaces</title><para>The polled I/O interfaces are only available under the following circumstances:</para><itemizedlist><listitem><para>When you enter the OpenBoot PROM by using the <keysym>L1+A</keysym> keystroke
+sequence</para>
+</listitem><listitem><para>When you boot the system with a standalone debugger such as <olink targetdoc="group-refman" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para>When the system panics</para>
+</listitem>
+</itemizedlist><para>The polled I/O interfaces only become available at a certain point in
+the boot process. Polled I/O requests issued from the OpenBoot PROM before
+the system is running are not rendered. Similarly, <command>kmdb</command> prompts
+issued before the console is configured are not rendered.</para><para>To test the polled I/O interfaces, enter the OpenBoot PROM by using
+the <keysym>L1+A</keysym> keystroke sequence. To validate that the polled
+I/O interfaces are being used, type the following command at the OpenBoot
+PROM <literal>ok</literal> prompt:</para><screen>ok <userinput>1b emit ." [32m This is a test" 1b emit ." [m"</userinput></screen><para>The polled I/O interfaces are working properly if the following statements
+are true:</para><itemizedlist><listitem><para>The result of the above command is that the phrase <computeroutput>This is a test</computeroutput> is displayed in green.</para>
+</listitem><listitem><para>The OpenBoot PROM continues to function correctly.</para>
+</listitem><listitem><para>Scrolling performs as expected.</para>
+</listitem><listitem><para>The cursor displays correctly.</para>
+</listitem><listitem><para>The system can be reentered and continued repeatedly.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="gcdeb"><title>Testing the Video Mode Change Callback Function</title><para><indexterm><primary><command>fbconfig</command>(1M) command</primary></indexterm>To determine whether the video mode change callback function is
+working properly, log in to the system and use <olink targetdoc="group-refman" targetptr="fbconfig-1m" remap="external"><citerefentry><refentrytitle>fbconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to change the resolution
+and depth of the frame buffer several times. If the console continues to display
+text properly, the video mode change callback function is working correctly.
+The kernel terminal emulator might adjust the font size to accommodate different
+screen sizes, but that is not significant to the console frame buffer driver.</para><para>To determine whether the X Window System and the console frame buffer
+driver interact correctly, switch between the X Window System and the command
+line several times while modifying the X Window System's video resolution
+and the command line resolution in different ways. If the X Window System
+exits and the console characters are not displayed correctly, either the X
+Window System did not notify the driver console code that the video mode changed
+or the driver did not call the kernel terminal emulator's video mode change
+callback function.</para>
+</sect2><sect2 id="gcdeu"><title>Additional Suggestions for Testing Console Frame
+Buffer Drivers</title><para><indexterm><primary><filename>/var/adm/messages</filename> file</primary></indexterm>During boot, the system sends messages to <filename>/var/adm/messages</filename> if the system fails to locate or successfully load a kernel terminal
+emulator compatible frame buffer driver. To monitor these messages, type the
+following command in a separate window:</para><screen>% <userinput>tail -f /var/adm/messages</userinput></screen><para><indexterm><primary><command>eeprom</command>(1M) command</primary></indexterm>To avoid problems with USB while debugging the driver, change
+the EEPROM <literal>input-device</literal> NVRAM configuration parameter to
+use a serial port instead of the keyboard. See the <olink targetdoc="group-refman" targetptr="eeprom-1m" remap="external"><citerefentry><refentrytitle>eeprom</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page
+for more information about this parameter.</para>
+</sect2>
+</sect1>
+</appendix><?Pub *0000049090 0?>

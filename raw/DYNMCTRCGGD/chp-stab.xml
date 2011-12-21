@@ -1,0 +1,290 @@
+<?Pub UDT _bookmark _target?><chapter id="chp-stab"><title>Stability</title><highlights><para>Sun often provides developers with early access to new technologies
+as well as observability tools that allow users to peer into the internal
+implementation details of user and kernel software. Unfortunately, new technologies
+and internal implementation details are both prone to changes as interfaces
+and implementations evolve and mature when software is upgraded or patched.
+Sun documents application and interface stability levels using a set of labels
+described in the <olink targetdoc="refman5" targetptr="attributes-5" remap="external"><citerefentry><refentrytitle>attributes</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink> man
+page to help set user expectations for what kinds of changes might occur in
+different kinds of future releases.</para><para>No one stability attribute appropriately describes the arbitrary set
+of entities and services that can be accessed from a D program. DTrace and
+the D compiler therefore include features to dynamically compute and describe
+the stability levels of D programs you create. This chapter discusses the
+DTrace features for determining program stability to help you design stable
+D programs. You can use the DTrace stability features to inform you of the
+stability attributes of your D programs, or to produce compile-time errors
+when your program has undesirable interface dependencies.</para>
+</highlights><sect1 id="chp-stab-1"><title>Stability Levels</title><para><indexterm><primary>stability</primary></indexterm><indexterm><primary>stability</primary><secondary>levels</secondary></indexterm>DTrace provides two types
+of stability attributes for entities such as built-in variables, functions,
+and probes: a <firstterm>stability level</firstterm> and an architectural <firstterm>dependency class</firstterm>. The DTrace stability level assists you in making
+risk assessments when developing scripts and tools based on DTrace by indicating
+how likely an interface or DTrace entity is to change in a future release
+or patch. The DTrace dependency class tells you whether an interface is common
+to all Solaris platforms and processors, or whether the interface is associated
+with a particular architecture such as SPARC processors only. The two types
+of attributes used to describe interfaces can vary independently.</para><para><indexterm><primary>stability</primary><secondary>values</secondary></indexterm>The stability values used by DTrace appear in the following list
+in order from lowest to highest stability. The more stable interfaces can
+be used by all D programs and layered applications because Sun will endeavor
+to ensure that these continue to work in future minor releases. Applications
+that depend only on Stable interfaces should reliably continue to function
+correctly on future minor releases and will not be broken by interim patches.
+The less stable interfaces allow experimentation, prototyping, tuning, and
+debugging on your current system, but should be used with the understanding
+that they might change incompatibly or even be dropped or replaced with alternatives
+in future minor releases.</para><para>The DTrace stability values also help you understand the stability of
+the software entities you are observing, in addition to the stability of the
+DTrace interfaces themselves. Therefore, DTrace stability values also tell
+you how likely your D programs and layered tools are to require corresponding
+changes when you upgrade or change the software stack you are observing.</para><variablelist termlength="narrow"><varlistentry><term>Internal</term><listitem><para><indexterm><primary>internal stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>internal</tertiary></indexterm>The interface is private to DTrace
+and represents an implementation detail of DTrace. Internal interfaces might
+change in minor or micro releases.</para>
+</listitem>
+</varlistentry><varlistentry><term>Private</term><listitem><para><indexterm><primary>private stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>private</tertiary></indexterm>The interface is private to Sun and
+represents an interface developed for use by other Sun products that is not
+yet publicly documented for use by customers and ISVs. Private interfaces
+might change in minor or micro releases.</para>
+</listitem>
+</varlistentry><varlistentry><term>Obsolete</term><listitem><para><indexterm><primary>obsolete stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>obsolete</tertiary></indexterm>The interface is supported in the
+current release but is scheduled to be removed, most likely in a future minor
+release. When support of an interface is to be discontinued, Sun will attempt
+to provide notification before discontinuing the interface. The D compiler
+might produce warning messages if you attempt to use an Obsolete interface.</para>
+</listitem>
+</varlistentry><varlistentry><term>External</term><listitem><para><indexterm><primary>external stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>external</tertiary></indexterm>The interface is controlled by an
+entity other than Sun. At Sun's discretion, Sun can deliver updated and possibly
+incompatible versions of such interfaces as part of any release, subject to
+their availability from the controlling entity. Sun makes no claims regarding
+either source or binary compatibility for External interfaces between any
+two releases. Applications based on these interfaces might not work in future
+releases, including patches that contain External interfaces.</para>
+</listitem>
+</varlistentry><varlistentry><term>Unstable</term><listitem><para><indexterm><primary>unstable stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>unstable</tertiary></indexterm>The interface is provided to give
+developers early access to new or rapidly changing technology or to an implementation
+artifact that is essential for observing or debugging system behavior for
+which a more stable solution is anticipated in the future. Sun makes no claims
+about either source or binary compatibility for Unstable interfaces from one
+minor release to another.</para>
+</listitem>
+</varlistentry><varlistentry><term>Evolving</term><listitem><para><indexterm><primary>evolving stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>evolving</tertiary></indexterm>The interface might eventually become
+Standard or Stable but is still in transition. Sun will make reasonable efforts
+to ensure compatibility with previous releases as it evolves. When non-upward
+compatible changes become necessary, they will occur in minor and major releases.
+These changes will be avoided in micro releases whenever possible. If such
+a change is necessary, it will be documented in the release notes for the
+affected release, and when feasible, Sun will provide migration aids for binary
+compatibility and continued D program development.</para>
+</listitem>
+</varlistentry><varlistentry><term>Stable</term><listitem><para><indexterm><primary>stable stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>stable</tertiary></indexterm>The interface is a mature interface under Sun's control. Sun will
+try to avoid non-upward-compatible changes to these interfaces, especially
+in minor or micro releases. If support of a Stable interface must be discontinued,
+Sun will attempt to provide notification and the stability level changes to
+Obsolete.</para>
+</listitem>
+</varlistentry><varlistentry><term>Standard</term><listitem><para><indexterm><primary>standard stability value</primary></indexterm><indexterm><primary>stability</primary><secondary>values</secondary><tertiary>standard</tertiary></indexterm>The interface complies with an industry
+standard. The corresponding documentation for the interface will describe
+the standard to which the interface conforms. Standards are typically controlled
+by a standards development organization, and changes can be made to the interface
+in accordance with approved changes to the standard. This stability level
+can also apply to interfaces that have been adopted without a
+formal standard by an industry convention. Support is provided for only the
+specified versions of a standard; support for later versions is not guaranteed.
+If the standards development organization approves a non-upward-compatible
+change to a Standard interface that Sun decides to support, Sun will announce
+a compatibility and migration strategy.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="chp-stab-2"><title>Dependency Classes</title><para><indexterm><primary>dependency classes</primary></indexterm><indexterm><primary>interface dependency classes</primary></indexterm>Since Solaris and
+DTrace support a variety of operating platforms and processors, DTrace also
+labels interfaces with a <firstterm>dependency class</firstterm> that tells
+you whether an interface is common to all Solaris platforms and processors,
+or whether the interface is associated with a particular system architecture.
+The dependency class is orthogonal to the stability levels described earlier.
+For example, a DTrace interface can be Stable but only supported on SPARC
+microprocessors, or it can be Unstable but common to all Solaris systems.
+The DTrace dependency classes are described in the following list in order
+from least common (that is, most specific to a particular architecture) to
+most common (that is, common to all architectures).</para><variablelist termlength="narrow"><varlistentry><term>Unknown</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>unknown</secondary></indexterm>The interface has an unknown set
+of architectural dependencies. DTrace does not necessarily know the architectural
+dependencies of all entities, such as data types defined in the operating
+system implementation. The Unknown label is typically applied to interfaces
+of very low stability for which dependencies cannot be computed. The interface
+might not be available when using DTrace on <emphasis>any</emphasis> architecture
+other than the one you are currently using.</para>
+</listitem>
+</varlistentry><varlistentry><term>CPU</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>CPU</secondary></indexterm>The interface is specific to the CPU
+model of the current system. You can use the <olink targetdoc="refman1m" targetptr="psrinfo-1m" remap="external"><citerefentry><refentrytitle>psrinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility's <option>v</option> option
+to display the current CPU model and implementation names. Interfaces with
+CPU model dependencies might not be available on other CPU implementations,
+even if those CPUs export the same instruction set architecture (ISA). For
+example, a CPU-dependent interface on an UltraSPARC-III+ microprocessor might
+not be available on an UltraSPARC-II microprocessor, even though both processors
+support the SPARC instruction set.</para>
+</listitem>
+</varlistentry><varlistentry><term>Platform</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>platform</secondary></indexterm>The interface is specific to the
+hardware platform of the current system. A platform typically associates a
+set of system components and architectural characteristics such as a set of
+supported CPU models with a system name such as <literal>SUNW,Ultra-Enterprise-10000</literal>. You can display the current platform name using the <olink targetdoc="refman1" targetptr="uname-1" remap="external"><citerefentry><refentrytitle>uname</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> <option>i</option> option.
+The interface might not be available on other hardware platforms.</para>
+</listitem>
+</varlistentry><varlistentry><term>Group</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>group</secondary></indexterm>The interface is specific to the hardware
+platform group of the current system. A platform group typically associates
+a set of platforms with related characteristics together under a single name,
+such as <literal>sun4u</literal>. You can display the current platform group
+name using the <olink targetdoc="refman1" targetptr="uname-1" remap="external"><citerefentry><refentrytitle>uname</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> <option>m</option> option. The interface is available on other platforms in the platform
+group, but might not be available on hardware platforms that are not members
+of the group.</para>
+</listitem>
+</varlistentry><varlistentry><term>ISA</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>ISA</secondary></indexterm>The interface is specific to the instruction
+set architecture (ISA) supported by the microprocessors on this system. The
+ISA describes a specification for software that can be executed on the microprocessor,
+including details such as assembly language instructions and registers. You
+can display the native instruction sets supported by the system using the <olink targetdoc="refman1" targetptr="isainfo-1" remap="external"><citerefentry><refentrytitle>isainfo</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility. The interface might
+not be supported on systems that do not export any of the same instruction
+sets. For example, an ISA-dependent interface on a Solaris SPARC system might
+not be supported on a Solaris x86 system.</para>
+</listitem>
+</varlistentry><varlistentry><term>Common</term><listitem><para><indexterm><primary>interface dependency classes</primary><secondary>common</secondary></indexterm>The interface is common to all Solaris
+systems regardless of the underlying hardware. DTrace programs and layered
+applications that depend only on Common interfaces can be executed and deployed
+on other Solaris systems with the same Solaris and DTrace revisions. The majority
+of DTrace interfaces are Common, so you can use them wherever you use Solaris.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="chp-stab-3"><title>Interface Attributes</title><para><indexterm><primary>interface attributes</primary></indexterm>DTrace
+describes interfaces using a triplet of attributes consisting of two stability
+levels and a dependency class. By convention, the interface attributes are
+written in the following order, separated by slashes:</para><literallayout><replaceable>name-stability</replaceable> <literal>/</literal> <replaceable>data-stability</replaceable> <literal>/</literal> <replaceable>dependency-class</replaceable></literallayout><para>The <firstterm>name stability</firstterm> of an interface describes
+the stability level associated with its name as it appears in your D program
+or on the <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command-line.
+For example, the <literal>execname</literal> D variable is a Stable name:
+Sun guarantees that this identifier will continue to be supported in your
+D programs according to the rules described for Stable interfaces above.</para><para>The <firstterm>data stability</firstterm> of an interface is distinct
+from the stability associated with the interface name. This stability level
+describes Sun's commitment to maintaining the data formats used by the interface
+and any associated data semantics. For example, the <literal>pid</literal> D
+variable is a Stable interface: process IDs are a Stable concept in Solaris,
+and Sun guarantees that the <literal>pid</literal> variable will be of type <literal>pid_t</literal> with the semantic that it is set to the process ID corresponding
+to the thread that fired a given probe in accordance with the rules for Stable
+interfaces.</para><para>The <firstterm>dependency class</firstterm> of an interface is distinct
+from its name and data stability, and describes whether the interface is specific
+to the current operating platform or microprocessor.</para><para>DTrace and the D compiler track the stability attributes for all of
+the DTrace interface entities, including providers, probe descriptions, D
+variables, D functions, types, and program statements themselves, as we'll
+see shortly. Notice that all three values can vary independently. For example,
+the <literal>curthread</literal> D variable has Stable/Private/Common attributes:
+the variable name is Stable and is Common to all Solaris operating platforms,
+but this variable provides access to a Private data format that is an artifact
+of the Solaris kernel implementation. Most D variables are provided with Stable/Stable/Common
+attributes, as are the variables you define.</para>
+</sect1><sect1 id="chp-stab-4"><title>Stability Computations and Reports</title><para><indexterm><primary>examples</primary><secondary>of stability reports</secondary></indexterm><indexterm><primary>stability</primary><secondary>reports</secondary><tertiary>example of use</tertiary></indexterm><indexterm><primary>stability</primary><secondary>reports</secondary></indexterm><indexterm><primary>stability</primary><secondary>computations</secondary></indexterm>The D compiler performs stability
+computations for each of the probe descriptions and action statements in your
+D programs. You can use the <command>dtrace</command> <option>v</option> option
+to display a report of your program's stability. The following example uses
+a program written on the command line:</para><screen><userinput># dtrace -v -n dtrace:::BEGIN'{exit(0);}'</userinput>
+dtrace: description 'dtrace:::BEGIN' matched 1 probe
+Stability data for description dtrace:::BEGIN:
+        Minimum probe description attributes
+                Identifier Names: Evolving
+                Data Semantics:   Evolving
+                Dependency Class: Common
+        Minimum probe statement attributes
+                Identifier Names: Stable
+                Data Semantics:   Stable
+                Dependency Class: Common
+CPU     ID                    FUNCTION:NAME
+  0      1                           :BEGIN</screen><para>You may also wish to combine the <command>dtrace</command> <option>v</option> option
+with the <option>e</option> option, which tells dtrace to compile but not
+execute your D program, so that you can determine program stability without
+having to enable any probes and execute your program. Here is another example
+stability report:</para><screen><userinput># dtrace -ev -n dtrace:::BEGIN'{trace(curthread-&gt;t_procp);}'</userinput>
+Stability data for description dtrace:::BEGIN:
+        Minimum probe description attributes
+                Identifier Names: Evolving
+                Data Semantics:   Evolving
+                Dependency Class: Common
+        Minimum probe statement attributes
+                Identifier Names: Stable
+                Data Semantics:   Private
+                Dependency Class: Common
+#</screen><para>Notice that in our new program, we have referenced the D variable <literal>curthread</literal>, which has a Stable name, but Private data semantics (that
+is, if you look at it, you are accessing Private implementation details of
+the kernel), and this status is now reflected in the program's stability report.
+Stability attributes in the program report are computed by selecting the minimum
+stability level and class out of the corresponding values for each interface
+attributes triplet.</para><para>Stability attributes are computed for a probe description by taking
+the minimum stability attributes of all <emphasis>specified</emphasis> probe
+description fields according to the attributes published by the provider.
+The attributes of the available DTrace providers are shown in the chapter
+corresponding to each provider. DTrace providers export a stability attributes
+triplet for each of the four description fields for all probes published by
+that provider. Therefore, a provider's name may have a greater stability than
+the individual probes it exports. For example, the probe description:</para><programlisting>fbt:::</programlisting><para>indicating that DTrace should trace entry and return from all kernel
+functions, has greater stability than the probe description:</para><programlisting>fbt:foo:bar:entry</programlisting><para>which names a specific internal function <function>bar</function> in
+the kernel module <literal>foo</literal>. For simplicity, most providers use
+a single set of attributes for all of the individual <literal></literal><replaceable>module</replaceable><literal>:</literal><replaceable>function</replaceable><literal>:</literal><replaceable>name</replaceable><literal></literal> values that
+they publish. Providers also specify attributes for the <literal>args[]</literal> array,
+as the stability of any probe arguments varies by provider.</para><para>If the provider field is not specified in a probe description, then
+the description is assigned the stability attributes Unstable/Unstable/Common
+because the description might end up matching probes of providers that do
+not yet exist when used on a future Solaris version. As such, Sun is not able
+to provide guarantees about the future stability and behavior of this program.
+You should always explicitly specify the provider when writing your D program
+clauses. In addition, any probe description fields that contain pattern matching
+characters (see <olink targetptr="chp-prog" remap="internal">Chapter&nbsp;4, D Program Structure</olink>)
+or macro variables such as <literal>$1</literal> (see <olink targetptr="chp-script" remap="internal">Chapter&nbsp;15, Scripting</olink>) are treated as
+if they are unspecified because these description patterns might expand to
+match providers or probes released by Sun in future versions of DTrace and
+the Solaris OS.</para><para>Stability attributes are computed for most D language statements by
+taking the minimum stability and class of the entities in the statement. For
+example, the following D language entities have the following attributes:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth=""/><colspec colwidth=""/><thead><row rowsep="1"><entry><para>Entity</para>
+</entry><entry><para>Attributes</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>D built-in variable <literal>curthread</literal></para>
+</entry><entry><para>Stable/Private/Common</para>
+</entry>
+</row><row><entry><para>D user-defined variable <literal>x</literal></para>
+</entry><entry><para>Stable/Stable/Common</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>If you write the following D program statement:</para><programlisting>x += curthread-&gt;t_pri;</programlisting><para>then the resulting attributes of the statement are Stable/Private/Common,
+the minimum attributes associated with the operands <literal>curthread</literal> and <literal>x</literal>. The stability of an expression is computed by taking the minimum
+stability attributes of each of the operands.</para><para>Any D variables you define in your program are automatically assigned
+the attributes Stable/Stable/Common. In addition, the D language grammar and
+D operators are implicitly assigned the attributes Stable/Stable/Common. References
+to kernel symbols using the backquote (<literal>`</literal>) operator are
+always assigned the attributes Private/Private/Unknown because they reflect
+implementation artifacts. Types that you define in your D program source code,
+specifically those that are associated with the C and D type namespace, are
+assigned the attributes Stable/Stable/Common. Types that are defined in the
+operating system implementation and provided by other type namespaces are
+assigned the attributes Private/Private/Unknown. The D type cast operator
+yields an expression whose stability attributes are the minimum of the input
+expression's attributes and the attributes of the cast output type.</para><para>If you use the C preprocessor to include C system header files, these
+types will be associated with the C type namespace and will be assigned the
+attributes Stable/Stable/Common as the D compiler has no choice but to assume
+that you are taking responsibility for these declarations. It is therefore
+possible to mislead yourself about your program's stability if you use the
+C preprocessor to include a header file containing implementation artifacts.
+You should always consult the documentation corresponding to the header files
+you are including in order to determine the correct stability levels.</para>
+</sect1><sect1 id="chp-stab-5"><title>Stability Enforcement</title><para><indexterm><primary>stability</primary><secondary>enforcement</secondary></indexterm>When developing a DTrace script or layered tool, you may wish
+to identify the specific source of stability issues or ensure that your program
+has a desired set of stability attributes. You can use the <command>dtrace
+-x amin=<replaceable>attributes</replaceable></command> option to force the
+D compiler to produce an error when any attributes computation results in
+a triplet of attributes less than the minimum values you specify on the command-line.
+The following example demonstrates the use of <option>x amin</option> using
+a snippet of D program source. Notice that attributes are specified using
+three labels delimited by <literal>/</literal> in the usual order.</para><screen><userinput># dtrace -x amin=Evolving/Evolving/Common \</userinput>
+    <userinput>-ev -n dtrace:::BEGIN'{trace(curthread-&gt;t_procp);}'</userinput>
+dtrace: invalid probe specifier dtrace:::BEGIN{trace(curthread-&gt;t_procp);}: \
+    in action list: attributes for scalar curthread (Stable/Private/Common) \
+    are less than predefined minimum
+#</screen>
+</sect1>
+</chapter><?Pub *0000026368 0?>

@@ -1,0 +1,81 @@
+<chapter id="chp-plockstat"><title><literal>plockstat</literal> Provider</title><highlights><para>The <literal>plockstat</literal> provider makes available probes that can be used to observe the behavior of user-level synchronization primitives including lock contention and hold times. The <olink targetdoc="refman1m" targetptr="plockstat-1m" remap="external"><citerefentry><refentrytitle>plockstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command is a DTrace consumer that uses the <literal>plockstat</literal> provider to gather data on user-level locking events.</para>
+</highlights><sect1 id="chp-plockstat-1"><title>Overview</title><para><indexterm><primary><literal>plockstat</literal></primary></indexterm><indexterm><primary>DTrace</primary><secondary>options</secondary><tertiary>modifying</tertiary></indexterm><indexterm><primary>options</primary><secondary>modifying</secondary></indexterm>The <literal>plockstat</literal> provider makes available probes for the following types of events:</para><variablelist><varlistentry><term><firstterm>Contention Events</firstterm></term><listitem><para><indexterm><primary>probes</primary><secondary>contention-event</secondary></indexterm><indexterm><primary>contention-event probes</primary></indexterm>These probes correspond to contention on a user-level synchronization primitive, and fire when a thread is forced to wait for a resource to become available. Solaris is generally optimized for the non-contention case, so prolonged contention is not expected; these probes should be used to understand those cases where contention does arise. Because contention is designed to be (relatively) rare, enabling contention-event probes generally doesn't have a serious probe effect; they can be enabled without concern for substantially affecting performance.</para>
+</listitem>
+</varlistentry><varlistentry><term><firstterm>Hold Events</firstterm></term><listitem><para><indexterm><primary>probes</primary><secondary>hold-event</secondary></indexterm><indexterm><primary>hold-event probes</primary></indexterm>These probes correspond to acquiring, releasing or otherwise manipulating a user-level synchronization primitive. As such, these probes can be used to answer arbitrary questions about the way user-level synchronization primitives are manipulated. Because applications typically acquire and release synchronization primitives very often, enabling hold-event probes can have a greater probe effect than enabling contention-event probes. While the probe effect induced by enabling them can be substantial, it is not pathological; they may still be enabled with confidence on production applications.</para>
+</listitem>
+</varlistentry><varlistentry><term><firstterm>Error Events</firstterm></term><listitem><para><indexterm><primary>probes</primary><secondary>error-event</secondary></indexterm><indexterm><primary>error-event probes</primary></indexterm>These probes correspond to any kind of anomalous behavior encountered when acquiring or releasing a user-level synchronization primitive. These events can be used to detect errors encountered while a thread is blocking on a user-level synchronization primitive. Error events should be extremely uncommon so enabling them shouldn't induce a serious probe effect.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="chp-plockstat-2"><title>Mutex Probes</title><para><indexterm><primary>probes</primary><secondary>mutex</secondary></indexterm><indexterm><primary>mutex probes</primary></indexterm><firstterm>Mutexes</firstterm> enforce mutual exclusion to critical sections. When a thread attempts to acquire a mutex held by another thread using <literal>mutex_lock(3C)</literal> or <literal>pthread_mutex_lock(3C)</literal>, it will determine if the owning thread is running on a different CPU. If it is, the acquiring thread will <emphasis>spin</emphasis> for a short while waiting for the mutex to become available. If the owner is not executing on another CPU, the acquiring thread will <emphasis>block</emphasis>.</para><para>The four <literal>plockstat</literal> probes pertaining to mutexes are listed in <olink targetptr="tbl-umutex" remap="internal">Table&nbsp;31&ndash;1</olink>. For each probe, <literal>arg0</literal> contains a pointer to the <literal>mutex_t</literal> or <literal>pthread_mutex_t</literal> structure (these are identical types) that represents the mutex.</para><table frame="topbot" id="tbl-umutex"><title>Mutex Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.20in"/><colspec colname="colspec1" colwidth="3.80in"/><tbody><row><entry><para><literal>mutex-acquire</literal></para>
+</entry><entry><para>Hold event probe that fires immediately after a mutex is acquired. <literal>arg1</literal> contains a boolean value that indicates whether the acquisition was recursive on a recursive mutex. <literal>arg2</literal> indicates the number of iterations that the acquiring thread spent spinning on this mutex. <literal>arg2</literal> will be non-zero only if the <literal>mutex-spin</literal> probe fired on this mutex acquisition.</para>
+</entry>
+</row><row><entry><para><literal>mutex-block</literal></para>
+</entry><entry><para>Contention event probe that fires before a thread blocks on a held mutex. Both <literal>mutex-block</literal> and <literal>mutex-spin</literal> might fire for a single lock acquisition.</para>
+</entry>
+</row><row><entry><para><literal>mutex-spin</literal></para>
+</entry><entry><para>Contention event probe that fires before a thread begins spinning on a held mutex. Both <literal>mutex-block</literal> and <literal>mutex-spin</literal> might fire for a single lock acquisition.</para>
+</entry>
+</row><row><entry><para><literal>mutex-release</literal></para>
+</entry><entry><para>Hold event probe that fires immediately after an mutex is released. <literal>arg1</literal> contains a boolean value that indicates whether the event corresponds to a recursive release on a recursive mutex.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>mutex-error</literal></para>
+</entry><entry colname="colspec1"><para>Error event probe that fires when an error is encountered on a mutex operation. <literal>arg1</literal> is the <literal>errno</literal> value for the error encountered.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-plockstat-3"><title>Reader/Writer Lock Probes</title><para><indexterm><primary>probes</primary><secondary>reader/writer locks</secondary></indexterm><indexterm><primary>reader/writer lock probes</primary></indexterm><firstterm>Reader/write locks</firstterm> permit multiple readers <emphasis>or</emphasis> a single writer, but not both, to be in a critical section at one time. These locks are typically used for structures that are searched more frequently than they are modified, or when threads spend substantial time in a critical section. Users interact with reader/writer locks using the Solaris <literal>rwlock(3C)</literal> or POSIX <literal>pthread_rwlock_init(3C)</literal> interfaces.</para><para>The probes pertaining to readers/writer locks are in <olink targetptr="tbl-urwlock" remap="internal">Table&nbsp;31&ndash;2</olink>. For each probe, <literal>arg0</literal> contains a pointer to the <literal>rwlock_t</literal> or <literal>pthread_rwlock_t</literal>structure (these are identical types) that represents the adaptive lock. <literal>arg1</literal> contains a boolean value that indicates whether the operation was as a writer.</para><table frame="topbot" id="tbl-urwlock"><title>Readers/Writer Lock Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>rw-acquire</literal></para>
+</entry><entry><para>Hold event probe that fires immediately after a readers/writer lock is acquired.</para>
+</entry>
+</row><row><entry><para><literal>rw-block</literal></para>
+</entry><entry><para>Contention event probe that fires before a thread blocks while attempting to acquire a lock. If enabled, the <literal>rw-acquire</literal> probe or the <literal>rw-error</literal> probe will fire after <literal>rw-block</literal>.</para>
+</entry>
+</row><row><entry><para><literal>rw-release</literal></para>
+</entry><entry><para>Hold event probe that fires immediately after a reader/writer lock is released</para>
+</entry>
+</row><row><entry><para><literal>rw-error</literal></para>
+</entry><entry><para>Error event probe that fires when an error is encountered during a reader/writer lock operation. <literal>arg1</literal> is the <literal>errno</literal> value of the error encountered.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-plockstat-stability"><title>Stability</title><para><indexterm><primary>probes</primary><secondary><literal>plockstat</literal></secondary><tertiary>stability</tertiary></indexterm><indexterm><primary>stability</primary><secondary><literal>plockstat</literal></secondary></indexterm>The <literal>plockstat</literal> provider uses DTrace's stability mechanism to describe its stabilities, as shown in the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

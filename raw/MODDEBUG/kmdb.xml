@@ -1,0 +1,80 @@
+<chapter id="chp-kmdb"><title>Kernel Execution Control</title><highlights><para>This chapter describes the MDB features for execution control
+of the live operating system kernel available when running <command>kmdb</command>. <command>kmdb</command> is a version of MDB specifically designed for kernel execution
+control and live kernel debugging.  Using <command>kmdb</command>, the kernel
+can be controlled and observed in much the same way that a user process can
+be controlled and observed using <command>mdb</command>.  The kernel execution
+control functionality includes instruction-level control of kernel threads
+executing on each CPU, enabling developers to single-step the kernel and inspect
+data structures in real time.</para><para>Both <command>mdb</command> and <command>kmdb</command> share the same
+user interface. All of the execution control functionality described in <olink targetptr="chp-exec" remap="internal">Chapter&nbsp;6, Execution Control</olink> is available in <command>kmdb</command>, and is identical
+to the set of commands used to control user processes.  The commands used
+to inspect kernel state, described in <olink targetptr="syntax-7" remap="internal">Chapter&nbsp;3, MDB Language Syntax</olink> and <olink targetptr="commands-1" remap="internal">Chapter&nbsp;5, Built-In Commands</olink>, are also available when using <command>kmdb</command>.
+ Finally, the commands specific to the Solaris kernel implementation, described
+in <olink targetptr="modules-1" remap="internal">Chapter&nbsp;8, Kernel Debugging Modules</olink>, are available unless otherwise noted. This
+chapter describes the remaining features that are specific to <command>kmdb</command>.</para>
+</highlights><sect1 id="kmdb-cmd"><title>Booting, Loading, and Unloading</title><para>To facilitate the debugging of kernel startup, <command>kmdb</command>
+can be loaded during the earliest stages of the boot process, before control
+has passed from the kernel runtime linker (<literal>krtld</literal>) to the
+kernel.  <command>kmdb</command> may be loaded at boot using the <option>k</option> boot flag, the <literal>kmdb</literal> boot file, or the <literal>kadb</literal> boot file (for compatibility). If <command>kmdb</command> is
+loaded at boot, the debugger cannot be unloaded until the system subsequently
+reboots.  Some functionality will not be immediately available during the
+earliest stages of boot.  In particular, debugging modules will not be loaded
+until the kernel module subsystem has initialized.  Processor-specific functionality
+will not be enabled until the kernel has completed the processor identification
+process.</para><para>If you boot your system using the <option>k</option> option, <command>kmdb</command> will automatically load during the boot process.  You can use
+the <option>d</option> boot option to request a debugger breakpoint prior
+to starting the kernel.  This feature works with the default kernel as well
+as alternate kernels. For example, to boot a SPARC system with <command>kmdb</command> and request immediate entry to the debugger, type any of the following
+commands:</para><screen>ok <userinput>boot -kd</userinput>
+ok <userinput>boot kmdb -d</userinput>
+ok <userinput>boot kadb -d</userinput></screen><para>To boot an x86 system in the same manner, type any of the following
+commands:</para><screen>Select (b)oot or (i)nterpreter: <userinput>b -kd</userinput>
+Select (b)oot or (i)nterpreter: <userinput>b kmdb -d</userinput>
+Select (b)oot or (i)nterpreter: <userinput>b kadb -d</userinput>	</screen><para>To boot a SPARC system with <command>kmdb</command> and load an alternate
+64&ndash;bit kernel, type the following command:</para><screen>ok <userinput>boot kernel.test/sparcv9/unix -k</userinput></screen><para>To boot an x86 system with&nbsp; <command>kmdb</command> and load an
+alternate 64&ndash;bit kernel, type the following command:</para><screen>Select (b)oot or (i)nterpreter: <userinput>b kernel.test/amd64/unix -k</userinput></screen><para>If the boot file is set to the string <literal>kmdb</literal> or <literal>kadb</literal> and you want to boot an alternate kernel, use the <option>D</option> option to specify the name of the kernel to boot. To boot a SPARC
+system in this manner, type the following command:</para><screen>ok <userinput>boot kmdb -D kernel.test/sparcv9/unix</userinput></screen><para>To boot a 32&ndash;bit x86 system in this manner, type the following
+command:</para><screen>Select (b) or (i)nterpreter: <userinput>b kmdb -D kernel.test/unix</userinput></screen><para>To boot a 64&ndash;bit x86 system in this manner, type the following
+command:</para><screen>Select (b) or (i)nterpreter: <userinput>b kmdb -D kernel.test/amd64/unix</userinput></screen><para>To debug a system that has already booted, use the <command>mdb</command> <option>K</option> option to load <command>kmdb</command> and stop kernel execution.
+ When the debugger is loaded using this method, it can be subsequently unloaded.
+You can unload <command>kmdb</command> when you are done debugging by specifying
+the <option>u</option> option to the <literal>::quit</literal> dcmd. Alternatively,
+you can resume execution of the operating system using the command <literal>mdb -U</literal>.</para>
+</sect1><sect1 id="kmdb-2"><title>Terminal Handling</title><para><command>kmdb</command> always uses the system console for interaction.
+ <command>kmdb</command> will determine the appropriate terminal type according
+to the following rules:</para><itemizedlist><listitem><para>If the system being debugged uses an attached keyboard and
+monitor for its console and the debugger is loaded at boot, the terminal type
+will be determined automatically based upon the platform architecture and
+console terminal settings.</para>
+</listitem><listitem><para>If the system begin debugged uses a serial console and the
+debugger is loaded at boot, a default terminal type of <literal>vt100</literal>
+will be assumed.</para>
+</listitem><listitem><para>If the debugger is loaded by running <command>mdb -K</command>
+on the console, the value of the <literal>$TERM</literal> environment variable
+will be used as the terminal type.</para>
+</listitem><listitem><para>If the debugger is loaded by running <command>mdb -K</command>
+on a terminal that is not the console, the debugger will use the terminal
+type that has been configured for use with the system console login prompt.</para>
+</listitem>
+</itemizedlist><para>You can use the <literal>::term</literal> dcmd from within <command>kmdb</command> to display the terminal type.</para>
+</sect1><sect1 id="kmdb-3"><title>Debugger Entry</title><para>The operating system kernel will implicitly stop executing and enter <command>kmdb</command> when a breakpoint is reached or according to the other execution
+control settings described in <olink targetptr="chp-exec" remap="internal">Chapter&nbsp;6, Execution Control</olink>. You can use the <command>mdb</command> <option>K</option> option or an appropriate keyboard break sequence
+to request explicit entry to <command>kmdb</command>. On a SPARC system console,
+use the STOP-A key sequence to send a break and enter <command>kmdb</command>.
+On an x86 system console, use the F1&ndash;A key sequence to send a break
+and enter <command>kmdb</command>. You can use the <command>kbd</command>
+command to customize the escape sequence on your Solaris system. To enter <command>kmdb</command> on a system with a serial console, use the appropriate serial
+console command to send a break sequence.</para>
+</sect1><sect1 id="kmdb-4"><title>Processor-Specific Features</title><para>Some <command>kmdb</command> functionality is specific to an individual
+processor architecture.  For example, various x86 processors support a hardware
+branch tracing capability that is not found on some other processor architectures.
+Access to processor-specific features is provided through processor-specific
+dcmds that are only present on systems that support them.  The
+availability of processor-specific support will be indicated in the output
+of the <command>::status</command> dcmd. The debugger relies upon the kernel
+to determine the processor type. Therefore, even though the debugger may provide
+features for a given processor architecture, this support will not be exposed
+until the kernel has progressed to the point where processor identification
+has completed.</para>
+</sect1>
+</chapter>

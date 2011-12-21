@@ -1,0 +1,199 @@
+<?Pub EntList bull rArr sect?><chapter id="chp-lockstat"><title><literal>lockstat</literal> Provider</title><highlights><para>The <literal>lockstat</literal> provider makes available probes that
+can be used to discern lock contention statistics, or to understand virtually
+any aspect of locking behavior. The <olink targetdoc="refman1m" targetptr="lockstat-1m" remap="external"><citerefentry><refentrytitle>lockstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command is actually a DTrace
+consumer that uses the <literal>lockstat</literal> provider to gather its
+raw data.</para>
+</highlights><sect1 id="chp-lockstat-1"><title>Overview</title><para><indexterm><primary>probes</primary><secondary>for <literal>lockstat</literal></secondary></indexterm><indexterm><primary><literal>lockstat</literal> provider</primary><secondary>probes</secondary></indexterm><indexterm><primary><literal>lockstat</literal> provider</primary></indexterm>The <literal>lockstat</literal> provider makes available
+two kinds of probes: contention-event probes and hold-event probes.</para><para><indexterm><primary>probes</primary><secondary>contention-event</secondary></indexterm><indexterm><primary><literal>lockstat</literal> provider</primary><secondary>contention-event probes</secondary></indexterm><indexterm><primary>contention-event probes</primary></indexterm><emphasis>Contention-event</emphasis> probes correspond
+to contention on a synchronization primitive, and fire when a thread is forced
+to wait for a resource to become available. Solaris is generally optimized
+for the non-contention case, so prolonged contention is not expected. These
+probes should be used to understand those cases where contention does arise.
+Because contention is relatively rare, enabling contention-event probes generally
+doesn't substantially affect performance.</para><para><indexterm><primary>probes</primary><secondary>hold-event</secondary></indexterm><indexterm><primary>hold-event probes</primary></indexterm><indexterm><primary><literal>lockstat</literal> provider</primary><secondary>hold-event probes</secondary></indexterm><emphasis>Hold-event</emphasis> probes correspond
+to acquiring, releasing, or otherwise manipulating a synchronization primitive.
+These probes can be used to answer arbitrary questions about the way synchronization
+primitives are manipulated. Because Solaris acquires and releases synchronization
+primitives very often (on the order of millions of times per second per CPU
+on a busy system), enabling hold-event probes has a much higher probe effect
+than does enabling contention-event probes. While the probe effect induced
+by enabling them can be substantial, it is not pathological; they may still
+be enabled with confidence on production systems.</para><para>The <literal>lockstat</literal> provider makes available probes that
+correspond to the different synchronization primitives in Solaris; these primitives
+and the probes that correspond to them are discussed in the remainder of this
+chapter.</para>
+</sect1><sect1 id="chp-lockstat-2"><title>Adaptive Lock Probes</title><para><indexterm><primary>probes</primary><secondary>adaptive lock</secondary></indexterm><indexterm><primary>adaptive lock probes</primary></indexterm><emphasis>Adaptive locks</emphasis> enforce mutual exclusion to a critical section,
+and may be acquired in most contexts in the kernel. Because adaptive locks
+have few context restrictions, they comprise the vast majority of synchronization
+primitives in the Solaris kernel. These locks are adaptive in their behavior
+with respect to contention: when a thread attempts to acquire a held adaptive
+lock, it will determine if the owning thread is currently running on a CPU.
+If the owner is running on another CPU, the acquiring thread will <emphasis>spin</emphasis>.
+If the owner is not running, the acquiring thread will <emphasis>block</emphasis>.</para><para>The four lockstat probes pertaining to adaptive locks are in <olink targetptr="tbl-adaptive" remap="internal">Table&nbsp;18&ndash;1</olink>. For each probe, <literal>arg0</literal> contains a pointer to the <literal>kmutex_t</literal> structure
+that represents the adaptive lock.</para><table frame="topbot" id="tbl-adaptive"><title>Adaptive Lock Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="1.20in"/><colspec colwidth="3.80in"/><tbody><row><entry><para><literal>adaptive-acquire</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after an adaptive lock is acquired.</para>
+</entry>
+</row><row><entry><para><literal>adaptive-block</literal></para>
+</entry><entry><para>Contention-event probe that fires after a thread that has blocked on
+a held adaptive mutex has reawakened and has acquired the mutex. If both probes
+are enabled, <literal>adaptive-block</literal> fires <emphasis>before</emphasis> <literal>adaptive-acquire</literal>. A single lock acquisition can fire both the <literal>adaptive-block</literal> and the <literal>adaptive-spin</literal> probes. <literal>arg1</literal> for <literal>adaptive-block</literal> contains the sleep time
+in nanoseconds.</para>
+</entry>
+</row><row><entry><para><literal>adaptive-spin</literal></para>
+</entry><entry><para>Contention-event probe that fires after a thread that has spun on a
+held adaptive mutex has successfully acquired the mutex. If both are enabled, <literal>adaptive-spin</literal> fires <emphasis>before</emphasis> <literal>adaptive-acquire</literal>. A single lock acquisition can fire both the <literal>adaptive-block</literal> and
+the <literal>adaptive-spin</literal> probes. <literal>arg1</literal> for <literal>adaptive-spin</literal> contains the <emphasis>spin time</emphasis>: the number
+of nanoseconds that were spent in the spin loop before the lock was acquired.</para>
+</entry>
+</row><row><entry><para><literal>adaptive-release</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after an adaptive lock is released.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-lockstat-5"><title>Spin Lock Probes</title><para><indexterm><primary>spin lock probes</primary></indexterm><indexterm><primary>probes</primary><secondary>spin lock</secondary></indexterm>Threads
+cannot block in some contexts in the kernel, such as high-level interrupt
+context and any context manipulating dispatcher state. In these contexts,
+this restriction prevents the use of adaptive locks. <emphasis>Spin locks</emphasis> are
+instead used to effect mutual exclusion to critical sections in these contexts.
+As the name implies, the behavior of these locks in the presence of contention
+is to spin until the lock is released by the owning thread. The three probes
+pertaining to spin locks are in <olink targetptr="tbl-spin" remap="internal">Table&nbsp;18&ndash;2</olink>.</para><table frame="topbot" id="tbl-spin"><title>Spin Lock Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>spin-acquire</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after a spin lock is acquired.</para>
+</entry>
+</row><row><entry><para><literal>spin-spin</literal></para>
+</entry><entry><para>Contention-event probe that fires after a thread that has spun on a
+held spin lock has successfully acquired the spin lock. If both are enabled, <literal>spin-spin</literal> fires <emphasis>before</emphasis> <literal>spin-acquire</literal>. <literal>arg1</literal> for <literal>spin-spin</literal> contains the <emphasis>spin
+time</emphasis>: the number of nanoseconds that were spent in the spin state
+before the lock was acquired. The spin count has little meaning on its own,
+but can be used to compare spin times.</para>
+</entry>
+</row><row><entry><para><literal>spin-release</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after a spin lock is released.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Adaptive locks are much more common than spin locks. The following script
+displays totals for both lock types to provide data to support this observation.</para><programlisting>lockstat:::adaptive-acquire
+/execname == "date"/
+{
+	@locks["adaptive"] = count();
+}
+
+lockstat:::spin-acquire
+/execname == "date"/
+{
+	@locks["spin"] = count();
+}</programlisting><para>Run this script in one window, and a <olink targetdoc="refman1" targetptr="date-1" remap="external"><citerefentry><refentrytitle>date</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command in another. When you terminate the DTrace
+script, you will see output similar to the following example:</para><screen><userinput># dtrace -s ./whatlock.d</userinput>
+dtrace: script './whatlock.d' matched 5 probes 
+<userinput>^C</userinput>
+spin                                                             26
+adaptive                                                       2981</screen><para>As this output indicates, over 99 percent of the locks acquired in running
+the <literal>date</literal> command are adaptive locks. It may be surprising
+that <emphasis>so</emphasis> many locks are acquired in doing something as
+simple as a <literal>date</literal>. The large number of locks is a natural
+artifact of the fine-grained locking required of an extremely scalable system
+like the Solaris kernel.</para>
+</sect1><sect1 id="chp-lockstat-7"><title>Thread Locks</title><para><indexterm><primary>thread lock probes</primary></indexterm><indexterm><primary>probes</primary><secondary>thread lock</secondary></indexterm><emphasis>Thread locks</emphasis> are a special kind of spin lock that are used to lock
+a thread for purposes of changing thread state. Thread lock hold events are
+available as spin lock hold-event probes (that is, <literal>spin-acquire</literal> and <literal>spin-release</literal>), but contention events have their own probe specific
+to thread locks. The thread lock hold-event probe is in <olink targetptr="tbl-thrlock" remap="internal">Table&nbsp;18&ndash;3</olink>.</para><table frame="topbot" id="tbl-thrlock"><title>Thread Lock Probe</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>thread-spin</literal></para>
+</entry><entry><para>Contention-event probe that fires after a thread has spun on a thread
+lock. Like other contention-event probes, if both the contention-event probe
+and the hold-event probe are enabled, <literal>thread-spin</literal> will
+fire before <literal>spin-acquire</literal>. Unlike other contention-event
+probes, however, thread-spin fires <emphasis>before</emphasis> the lock is
+actually acquired. As a result, multiple <literal>thread-spin</literal> probe
+firings may correspond to a single <literal>spin-acquire</literal> probe firing.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-lockstat-9"><title>Readers/Writer Lock Probes</title><para><indexterm><primary>reader/writer lock probes</primary></indexterm><indexterm><primary>probes</primary><secondary>reader/writer</secondary></indexterm><emphasis>Readers/writer locks</emphasis> enforce a policy of allowing multiple readers <emphasis>or</emphasis> a single writer &mdash; but not both &mdash; to be in a critical
+section. These locks are typically used for structures that are searched more
+frequently than they are modified and for which there is substantial time
+in the critical section. If critical section times are short, readers/writer
+locks will implicitly serialize over the shared memory used to implement the
+lock, giving them no advantage over adaptive locks. See <olink targetdoc="refman9f" targetptr="rwlock-9f" remap="external"><citerefentry><refentrytitle>rwlock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for more details on readers/writer
+locks.</para><para>The probes pertaining to readers/writer locks are in <olink targetptr="tbl-rwlock" remap="internal">Table&nbsp;18&ndash;4</olink>. For each probe, <literal>arg0</literal> contains a pointer to the <literal>krwlock_t</literal> structure
+that represents the adaptive lock.</para><table frame="topbot" id="tbl-rwlock"><title>Readers/Writer Lock Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="1.00in"/><colspec colwidth="4.00in"/><tbody><row><entry><para><literal>rw-acquire</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after a readers/writer lock
+is acquired. <literal>arg1</literal> contains the constant <literal>RW_READER</literal> if
+the lock was acquired as a reader, and <literal>RW_WRITER</literal> if the
+lock was acquired as a writer.</para>
+</entry>
+</row><row><entry><para><literal>rw-block</literal></para>
+</entry><entry><para>Contention-event probe that fires after a thread that has blocked on
+a held readers/writer lock has reawakened and has acquired the lock. <literal>arg1</literal> contains the length of time (in nanoseconds) that the current thread
+had to sleep to acquire the lock. <literal>arg2</literal> contains the constant <literal>RW_READER</literal> if the lock was acquired as a reader, and <literal>RW_WRITER</literal> if
+the lock was acquired as a writer. <literal>arg3</literal> and <literal>arg4</literal> contain
+more information on the reason for blocking. <literal>arg3</literal> is non-zero
+if and only if the lock was held as a writer when the current thread blocked. <literal>arg4</literal> contains the readers count when the current thread blocked.
+If both the <literal>rw-block</literal> and <literal>rw-acquire</literal> probes
+are enabled, <literal>rw-block</literal> fires <emphasis>before</emphasis> <literal>rw-acquire</literal>.</para>
+</entry>
+</row><row><entry><para><literal>rw-upgrade</literal></para>
+</entry><entry><para>Hold-event probe that fires after a thread has successfully upgraded
+a readers/writer lock from a reader to a writer. Upgrades do not have an associated
+contention event because they are only possible through a non-blocking interface, <olink targetdoc="refman9f" targetptr="rw-tryupgrade-9f" remap="external"><citerefentry><refentrytitle>rw_tryupgrade</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</entry>
+</row><row><entry><para><literal>rw-downgrade</literal></para>
+</entry><entry><para>Hold-event probe that fires after a thread had downgraded its ownership
+of a readers/writer lock from writer to reader. Downgrades do not have an
+associated contention event because they always succeed without contention.</para>
+</entry>
+</row><row><entry><para><literal>rw-release</literal></para>
+</entry><entry><para>Hold-event probe that fires immediately after a readers/writer lock
+is released. <literal>arg1</literal> contains the constant <literal>RW_READER</literal> if
+the released lock was held as a reader, and <literal>RW_WRITER</literal> if
+the released lock was held as a writer. Due to upgrades and downgrades, the
+lock may <emphasis>not</emphasis> have been released as it was acquired.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-lockstat-stability"><title>Stability</title><para><indexterm><primary><literal>lockstat</literal> </primary><secondary>stability of</secondary></indexterm><indexterm><primary><literal>lockstat</literal> stability</primary></indexterm><indexterm><primary>stability</primary><secondary>of <literal>lockstat</literal></secondary></indexterm>The <literal>lockstat</literal> provider
+uses DTrace's stability mechanism to describe its stabilities
+as shown in the following table. For more information about the stability
+mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000017299 0?>

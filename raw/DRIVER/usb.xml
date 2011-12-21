@@ -1,0 +1,1189 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part()part(title()partintro()chapter()?><chapter id="usb-1"><title>USB Drivers</title><indexterm><primary>device drivers</primary><secondary>USB driver</secondary>
+</indexterm><indexterm><primary>USBA (Solaris USB Architecture)</primary>
+</indexterm><indexterm><primary>USBA&nbsp;2.0 framework</primary>
+</indexterm><highlights><para>This chapter describes how to write a client USB device driver using
+the USBA&nbsp;2.0 framework for the Solaris environment. This chapter discusses the following
+topics:</para><itemizedlist><listitem><para><olink targetptr="usb-2" remap="internal">USB in the Solaris Environment</olink></para>
+</listitem><listitem><para><olink targetptr="usb-7" remap="internal">Binding Client Drivers</olink></para>
+</listitem><listitem><para><olink targetptr="usb-8" remap="internal">Basic Device Access</olink></para>
+</listitem><listitem><para><olink targetptr="usb-16" remap="internal">Device Communication</olink></para>
+</listitem><listitem><para><olink targetptr="usb-43" remap="internal">Device State Management</olink></para>
+</listitem><listitem><para><olink targetptr="usb-17" remap="internal">Utility Functions</olink></para>
+</listitem><listitem><para><olink targetptr="ewavr" remap="internal">Sample USB Device Driver</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="usb-2"><title>USB in the Solaris Environment</title><para>The Solaris USB architecture includes the USBA&nbsp;2.0 framework and USB client drivers.</para><sect2 id="usb-4"><title>USBA 2.0 Framework</title><indexterm><primary>USB&nbsp;2.0 specification</primary>
+</indexterm><para>The USBA&nbsp;2.0 framework is a service layer that presents an abstract view of USB
+devices to USBA-compliant client drivers. The framework enables USBA-compliant
+client drivers to manage their USB devices. The USBA&nbsp;2.0 framework supports the USB&nbsp;2.0 specification
+except for high speed isochronous pipes. For information on the USB&nbsp;2.0 specification,
+see <ulink url="http://www.usb.org/" type="url"></ulink>.</para><para>The USBA&nbsp;2.0 framework is platform-independent. The Solaris USB architecture is
+shown in the following figure. The USBA&nbsp;2.0 framework is the USBA layer in the figure.
+This layer interfaces through a hardware-independent host controller driver
+interface to hardware-specific host controller drivers. The host controller
+drivers access the USB physical devices through the host controllers they
+manage.</para><figure id="euxbt"><title>Solaris USB Architecture</title><mediaobject><imageobject><imagedata entityref="usb.arch"/>
+</imageobject><textobject><simpara>Diagram shows the flow of control from client and hub
+drivers, through the USB Architecture Interfaces, to the controllers and devices.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="usb-5"><title>USB Client Drivers</title><indexterm><primary>USB drivers</primary>
+</indexterm><indexterm><primary>nexus driver</primary>
+</indexterm><indexterm><primary>hub driver</primary>
+</indexterm><para>The USBA&nbsp;2.0 framework is not a device driver itself. This chapter describes the
+client drivers shown in <olink targetptr="euxbt" remap="internal">Figure&nbsp;20&ndash;1</olink> and <olink targetptr="euxbg" remap="internal">Figure&nbsp;20&ndash;2</olink>. The client drivers interact
+with various kinds of USB devices such as mass storage devices, printers,
+and human interface devices. The hub driver is a client driver that is also
+a nexus driver. The hub driver enumerates devices on its ports and creates <literal>devinfo</literal> nodes for those devices and then attaches the client drivers.
+This chapter does not describe how to write a hub driver.</para><para>USB drivers have the same structure as any other Solaris driver. USB
+drivers can be block drivers, character drivers, or STREAMS drivers. USB drivers
+follow the calling conventions and use the data structures and routines described
+in the Solaris OS section 9 man pages. See <olink targetdoc="group-refman" targetptr="intro-9e" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="intro-9f" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="intro-9s" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>.</para><para><indexterm><primary>USB drivers</primary><secondary>interfaces</secondary></indexterm><indexterm><primary>OHCI (Open Host Controller Interface)</primary></indexterm><indexterm><primary>EHCI (Enhanced Host Controller Interface)</primary></indexterm><indexterm><primary>UHCI (Universal Host Controller Interface)</primary></indexterm>The difference between USB drivers and other Solaris drivers is
+that USB drivers call USBA&nbsp;2.0 framework functions to access the device instead of directly
+accessing the device. The USBA&nbsp;2.0 framework supplements the standard Solaris DDI routines.
+See the following figure.</para><figure id="euxbg"><title>Driver and Controller Interfaces</title><mediaobject><imageobject><imagedata entityref="usb.drv.ctrl.int"/>
+</imageobject><textobject><simpara>Diagram shows DDI and USBAI functions, different versions
+of the USBA framework, and different types of host controllers.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><olink targetptr="euxbg" remap="internal">Figure&nbsp;20&ndash;2</olink> shows interfaces
+in more detail than <olink targetptr="euxbt" remap="internal">Figure&nbsp;20&ndash;1</olink> does. <olink targetptr="euxbg" remap="internal">Figure&nbsp;20&ndash;2</olink> shows that the USBA is a
+kernel subsystem into which a client driver can call, just as a client driver
+can call DDI functions.</para><para>Not all systems have all of the host controller interfaces shown in <olink targetptr="euxbg" remap="internal">Figure&nbsp;20&ndash;2</olink>. OHCI (Open Host Controller
+Interface) hardware is most prevalent on SPARC systems and third-party USB
+PCI cards. UHCI (Universal Host Controller Interface) hardware is most prevalent
+on x86 systems.  However, both OHCI and UHCI hardware can be used on any system.
+When EHCI (Enhanced Host Controller Interface) hardware is present, the EHCI
+hardware is on the same card and shares the same ports with either OHCI or
+UHCI.</para><para>The host controllers, host controller drivers, and HCDI make up a transport
+layer that is commanded by the USBA. You cannot directly call into the OHCI,
+EHCI, or UHCI. You call into them indirectly through the platform-independent
+USBA interface.</para>
+</sect2>
+</sect1><sect1 id="usb-7"><title>Binding Client Drivers</title><para>This section discusses binding a driver to a device. It discusses compatible
+device names for devices with single interfaces and devices with multiple
+interfaces.</para><sect2 id="usb-46"><title>How USB Devices Appear to the System</title><indexterm><primary>USB device</primary><secondary>current configuration</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>multiple configurations</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>interfaces</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>alternate settings</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>endpoints</secondary>
+</indexterm><indexterm><primary>device</primary><secondary>configurations</secondary>
+</indexterm><indexterm><primary>device</primary><secondary>interfaces</secondary>
+</indexterm><indexterm><primary>device</primary><secondary>alternate settings</secondary>
+</indexterm><indexterm><primary>device</primary><secondary>endpoints</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary>pipes</secondary>
+</indexterm><indexterm><primary>pipes</primary><secondary>USB devices</secondary>
+</indexterm><para>A USB device can support multiple configurations. Only one configuration
+is active at any given time. The active configuration is called the <emphasis>current
+configuration</emphasis>.</para><para>A configuration can have more than one <emphasis>interface</emphasis>,
+possibly with intervening interface-associations that group two or more interfaces
+for a function. All interfaces of a configuration are active simultaneously.
+Different interfaces might be operated by different device drivers.</para><para>An interface can represent itself to the host system in different ways
+by using <emphasis>alternate settings</emphasis>. Only one alternate setting
+is active for any given interface.</para><para>Each alternate setting provides device access through <emphasis>endpoints</emphasis>.
+Each endpoint has a specific purpose. The host system communicates with the
+device by establishing a communication channel to an endpoint. This communication
+channel is called a <emphasis>pipe</emphasis>.</para>
+</sect2><sect2 id="usb-47"><title>USB Devices and the Solaris Device Tree</title><indexterm><primary>single device node</primary>
+</indexterm><indexterm><primary>device node</primary>
+</indexterm><para>If a USB device has  one configuration, one interface, and device class
+zero, the device is represented as a single <emphasis>device node</emphasis>.
+If a USB device has multiple interfaces, the device is represented as a hierarchical
+device structure. In a hierarchical device structure, the device node for
+each interface is a child of the top-level device node. An example of a device
+with multiple interfaces is an audio device that presents simultaneously to
+the host computer both an audio control interface and an audio streaming interface.
+The audio control interface and the audio streaming interface each could be
+controlled by its own driver.</para>
+</sect2><sect2 id="erfbb"><title>Compatible Device Names</title><indexterm><primary>device information</primary><secondary>compatible device names</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>compatible device names</secondary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>binding to device node</secondary>
+</indexterm><indexterm><primary>device information</primary><secondary>binding a driver to a USB device</secondary>
+</indexterm><indexterm><primary>binding a driver to a USB device</primary>
+</indexterm><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying device names</secondary>
+</indexterm><para>The Solaris software builds an ordered list of compatible device names
+for USB binding based on identification information kept within each device.
+This information includes device class, subclass, vendor ID, product ID, revision,
+and protocol. See <ulink url="http://www.usb.org/" type="url"></ulink> for
+a list of USB classes and subclasses.</para><para>This name hierarchy enables binding to a general driver if a more device-specific
+driver is not available. An example of a general driver is a class-specific
+driver. Device names that begin with <literal>usbif</literal> designate single
+interface devices. See <olink targetptr="usb-fig-27" remap="internal">Example&nbsp;20&ndash;1</olink> for
+examples. The USBA&nbsp;2.0 framework defines all compatible names for a device. Use the <command>prtconf</command> command to display these device names, as shown in <olink targetptr="ewatq" remap="internal">Example&nbsp;20&ndash;2</olink>.</para><para>The following example shows an example of compatible device names for
+a USB mouse device. This mouse device represents a combined node entirely
+operated by a single driver. The USBA&nbsp;2.0 framework gives this device node the names
+shown in the example, in the order shown.</para><example id="usb-fig-27"><title>USB Mouse Compatible Device Names</title><programlisting>1. 'usb430,100.102'      Vendor 430, product 100, revision 102
+2. 'usb430,100'      Vendor 430, product 100
+3. 'usbif430,class3.1.2' Vendor 430, class 3, subclass 1, protocol 2
+4. 'usbif430,class3.1'   Vendor 430, class 3, subclass 1
+5. 'usbif430,class3'     Vendor 430, class 3
+6. 'usbif,class3.1.2'    Class 3, subclass 1, protocol 2
+7. 'usbif,class3.1'      Class 3, subclass 1
+8. 'usbif,class3'    Class 3</programlisting>
+</example><para><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying the bound driver</secondary></indexterm>Note that the
+names in the above example progress from the most specific to the most general.
+Entry 1 binds only to a particular revision of a specific product from a particular
+vendor. Entries 3, 4, and 5 are for class&nbsp;3 devices manufactured by vendor
+430. Entries 6, 7, and 8 are for class&nbsp;3 devices from any vendor. The
+binding process looks for a match on the name from the top name down. To bind,
+drivers must be added to the system with an alias that matches one of these
+names. To get a list of compatible device names to which to bind when you
+add your driver, check the <literal>compatible</literal> property of the device
+in the output from the <command>prtconf</command>&nbsp;<option>vp</option> command.</para><para>The following example shows compatible property lists for a keyboard
+and a mouse. Use the <command>prtconf</command>&nbsp;<option>D</option> command
+to display the bound driver.</para><example id="ewatq"><title>Compatible Device Names Shown by the Print Configuration
+Command</title><screen># <userinput>prtconf -vD | grep compatible</userinput>
+            compatible: 'usb430,5.200' + 'usb430,5' + 'usbif430,class3.1.1'
++ 'usbif430,class3.1' + 'usbif430,class3' + 'usbif,class3.1.1' +
+'usbif,class3.1' + 'usbif,class3'
+            compatible: 'usb2222,2071.200' + 'usb2222,2071' +
+'usbif2222,class3.1.2' + 'usbif2222,class3.1' + 'usbif2222,class3' +
+'usbif,class3.1.2' + 'usbif,class3.1' + 'usbif,class3'</screen>
+</example><para><indexterm><primary><command>add_drv</command> command</primary><secondary>device name</secondary></indexterm>Use the most specific name you
+can to more accurately identify a driver for a device or group of devices.
+To bind drivers written for a specific revision of a specific product, use
+the most specific name match possible. For example, if you have a USB mouse
+driver written by vendor&nbsp;430 for revision&nbsp;102 of their product&nbsp;100,
+use the following command to add that driver to the system:</para><programlisting>add_drv -n -i '"usb430,100.102"' specific_mouse_driver</programlisting><para>To add a driver written for any USB mouse (class 3, subclass 1, protocol
+2) from vendor&nbsp;430, use the following command:</para><programlisting>add_drv -n -i '"usbif430,class3.1.2"' more_generic_mouse_driver</programlisting><para>If you install both of these drivers and then connect a compatible device,
+the system binds the correct driver to the connected device. For example,
+if you install both of these drivers and then connect a vendor 430, model
+100, revision 102 device, this device is bound to <literal>specific_mouse_driver</literal>.
+If you connect a vendor 430, model 98 device, this device is bound to <literal>more_generic_mouse_driver</literal>. If you connect a mouse from another vendor, this device also is
+bound to <literal>more_generic_mouse_driver</literal>. If multiple drivers
+are available for a specific device, the driver binding framework selects
+the driver with the first matching compatible name in the compatible names
+list.</para>
+</sect2><sect2 id="erfbd"><title>Devices With Multiple Interfaces</title><indexterm><primary>device</primary><secondary>composite</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>composite</secondary>
+</indexterm><para><emphasis>Composite devices</emphasis> are devices that support multiple
+interfaces. Composite devices have a list of compatible names for each interface.
+This compatible names list ensures that the best available driver is bound
+to the interface. The most general multiple interface entry is <literal>usb,device</literal>.</para><para>For a USB audio composite device, the compatible names are as follows:</para><programlisting>1. 'usb471,101.100'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Vendor 471, product 101, revision 100
+2. 'usb471,101'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Vendor 471, product 101
+3. 'usb,device'&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Generic USB device</programlisting><para><indexterm><primary>device drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary></indexterm><indexterm><primary>USB drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary></indexterm><indexterm><primary><literal>usb_mid</literal> USB multi-interface driver</primary></indexterm>The name <literal>usb,device</literal> is a compatible
+name that represents any whole USB device. The <olink targetdoc="refman7" targetptr="usb-mid-7d" remap="external"><citerefentry><refentrytitle>usb_mid</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver (USB multiple-interface
+driver) binds to the <literal>usb,device</literal> device node if no other
+driver has claimed the whole device. The <literal>usb_mid</literal> driver
+creates a child device node for each interface of the physical device. The <literal>usb_mid</literal> driver also generates a set of compatible names for each
+interface. Each of these generated compatible names begins with <literal>usbif</literal>.
+The system then uses these generated compatible names to find the best driver
+for each interface. In this way, different interfaces of one physical device
+can be bound to different drivers.</para><para>For example, the <literal>usb_mid</literal> driver binds to a multiple-interface
+audio device through the <literal>usb,device</literal> node name of that audio
+device. The <literal>usb_mid</literal> driver then creates interface-specific
+device nodes. Each of these interface-specific device nodes has its own compatible
+name list. For an audio control interface node, the compatible name list might
+look like the list shown in the following example.</para><example id="ekyic"><title>USB Audio Compatible Device Names</title><programlisting>1. 'usbif471,101.100.config1.0' Vend 471, prod 101, rev 100, cnfg 1, iface 0
+2. 'usbif471,101.config1.0'     Vend 471, product 101, config 1, interface 0
+3. 'usbif471,class1.1.0'    Vend 471, class 1, subclass 1, protocol 0
+4. 'usbif471,class1.1'      Vend 471, class 1, subclass 1
+5. 'usbif471,class1'        Vend 471, class 1
+6. 'usbif,class1.1.0'       Class 1, subclass 1, protocol 0
+7. 'usbif,class1.1'         Class 1, subclass 1
+8. 'usbif,class1'           Class 1</programlisting>
+</example><para>Use the following command to bind a vendor-specific, device-specific
+client driver named <literal>vendor_model_audio_usb</literal> to the vendor-specific,
+device-specific configuration 1, interface 0 interface compatible name shown
+in <olink targetptr="ekyic" remap="internal">Example&nbsp;20&ndash;3</olink>.</para><programlisting>add_drv -n -i '"usbif471,101.config1.0"' vendor_model_audio_usb</programlisting><para>Use the following command to bind a class driver named <literal>audio_class_usb_if_driver</literal> to the more general class 1, subclass 1 interface compatible name
+shown in <olink targetptr="ekyic" remap="internal">Example&nbsp;20&ndash;3</olink>:</para><programlisting>add_drv -n -i '"usbif,class1.1"' audio_class_usb_if_driver</programlisting><para><indexterm><primary>device</primary><secondary>splitting interfaces</secondary></indexterm><indexterm><primary>USB device</primary><secondary>splitting interfaces</secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying interfaces</secondary></indexterm>Use the <command>prtconf</command> <option>D</option> command to show a list of devices and their drivers. In the following
+example, the <command>prtconf</command> <option>D</option> command shows that
+the <literal>usb_mid</literal> driver manages the <literal>audio</literal> device.
+The <literal>usb_mid</literal> driver is splitting the <literal>audio</literal> device
+into interfaces. Each interface is indented under the <literal>audio</literal> device
+name. For each interface shown in the indented list, the <command>prtconf</command> <option>D</option> command shows which driver manages the interface.</para><programlisting>audio, instance #0 (driver name: usb_mid)
+    sound-control, instance #2 (driver name: usb_ac)
+    sound, instance #2 (driver name: usb_as)
+    input, instance #8 (driver name: hid)</programlisting>
+</sect2><sect2 id="usb-50"><title>Devices With Interface-Association Descriptors</title><indexterm><primary>device drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary><literal>usb_mid</literal> USB multi-interface driver</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>interface association nodes</secondary>
+</indexterm><indexterm><primary>interface association nodes</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary><literal>usb_ia</literal> USB interface association driver</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary><literal>usb_ia</literal> USB interface association driver</secondary>
+</indexterm><indexterm><primary><literal>usb_ia</literal> USB interface association driver</primary>
+</indexterm><para>If the device includes an interface-association descriptor, the device
+tree can be parsed at the following three levels:</para><itemizedlist><listitem><para>The  <olink targetdoc="refman7" targetptr="usb-mid-7d" remap="external"><citerefentry><refentrytitle>usb_mid</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> USB
+multi-interface driver binds to device level nodes of a composite device if
+no vendor or class-specific  driver is available.</para>
+</listitem><listitem><para>A client driver is bound to the interface association nodes.</para>
+</listitem><listitem><para>The <olink targetdoc="refman7" targetptr="usb-ia-7d" remap="external"><citerefentry><refentrytitle>usb_ia</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> USB
+interface association driver is bound by default if no client driver is found.
+Then client drivers can be bound to the interface level of this interface
+association.</para>
+</listitem>
+</itemizedlist><para>The <literal>usb_mid</literal> driver creates an <literal>ia</literal> (interface
+association) node for each <literal>ia</literal>. The compatible names of <literal>ia</literal> nodes generally begin with <literal>usbia</literal>. The name <literal>usb,ia</literal> is a compatible name that represents any <literal>ia</literal> as
+the tail of the compatible names. The <literal>usb_ia</literal> driver is
+bound to an <literal>ia</literal> node if no other driver has claimed this <literal>ia</literal>. The <literal>usb_ia</literal> driver creates a child node for
+each interface. An interface node as the child node of an <literal>ia</literal> node
+has the same properties with an interface node as the child of a device node.</para><example id="usb-51"><title>USB Video Interface Association Compatible Names</title><programlisting>1. 'usbia46d,8c9.5.config1.0' vend 46d, prod 8c9, rev 5, cnfg 1, first_if_in_ia 0
+2. 'usbia46d,8c9.config1.0'   vend 46d, prod 8c9, cnfg 1, first_if_in_ia 0
+3. 'usbia46d,classe.3.0'      vend 46d, class e, subclass 3, protocol 0
+4. 'usbia46d,classe.3'        vend 46d, class e, subclass 3
+5. 'usbia46d,classe'          vend 46d, class e
+6. 'usbia,classe.3.0'         class e, subclass 3, protocol 0
+7. 'usbia,classe.3'           class e, subclass 3
+8. 'usbia,classe'             class e
+9. 'usb,ia'                   by default</programlisting>
+</example><para>Use the following command to bind a vendor-specific, device-specific
+client driver named <literal>vendor_model_video_usb</literal> to the vendor-specific,
+device-specific configuration 1, first_if_in_ia 0 compatible name shown in <olink targetptr="usb-51" remap="internal">Example&nbsp;20&ndash;4</olink>:</para><programlisting>add_drv -n -i '"usbia46d,8c9.config1.0"' vendor_model_video_usb</programlisting><para>Use the following command to bind a class driver named <literal>video_class_usb_ia_driver</literal> to the more general class e compatible names shown in <olink targetptr="usb-51" remap="internal">Example&nbsp;20&ndash;4</olink>:</para><programlisting>add_drv -n -i '"usbia,classee"' video_class_usb_ia_driver</programlisting><para>In the following example, the <command>prtconf</command>&nbsp;<option>D</option> command
+shows a device tree of a webcam with <literal>ia</literal> of <literal>video</literal> and <literal>audio</literal>. The <literal>usb_mid</literal> driver manages the device
+and creates two <literal>ia</literal> respectively for video and audio. A
+video driver <literal>usbvc</literal> is bound to the video <literal>ia</literal>,
+and audio drivers are bound to the interface of the audio <literal>ia</literal>.</para><programlisting>miscellaneous, instance #28 (driver name: usb_mid)
+    video, instance #24 (driver name: usbvc)
+    audio, instance #30 (driver name: usb_ia)
+        sound-control, instance #38 (driver name: usb_ac)
+        sound, instance #47 (driver name: usb_as)</programlisting>
+</sect2><sect2 id="erfbg"><title>Checking Device Driver Bindings</title><indexterm><primary>device drivers</primary><secondary>bindings</secondary>
+</indexterm><indexterm><primary><literal>/etc/driver_aliases</literal> file</primary>
+</indexterm><indexterm><primary><command>add_drv</command> command</primary>
+</indexterm><indexterm><primary><command>update_drv</command> command</primary>
+</indexterm><para>The file <filename>/etc/driver_aliases</filename> contains entries for
+the bindings that already exist on a system. Each line of the <filename>/etc/driver_aliases</filename> file shows a driver name, followed by a space, followed by a device
+name. Use this file to check existing device driver bindings.</para><note><para>Do not edit the <filename>/etc/driver_aliases</filename> file
+manually. Use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to establish a binding. Use the <olink targetdoc="group-refman" targetptr="update-drv-1m" remap="external"><citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to change a binding.</para>
+</note>
+</sect2>
+</sect1><sect1 id="usb-8"><title>Basic Device Access</title><para>This section describes how to access a USB device and how to register
+a client driver. This section also discusses the descriptor tree.</para><sect2 id="usb-9"><title>Before the Client Driver Is Attached</title><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>default control</tertiary>
+</indexterm><indexterm><primary>pipes</primary><secondary>use before <function>attach</function></secondary>
+</indexterm><para>The following events take place before the client driver is attached:</para><orderedlist><listitem><para>The PROM (OBP/BIOS) and USBA framework gain access to the
+device before any client driver is attached.</para>
+</listitem><listitem><para>The hub driver probes devices on each of its hub's ports for
+identity and configuration.</para>
+</listitem><listitem><para>The default control pipe to each device is opened, and each
+device is probed for its device descriptor.</para>
+</listitem><listitem><para>Compatible names properties are constructed for each device,
+using the device and interface descriptors.</para>
+</listitem>
+</orderedlist><para>The compatible names properties define different parts of the device
+that can be individually bound to client drivers. Client drivers can bind
+either to the entire device or to just one interface. See <olink targetptr="usb-7" remap="internal">Binding Client Drivers</olink>.</para>
+</sect2><sect2 id="usb-10"><title>The Descriptor Tree</title><indexterm><primary>descriptor tree</primary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary>descriptor tree</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>configuration descriptors</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_dev_data</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_parse_data</function> function</secondary>
+</indexterm><para>Parsing descriptors involves aligning structure members at natural boundaries
+and converting the structure members to the endianness of the host CPU. Parsed
+standard USB configuration descriptors, interface descriptors, and endpoint
+descriptors are available to the client driver in the form of a hierarchical
+tree for each configuration. Any raw class-specific or vendor-specific descriptor
+information also is available to the client driver in the same hierarchical
+tree.</para><para>Call the <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to retrieve the hierarchical descriptor tree.
+The &ldquo;SEE ALSO&rdquo; section of the <citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man page lists the
+man pages for each standard USB descriptor. Use the <olink targetdoc="group-refman" targetptr="usb-parse-data-9f" remap="external"><citerefentry><refentrytitle>usb_parse_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to parse raw descriptor information.</para><para>A descriptor tree for a device with two configurations might look like
+the tree shown in the following figure.</para><figure id="euxbn"><title>A Hierarchical USB Descriptor Tree</title><mediaobject><imageobject><imagedata entityref="usb.descr.tree"/>
+</imageobject><textobject><simpara>Diagram shows a tree of pairs of descriptors for each
+interface of a device with two configurations.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The <literal>dev_cfg</literal> array shown in the above figure contains
+nodes that correspond to configurations. Each node contains the following
+information:</para><itemizedlist><listitem><para>A parsed configuration descriptor</para>
+</listitem><listitem><para>A pointer to an array of descriptors that correspond to the
+interfaces of that configuration</para>
+</listitem><listitem><para>A pointer to an array of class-specific or vendor-specific
+raw data, if any exists</para>
+</listitem>
+</itemizedlist><para>The node that represents the second interface of the second indexed
+configuration is at <literal>dev_cfg[1].cfg_if[1]</literal> in the diagram.
+That node contains an array of nodes that represent the alternate settings
+for that interface. The hierarchy of USB descriptors propagates through the
+tree. ASCII strings from string descriptor data are attached where the USB
+specification says these strings exist.</para><para>The array of configurations is non-sparse and is indexed by the configuration
+index. The first valid configuration (configuration&nbsp;1) is <literal>dev_cfg[0]</literal>. Interfaces and alternate settings have indices that align with
+their numbers. Endpoints of each alternate setting are indexed consecutively.
+The first endpoint of each alternate setting is at index&nbsp;0.</para><para>This numbering scheme makes the tree easy to traverse. For example,
+the raw descriptor data of endpoint index 0, alternate 0, interface 1, configuration
+index 1 is at the node defined by the following path:</para><programlisting>dev_cfg[1].cfg_if[1].if_alt[0].altif_ep[0].ep_descr</programlisting><para><indexterm><primary>USB functions</primary><secondary><function>usb_lookup_ep_data</function> function</secondary></indexterm>An alternative to using the descriptor
+tree directly is using the <olink targetdoc="group-refman" targetptr="usb-lookup-ep-data-9f" remap="external"><citerefentry><refentrytitle>usb_lookup_ep_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.
+The <citerefentry><refentrytitle>usb_lookup_ep_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function takes as arguments the interface, alternate, which
+endpoint, endpoint type, and direction. You can use the <citerefentry><refentrytitle>usb_lookup_ep_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to traverse the descriptor tree to get a particular
+endpoint. See the <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for more information.</para>
+</sect2><sect2 id="usb-11"><title>Registering Drivers to Gain Device Access</title><indexterm><primary>USB drivers</primary><secondary>registering</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_client_attach</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_dev_data</function> function</secondary>
+</indexterm><indexterm><primary><function>attach</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function> function</secondary>
+</indexterm><para>Two of the first calls into the USBA&nbsp;2.0 framework by a client driver are calls
+to the <olink targetdoc="group-refman" targetptr="usb-client-attach-9f" remap="external"><citerefentry><refentrytitle>usb_client_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function and the <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. These two calls
+come from the client driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. You must call
+the <citerefentry><refentrytitle>usb_client_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function before you call the <citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function.</para><para><indexterm><primary>USB drivers</primary><secondary>versioning</secondary></indexterm>The <citerefentry><refentrytitle>usb_client_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function registers a client driver
+with the USBA&nbsp;2.0 framework. The <citerefentry><refentrytitle>usb_client_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function enforces versioning. All
+client driver source files must start with the following lines:</para><screen>#define USBDRV_MAJOR_VER        2
+#define USBDRV_MINOR_VER        <replaceable>minor-version</replaceable>
+#include &lt;sys/usb/usba.h&gt;</screen><para>The value of <replaceable>minor-version</replaceable> must be less than
+or equal to <literal>USBA_MINOR_VER</literal>. The symbol <literal>USBA_MINOR_VER</literal> is defined in the <literal>&lt;sys/usb/usbai.h&gt;</literal> header
+file. The <filename>&lt;sys/usb/usbai.h&gt;</filename> header file is included
+by the <filename>&lt;sys/usb/usba.h&gt;</filename> header file.</para><para><literal>USBDRV_VERSION</literal> is a macro that generates the version
+number from <literal>USBDRV_MAJOR_VERSION</literal> and <literal>USBDRV_MINOR_VERSION</literal>. The second argument to <function>usb_client_attach</function> must
+be <literal>USBDRV_VERSION</literal>. The <function>usb_client_attach</function> function
+fails if the second argument is not <literal>USBDRV_VERSION</literal> or if <literal>USBDRV_VERSION</literal> reflects an invalid version. This restriction ensures
+programming interface compatibility.</para><para><indexterm><primary>USB drivers</primary><secondary>mutex initialization</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_dev_data</function> function</secondary></indexterm><indexterm><primary><function>mutex_init</function> function</primary></indexterm>The <function>usb_get_dev_data</function> function
+returns information that is required for proper USB device management. For
+example, the <function>usb_get_dev_data</function> function returns the following
+information:</para><itemizedlist><listitem><para><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>default control</tertiary></indexterm><indexterm><primary>pipes</primary><secondary>default control</secondary></indexterm>The default control pipe</para>
+</listitem><listitem><para>The <replaceable>iblock_cookie</replaceable> to use in mutex
+initializations (see <olink targetdoc="group-refman" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>)</para>
+</listitem><listitem><para>The parsed device descriptor</para>
+</listitem><listitem><para>ID strings</para>
+</listitem><listitem><para>The tree hierarchy as described in <olink targetptr="usb-10" remap="internal">The
+Descriptor Tree</olink></para>
+</listitem>
+</itemizedlist><para>The call to the <function>usb_get_dev_data</function> function is mandatory.
+Calling <function>usb_get_dev_data</function> is the only way to retrieve
+the default control pipe and retrieve the <replaceable>iblock_cookie</replaceable> required
+for mutex initialization.</para><para><indexterm><primary>descriptor tree</primary></indexterm><indexterm><primary>USB drivers</primary><secondary>descriptor tree</secondary></indexterm><indexterm><primary>soft state information</primary><secondary>USB</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_free_descr_tree</function> function</secondary></indexterm><indexterm><primary>USB drivers</primary><secondary>pipes</secondary></indexterm><indexterm><primary>pipes</primary><secondary>mutex initialization</secondary></indexterm>After calling <function>usb_get_dev_data</function>,
+the client driver's <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine typically copies the desired
+descriptors and data from the descriptor tree to the driver's soft state.
+Endpoint descriptors copied to the soft state are used later to open pipes
+to those endpoints. The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine usually calls <olink targetdoc="group-refman" targetptr="usb-free-descr-tree-9f" remap="external"><citerefentry><refentrytitle>usb_free_descr_tree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to free the descriptor tree after copying descriptors.
+Alternatively, you might choose to keep the descriptor tree and not copy the
+descriptors.</para><para>Specify one of the following three parse levels to the <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to request the breadth of the descriptor
+tree you want returned. You need greater tree breadth if your driver needs
+to bind to more of the device.</para><itemizedlist><listitem><para><literal>USB_PARSE_LVL_IF</literal>. If your client driver
+binds to a specific interface, the driver needs the descriptors for only that
+interface. Specify <literal>USB_PARSE_LVL_IF</literal> for the parse level
+in the <function>usb_get_dev_data</function> call to retrieve only those descriptors.</para>
+</listitem><listitem><para><literal>USB_PARSE_LVL_CFG</literal>. If your client driver
+binds to the whole device, specify <literal>USB_PARSE_LVL_CFG</literal> to
+retrieve all descriptors of the current configuration.</para>
+</listitem><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_print_descr_tree</function> function</secondary></indexterm><literal>USB_PARSE_LVL_ALL</literal>.
+Specify <literal>USB_PARSE_LVL_ALL</literal> to retrieve all descriptors of
+all configurations. For example, you need this greatest tree breadth to use <olink targetdoc="group-refman" targetptr="usb-print-descr-tree-9f" remap="external"><citerefentry><refentrytitle>usb_print_descr_tree</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to print a descriptor dump of all configurations of
+a device.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>USB functions</primary><secondary><function>usb_free_dev_data</function> function</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_client_detach</function> function</secondary></indexterm>The client driver's <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine must call the <olink targetdoc="group-refman" targetptr="usb-free-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_free_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to release all resources allocated by the<function>usb_get_dev_data</function> function. The <function>usb_free_dev_data</function> function
+accepts handles where the descriptor tree has already been freed with the <function>usb_free_descr_tree</function> function. The client driver's <function>detach</function> routine
+also must call the <olink targetdoc="group-refman" targetptr="usb-client-detach-9f" remap="external"><citerefentry><refentrytitle>usb_client_detach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to release all resources
+allocated by the <olink targetdoc="group-refman" targetptr="usb-client-attach-9f" remap="external"><citerefentry><refentrytitle>usb_client_attach</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para>
+</sect2>
+</sect1><sect1 id="usb-16"><title>Device Communication</title><indexterm><primary>pipes</primary><secondary>USB device communication</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary>pipes</secondary>
+</indexterm><para>USB devices operate by passing requests through communication channels
+called <emphasis>pipes</emphasis>. Pipes must be open before you can submit
+requests. Pipes also can be flushed, queried, and closed. This section discusses
+pipes, data transfers and callbacks, and data requests.</para><sect2 id="usb-48"><title>USB Endpoints</title><indexterm><primary>USB device</primary><secondary>endpoints</secondary><tertiary>control</tertiary>
+</indexterm><indexterm><primary>USB device</primary><secondary>endpoints</secondary><tertiary>bulk</tertiary>
+</indexterm><indexterm><primary>USB device</primary><secondary>endpoints</secondary><tertiary>interrupt</tertiary>
+</indexterm><indexterm><primary>USB device</primary><secondary>endpoints</secondary><tertiary>isochronous</tertiary>
+</indexterm><para>The four kinds of pipes that communicate with the four kinds of USB
+endpoints are:</para><itemizedlist><listitem><para><emphasis role="strong">Control</emphasis>. Control pipes
+are used primarily to send commands and retrieve status. Control pipes are
+intended for non-periodic, host-initiated request and response communication
+of small-sized structured data. Control pipes are bidirectional. The default
+pipe is a control pipe. See <olink targetptr="usb-18" remap="internal">The Default Pipe</olink>.</para>
+</listitem><listitem><para><emphasis role="strong">Bulk</emphasis>. Bulk pipes are used
+primarily for data transfer. Bulk pipes offer reliable transportation of large
+amounts of data. Bulk pipes do not necessarily deliver the data in a timely
+manner. Bulk pipes are unidirectional.</para>
+</listitem><listitem><para><emphasis role="strong">Interrupt</emphasis>. Interrupt pipes
+offer timely, reliable communication of small amounts of unstructured data.
+Periodic polling often is started on interrupt-IN pipes. Interrupt-IN pipes
+return data to the host when the data becomes present on the device. Some
+devices have interrupt-OUT pipes. Interrupt-OUT pipes transfer data to the
+device with the same timely, reliable &ldquo;interrupt pipe&rdquo; characteristics
+of interrupt-IN pipes. Interrupt pipes are unidirectional.</para>
+</listitem><listitem><para><emphasis role="strong">Isochronous</emphasis>. Isochronous
+pipes offer a channel for transferring constant-rate, time-relevant data,
+such as for audio devices. Data is not retried on error. Isochronous pipes
+are unidirectional.</para>
+</listitem>
+</itemizedlist><para>See Chapter&nbsp;5 of the USB&nbsp;2.0 specification or see <olink targetptr="usb-24" remap="internal">Requests</olink> for more information on the transfer types
+that correspond to these endpoints.</para>
+</sect2><sect2 id="usb-18"><title>The Default Pipe</title><indexterm><primary>USB device</primary><secondary>endpoints</secondary><tertiary>default</tertiary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_dev_data</function> function</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>default control</tertiary>
+</indexterm><indexterm><primary>pipes</primary><secondary>default control</secondary>
+</indexterm><para>Each USB device has a special control endpoint called the <emphasis>default</emphasis> endpoint. Its communication channel is called the default pipe.
+ Most, if not all, device setup is done through this pipe.  Many USB devices
+have this pipe as their only control pipe.</para><para>The <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function provides the default control pipe to the
+client driver. This pipe is pre-opened to accommodate any special setup needed
+before opening other pipes. This default control pipe is special in the following
+ways:</para><itemizedlist><listitem><para>This pipe is shared. Drivers that are operating other interfaces
+of the same device use the same default control pipe. The USBA&nbsp;2.0 framework arbitrates
+this pipe among the different drivers.</para>
+</listitem><listitem><para>This pipe cannot be opened, closed, or reset by the client
+driver. This restriction exists because the pipe is shared.</para>
+</listitem><listitem><para>The pipe is autocleared on an exception.</para>
+</listitem>
+</itemizedlist><para>Other pipes, including other control pipes, must be opened explicitly
+and are exclusive-open only.</para>
+</sect2><sect2 id="usb-21"><title>Pipe States</title><para>Pipes are in one of the following states:</para><itemizedlist><listitem><para><literal>USB_PIPE_STATE_IDLE</literal></para><itemizedlist><listitem><para>All control and bulk pipes, interrupt-OUT pipes, and isochronous-OUT
+pipes: No request is in progress.</para>
+</listitem><listitem><para>Interrupt-IN and isochronous-IN pipes: No polling is in progress.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><literal>USB_PIPE_STATE_ACTIVE</literal></para><itemizedlist><listitem><para>All control and bulk pipes, interrupt-OUT pipes, and isochronous-OUT
+pipes: The pipe is transferring data or an I/O request is active.</para>
+</listitem><listitem><para>Interrupt-IN and isochronous-IN pipes: Polling is active.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_reset</function> function</secondary></indexterm><literal>USB_PIPE_STATE_ERROR</literal>.
+An error occurred. If this pipe is not the default pipe and if autoclearing
+is not enabled, then the client driver must call the <olink targetdoc="group-refman" targetptr="usb-pipe-reset-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para>
+</listitem><listitem><para><literal>USB_PIPE_STATE_CLOSING</literal>. The pipe is being
+closed.</para>
+</listitem><listitem><para><literal>USB_PIPE_STATE_CLOSED</literal>. The pipe is closed.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_get_state</function> function</secondary></indexterm>Call the <olink targetdoc="group-refman" targetptr="usb-pipe-get-state-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_get_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to retrieve the state of a pipe.</para>
+</sect2><sect2 id="usb-19"><title>Opening Pipes</title><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>opening</tertiary>
+</indexterm><indexterm><primary>pipes</primary><secondary>opening</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_lookup_ep_data</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_open</function> function</secondary>
+</indexterm><para>To open a pipe, pass to the <olink targetdoc="group-refman" targetptr="usb-pipe-open-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_open</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function the endpoint descriptor
+that corresponds to the pipe you want to open. Use the <olink targetdoc="group-refman" targetptr="usb-get-dev-data-9f" remap="external"><citerefentry><refentrytitle>usb_get_dev_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="usb-lookup-ep-data-9f" remap="external"><citerefentry><refentrytitle>usb_lookup_ep_data</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> functions
+to retrieve the endpoint descriptor from the descriptor tree. The <citerefentry><refentrytitle>usb_pipe_open</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns a handle to the pipe.</para><para>You must specify a pipe policy when you open a pipe. The pipe policy
+contains an estimate of the number of concurrent asynchronous operations that
+require separate threads that will be needed for this pipe. An estimate of
+the number of threads is the number of parallel operations that could occur
+during a callback. The value of this estimate must be at least 2. See the <citerefentry><refentrytitle>usb_pipe_open</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man page for more information on pipe policy.</para>
+</sect2><sect2 id="usb-20"><title>Closing Pipes</title><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>closing</tertiary>
+</indexterm><indexterm><primary>pipes</primary><secondary>closing</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_close</function> function</secondary>
+</indexterm><para>The driver must use the <olink targetdoc="group-refman" targetptr="usb-pipe-close-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to close pipes other
+than the default pipe. The <citerefentry><refentrytitle>usb_pipe_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function enables all remaining requests
+in the pipe to complete. The function then allows one second for all callbacks
+of those requests to complete.</para>
+</sect2><sect2 id="usb-22"><title>Data Transfer</title><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_bulk_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_ctrl_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_intr_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_isoc_xfer</function> function</secondary>
+</indexterm><para>For all pipe types, the programming model is as follows:</para><orderedlist><listitem><para>Allocate a request.</para>
+</listitem><listitem><para>Submit the request using one of the pipe transfer functions.
+See the <olink targetdoc="group-refman" targetptr="usb-pipe-bulk-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_bulk_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usb-pipe-ctrl-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_ctrl_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usb-pipe-intr-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_intr_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="usb-pipe-isoc-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_isoc_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man pages.</para>
+</listitem><listitem><para>Wait for completion notification.</para>
+</listitem><listitem><para>Free the request.</para>
+</listitem>
+</orderedlist><para>See <olink targetptr="usb-24" remap="internal">Requests</olink> for more information
+on requests.  The following sections describe the features of different request
+types.</para><sect3 id="usb-23"><title>Synchronous and Asynchronous Transfers and Callbacks</title><indexterm><primary>synchronous data transfers</primary><secondary>USB</secondary>
+</indexterm><indexterm><primary>asynchronous data transfers</primary><secondary>USB</secondary>
+</indexterm><para>Transfers are either synchronous or asynchronous. Synchronous transfers
+block until they complete. Asynchronous transfers callback into the client
+driver when they complete. Most transfer functions called with the <literal>USB_FLAGS_SLEEP</literal> flag set in the <replaceable>flags</replaceable> argument are synchronous.</para><para>Continuous transfers such as polling and isochronous transfers cannot
+be synchronous. Calls to transfer functions for continuous transfers made
+with the <literal>USB_FLAGS_SLEEP</literal> flag set block only to wait for
+resources before the transfer begins.</para><para>Synchronous transfers are the most simple transfers to set up because
+synchronous transfers do not require any callback functions. Synchronous transfer
+functions return a transfer start status, even though synchronous transfer
+functions block until the transfer is completed. Upon completion, you can
+find additional information about the transfer status in the completion reason
+field and callback flags field of the request. Completion reasons and callback
+flags fields are discussed below.</para><para>If the <literal>USB_FLAGS_SLEEP</literal> flag is not specified in the <replaceable>flags</replaceable> argument, that transfer operation is asynchronous. The
+exception to this rule are isochronous transfers. Asynchronous transfer operations
+set up and start the transfer, and then return before the transfer is complete.
+Asynchronous transfer operations return a transfer start status. The client
+driver receives transfer completion status through callback handlers.</para><para><indexterm><primary>USB drivers</primary><secondary>asynchronous transfer callbacks</secondary></indexterm>Callback handlers are functions that are
+called when asynchronous transfers complete. Do not set up an asynchronous
+transfer without callbacks. The two types of callback handlers are normal
+completion handlers and exception handlers. You can specify one handler to
+be called in both of these cases.</para><itemizedlist><listitem><para><emphasis role="strong">Normal completion</emphasis>. A normal
+completion callback handler is called to notify of a normally completed transfer.</para>
+</listitem><listitem><para><emphasis role="strong">Exception</emphasis>. An exception
+callback handler is called to notify of an abnormally completed transfer and
+to process its errors.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>USB structures</primary><secondary><literal>usb_completion_reason</literal></secondary></indexterm><indexterm><primary>USB drivers</primary><secondary>data transfer</secondary><tertiary>completion reasons</tertiary></indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_callback_flags</literal></secondary></indexterm><indexterm><primary>USB drivers</primary><secondary>data transfer</secondary><tertiary>callback status flags</tertiary></indexterm>Both completion handlers and exception handlers receive the transfer's
+request as an argument. Exception handlers use the completion reason and callback
+status in the request to find out what happened. The completion reason (<literal>usb_cr_t</literal>) indicates how the original transaction completed. For
+example, a completion reason of <literal>USB_CR_TIMEOUT</literal> indicates
+that the transfer timed out. As another example, if a USB device is removed
+while in use, client drivers might receive <literal>USB_CR_DEV_NOT_RESP</literal> as
+the completion reason on their outstanding requests. The callback status (<literal>usb_cb_flags_t</literal>) indicates what the USBA framework did to remedy
+the situation. For example, a callback status of <literal>USB_CB_STALL_CLEARED</literal> indicates
+that the USBA framework cleared a functional stall condition. See the <olink targetdoc="group-refman" targetptr="usb-completion-reason-9s" remap="external"><citerefentry><refentrytitle>usb_completion_reason</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more information on completion reasons.
+See the <olink targetdoc="group-refman" targetptr="usb-callback-flags-9s" remap="external"><citerefentry><refentrytitle>usb_callback_flags</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more information on callback status flags.</para><para><indexterm><primary>pipes</primary><secondary>policy</secondary></indexterm>The context of the callback and the policy of the pipe on which
+the requests are run limit what you can do in the callback.</para><itemizedlist><listitem><para><emphasis role="strong">Callback context</emphasis>. Most
+callbacks execute in kernel context and usually can block. Some callbacks
+execute in interrupt context and cannot block. The <literal>USB_CB_INTR_CONTEXT</literal> flag
+is set in the callback flags to denote interrupt context. See the <olink targetdoc="group-refman" targetptr="usb-callback-flags-9s" remap="external"><citerefentry><refentrytitle>usb_callback_flags</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more information on callback context
+and details on blocking.</para>
+</listitem><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_open</function> function</secondary></indexterm><emphasis role="strong">Pipe policy</emphasis>.
+The pipe policy's hint on concurrent asynchronous operations limits the number
+of operations that can be run in parallel, including those executed from a
+callback handler. Blocking on a synchronous operation counts as one operation.
+See the <olink targetdoc="group-refman" targetptr="usb-pipe-open-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_open</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for more information on pipe policy.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="usb-24"><title>Requests</title><indexterm><primary>USB drivers</primary><secondary>data transfer requests</secondary>
+</indexterm><para>This section discusses request structures and allocating and deallocating
+different types of requests.</para><sect4 id="usb-25"><title>Request Allocation and Deallocation</title><para>Requests are implemented as initialized request structures. Each different
+endpoint type takes a different type of request. Each type of request has
+a different request structure type. The following table shows the structure
+type for each type of request. This table also lists the functions to use
+to allocate and free each type of structure.</para><table frame="topbot" pgwide="1" id="usb-tbl-33"><title>Request Initialization</title><indexterm><primary>USB structures</primary><secondary><literal>usb_bulk_request</literal></secondary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_ctrl_request</literal></secondary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_intr_request</literal></secondary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_isoc_request</literal></secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_alloc_bulk_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_alloc_ctrl_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_alloc_intr_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_alloc_isoc_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_free_bulk_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_free_ctrl_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_free_intr_req</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_free_isoc_req</function> function</secondary>
+</indexterm><tgroup cols="4" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="7.00in"?><colspec colwidth="14.54*"/><colspec colwidth="26.81*"/><colspec colwidth="30.40*"/><colspec colwidth="28.29*"/><thead><row rowsep="1"><entry><para>Pipe or Endpoint Type</para>
+</entry><entry><para>Request Structure</para>
+</entry><entry><para>Request Structure Allocation Function</para>
+</entry><entry><para>Request Structure Free Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Control</para>
+</entry><entry><para><literal>usb_ctrl_req_t</literal> (see the <olink targetdoc="group-refman" targetptr="usb-ctrl-request-9s" remap="external"><citerefentry><refentrytitle>usb_ctrl_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page)</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-alloc-ctrl-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_ctrl_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-free-ctrl-req-9f" remap="external"><citerefentry><refentrytitle>usb_free_ctrl_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Bulk</para>
+</entry><entry><para><literal>usb_bulk_req_t</literal> (see the <olink targetdoc="group-refman" targetptr="usb-bulk-request-9s" remap="external"><citerefentry><refentrytitle>usb_bulk_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page)</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-alloc-bulk-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_bulk_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-free-bulk-req-9f" remap="external"><citerefentry><refentrytitle>usb_free_bulk_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Interrupt</para>
+</entry><entry><para><literal>usb_intr_req_t</literal> (see the <olink targetdoc="group-refman" targetptr="usb-intr-request-9s" remap="external"><citerefentry><refentrytitle>usb_intr_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page)</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-alloc-intr-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_intr_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-free-intr-req-9f" remap="external"><citerefentry><refentrytitle>usb_free_intr_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Isochronous</para>
+</entry><entry><para><literal>usb_isoc_req_t</literal> (see the <olink targetdoc="group-refman" targetptr="usb-isoc-request-9s" remap="external"><citerefentry><refentrytitle>usb_isoc_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page)</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-alloc-isoc-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_isoc_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-free-isoc-req-9f" remap="external"><citerefentry><refentrytitle>usb_free_isoc_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The following table lists the transfer functions that you can use for
+each type of request.</para><table frame="topbot" id="usb-tbl-34"><title>Request Transfer Setup</title><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_bulk_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_ctrl_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_ctrl_xfer_wait</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_intr_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_stop_intr_polling</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_isoc_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_stop_isoc_polling</function> function</secondary>
+</indexterm><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="586.00px"?><colspec colwidth="25.97*"/><colspec colwidth="74.03*"/><thead><row rowsep="1"><entry><para>Pipe or Endpoint Type</para>
+</entry><entry><para>Transfer Functions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Control</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-pipe-ctrl-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_ctrl_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usb-pipe-ctrl-xfer-wait-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_ctrl_xfer_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Bulk</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-pipe-bulk-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_bulk_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Interrupt</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-pipe-intr-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_intr_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usb-pipe-stop-intr-polling-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_stop_intr_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>Isochronous</para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="usb-pipe-isoc-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_isoc_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usb-pipe-stop-isoc-polling-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_stop_isoc_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Use the following procedure to allocate and deallocate a request:</para><orderedlist><listitem><para>Use the appropriate allocation function to allocate a request
+structure for the type of request you need. The man pages for the request
+structure allocation functions are listed in <olink targetptr="usb-tbl-33" remap="internal">Table&nbsp;20&ndash;1</olink>.</para>
+</listitem><listitem><para>Initialize any fields you need in the structure. See <olink targetptr="usb-26" remap="internal">Request Features and Fields</olink> or the appropriate
+request structure man page for more information. The man pages for the request
+structures are listed in <olink targetptr="usb-tbl-33" remap="internal">Table&nbsp;20&ndash;1</olink>.</para>
+</listitem><listitem><para>When the data transfer is complete, use the appropriate free
+function to free the request structure. The man pages for the request structure
+free functions are listed in <olink targetptr="usb-tbl-33" remap="internal">Table&nbsp;20&ndash;1</olink>.</para>
+</listitem>
+</orderedlist>
+</sect4><sect4 id="usb-26"><title>Request Features and Fields</title><indexterm><primary>USB drivers</primary><secondary>message blocks</secondary>
+</indexterm><indexterm><primary><function>allocb</function>function</primary>
+</indexterm><indexterm><primary><function>freemsg</function> function</primary>
+</indexterm><para>Data for all requests is passed in message blocks so that the data is
+handled uniformly whether the driver is a STREAMS, character, or block driver.
+The message block type, <literal>mblk_t</literal>, is described in the <olink targetdoc="group-refman" targetptr="mblk-9s" remap="external"><citerefentry><refentrytitle>mblk</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page. The DDI offers
+several routines for manipulating message blocks. Examples include <olink targetdoc="group-refman" targetptr="allocb-9f" remap="external"><citerefentry><refentrytitle>allocb</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="freemsg-9f" remap="external"><citerefentry><refentrytitle>freemsg</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. To learn
+about other routines for manipulating message blocks, see the &ldquo;SEE ALSO&rdquo;
+sections of the <citerefentry><refentrytitle>allocb</refentrytitle><manvolnum>9F</manvolnum></citerefentry> and <citerefentry><refentrytitle>freemsg</refentrytitle><manvolnum>9F</manvolnum></citerefentry> man pages. Also see the <olink targetdoc="streams" remap="external"><citetitle remap="book">STREAMS Programming Guide</citetitle></olink>.</para><para>The following request fields are included in all transfer types. In
+each field name, the possible values for <replaceable>xxxx</replaceable> are: <replaceable>ctrl</replaceable>, <replaceable>bulk</replaceable>, <replaceable>intr</replaceable>,
+or <replaceable>isoc</replaceable>.</para><variablelist><varlistentry><term><replaceable>xxxx_client_private</replaceable></term><listitem><para>This field value is a pointer that is intended for internal
+data to be passed around the client driver along with the request.  This pointer
+is not used to transfer data to the device.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>xxxx_attributes</replaceable></term><listitem><para><indexterm><primary>USB structures</primary><secondary><literal>usb_request_attributes</literal></secondary></indexterm>This field value is a set of transfer attributes.
+While this field is common to all request structures, the initialization of
+this field is somewhat different for each transfer type.  See the appropriate
+request structure man page for more information. These man pages are listed
+in <olink targetptr="usb-tbl-33" remap="internal">Table&nbsp;20&ndash;1</olink>. See also the <olink targetdoc="group-refman" targetptr="usb-request-attributes-9s" remap="external"><citerefentry><refentrytitle>usb_request_attributes</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>xxxx_cb</replaceable></term><listitem><para>This field value is a callback function for normal transfer
+completion. This function is called when an asynchronous transfer completes
+without error.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>xxxx_exc_cb</replaceable></term><listitem><para>This field value is a callback function for error handling.
+This function is called only when asynchronous transfers complete with errors.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>xxxx_completion_reason</replaceable></term><listitem><para><indexterm><primary>USB drivers</primary><secondary>data transfer</secondary><tertiary>completion reasons</tertiary></indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_completion_reason</literal></secondary></indexterm>This field holds the completion status of the transfer itself.
+If an error occurred, this field shows what went wrong. See the <olink targetdoc="group-refman" targetptr="usb-completion-reason-9s" remap="external"><citerefentry><refentrytitle>usb_completion_reason</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more information. This field is updated
+by the USBA&nbsp;2.0 framework.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>xxxx_cb_flags</replaceable></term><listitem><para><indexterm><primary>USB drivers</primary><secondary>data transfer</secondary><tertiary>callback status flags</tertiary></indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_callback_flags</literal></secondary></indexterm>This field lists the recovery actions that were taken by the USBA&nbsp;2.0 framework before
+calling the callback handler. The <literal>USB_CB_INTR_CONTEXT</literal> flag
+indicates whether a callback is running in interrupt context. See the <olink targetdoc="group-refman" targetptr="usb-callback-flags-9s" remap="external"><citerefentry><refentrytitle>usb_callback_flags</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more information. This field is updated
+by the USBA&nbsp;2.0 framework.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following sections describe the request fields that are different
+for the four different transfer types. These sections describe how to initialize
+these structure fields. These sections also describe the restrictions on various
+combinations of attributes and parameters.</para>
+</sect4><sect4 id="eqxri"><title>Control Requests</title><indexterm><primary>USB drivers</primary><secondary>control data transfer requests</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary>synchronous control requests</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_ctrl_xfer_wait</function> function</secondary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_ctrl_request</literal></secondary>
+</indexterm><para>Use control requests to initiate message transfers down a control pipe.
+You can set up transfers manually, as described below. You can also set up
+and send synchronous transfers using the <olink targetdoc="group-refman" targetptr="usb-pipe-ctrl-xfer-wait-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_ctrl_xfer_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> wrapper function.</para><para>The client driver must initialize the <replaceable>ctrl_bmRequestType</replaceable>, <replaceable>ctrl_bRequest</replaceable>, <replaceable>ctrl_wValue</replaceable>, <replaceable>ctrl_wIndex</replaceable>, and <replaceable>ctrl_wLength</replaceable> fields
+as described in the USB&nbsp;2.0 specification.</para><para>The <replaceable>ctrl_data</replaceable> field of the request must be
+initialized to point to a data buffer.  The <olink targetdoc="group-refman" targetptr="usb-alloc-ctrl-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_ctrl_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+initializes this field when you pass a positive value as the buffer <replaceable>len</replaceable>. The buffer must, of course, be initialized for any outbound
+transfers. In all cases, the client driver must free the request when the
+transfer is complete.</para><para>Multiple control requests can be queued. Queued requests can be a combination
+of synchronous and asynchronous requests.</para><para>The <replaceable>ctrl_timeout</replaceable> field defines the maximum
+wait time for the request to be processed, excluding wait time on the queue.
+This field applies to both synchronous and asynchronous requests. The <replaceable>ctrl_timeout</replaceable> field is specified in seconds.</para><para>The <replaceable>ctrl_exc_cb</replaceable> field accepts the address
+of a function to call if an exception occurs. The arguments of this exception
+handler are specified in the <olink targetdoc="group-refman" targetptr="usb-ctrl-request-9s" remap="external"><citerefentry><refentrytitle>usb_ctrl_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page. The second argument
+of the exception handler is the <literal>usb_ctrl_req_t</literal> structure.
+Passing the request structure as an argument allows the exception handler
+to check the <replaceable>ctrl_completion_reason</replaceable> and <replaceable>ctrl_cb_flags</replaceable> fields of the request to determine the best recovery action.</para><para>The <literal>USB_ATTRS_ONE_XFER</literal> and <literal>USB_ATTRS_ISOC_*</literal> flags
+are invalid attributes for all control requests.  The <literal>USB_ATTRS_SHORT_XFER_OK</literal> flag is valid only for host-bound requests.</para>
+</sect4><sect4 id="eqxrp"><title>Bulk Requests</title><indexterm><primary>USB drivers</primary><secondary>bulk data transfer requests</secondary>
+</indexterm><indexterm><primary><function>msgb</function> structure</primary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_bulk_request</literal></secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_get_max_bulk_transfer_ size</function> function</secondary>
+</indexterm><indexterm><primary><function>minphys</function> function</primary><secondary>bulk requests</secondary>
+</indexterm><para>Use bulk requests to send data that is not time-critical. Bulk requests
+can take several USB frames to complete, depending on overall bus load.</para><para>All requests must receive an initialized message block. See the <olink targetdoc="group-refman" targetptr="mblk-9s" remap="external"><citerefentry><refentrytitle>mblk</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for a description
+of the <literal>mblk_t</literal> message block type. This message block either
+supplies the data or stores the data, depending on the transfer direction.
+Refer to the <olink targetdoc="group-refman" targetptr="usb-bulk-request-9s" remap="external"><citerefentry><refentrytitle>usb_bulk_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more details.</para><para>The <literal>USB_ATTRS_ONE_XFER</literal> and <literal>USB_ATTRS_ISOC_*</literal> flags
+are invalid attributes for all bulk requests. The <literal>USB_ATTRS_SHORT_XFER_OK</literal> flag is valid only for host-bound requests.</para><para>The <olink targetdoc="group-refman" targetptr="usb-pipe-get-max-bulk-transfer-size-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_get_max_bulk_transfer_size</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+specifies the maximum number of bytes per request. The value retrieved can
+be the maximum value used in the client driver's <olink targetdoc="group-refman" targetptr="minphys-9f" remap="external"><citerefentry><refentrytitle>minphys</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine.</para><para>Multiple bulk requests can be queued.</para>
+</sect4><sect4 id="eqxrk"><title>Interrupt Requests</title><indexterm><primary>USB drivers</primary><secondary>interrupt data transfer requests</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_intr_xfer</function> function</secondary>
+</indexterm><indexterm><primary>USB structures</primary><secondary><literal>usb_alloc_intr_request</literal></secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_stop_intr_polling</function> function</secondary>
+</indexterm><para>Interrupt requests typically are for periodic inbound data. Interrupt
+requests periodically poll the device for data. However, the USBA&nbsp;2.0 framework supports
+one-time inbound interrupt data requests, as well as outbound interrupt data
+requests. All interrupt requests can take advantage of the USB interrupt transfer
+features of timeliness and retry.</para><para>The <literal>USB_ATTRS_ISOC_*</literal> flags are invalid attributes
+for all interrupt requests. The <literal>USB_ATTRS_SHORT_XFER_OK</literal> and <literal>USB_ATTRS_ONE_XFER</literal> flags are valid only for host-bound requests.</para><para>Only one-time polls can be done as synchronous interrupt transfers.
+Specifying the <literal>USB_ATTRS_ONE_XFER</literal> attribute in the request
+results in a one-time poll.</para><para>Periodic polling is started as an asynchronous interrupt transfer. An
+original interrupt request is passed to <olink targetdoc="group-refman" targetptr="usb-pipe-intr-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_intr_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. When polling
+finds new data to return, a  new <literal>usb_intr_req_t</literal> structure
+is cloned from the original and is populated with an initialized data block.
+When allocating the request, specify zero for the <replaceable>len</replaceable> argument
+to the <olink targetdoc="group-refman" targetptr="usb-alloc-intr-req-9f" remap="external"><citerefentry><refentrytitle>usb_alloc_intr_req</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. The <replaceable>len</replaceable> argument
+is zero because the USBA&nbsp;2.0 framework allocates and fills in a new request with each
+callback. After you allocate the request structure, fill in the <replaceable>intr_len</replaceable> field to specify the number of bytes you want the framework
+to allocate with each poll. Data beyond <replaceable>intr_len</replaceable> bytes
+is not returned.</para><para>The client driver must free each request it receives. If the message
+block is sent upstream, decouple the message block from the request before
+you send the message block upstream. To decouple the message block from the
+request, set the data pointer of the request to <literal>NULL</literal>. Setting
+the data pointer of the request to <literal>NULL</literal> prevents the message
+block from being freed when the request is deallocated.</para><para>Call the <citerefentry><refentrytitle>usb_pipe_stop_intr_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to cancel periodic polling.
+When polling is stopped or the pipe is closed, the original request structure
+is returned through an exception callback. This returned request structure
+has its completion reason set to <literal>USB_CR_STOPPED_POLLING</literal>.</para><para>Do not start polling while polling is already in progress. Do not start
+polling while a call to <olink targetdoc="group-refman" targetptr="usb-pipe-stop-intr-polling-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_stop_intr_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is in progress.</para>
+</sect4><sect4 id="eqxrl"><title>Isochronous Requests</title><indexterm><primary>USB drivers</primary><secondary>isochronous data transfer requests</secondary>
+</indexterm><para>Isochronous requests are for streaming, constant-rate, time-relevant
+data. Retries are not made on errors. Isochronous requests have the following
+request-specific fields:</para><variablelist><varlistentry><term><replaceable>isoc_frame_no</replaceable></term><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_get_current_frame_number</function> function</secondary></indexterm>Specify this field when the overall
+transfer must start from a specific frame number. The value of this field
+must be greater than the current frame number. Use <olink targetdoc="group-refman" targetptr="usb-get-current-frame-number-9f" remap="external"><citerefentry><refentrytitle>usb_get_current_frame_number</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to find the current frame number. Note that the current
+frame number is a moving target. For low-speed and full-speed buses, the current
+frame is new each millisecond. For high-speed buses, the current frame is
+new each 0.125 millisecond. Set the <literal>USB_ATTR_ISOC_START_FRAME</literal> attribute
+so that the <replaceable>isoc_frame_no</replaceable> field is recognized.</para><para>To ignore this frame number field and start as soon as possible, set
+the <literal>USB_ATTR_ISOC_XFER_ASAP</literal> flag.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>isoc_pkts_count</replaceable></term><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_get_max_pkts_per_isoc_request</function> function</secondary></indexterm>This field is the number of packets
+in the request. This value is bounded by the value returned by the <olink targetdoc="group-refman" targetptr="usb-get-max-pkts-per-isoc-request-9f" remap="external"><citerefentry><refentrytitle>usb_get_max_pkts_per_isoc_request</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function and by the size of the <replaceable>isoc_pkt_descr</replaceable> array (see below). The number of bytes transferable with this
+request is equal to the product of this <replaceable>isoc_pkts_count</replaceable> value
+and the <replaceable>wMaxPacketSize</replaceable> value of the endpoint.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>isoc_pkts_length</replaceable></term><listitem><para>This field is the sum of the lengths of all packets of the
+request. This value is set by the initiator. This value should be set to zero
+so that the sum of <replaceable>isoc_pkts_length</replaceable> in the <replaceable>isoc_pkt_descr</replaceable> list will be used automatically and no check
+will be applied to this element.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>isoc_error_count</replaceable></term><listitem><para>This field is the number of packets that completed with errors.
+This value is set by the USBA&nbsp;2.0 framework.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>isoc_pkt_descr</replaceable></term><listitem><para><indexterm><primary>USB structures</primary><secondary><literal>usb_isoc_request</literal></secondary></indexterm>This field points to an array of packet
+descriptors that define how much data to transfer per packet. For an outgoing
+request, this value defines a private queue of sub-requests to process. For
+an incoming request, this value describes how the data arrived in pieces.
+The client driver allocates these descriptors for outgoing requests. The framework
+allocates and initializes these descriptors for incoming requests.  Descriptors
+in this array contain framework-initialized fields that hold the number of
+bytes actually transferred and the status of the transfer. See the <olink targetdoc="group-refman" targetptr="usb-isoc-request-9s" remap="external"><citerefentry><refentrytitle>usb_isoc_request</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for more details.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary><function>msgb</function> structure</primary></indexterm>All requests must receive an initialized message block. This message
+block either supplies the data or stores the data. See the <olink targetdoc="group-refman" targetptr="mblk-9s" remap="external"><citerefentry><refentrytitle>mblk</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for a description
+of the <literal>mblk_t</literal> message block type.</para><para>The <literal>USB_ATTR_ONE_XFER</literal> flag is an illegal attribute
+because the system decides how to vary the amounts of data through available
+packets. The <literal>USB_ATTR_SHORT_XFER_OK</literal> flag is valid only
+on host-bound data.</para><para><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_stop_isoc_polling</function> function</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="usb-pipe-isoc-xfer-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_isoc_xfer</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+makes all isochronous transfers asynchronous, regardless of whether the <literal>USB_FLAGS_SLEEP</literal> flag is set. All isochronous input requests start
+polling.</para><para>Call the <olink targetdoc="group-refman" targetptr="usb-pipe-stop-isoc-polling-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_stop_isoc_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to cancel periodic polling. When polling is stopped or the pipe is closed,
+the original request structure is returned through an exception callback.
+This returned request structure has its completion reason set to <literal>USB_CR_STOPPED_POLLING</literal>.</para><para>Polling continues until one of the following events occurs:</para><itemizedlist><listitem><para>A <citerefentry><refentrytitle>usb_pipe_stop_isoc_polling</refentrytitle><manvolnum>9F</manvolnum></citerefentry> call is received.</para>
+</listitem><listitem><para>A device disconnect is reported through an exception callback.</para>
+</listitem><listitem><para><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_close</function> function</secondary></indexterm>A <citerefentry><refentrytitle>usb_pipe_close</refentrytitle><manvolnum>9F</manvolnum></citerefentry> call is received.</para>
+</listitem>
+</itemizedlist>
+</sect4>
+</sect3>
+</sect2><sect2 id="usb-44"><title>Flushing Pipes</title><indexterm><primary>USB drivers</primary><secondary>pipes</secondary><tertiary>flushing</tertiary>
+</indexterm><indexterm><primary>pipes</primary><secondary>flushing</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_reset</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_get_state</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_drain_reqs</function> function</secondary>
+</indexterm><para>You might need to clean up a pipe after errors, or you might want to
+wait for a pipe to clear. Use one of the following methods to flush or clear
+pipes:</para><itemizedlist><listitem><para>The <olink targetdoc="group-refman" targetptr="usb-pipe-reset-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_reset</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function resets the pipe and flushes all of its requests.
+Do this for pipes that are in an error state if autoclearing is not enabled
+on those pipes. Use     <olink targetdoc="group-refman" targetptr="usb-pipe-get-state-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_get_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine
+the state of a pipe.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="usb-pipe-drain-reqs-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_drain_reqs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+blocks waiting for all pending requests to complete before continuing. This
+function can wait indefinitely, or it can time-out after a specified period
+of time. The <citerefentry><refentrytitle>usb_pipe_drain_reqs</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function neither closes nor flushes
+the pipe.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="usb-43"><title>Device State Management</title><indexterm><primary>USB device</primary><secondary>states</secondary>
+</indexterm><para>Managing a USB device includes accounting for hotplugging, system power
+management (checkpoint and resume), and device power management. All client
+drivers should implement the basic state machine shown in the following figure.
+For more information, see <literal>/usr/include/sys/usb/usbai.h</literal>.</para><figure id="euxbq"><title>USB Device State Machine</title><mediaobject><imageobject><imagedata entityref="usb.hotplug.state"/>
+</imageobject><textobject><simpara>Diagram shows what state the device goes to after each
+of seven different events.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>This state machine and its four states can be augmented with driver-specific
+states. Device states <literal>0x80</literal> to <literal>0xff</literal> can
+be defined and used only by client drivers.</para><sect2 id="usb-12"><title>Hotplugging USB Devices</title><indexterm><primary>USB device</primary><secondary>hotplugging</secondary>
+</indexterm><indexterm><primary>hotplugging</primary><secondary>USB device</secondary>
+</indexterm><para>USB devices support hotplugging. A USB device can be inserted or removed
+at any time. The client driver must handle removal and reinsertion of an open
+device. Use hotplug callbacks to handle open devices. Insertion and removal
+of closed devices is handled by the <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points.</para><sect3 id="usb-49"><title>Hotplug Callbacks</title><indexterm><primary>USB device</primary><secondary>hotplugging</secondary><tertiary>callbacks</tertiary>
+</indexterm><para><indexterm><primary>USB drivers</primary><secondary>event notification</secondary></indexterm><indexterm><primary>events</primary><secondary>hotplug notification</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>offlining</secondary></indexterm><indexterm><primary>offlining</primary></indexterm>The USBA&nbsp;2.0 framework supports
+the following event notifications:</para><itemizedlist><listitem><para>The client driver receives a callback when the device is hot
+removed.</para>
+</listitem><listitem><para>The client driver receives a callback when the device is returned
+after hot removal. This event callback can occur when the user returns the
+device to its original port if the driver instance of the device is not offlined.
+If the driver instance is held open, then the driver instance cannot be offlined.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>USB drivers</primary><secondary>registering for events</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_register_hotplug_cbs</function> function</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_unregister_hotplug_cbs</function> function</secondary></indexterm>Client drivers must call <olink targetdoc="group-refman" targetptr="usb-register-hotplug-cbs-9f" remap="external"><citerefentry><refentrytitle>usb_register_hotplug_cbs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in their <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine to register for event
+callbacks.  Drivers must call <olink targetdoc="group-refman" targetptr="usb-unregister-hotplug-cbs-9f" remap="external"><citerefentry><refentrytitle>usb_unregister_hotplug_cbs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in their <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine before
+dismantling.</para>
+</sect3><sect3 id="euaxk"><title>Hot Insertion</title><indexterm><primary>USB device</primary><secondary>hotplugging</secondary><tertiary>insertion</tertiary>
+</indexterm><indexterm><primary>device drivers</primary><secondary><literal>hubd</literal> USB hub driver</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary><literal>hubd</literal> USB hub driver</secondary>
+</indexterm><indexterm><primary><literal>hubd</literal> USB hub driver</primary>
+</indexterm><para>The sequence of events for hot insertion of a USB device is as follows:</para><orderedlist><listitem><para>The hub driver, <olink targetdoc="refman7" targetptr="hubd-7d" remap="external"><citerefentry><refentrytitle>hubd</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>,
+waits for a port connect status change.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver detects a port connect.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver enumerates the device,
+creates child device nodes, and attaches client drivers.  Refer to <olink targetptr="usb-7" remap="internal">Binding Client Drivers</olink> for compatible names definitions.</para>
+</listitem><listitem><para>The client driver manages the device. The driver is in the <literal>ONLINE</literal> state.</para>
+</listitem>
+</orderedlist>
+</sect3><sect3 id="euaxl"><title>Hot Removal</title><indexterm><primary>USB device</primary><secondary>hotplugging</secondary><tertiary>removal</tertiary>
+</indexterm><indexterm><primary>device drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary><literal>usb_mid</literal> USB multi-interface driver</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>offlining</secondary>
+</indexterm><indexterm><primary>offlining</primary>
+</indexterm><indexterm><primary><function>detach</function> entry point</primary><secondary>hot removal</secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>detach</function> function</secondary><tertiary>hot removal</tertiary>
+</indexterm><para>The sequence of events for hot removal of a USB device is as follows:</para><orderedlist><listitem><para>The hub driver, <olink targetdoc="refman7" targetptr="hubd-7d" remap="external"><citerefentry><refentrytitle>hubd</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>,
+waits for a port connect status change.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver detects a port disconnect.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver sends a disconnect event
+to the child client driver. If the child client driver is the <literal>hubd</literal> driver
+or the <olink targetdoc="refman7" targetptr="usb-mid-7d" remap="external"><citerefentry><refentrytitle>usb_mid</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> multi-interface
+driver, then the child client driver propagates the event to its children.</para>
+</listitem><listitem><para>The client driver receives the disconnect event notification
+in kernel thread context. Kernel thread context enables the driver's disconnect
+handler to block.</para>
+</listitem><listitem><para>The client driver moves to the <literal>DISCONNECTED</literal> state.
+Outstanding I/O transfers fail with the completion reason of <literal>device
+not responding</literal>. All new I/O transfers and attempts to open the device
+node also fail. The client driver is not required to close pipes. The driver
+is required to save the device and driver context that needs to be restored
+if the device is reconnected.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver attempts to offline the
+OS device node and its children in bottom-up order.</para>
+</listitem>
+</orderedlist><para>The following events take place if the device node is not open when
+the <literal>hubd</literal> driver attempts to offline the device node:</para><orderedlist><listitem><para>The client driver's <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called.</para>
+</listitem><listitem><para>The device node is destroyed.</para>
+</listitem><listitem><para>The port becomes available for a new device.</para>
+</listitem><listitem><para>The hotplug sequence of events starts over. The <literal>hubd</literal> driver
+waits for a port connect status change.</para>
+</listitem>
+</orderedlist><para>The following events take place if the device node is open when the <literal>hubd</literal> driver attempts to offline the device node:</para><orderedlist><listitem><para>The <literal>hubd</literal> driver puts the offline request
+in the periodic offline retry queue.</para>
+</listitem><listitem><para>The port remains unavailable for a new device.</para>
+</listitem>
+</orderedlist><para>If the device node was open when the <literal>hubd</literal> driver
+attempted to offline the device node and the user later closes the device
+node, the <literal>hubd</literal> driver periodic offlining of that device
+node succeeds and the following events take place:</para><orderedlist><listitem><para>The client driver's <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point is called.</para>
+</listitem><listitem><para>The device node is destroyed.</para>
+</listitem><listitem><para>The port becomes available for a new device.</para>
+</listitem><listitem><para>The hotplug sequence of events starts over. The <literal>hubd</literal> driver
+waits for a port connect status change.</para>
+</listitem>
+</orderedlist><para>If the user closes all applications that use the device, the port becomes
+available again. If the application does not terminate or does not close the
+device, the port remains unavailable.</para>
+</sect3><sect3 id="euaxr"><title>Hot Reinsertion</title><indexterm><primary>USB device</primary><secondary>hotplugging</secondary><tertiary>reinsertion</tertiary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>configuration descriptor clouds</secondary>
+</indexterm><indexterm><primary>configuration descriptor clouds</primary>
+</indexterm><para>The following events take place if a previously-removed device is reinserted
+into the same port while the device node of the device is still open:</para><orderedlist><listitem><para>The hub driver, <olink targetdoc="refman7" targetptr="hubd-7d" remap="external"><citerefentry><refentrytitle>hubd</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>,
+detects a port connect.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver restores the bus address
+and the device configuration.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver cancels the offline retry
+request.</para>
+</listitem><listitem><para>The <literal>hubd</literal> driver sends a connect event to
+the client driver.</para>
+</listitem><listitem><para>The client driver receives the connect event.</para>
+</listitem><listitem><para>The client driver determines whether the new device is the
+same as the device that was previously connected. The client driver makes
+this determination first by comparing device descriptors. The client driver
+might also compare serial numbers and configuration descriptor clouds.</para>
+</listitem>
+</orderedlist><para>The following events might take place if the client driver determines
+that the current device is not the same as the device that was previously
+connected:</para><orderedlist><listitem><para>The client driver might issue a warning message to the console.</para>
+</listitem><listitem><para>The user might remove the device again. If the user removes
+the device again, the hot remove sequence of events starts over. The <literal>hubd</literal> driver detects a port disconnect. If the user does not remove the
+device again, the following events take place:</para><orderedlist><listitem><para>The client driver remains in the <literal>DISCONNECTED</literal> state,
+failing all requests and opens.</para>
+</listitem><listitem><para>The port remains unavailable. The user must close and disconnect
+the device to free the port.</para>
+</listitem><listitem><para>The hotplug sequence of events starts over when the port is
+freed. The <literal>hubd</literal> driver waits for a port connect status
+change.</para>
+</listitem>
+</orderedlist>
+</listitem>
+</orderedlist><para>The following events might take place if the client driver determines
+that the current device is the same as the device that was previously connected:</para><orderedlist><listitem><para>The client driver might restore its state and continue normal
+operation. This policy is up to the client driver. Audio speakers are a good
+example where the client driver should continue.</para>
+</listitem><listitem><para>If it is safe to continue using the reconnected device, the
+hotplug sequence of events starts over. The <literal>hubd</literal> driver
+waits for a port connect status change. The device is in service once again.</para>
+</listitem>
+</orderedlist>
+</sect3>
+</sect2><sect2 id="usb-13"><title>Power Management</title><indexterm><primary>USB device</primary><secondary>power management</secondary>
+</indexterm><indexterm><primary>power management</primary><secondary>USB devices</secondary>
+</indexterm><para>This section discusses device power management and system power management.</para><para>Device power management manages individual USB devices depending on
+their I/O activity or idleness.</para><para>System power management uses checkpoint and resume to checkpoint the
+state of the system into a file and shut down the system completely. (Checkpoint
+is sometimes called &ldquo;system suspend.&rdquo;) The system is resumed to
+its pre-suspend state when the system is powered up again.</para><sect3 id="usb-14"><title>Device Power Management</title><indexterm><primary>USB device</primary><secondary>power management</secondary><tertiary>device</tertiary>
+</indexterm><indexterm><primary>device power management</primary><secondary>USB devices</secondary>
+</indexterm><indexterm><primary><function>attach</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_create_pm_components</function> function</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>usb_create_pm_components</function> function</secondary>
+</indexterm><indexterm><primary><function>power</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>power</function> function</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>power</function> entry point</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>pm_busy_component</function> function</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>pm_idle_component</function> function</secondary>
+</indexterm><indexterm><primary>device power management</primary><secondary><function>pm_raise_power</function> function</secondary>
+</indexterm><indexterm><primary><function>pm_busy_component</function> function</primary>
+</indexterm><indexterm><primary><function>pm_idle_component</function> function</primary>
+</indexterm><indexterm><primary><function>pm_raise_power</function> function</primary>
+</indexterm><para>The following summary lists what your driver needs to do to power manage
+a USB device. A more detailed description of power management follows this
+summary.</para><orderedlist><listitem><para>Create power management components during <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. See the <olink targetdoc="group-refman" targetptr="usb-create-pm-components-9f" remap="external"><citerefentry><refentrytitle>usb_create_pm_components</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>Implement the <olink targetdoc="group-refman" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> before accessing the device.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when finished accessing the
+device.</para>
+</listitem>
+</orderedlist><para>The USBA&nbsp;2.0 framework supports four power levels as specified by the USB interface
+power management specification. See <literal>/usr/include/sys/usb/usbai.h</literal> for
+information on mapping USB power levels to operating system power levels.</para><para>The <literal>hubd</literal> driver suspends the port when the device
+goes to the <literal>USB_DEV_OS_PWR_OFF</literal> state. The <literal>hubd</literal> driver
+resumes the port when the device goes to the <literal>USB_DEV_OS_PWR_1</literal> state
+and above. Note that port suspend is different from system suspend. In port
+suspend, only the USB port is shut off. System suspend is defined in <olink targetptr="usb-15" remap="internal">System Power Management</olink>.</para><para><indexterm><primary>USB device</primary><secondary>remote wakeup</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_handle_remote_wakeup</function> function</secondary></indexterm>The client driver might choose
+to enable remote wakeup on the device. See the <olink targetdoc="group-refman" targetptr="usb-handle-remote-wakeup-9f" remap="external"><citerefentry><refentrytitle>usb_handle_remote_wakeup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.
+When the <literal>hubd</literal> driver sees a remote wakeup on a port, the <literal>hubd</literal> driver completes the wakeup operation and calls <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to notify the child.</para><para>The following figure shows the relationship between the different pieces
+of power management.</para><figure id="euxbo"><title>USB Power Management</title><mediaobject><imageobject><imagedata entityref="usb.pwr.mgmt"/>
+</imageobject><textobject><simpara>Diagram shows when to employ two different power management
+schemes.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The driver can implement one of the two power management schemes described
+at the bottom of <olink targetptr="euxbo" remap="internal">Figure&nbsp;20&ndash;5</olink>.
+The passive scheme is simpler than the active scheme because the passive scheme
+does not do power management during device transfers.</para><sect4 id="ewavf"><title>Active Power Management</title><indexterm><primary>USB device</primary><secondary>power management</secondary><tertiary>active</tertiary>
+</indexterm><para><indexterm><primary><function>attach</function> entry point</primary><secondary>active power management</secondary></indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function> function</secondary><tertiary>active power management</tertiary></indexterm><indexterm><primary><function>detach</function> entry point</primary><secondary>active power management</secondary></indexterm><indexterm><primary>entry points</primary><secondary><function>detach</function> function</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_create_pm_components</function> function</secondary></indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_handle_remote_wakeup</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_busy_component</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_idle_component</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_raise_power</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>pm_lower_power</function> function</secondary></indexterm><indexterm><primary><function>pm_busy_component</function> function</primary></indexterm><indexterm><primary><function>pm_idle_component</function> function</primary></indexterm><indexterm><primary><function>pm_raise_power</function> function</primary></indexterm><indexterm><primary><function>pm_lower_power</function> function</primary></indexterm>This
+section describes the functions you need to use to implement the active power
+management scheme.</para><para>Do the following work in the <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for your driver:</para><orderedlist><listitem><para>Call <olink targetdoc="group-refman" targetptr="usb-create-pm-components-9f" remap="external"><citerefentry><refentrytitle>usb_create_pm_components</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Optionally call <olink targetdoc="group-refman" targetptr="usb-handle-remote-wakeup-9f" remap="external"><citerefentry><refentrytitle>usb_handle_remote_wakeup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> with <literal>USB_REMOTE_WAKEUP_ENABLE</literal> as the second argument to enable a remote wakeup on the device.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to take power to the <literal>USB_DEV_OS_FULL_PWR</literal> level.</para>
+</listitem><listitem><para>Communicate with the device to initialize the device.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</orderedlist><para>Do the following work in the <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for your driver:</para><orderedlist><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to take power to the <literal>USB_DEV_OS_FULL_PWR</literal> level.</para>
+</listitem><listitem><para>If you called the <citerefentry><refentrytitle>usb_handle_remote_wakeup</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function in your <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point, call <citerefentry><refentrytitle>usb_handle_remote_wakeup</refentrytitle><manvolnum>9F</manvolnum></citerefentry> here with <literal>USB_REMOTE_WAKEUP_DISABLE</literal> as the second argument.</para>
+</listitem><listitem><para>Communicate with the device to cleanly shut down the device.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-lower-power-9f" remap="external"><citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to take power to the <literal>USB_DEV_OS_PWR_OFF</literal> level.</para><para>This is the only time a client driver calls <citerefentry><refentrytitle>pm_lower_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</orderedlist><para>When a driver thread wants to start I/O to the device, that thread does
+the following tasks:</para><orderedlist><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Call <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to take power to the <literal>USB_DEV_OS_FULL_PWR</literal> level.</para>
+</listitem><listitem><para>Begin the I/O transfer.</para>
+</listitem>
+</orderedlist><para>The driver calls <olink targetdoc="group-refman" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when the driver receives
+notice that an I/O transfer has completed.</para><para><indexterm><primary><function>power</function> entry point</primary></indexterm><indexterm><primary>entry points</primary><secondary><function>power</function> function</secondary></indexterm><indexterm><primary>device power management</primary><secondary><function>power</function> entry point</secondary></indexterm>In
+the <olink targetdoc="group-refman" targetptr="power-9e" remap="external"><citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point for your driver, check whether the power level to which you are transitioning
+is valid. You might also need to account for different  threads calling into <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> at
+the same time.</para><para>The <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine might be called to take the device to the <literal>USB_DEV_OS_PWR_OFF</literal> state if the device has been idle for some time or the system is
+shutting down. This state corresponds to the <literal>PWRED_DWN</literal> state
+shown in <olink targetptr="euxbq" remap="internal">Figure&nbsp;20&ndash;4</olink>. If the device
+is going to the <literal>USB_DEV_OS_PWR_OFF</literal> state, do the following
+work in your <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine:</para><orderedlist><listitem><para>Put all open pipes into the idle state. For example, stop
+polling on the interrupt pipe.</para>
+</listitem><listitem><para>Save any device or driver context that needs to be saved.</para><para>The port to which the device is connected is suspended after the call
+to <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> completes.</para>
+</listitem>
+</orderedlist><para>The <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine might be called to power on the device when either
+a device-initiated remote wakeup or a system-initiated wakeup is received.
+Wakeup notices occur after the device has been powered down due to extended
+idle time or system suspend. If the device is going to the <literal>USB_DEV_OS_PWR_1</literal> state or above, do the following work in your <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine:</para><orderedlist><listitem><para>Restore any needed device and driver context.</para>
+</listitem><listitem><para>Restart activity on the pipe that is appropriate to the specified
+power level. For example, start polling on the interrupt pipe.</para>
+</listitem>
+</orderedlist><para>If the port to which the device is connected was previously suspended,
+that port is resumed before <citerefentry><refentrytitle>power</refentrytitle><manvolnum>9E</manvolnum></citerefentry> is called.</para>
+</sect4><sect4 id="ewavb"><title>Passive Power Management</title><indexterm><primary>USB device</primary><secondary>power management</secondary><tertiary>passive</tertiary>
+</indexterm><para>The passive power management scheme is simpler than the active power
+management scheme described above. In this passive scheme, no power management
+is done during transfers. To implement this passive scheme, call <olink targetdoc="group-refman" targetptr="pm-busy-component-9f" remap="external"><citerefentry><refentrytitle>pm_busy_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pm-raise-power-9f" remap="external"><citerefentry><refentrytitle>pm_raise_power</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when you open the device.
+Then call <olink targetdoc="group-refman" targetptr="pm-idle-component-9f" remap="external"><citerefentry><refentrytitle>pm_idle_component</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> when you close the device.</para>
+</sect4>
+</sect3><sect3 id="usb-15"><title>System Power Management</title><indexterm><primary>USB device</primary><secondary>power management</secondary><tertiary>system</tertiary>
+</indexterm><indexterm><primary>system power management</primary><secondary>USB devices</secondary>
+</indexterm><indexterm><primary>CPR (CheckPoint and Resume)</primary>
+</indexterm><indexterm><primary><function>attach</function> entry point</primary><secondary>system power management</secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function> function</secondary><tertiary>system power management</tertiary>
+</indexterm><indexterm><primary><function>detach</function> entry point</primary><secondary>system power management</secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>detach</function> function</secondary><tertiary>system power management</tertiary>
+</indexterm><para>System power management consists of turning off the entire system after
+saving its state, and restoring the state after the system is turned back
+on. This process is called <emphasis>CPR</emphasis> (checkpoint and resume).
+USB client drivers operate the same way that other client drivers operate
+with respect to CPR.  To suspend a device, the driver's <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+is called with a <replaceable>cmd</replaceable> argument of <literal>DDI_SUSPEND</literal>.
+To resume a device, the driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called with
+a <replaceable>cmd</replaceable> argument of <literal>DDI_RESUME</literal>.
+When you handle the <literal>DDI_SUSPEND</literal> command in your <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine,
+clean up device state and clean up driver state as much as necessary for a
+clean resume later. (Note that this  corresponds to the <literal>SUSPENDED</literal> state
+in <olink targetptr="euxbq" remap="internal">Figure&nbsp;20&ndash;4</olink>.) When you handle
+the <literal>DDI_RESUME</literal> command in your <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine, always take
+the device to full power to put the system in sync with the device.</para><para>For USB devices, suspend and resume are handled similarly to a hotplug
+disconnect and reconnect (see <olink targetptr="usb-12" remap="internal">Hotplugging USB Devices</olink>).
+An important difference between CPR and hotplugging is that with CPR the driver
+can fail the checkpoint process if the device is not in a state from which
+it can be suspended. For example, the device cannot be suspended if the device
+has an error recovery in progress. The device also cannot be suspended if
+the device is busy and cannot be stopped safely.</para>
+</sect3>
+</sect2><sect2 id="eqbsy"><title>Serialization</title><para>In general, a driver should not call USBA functions while the driver
+is holding a mutex. Therefore, race conditions in a client driver can be difficult
+to prevent.</para><para>Do not allow normal operational code to run simultaneously with the
+processing of asynchronous events such as a disconnect or CPR. These types
+of asynchronous events normally clean up and dismantle pipes and could disrupt
+the normal operational code.</para><para>One way to manage race conditions and protect normal operational code
+is to write a serialization facility that can acquire and release an exclusive-access
+synchronization object. You can write the serialization facility in such a
+way that the synchronization object is safe to hold through calls to USBA
+functions.  The <literal>usbskel</literal> sample driver demonstrates this
+technique. See <olink targetptr="ewavr" remap="internal">Sample USB Device Driver</olink> for
+information on the <literal>usbskel</literal> driver.</para>
+</sect2>
+</sect1><sect1 id="usb-17"><title>Utility Functions</title><para>This section describes several functions that are of general use.</para><sect2 id="usb-42"><title>Device Configuration Facilities</title><para>This section describes functions related to device configuration.</para><sect3 id="erfbk"><title>Getting Interface Numbers</title><indexterm><primary>device drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary>USB drivers</primary><secondary><literal>usb_mid</literal> USB multi-interface driver</secondary>
+</indexterm><indexterm><primary><literal>usb_mid</literal> USB multi-interface driver</primary>
+</indexterm><indexterm><primary>device</primary><secondary>interface number</secondary>
+</indexterm><indexterm><primary>USB device</primary><secondary>interface number</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_if_number</function> function</secondary>
+</indexterm><para>If you are using a multiple-interface device where the <olink targetdoc="refman7" targetptr="usb-mid-7d" remap="external"><citerefentry><refentrytitle>usb_mid</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver is making only one
+of its interfaces available to the calling driver, you might need to know
+the number of the interface to which the calling driver is bound. Use the <olink targetdoc="group-refman" targetptr="usb-get-if-number-9f" remap="external"><citerefentry><refentrytitle>usb_get_if_number</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to do any of the following tasks:</para><itemizedlist><listitem><para>Return the number of the interface to which the calling driver
+is bound. The <citerefentry><refentrytitle>usb_get_if_number</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns an interface number
+greater than zero in this case.</para>
+</listitem><listitem><para>Discover that the calling driver manages an entire multi-interface
+device. The driver is bound at the device level so that <literal>usb_mid</literal> has
+not split it. The <citerefentry><refentrytitle>usb_get_if_number</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns <literal>USB_DEVICE_NODE</literal> in this case.</para>
+</listitem><listitem><para>Discover that the calling driver manages an entire device
+by managing the only interface that device offers in its current configuration.
+The <citerefentry><refentrytitle>usb_get_if_number</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns <literal>USB_COMBINED_NODE</literal> in this
+case.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="erfbn"><title>Managing Entire Devices</title><indexterm><primary>USB functions</primary><secondary><function>usb_owns_device</function> function</secondary>
+</indexterm><para><indexterm><primary>device</primary><secondary>composite</secondary></indexterm><indexterm><primary>USB device</primary><secondary>composite</secondary></indexterm>If a driver manages an entire composite device, that driver can
+bind to the entire device by using a compatible name that contains vendor
+ID, product ID, and revision ID. A driver that is bound to an entire composite
+device must manage all the interfaces of that device as a nexus driver would.
+In general, you should not bind your driver to an entire composite device.
+Instead, you should use the generic multiple-interface driver <olink targetdoc="refman7" targetptr="usb-mid-7d" remap="external"><citerefentry><refentrytitle>usb_mid</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>.</para><para>Use the <olink targetdoc="group-refman" targetptr="usb-owns-device-9f" remap="external"><citerefentry><refentrytitle>usb_owns_device</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to determine whether a driver owns an entire
+device. The device might be a composite device. The <citerefentry><refentrytitle>usb_owns_device</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns <literal>TRUE</literal> if the driver owns
+the entire device.</para>
+</sect3><sect3 id="usb-36"><title>Multiple-Configuration Devices</title><indexterm><primary>USB drivers</primary><secondary>set configuration</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_cfg</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><command>cfgadm_usb</command> command</secondary>
+</indexterm><indexterm><primary><command>cfgadm_usb</command> command</primary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_set_cfg</function> function</secondary>
+</indexterm><para>USB devices make only a single configuration available to the host at
+any particular time. Most devices support only a single configuration. However,
+a few USB devices support multiple configurations.</para><para><indexterm><primary>device</primary><secondary>splitting interfaces</secondary></indexterm><indexterm><primary>USB device</primary><secondary>splitting interfaces</secondary></indexterm>Any device that has multiple configurations is placed
+into the first configuration for which a driver is available. When seeking
+a match, device configurations are considered in numeric order. If no matching
+driver is found, the device is set to the first configuration. In this case,
+the <literal>usb_mid</literal> driver takes over the device and splits the
+device into interface nodes. Use the <olink targetdoc="group-refman" targetptr="usb-get-cfg-9f" remap="external"><citerefentry><refentrytitle>usb_get_cfg</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to return the current
+configuration of a device.</para><para>You can use either of the following two methods to request a different
+configuration. Using either of these two methods to modify the device configuration
+ensures that the USBA module remains in sync with the device.</para><itemizedlist><listitem><para>Use the <olink targetdoc="group-refman" targetptr="cfgadm-usb-1m" remap="external"><citerefentry><refentrytitle>cfgadm_usb</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para>
+</listitem><listitem><para>Call the <olink targetdoc="group-refman" targetptr="usb-set-cfg-9f" remap="external"><citerefentry><refentrytitle>usb_set_cfg</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function from the driver.</para><para>Because changing device configuration affects an entire device, the
+client driver must meet all of the following criteria to call the <citerefentry><refentrytitle>usb_set_cfg</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function successfully:</para><itemizedlist><listitem><para>The client driver must own the entire device.</para>
+</listitem><listitem><para>The device must have no child nodes, because other drivers
+could drive the device through them.</para>
+</listitem><listitem><para>All pipes except the default pipe must be closed.</para>
+</listitem><listitem><para>The device must have multiple configurations.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><caution><para>Do not change the device configuration by doing a <literal>SET_CONFIGURATION</literal> USB request manually. Using a <literal>SET_CONFIGURATION</literal> request
+to change the configuration is not supported.</para>
+</caution>
+</sect3><sect3 id="erfay"><title>Modifying or Getting the Alternate Setting</title><indexterm><primary>USB drivers</primary><secondary>set alternate</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_set_alt_if</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_get_alt_if</function> function</secondary>
+</indexterm><indexterm><primary>pipe</primary><secondary>alternate setting</secondary>
+</indexterm><para>A client driver can call the <olink targetdoc="group-refman" targetptr="usb-set-alt-if-9f" remap="external"><citerefentry><refentrytitle>usb_set_alt_if</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to change the selected
+alternate setting of the currently selected interface. Be sure to close all
+pipes that were opened explicitly. When switching alternate settings, the <citerefentry><refentrytitle>usb_set_alt_if</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function verifies that only the default pipe is open. Be sure
+the device is settled before you call <citerefentry><refentrytitle>usb_set_alt_if</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para><para>Changing the alternate setting can affect which endpoints and which
+class-specific and vendor-specific descriptors are available to the driver.
+See <olink targetptr="usb-10" remap="internal">The Descriptor Tree</olink> for more information
+about endpoints and descriptors.</para><para>Call the <olink targetdoc="group-refman" targetptr="usb-get-alt-if-9f" remap="external"><citerefentry><refentrytitle>usb_get_alt_if</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to retrieve the number of the current alternate
+setting.</para><note><para>When you request a new alternate setting, a new configuration,
+or a new interface, all pipes except the default pipe to the device must be
+closed. This is because changing an alternate setting, a configuration, or
+an interface changes the mode of operation of the device. Also, changing an
+alternate setting, a configuration, or an interface changes the device's presentation
+to the system.</para>
+</note>
+</sect3>
+</sect2><sect2 id="usb-45"><title>Other Utility Functions</title><para>This section describes other functions that are useful in USB device
+drivers.</para><sect3 id="usb-35"><title>Retrieving a String Descriptor</title><indexterm><primary>USB functions</primary><secondary><function>usb_get_string_descr</function> function</secondary>
+</indexterm><para>Call the <olink targetdoc="group-refman" targetptr="usb-get-string-descr-9f" remap="external"><citerefentry><refentrytitle>usb_get_string_descr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve a string descriptor given its index. Some configuration, interface,
+or device descriptors have string IDs associated with them. Such descriptors
+contain string index fields with nonzero values. Pass a string index field
+value to the <citerefentry><refentrytitle>usb_get_string_descr</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to retrieve the corresponding string.</para>
+</sect3><sect3 id="usb-38"><title>Pipe Private Data Facility</title><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_get_private</function> function</secondary>
+</indexterm><indexterm><primary>USB functions</primary><secondary><function>usb_pipe_set_private</function> function</secondary>
+</indexterm><para>Each pipe has one pointer of space set aside for the client driver's
+private use. Use the <olink targetdoc="group-refman" targetptr="usb-pipe-set-private-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_set_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to install a value. Use the <olink targetdoc="group-refman" targetptr="usb-pipe-get-private-9f" remap="external"><citerefentry><refentrytitle>usb_pipe_get_private</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve the value. This facility is useful in callbacks, when pipes might
+need to bring their own client-defined state to the callback for specific
+processing.</para>
+</sect3><sect3 id="usb-39"><title>Clearing a USB Condition</title><indexterm><primary>USB functions</primary><secondary><function>usb_clr_feature</function> function</secondary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="usb-clr-feature-9f" remap="external"><citerefentry><refentrytitle>usb_clr_feature</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to do the following tasks:</para><itemizedlist><listitem><para>Issue a USB <literal>CLEAR_FEATURE</literal> request to clear
+a halt condition on an endpoint.</para>
+</listitem><listitem><para>Clear a remote wakeup condition on a device.</para>
+</listitem><listitem><para>Clear a device-specific condition at a device, interface,
+or endpoint level.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="usb-40"><title>Getting Device, Interface, or Endpoint Status</title><indexterm><primary>USB functions</primary><secondary><function>usb_get_status</function> function</secondary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="usb-get-status-9f" remap="external"><citerefentry><refentrytitle>usb_get_status</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to issue a USB <literal>GET_STATUS</literal> request
+to retrieve the status of a device, interface, or endpoint.</para><itemizedlist><listitem><para><emphasis role="strong">Device status</emphasis>. Self-powered
+and remote-wakeup-enabled.</para>
+</listitem><listitem><para><emphasis role="strong">Interface status</emphasis>. Returns
+zero, per USB&nbsp;2.0 specification.</para>
+</listitem><listitem><para><emphasis role="strong">Endpoint status</emphasis>. Endpoint
+halted. This status indicates a functional stall. A halt must be cleared before
+the device can operate again.</para><para>A protocol stall indicates that
+an unsupported control pipe request has been made. A protocol stall is cleared
+automatically at the beginning of the next control transfer.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="usb-41"><title>Getting the Bus Address of a Device</title><indexterm><primary>USB functions</primary><secondary><function>usb_get_addr</function> function</secondary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="usb-get-addr-9f" remap="external"><citerefentry><refentrytitle>usb_get_addr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to get the USB bus address of a device for
+debugging purposes. This address maps to a particular USB port.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="ewavr"><title>Sample USB Device Driver</title><para>This section describes a template USB device driver that uses the USBA&nbsp;2.0 framework for
+the Solaris environment. This driver demonstrates many of the features discussed
+in this chapter. This template or skeleton driver is named <literal>usbskel</literal>.</para><para>The <literal>usbskel</literal> driver is a template that you can use
+to start your own USB device driver. The <literal>usbskel</literal> driver
+demonstrates the following features:</para><itemizedlist><listitem><para>Reading the raw configuration data of a device. Every USB
+device needs to be able to report device raw configuration data.</para>
+</listitem><listitem><para>Managing pipes. The <literal>usbskel</literal> driver opens
+an interrupt pipe to show how to manage pipes.</para>
+</listitem><listitem><para>Polling. Comments in the <literal>usbskel</literal> driver
+discuss how to do polling.</para>
+</listitem><listitem><para>USB version management and registration.</para>
+</listitem><listitem><para>USB logging.</para>
+</listitem><listitem><para>Accommodations for USB hotplugging.</para>
+</listitem><listitem><para>Accommodations for Solaris suspend and resume.</para>
+</listitem><listitem><para>Accommodations for power management.</para>
+</listitem><listitem><para>USB serialization.</para>
+</listitem><listitem><para>Use of USB callbacks.</para>
+</listitem>
+</itemizedlist><para>This <literal>usbskel</literal> driver is available on Sun's web site
+at <ulink url="http://www.sun.com/bigadmin/software/usbskel/" type="url"></ulink>.</para><para>For source for additional USB drivers, see the OpenSolaris web site.
+Go to <ulink url="http://www.opensolaris.org/os/" type="url"></ulink>, and
+click &ldquo;Source Browser&rdquo; in the menu on the left side of the page.</para>
+</sect1>
+</chapter><?Pub *0000142068 0?>

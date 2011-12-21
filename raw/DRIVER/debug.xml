@@ -1,0 +1,1186 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(2)part(title()partintro()chapter()?><chapter id="debug-60"><?Pub Tag atict:info tracking="off" ref="2"?><?Pub Tag atict:user
+user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user user="ae149097"
+fullname="Alta Elstad"?><title>Debugging, Testing, and Tuning Device Drivers</title><indexterm><primary>device drivers</primary><secondary>debugging</secondary>
+</indexterm><highlights><para>This chapter presents an overview of the various tools that are provided
+to assist with testing, debugging, and tuning device drivers. This chapter
+provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="debug-61" remap="internal">Testing Drivers</olink> &ndash;
+Testing a driver can potentially impair a system's ability to function. Use
+of both serial connections and alternate kernels helps facilitate recovery
+from crashes.</para>
+</listitem><listitem><para><olink targetptr="euxdb" remap="internal">Debugging Tools</olink> &ndash; Integral
+debugging facilities enable you to exercise and observe driver features conveniently
+without having to run a separate debugger.</para>
+</listitem><listitem><para><olink targetptr="euxde" remap="internal">Tuning Drivers</olink> &ndash; The
+Solaris OS provides facilities for measuring the performance of device drivers.
+Writing kernel statistics structures for your device exports continuous statistics
+as the device is running. If an area for performance improvement is determined,
+then the DTrace dynamic instrumentation tool can help determine any problems
+more precisely.</para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="debug-61"><title>Testing Drivers</title><indexterm><primary>configuration</primary><secondary>testing device drivers</secondary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>testing</secondary>
+</indexterm><indexterm><primary>testing device drivers</primary>
+</indexterm><para>To avoid data loss and other problems, you should take special care
+when testing a new device driver. This section discusses various testing strategies.
+For example, setting up a separate system that you control through a serial
+connection is the safest way to test a new driver. You can load test modules
+with various kernel variable settings to test performance under different
+kernel conditions. Should your system crash, you should be prepared to restore
+backup data, analyze any crash dumps, and rebuild the device directory.</para><sect2 id="deadman"><title>Enable the Deadman Feature to Avoid a Hard Hang</title><para><indexterm><primary><command>kmdb</command> kernel debugger</primary></indexterm><indexterm><primary><varname>snooping</varname> kernel variable</primary></indexterm><indexterm><primary>deadman kernel feature</primary></indexterm>If
+your system is in a hard hang, then you cannot break into the debugger. If
+you enable the deadman feature, the system panics instead of hanging indefinitely.
+You can then use the <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> kernel
+debugger to analyze your problem.</para><para>The deadman feature checks every second whether the system clock is
+updating. If the system clock is not updating, then you are in an indefinite
+hang. If the system clock has not been updated for 50 seconds, the deadman
+feature induces a panic and puts you in the debugger.</para><orderedlist><para>Take the following steps to enable the deadman feature:</para><listitem><para>Make sure you are capturing crash images with <olink targetdoc="group-refman" targetptr="dumpadm-1m" remap="external"><citerefentry><refentrytitle>dumpadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Set the <varname>snooping</varname> variable in the <filename>/etc/system</filename> file. See the <olink targetdoc="refman4" targetptr="system-4" remap="external"><citerefentry><refentrytitle>system</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page for information on the <filename>/etc/system</filename> file.</para><programlisting>set snooping=1</programlisting>
+</listitem><listitem><para>Reboot the system so that the <filename>/etc/system</filename> file
+is read again and the <varname>snooping</varname> setting takes effect.</para>
+</listitem>
+</orderedlist><para>Note that any zones on your system inherit the deadman setting as well.</para><para>If your system hangs while the deadman feature is enabled, you should
+see output similar to the following example on your console:</para><programlisting>panic[cpu1]/thread=30018dd6cc0: deadman: timed out after 9 seconds of
+clock inactivity
+
+panic: entering debugger (continue to save dump)</programlisting><para>Inside the debugger, use the <command>::cpuinfo</command> command to
+investigate why the clock interrupt was not able to fire and advance the system
+time.</para>
+</sect2><sect2 id="debug-62"><title>Testing With a Serial Connection</title><para><indexterm><primary>debugging</primary><secondary>setting up a serial connection</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>debugging</secondary><tertiary>setting up a serial connection</tertiary></indexterm><indexterm><primary><literal>tip</literal> connection</primary></indexterm><indexterm><primary>serial connection</primary></indexterm>Using
+a serial connection is a good way to test drivers. Use the <olink targetdoc="refman1" targetptr="tip-1" remap="external"><citerefentry><refentrytitle>tip</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command to make a serial connection
+between a host system and a test system. With this approach, the <emphasis>tip
+window</emphasis> on the host console is used as the console of the test machine.
+See the <olink targetdoc="group-refman" targetptr="tip-1" remap="external"><citerefentry><refentrytitle>tip</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for additional information.</para><itemizedlist><para>A tip window has the following advantages:</para><listitem><para>Interactions with the test system and kernel debuggers can
+be monitored. For example, the window can keep a log of the session for use
+if the driver crashes the test system.</para>
+</listitem><listitem><para>The test machine can be accessed remotely by logging into
+a <emphasis>tip host</emphasis> machine and using <olink targetdoc="group-refman" targetptr="tip-1" remap="external"><citerefentry><refentrytitle>tip</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to connect to the test machine.</para>
+</listitem>
+</itemizedlist><note><para>Although using a tip connection and a second machine are not required
+to debug a Solaris device driver, this technique is still recommended.</para>
+</note><task id="debug-63"><title>To Set Up the Host System for a <command>tip</command> Connection</title><procedure><step id="debug-step-65"><para>Connect the host system to the test machine
+using serial port A on both machines.</para><para>This connection must be
+made with a null modem cable.</para>
+</step><step id="debug-step-66"><para>On the host system, make sure there is an entry
+in <filename>/etc/remote</filename> for the connection. See the <olink targetdoc="refman4" targetptr="remote-4" remap="external"><citerefentry><refentrytitle>remote</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page for details.</para><para>The terminal entry must match the serial port that is used. The Solaris
+operating system comes with the correct entry for serial port B, but a terminal
+entry must be added for serial port A:</para><screen>debug:\
+        :dv=/dev/term/a:br#9600:el=^C^S^Q^U^D:ie=%$:oe=^D:</screen><note><para>The baud rate must be set to 9600.</para>
+</note>
+</step><step id="debug-step-67"><para>In a shell window on the host, run <olink targetdoc="refman1" targetptr="tip-1" remap="external"><citerefentry><refentrytitle>tip</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and specify the name of the
+entry:</para><screen>% <userinput>tip debug</userinput>
+connected</screen><para>The shell window is now a tip window with a connection to the console
+of the test machine.</para><caution><para>Do not use <literal>STOP-A</literal> for SPARC machines or <literal>F1-A</literal> for x86 architecture machines on the host machine to stop the
+test machine. This action actually stops the host machine. To send a break
+to the test machine, type <userinput>~#</userinput> in the tip window. Commands
+such as <userinput>~#</userinput> are recognized only if these characters
+on first on the line. If the command has no effect, press either the Return
+key or Control-U.</para>
+</caution>
+</step>
+</procedure>
+</task><sect3 id="debug-68"><title>Setting Up a Target System on the SPARC Platform</title><indexterm><primary>debugging</primary><secondary>setting up a SPARC test system</secondary>
+</indexterm><para>A quick way to set up the test machine on the SPARC platform is to unplug
+the keyboard before turning on the machine. The machine then automatically
+uses serial port A as the console.</para><para>Another way to set up the test machine is to use boot PROM commands
+to make serial port A the console. On the test machine, at the boot PROM <literal>ok</literal> prompt, direct console I/O to the serial line. To make the test
+machine always come up with serial port A as the console, set the environment
+variables: <envar>input-device</envar> and <envar>output-device</envar>.</para><example id="faaxq"><title>Setting <envar>input-device</envar> and <envar>output-device</envar> With Boot PROM Commands</title><screen>ok <userinput>setenv input-device ttya</userinput>
+ok <userinput>setenv output-device ttya</userinput></screen>
+</example><para>The <command>eeprom</command> command can also be used to make serial
+port A the console. As superuser, execute the following commands to make the <literal>input-device</literal> and <literal>output-device</literal> parameters point
+to serial port A. The following example demonstrates the <command>eeprom</command> command.</para><example id="faasj"><title>Setting <envar>input-device</envar> and <envar>output-device</envar> With the <command>eeprom</command> Command</title><screen># <userinput>eeprom input-device=ttya</userinput>
+# <userinput>eeprom output-device=ttya</userinput></screen>
+</example><para>The <command>eeprom</command> commands cause the console to be redirected
+to serial port A at each subsequent system boot.</para>
+</sect3><sect3 id="debug-69"><title>Setting Up a Target System on the x86 Platform</title><indexterm><primary>debugging</primary><secondary>setting up an x86 test system</secondary>
+</indexterm><para>On x86 platforms, use the <command>eeprom</command> command to make
+serial port A the console. This procedure is the same as the SPARC platform
+procedure. See <olink targetptr="debug-68" remap="internal">Setting Up a Target System on the
+SPARC Platform</olink>. The <command>eeprom</command> command causes the console
+to switch to serial port A (COM1) during reboot.</para><note><para>x86 machines do not transfer console control to the <command>tip</command> connection
+until an early stage in the boot process unless the BIOS supports console
+redirection to a serial port. In SPARC machines, the <command>tip</command> connection
+maintains console control throughout the boot process.</para>
+</note>
+</sect3>
+</sect2><sect2 id="eupvl"><title>Setting Up Test Modules</title><para><indexterm><primary sortas="etc"><filename>system</filename> file</primary></indexterm><indexterm><primary>test modules</primary></indexterm><indexterm><primary>debugging</primary><secondary sortas="etc/system"><filename>system</filename> file</secondary></indexterm><indexterm><primary>kernel variables</primary><secondary>using</secondary></indexterm>The <olink targetdoc="refman4" targetptr="system-4" remap="external"><citerefentry><refentrytitle>system</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file in the <filename>/etc</filename> directory
+enables you to set the value of kernel variables at boot time. With kernel
+variables, you can toggle different behaviors in a driver and take advantage
+of debugging features that are provided by the kernel. The kernel variables <envar>moddebug</envar> and <envar>kmem_flags</envar>, which can be very useful in
+debugging, are discussed later in this section. See also <olink targetptr="deadman" remap="internal">Enable the Deadman Feature to Avoid a Hard Hang</olink>.</para><para>Changes to kernel variables after boot are unreliable, because <literal>/etc/system</literal> is read only once when the kernel boots. After this file is modified,
+the system must be rebooted for the changes to take effect. If a change in
+the file causes the system not to work, boot with the ask (<literal>-a</literal>)
+option. Then specify <literal>/dev/null</literal> as the system file.</para><note><para>Kernel variables cannot be relied on to be present in subsequent
+releases.</para>
+</note><sect3 id="eupvk"><title>Setting Kernel Variables</title><indexterm><primary>kernel variables</primary><secondary>setting</secondary>
+</indexterm><para>The <literal>set</literal> command changes the value of module or kernel
+variables. To set module variables, specify the module name and the variable:</para><screen>set <emphasis>module_name</emphasis>:variable=value</screen><para>For example, to set the variable <literal>test_debug</literal> in a
+driver that is named <literal>myTest</literal>, use <command>set</command> as
+follows:</para><screen>% <userinput>set myTest:test_debug=1</userinput></screen><para>To set a variable that is exported by the kernel itself, omit the module
+name.</para><para>You can also use a bitwise OR operation to set a value, for example:</para><screen>% <userinput>set moddebug | 0x80000000</userinput></screen>
+</sect3><sect3 id="eupvm"><title>Loading and Unloading Test Modules</title><?Pub _bookmark Command="[Quick Mark]"?><indexterm><primary>loading test modules</primary>
+</indexterm><indexterm><primary>unloading test modules</primary>
+</indexterm><indexterm><primary>debugging</primary><secondary><literal>moddebug</literal></secondary>
+</indexterm><indexterm><primary><command>modinfo</command> command</primary>
+</indexterm><indexterm><primary><command>modload</command> command</primary>
+</indexterm><indexterm><primary><command>modunload</command> command</primary>
+</indexterm><para>The commands <olink targetdoc="refman1m" targetptr="modload-1m" remap="external"><citerefentry><refentrytitle>modload</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="refman1m" targetptr="modunload-1m" remap="external"><citerefentry><refentrytitle>modunload</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, and <olink targetdoc="refman1m" targetptr="modinfo-1m" remap="external"><citerefentry><refentrytitle>modinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> can be used to add test modules,
+which is a useful technique for debugging and stress-testing drivers. These
+commands are generally not needed in normal operation, because the kernel
+automatically loads needed modules and unloads unused modules. The <varname>moddebug</varname> kernel variable works with these commands to provide information
+and set controls.</para><sect4 id="faato"><title>Using the <function>modload</function> Function</title><para>Use <citerefentry><refentrytitle>modload</refentrytitle><manvolnum>1M</manvolnum></citerefentry> to force a module into memory. The <command>modload</command> command
+verifies that the driver has no unresolved references when that driver is
+loaded. Loading a driver does <emphasis>not</emphasis> necessarily mean that
+the driver can attach. When a driver loads successfully, the driver's <olink targetdoc="refman9e" targetptr="u-info-9e" remap="external"><citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called. The <function>attach</function> entry point is not necessarily called.</para>
+</sect4><sect4 id="faasm"><title>Using the <function>modinfo</function> Function</title><para>Use <citerefentry><refentrytitle>modinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry> to confirm that the driver is loaded.</para><example id="faatr"><title>Using <command>modinfo</command> to Confirm a Loaded
+Driver</title><screen>$ <userinput>modinfo</userinput>
+ Id Loadaddr   Size Info Rev Module Name
+  6 101b6000    732   -   1  obpsym (OBP symbol callbacks)
+  7 101b65bd  1acd0 226   1  rpcmod (RPC syscall)
+  7 101b65bd  1acd0 226   1  rpcmod (32-bit RPC syscall)
+  7 101b65bd  1acd0   1   1  rpcmod (rpc interface str mod)
+  8 101ce8dd  74600   0   1  ip (IP STREAMS module)
+  8 101ce8dd  74600   3   1  ip (IP STREAMS device)
+...
+$ <userinput>modinfo | grep mydriver</userinput>
+169 781a8d78   13fb   0   1  mydriver (Test Driver 1.5)</screen>
+</example><para>The number in the <literal>info</literal> field is the major number
+that has been chosen for the driver. The <citerefentry><refentrytitle>modunload</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command can be used to unload a module
+if the module ID is provided. The module ID is found in the left column of <command>modinfo</command> output.</para><para>Sometimes a driver does not unload as expected after a <command>modunload</command> is
+issued, because the driver is determined to be busy. This situation occurs
+when the driver fails <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>,
+either because the driver really is busy, or because the <literal>detach</literal> entry
+point is implemented incorrectly.</para>
+</sect4><sect4 id="faaur"><title>Using <function>modunload</function></title><para>To remove all of the currently unused modules from memory, run <citerefentry><refentrytitle>modunload</refentrytitle><manvolnum>1M</manvolnum></citerefentry> with
+a module ID of 0:</para><screen># <userinput>modunload -i 0</userinput></screen>
+</sect4><sect4 id="faawr"><title>Setting the <varname>moddebug</varname> Kernel Variable</title><para><indexterm><primary><literal>moddebug</literal> kernel variable</primary></indexterm>The <literal>moddebug</literal> kernel variable controls the module
+loading process. The possible values of <literal>moddebug</literal> are:</para><variablelist><varlistentry><term><literal>0x80000000</literal></term><listitem><para>Prints messages to the console when loading or unloading modules.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x40000000</literal></term><listitem><para>Gives more detailed error messages.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x20000000</literal></term><listitem><para>Prints more detail when loading or unloading, such as including
+the address and size.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x00001000</literal></term><listitem><para>No auto-unloading drivers. The system does not attempt to
+unload the device driver when the system resources become low.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x00000080</literal></term><listitem><para>No auto-unloading streams. <?Pub _bookmark Command="[Quick Mark]"?>The
+system does not attempt to unload the STREAMS module when the system resources
+become low.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x00000010</literal></term><listitem><para>No auto-unloading of kernel modules of any type.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>0x00000001</literal></term><listitem><para>If running with <command>kmdb</command>,
+<literal>moddebug</literal> causes a breakpoint to be executed and a return to
+<command>kmdb</command> immediately before each module's
+<function>_init</function> routine is called. This setting also generates
+additional debug messages when the module's <function>_info</function> and
+<function>_fini</function> routines are executed.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect4>
+</sect3><sect3 id="eupvp"><title>Setting <literal>kmem_flags</literal> Debugging Flags</title><indexterm><primary>debugging</primary><secondary><literal>kmem_flags</literal></secondary>
+</indexterm><indexterm><primary><literal>kmem_flags</literal> kernel variable</primary>
+</indexterm><para>The <literal>kmem_flags</literal> kernel variable enables debugging
+features in the kernel's memory allocator. Set <literal>kmem_flags</literal> to
+<literal>0xf</literal> to enable the allocator's debugging features. These
+features include runtime checks to find the following code conditions:</para><itemizedlist><listitem><para>Writing to a buffer after the buffer is freed</para>
+</listitem><listitem><para>Using memory before the memory is initialized</para>
+</listitem><listitem><para>Writing past the end of a buffer</para>
+</listitem>
+</itemizedlist><para>The
+<olink targetdoc="moddebug" remap="external"><citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink>
+describes how
+to use the kernel memory allocator to analyze such problems.</para><note><para>Testing and developing with <literal>kmem_flags</literal> set
+to <literal>0xf</literal> can help detect latent memory corruption bugs. Because
+setting <literal>kmem_flags</literal> to <literal>0xf</literal> changes the
+internal behavior of the kernel memory allocator, you should thoroughly test
+without <literal>kmem_flags</literal> as well.</para>
+</note>
+</sect3>
+</sect2><sect2 id="debug-70"><title>Avoiding Data Loss on a Test System</title><indexterm><primary>avoiding data loss while testing</primary>
+</indexterm><indexterm><primary>testing debuggers</primary><secondary>avoiding data loss</secondary>
+</indexterm><para><indexterm><primary>debugging</primary><secondary>preparing for disasters</secondary></indexterm>A driver bug can sometimes render a system incapable of booting.
+By taking precautions, you can avoid system reinstallation in this event,
+as described in this section.</para><sect3 id="debug-71"><title>Back Up Critical System Files</title><para>A number of driver-related system files are difficult, if not impossible,
+to reconstruct. Files such as <filename>/etc/name_to_major</filename>, <filename>/etc/driver_aliases</filename>, <filename>/etc/driver_classes</filename>,
+and <filename>/etc/minor_perm</filename> can be corrupted if the driver crashes
+the system during installation. See the <olink targetdoc="refman1m" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para><para>To be safe, make a backup copy of the root file system after the test
+machine is in the proper configuration. If you plan to modify the <filename>/etc/system</filename> file, make a backup copy of the file before making modifications.</para>
+</sect3><task id="fapty"><title>To Boot With an Alternate Kernel</title><indexterm><primary>debugging</primary><secondary>booting an alternate kernel</secondary>
+</indexterm><indexterm><primary>booting an alternate kernel</primary>
+</indexterm><tasksummary><para>To avoid rendering a system inoperable, you should boot from a copy
+of the kernel and associated binaries rather than from the default kernel.</para>
+</tasksummary><procedure><step><para>Make a copy of the drivers in <literal>/platform/*</literal>.</para><screen># <userinput>cp -r /platform/`uname -i`/kernel /platform/`uname -i`/kernel.test</userinput></screen>
+</step><step><para>Place the driver module in <literal>/platform/`uname -i`/kernel.test/drv</literal>.</para>
+</step><step><para>Boot the alternate kernel instead of the default kernel.</para><para>After you have created and stored the alternate kernel, you can boot
+this kernel in a number of ways.</para><itemizedlist><listitem><para>You can boot the alternate kernel by rebooting:</para><screen># <userinput>reboot -- kernel.test/unix</userinput></screen>
+</listitem><listitem><para>On a SPARC-based system, you can also boot from the PROM:</para><screen>ok <userinput>boot kernel.test/sparcv9/unix</userinput></screen><note><para>To boot with the <command>kmdb</command> debugger, use the <option>k</option> option
+as described in <olink targetptr="faapi" remap="internal">Getting Started With the Modular
+Debugger</olink>.</para>
+</note>
+</listitem><listitem><para>On an x86-based system, when the <literal>Select (b)oot or
+(i)nterpreter:</literal> message is displayed in the boot process, type the
+following:</para><screen><userinput>boot kernel.test/unix</userinput></screen>
+</listitem>
+</itemizedlist>
+</step>
+</procedure><example id="faavq"><title>Booting an Alternate Kernel</title><para>The following example demonstrates booting with an alternate kernel.</para><screen>ok <userinput>boot kernel.test/sparcv9/unix</userinput>
+Rebooting with command: boot kernel.test/sparcv9/unix
+Boot device: /sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@0,0:a File and \
+    args:
+kernel.test/sparcv9/unix</screen>
+</example><example id="faayx"><title>Booting an Alternate Kernel With the <option>a</option> Option</title><para>Alternatively, the module path can be changed by booting with the ask
+(<literal>-a</literal>) option. This option results in a series of prompts
+for configuring the boot method.</para><screen>ok <userinput>boot -a</userinput>
+Rebooting with command: boot -a
+Boot device: /sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@0,0:a File and \
+args: -a
+Enter filename [kernel/sparcv9/unix]: <userinput>kernel.test/sparcv9/unix</userinput>
+Enter default directory for modules
+[/platform/sun4u/kernel.test /kernel /usr/kernel]: <userinput>&lt;CR&gt;</userinput>
+Name of system file [etc/system]: <userinput>&lt;CR&gt;</userinput>
+SunOS Release 5.10 Version Generic 64-bit
+Copyright 1983-2002 Sun Microsystems, Inc. All rights reserved.
+root filesystem type [ufs]: <userinput>&lt;CR&gt;</userinput>
+Enter physical name of root device
+[/sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@0,0:a]: <userinput>&lt;CR&gt;</userinput></screen>
+</example>
+</task><sect3 id="debug-73"><title>Consider Alternative Back-Up Plans</title><para>If the system is attached to a network, the test machine can be added
+as a client of a server. If a problem occurs, the system can be booted from
+the network. The local disks can then be mounted, and any fixes can be made.
+Alternatively, the system can be booted directly from the Solaris system CD-ROM.</para><para>Another way to recover from disaster is to have another bootable root
+file system. Use <olink targetdoc="refman1m" targetptr="format-1m" remap="external"><citerefentry><refentrytitle>format</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to
+make a partition that is the exact size of the original. Then use <olink targetdoc="refman1m" targetptr="dd-1m" remap="external"><citerefentry><refentrytitle>dd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to copy the bootable root
+file system. After making a copy, run <olink targetdoc="refman1m" targetptr="fsck-1m" remap="external"><citerefentry><refentrytitle>fsck</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> on the new file system to ensure its integrity.</para><para>Subsequently, if the system cannot boot from the original root partition,
+boot the backup partition. Use <olink targetdoc="refman1m" targetptr="dd-1m" remap="external"><citerefentry><refentrytitle>dd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to
+copy the backup partition onto the original partition. You might have a situation
+where the system cannot boot even though the root file system is undamaged.
+For example, the damage might be limited to the boot block or the boot program.
+In such a case, you can boot from the backup partition with the ask (<option>a</option>)
+option. You can then specify the original file system as the root file system.</para>
+</sect3><sect3 id="debug-54"><title>Capture System Crash Dumps</title><para><indexterm><primary>saving crash dumps</primary></indexterm><indexterm><primary>crash dumps, saving</primary></indexterm>When a system panics, the
+system writes an image of kernel memory to the dump device. The dump device
+is by default the most suitable swap device. The dump is a system crash dump,
+similar to core dumps generated by applications. On rebooting after a panic, <olink targetdoc="refman1m" targetptr="savecore-1m" remap="external"><citerefentry><refentrytitle>savecore</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> checks the
+dump device for a crash dump. If a dump is found, <command>savecore</command> makes
+a copy of the kernel's symbol table, which is called <filename>unix.<replaceable>n</replaceable></filename>. The <command>savecore</command> utility then dumps
+a core file that is called <filename>vmcore.<replaceable>n</replaceable></filename> in
+the core image directory. By default, the core image directory is <filename>/var/crash/<replaceable>machine_name</replaceable></filename>. If <filename>/var/crash</filename> has
+insufficient space for a core dump, the system displays the needed space but
+does not actually save the dump. The <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> debugger
+can then be used on the core dump and the saved kernel.</para><para>In the Solaris operating system, crash dump is enabled by default. The <olink targetdoc="refman1m" targetptr="dumpadm-1m" remap="external"><citerefentry><refentrytitle>dumpadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command is used to configure
+system crash dumps. Use the <command>dumpadm</command> command to verify that
+crash dumps are enabled and to determine the location of core files that have
+been saved.</para><note><para>You can prevent the <command>savecore</command> utility from
+filling the file system.
+Add a file that is named <filename>minfree</filename> to the directory in
+which the dumps are to be saved. In this file, specify the number of kilobytes
+to remain free after <command>savecore</command> has run. If insufficient
+space is available, the core file is not saved.</para>
+</note>
+</sect3>
+</sect2><sect2 id="debug-74"><title>Recovering the Device Directory</title><indexterm><primary>disaster recovery</primary>
+</indexterm><indexterm><primary>recovering the device directory</primary>
+</indexterm><indexterm><primary>device directory</primary><secondary>recovering</secondary>
+</indexterm><para>Damage to the <filename>/devices</filename> and <filename>/dev</filename> directories
+can occur if the driver crashes during <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. If either directory is damaged,
+you can rebuild the directory by booting the system and running <olink targetdoc="refman1m" targetptr="fsck-1m" remap="external"><citerefentry><refentrytitle>fsck</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to repair the damaged root
+file system. The root file system can then be mounted. Recreate the <filename>/devices</filename> and <filename>/dev</filename> directories by running <olink targetdoc="refman1m" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and specifying
+the <filename>/devices</filename> directory on the mounted disk.</para><para>The following example shows how to repair a damaged root file system
+on a SPARC system. In this example, the damaged disk is <filename>/dev/dsk/c0t3d0s0</filename>, and an alternate boot disk is <filename>/dev/dsk/c0t1d0s0</filename>.</para><example id="faauw"><title>Recovering a Damaged Device Directory</title><screen>ok <userinput>boot disk1</userinput>
+...
+Rebooting with command: boot kernel.test/sparcv9/unix
+Boot device: /sbus@1f,0/espdma@e,8400000/esp@e,8800000/sd@31,0:a File and \
+    args:
+kernel.test/sparcv9/unix
+...
+# <userinput>fsck /dev/dsk/c0t3d0s0</userinput>** /dev/dsk/c0t3d0s0
+** Last Mounted on /
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+** Phase 3 - Check Connectivity
+** Phase 4 - Check Reference Counts
+** Phase 5 - Check Cyl groups
+1478 files, 9922 used, 29261 free
+     (141 frags, 3640 blocks, 0.4% fragmentation)
+# <userinput>mount /dev/dsk/c0t3d0s0 /mnt</userinput>
+# <userinput>devfsadm -r /mnt</userinput></screen>
+</example><note><para>A fix to the <filename>/devices</filename> and
+<filename>/dev</filename> directories can allow the system to boot while other
+parts of the system are still corrupted.
+Such repairs are only a temporary fix to save information, such as system
+crash dumps, before reinstalling the system.</para>
+</note>
+</sect2>
+</sect1><sect1 id="euxdb"><title>Debugging Tools</title><indexterm><primary>debugging</primary><secondary>tools</secondary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>debugging</secondary><tertiary>tools</tertiary>
+</indexterm><?Pub _bookmark Command="[Quick Mark]"?><itemizedlist><para>This section describes two debuggers that can be applied to device drivers.
+Both debuggers are described in detail in the
+<olink targetdoc="moddebug" remap="external"><citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink>.</para><listitem><para>The <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> <emphasis role="strong">kernel debugger</emphasis> provides typical runtime debugger
+facilities, such as breakpoints, watch points, and single-stepping. The <command>kmdb</command> debugger supersedes <command>kadb</command>, which was available
+in previous releases. The commands that were previously available from <command>kadb</command> are used in <command>kmdb</command>, in addition to new functionality.
+Where <command>kadb</command> could only be loaded at boot time, <command>kmdb</command> can
+be loaded at any time. The <command>kmdb</command> debugger is preferred for
+live, interactive debugging due to its execution controls.</para>
+</listitem><listitem><para>The <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> <emphasis role="strong">modular debugger</emphasis> is more limited than <command>kmdb</command> as
+a real-time debugger, but <command>mdb</command> has rich facilities for postmortem
+debugging.</para>
+</listitem>
+</itemizedlist><para>The <command>kmdb</command> and <command>mdb</command> debuggers mostly
+share the same user interface. Many debugging techniques therefore can be
+applied with the same commands in both tools. Both debuggers support macros,
+dcmds, and dmods. A <emphasis>dcmd</emphasis> (pronounced dee-command) is a
+routine in the debugger that can access any of the properties of the current
+target program. A dcmd can be dynamically loaded at runtime. A
+<emphasis>dmod</emphasis>, which is short for debugger module, is a package of
+dcmds that can be loaded to provide non-standard behavior.</para><para>Both <command>mdb</command> and <command>kmdb</command> are
+backward-compatible with legacy debuggers such as <command>adb</command> and
+<command>kadb</command>. The <command>mdb</command> debugger can execute all of
+the macros that are available to <command>kmdb</command> as well as any legacy
+user-defined macros for <command>adb</command>. See the 
+<citetitle>Solaris Modular Debugger Guide</citetitle> for information about
+where to find standard macro sets.</para><sect2 id="faprx"><title>Postmortem Debugging</title><indexterm><primary>postmortem debugging</primary>
+</indexterm><indexterm><primary>debugging</primary><secondary>postmortem</secondary>
+</indexterm><para>Postmortem analysis offers numerous advantages to driver developers.
+More than one developer can examine a problem in parallel. Multiple instances
+of the debugger can be used simultaneously on a single crash dump. The analysis
+can be performed offline so that the crashed system can be returned to service,
+if possible. Postmortem analysis enables the use of user-developed debugger
+functionality in the form of dmods. Dmods can bundle functionality that would
+be too memory-intensive for real-time debuggers, such as <command>kmdb</command>.</para><para>When a system panics while <command>kmdb</command> is loaded, control
+is passed to the debugger for immediate investigation. If <command>kmdb</command> does
+not seem appropriate for analyzing the current problem, a good strategy is
+to use <command>:c</command> to continue execution and save the crash dump.
+When the system reboots, you can perform postmortem analysis with <command>mdb</command> on
+the saved crash dump. This process is analogous to debugging an application
+crash from a process core file.</para><note><para><indexterm><primary><command>crash</command> command</primary></indexterm>In earlier versions of the Solaris operating system, <citerefentry><refentrytitle>adb</refentrytitle><manvolnum>1</manvolnum></citerefentry> was
+the recommended tool for postmortem analysis. In the current Solaris operating
+system, <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> is
+the recommended tool for postmortem analysis. The <function>mdb</function> feature
+set surpasses the set of commands from the legacy <citerefentry><refentrytitle>crash</refentrytitle><manvolnum>1M</manvolnum></citerefentry> utility. The <command>crash</command> utility is no longer available in the Solaris operating system.</para>
+</note>
+</sect2><sect2 id="eupvn"><title>Using the <command>kmdb</command> Kernel Debugger</title><indexterm><primary>debugging</primary><secondary><command>kmdb</command> debugger</secondary>
+</indexterm><indexterm><primary>kernel</primary><secondary>debugger</secondary><see><command>kmdb</command> debugger</see>
+</indexterm><indexterm><primary><command>kmdb</command> debugger</primary>
+</indexterm><itemizedlist><para>The <command>kmdb</command> debugger is an interactive kernel debugger
+that provides the following capabilities:</para><listitem><para>Control of kernel execution</para>
+</listitem><listitem><para>Inspection of the kernel state</para>
+</listitem><listitem><para>Live modifications to the code</para>
+</listitem>
+</itemizedlist><para>This section assumes that you are already familiar with the <command>kmdb</command> debugger.
+The focus in this section is on <command>kmdb</command> capabilities that
+are useful in device driver design. To learn how to use <command>kmdb</command> in
+detail, refer to the <olink targetdoc="refman1" targetptr="kmdb-1" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page and to the <olink targetdoc="moddebug" remap="external"><citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink>. If you are familiar with <command>kadb</command>, refer to the <olink targetdoc="refman1m" targetptr="kadb-1m" remap="external"><citerefentry><refentrytitle>kadb</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for the major differences between <command>kadb</command> and <command>kmdb</command>.</para><para>The <command>kmdb</command> debugger can be loaded and unloaded at will.
+Instructions for loading and unloading <command>kmdb</command> are in the <citetitle>Solaris Modular Debugger Guide</citetitle>. For safety and convenience, booting
+with an alternate kernel is highly encouraged. The boot process is slightly
+different between the SPARC platform and the x86 platform, as described in
+this section.</para><note><para>By default, <command>kmdb</command> uses the CPU ID as the prompt
+when <computeroutput>kmdb</computeroutput> is running. In the examples in
+this chapter <literal>[0]</literal> is used as the prompt unless otherwise
+noted.</para>
+</note><sect3 id="fappa"><title>Booting <command>kmdb</command><?Pub _bookmark
+Command="[Quick Mark]"?> With an Alternate Kernel on the SPARC Platform</title><indexterm><primary>booting the <command>kmdb</command> debugger</primary><secondary> on SPARC systems</secondary>
+</indexterm><indexterm><primary><command>kmdb</command> debugger</primary><secondary>booting on SPARC systems</secondary>
+</indexterm><para>Use either of the following commands to boot a SPARC system with both <command>kmdb</command> and an alternate kernel:</para><screen>boot kmdb -D kernel.test/sparcv9/unix 
+boot kernel.test/sparcv9/unix -k</screen>
+</sect3><sect3 id="fapoz"><title>Booting <command>kmdb</command> With an Alternate
+Kernel on the x86 Platform</title><indexterm><primary>booting the <command>kmdb</command> debugger</primary><secondary> on x86 systems</secondary>
+</indexterm><indexterm><primary><command>kmdb</command> debugger</primary><secondary>booting on x86 systems</secondary>
+</indexterm><para>Use either of the following commands to boot an x86 system with both <command>kmdb</command> and an alternate kernel:</para><screen>b kmdb -D kernel.test/unix 
+b kernel.test/unix -k</screen>
+</sect3><sect3 id="ezsum"><title>Setting Breakpoints in <command>kmdb</command></title><indexterm><primary><command>kmdb</command> debugger</primary><secondary>setting breakpoints</secondary>
+</indexterm><para>Use the <command>bp</command> command to set a breakpoint, as shown
+in the following example.</para><example id="ezsuo"><title>Setting Standard Breakpoints in <command>kmdb</command></title><screen>[0]<userinput>&gt; myModule`myBreakpointLocation::bp</userinput>
+        </screen>
+</example><para>If the target module has not been loaded, then an error message that
+indicates this condition is displayed, and the breakpoint is not created.
+In this case you can use a <emphasis>deferred breakpoint</emphasis>. A deferred
+breakpoint activates automatically when the specified module is loaded. Set
+a deferred breakpoint by specifying the target location after the <command>bp</command> command.
+The following example demonstrates a deferred breakpoint.</para><example id="ezsup"><title>Setting Deferred Breakpoints in <command>kmdb</command></title><screen>[0]&gt;<userinput>::bp myModule`myBreakpointLocation</userinput>       </screen>
+</example><para>For more information on using breakpoints, see the <citetitle>Solaris
+Modular Debugger Guide</citetitle>. You can also get help by typing either
+of the following two lines:</para><screen>&gt; <userinput>::help bp</userinput>
+&gt; <userinput>::bp dcmd</userinput></screen>
+</sect3><sect3 id="eupvr"><title><command>kmdb</command> Macros for Driver Developers</title><indexterm><primary><command>kmdb</command> debugger</primary><secondary>macros</secondary>
+</indexterm><?Pub _bookmark Command="[Quick Mark]"?><para>The <command>kmdb</command>(1M) debugger supports macros that can be
+used to display kernel data structures. Use <literal>$M</literal> to display <command>kmdb</command> macros. Macros are used in the form:</para><screen>[ address ] $&lt;macroname</screen><note><para>Neither the information displayed by these macros nor the format
+in which the information is displayed, constitutes an interface. Therefore,
+the information and format can change at any time.</para>
+</note><para>The <command>kmdb</command> macros in the following table are particularly
+useful to developers of device drivers. For convenience, legacy macro names
+are shown where applicable.</para><table frame="topbot" id="fapgc"><title><command>kmdb</command> Macros</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para>Dcmd</para>
+</entry><entry><para>Legacy Macro</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><command>::devinfo</command></para>
+</entry><entry><para><command>devinfo</command></para><para><command>devinfo_brief</command></para><para><command>devinfo.prop</command></para>
+</entry><entry><para>Print a summary of a device node</para>
+</entry>
+</row><row><entry><para><command>::walk devinfo_parents</command></para>
+</entry><entry><para><computeroutput>devinfo.parent</computeroutput></para>
+</entry><entry><para>Walk the ancestors of a device node</para>
+</entry>
+</row><row><entry><para><command>::walk devinfo_sibling</command></para>
+</entry><entry><para><computeroutput>devinfo.sibling</computeroutput></para>
+</entry><entry><para>Walk the siblings of a device node</para>
+</entry>
+</row><row><entry><para><command>::minornodes</command></para>
+</entry><entry><para><computeroutput>devinfo.minor</computeroutput></para>
+</entry><entry><para>Print the minor nodes that correspond to the given device node</para>
+</entry>
+</row><row><entry><para><command>::major2name</command></para>
+</entry><entry>
+</entry><entry><para>Print the name of a device that is bound to a given device node.</para>
+</entry>
+</row><row><entry><para><command>::devbindings</command></para>
+</entry><entry>
+</entry><entry><para>Print the device nodes that are bound to a given device node or major
+number.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <command>::devinfo</command> dcmd displays a node state that can
+have one of the following values:</para><variablelist><varlistentry><term><literal>DS_ATTACHED</literal></term><listitem><para>The driver's <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine returned successfully.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DS_BOUND</literal></term><listitem><para>The node is bound to a driver, but the driver's <citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+has not yet been called.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DS_INITIALIZED</literal></term><listitem><para>The parent nexus has assigned a bus address for the driver.
+The implementation-specific initializations have been completed. The driver's <citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine
+has not yet been called at this point.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DS_LINKED</literal></term><listitem><para>The device node has been linked into the kernel's device tree,
+but the system has not yet found a driver for this node.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DS_PROBED</literal></term><listitem><para>The driver's <citerefentry><refentrytitle>probe</refentrytitle><manvolnum>9E</manvolnum></citerefentry> routine returned successfully.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DS_READY</literal></term><listitem><para>The device is fully configured.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><?Pub _bookmark Command="[Quick Mark]"?>
+</sect2><sect2 id="ezswb"><title>Using the <command>mdb</command> Modular Debugger</title><indexterm><primary>debugging</primary><secondary><command>mdb</command> debugger</secondary>
+</indexterm><indexterm><primary>modular debugger</primary><see><command>mdb</command> debugger</see>
+</indexterm><indexterm><primary><command>mdb</command> debugger</primary>
+</indexterm><itemizedlist><para>The <olink targetdoc="refman1" targetptr="mdb-1" remap="external"><citerefentry><refentrytitle>mdb</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> modular
+debugger can be applied to the following types of files:</para><listitem><para>Live operating system components</para>
+</listitem><listitem><para>Operating system crash dumps</para>
+</listitem><listitem><para>User processes</para>
+</listitem><listitem><para>User process core dumps</para>
+</listitem><listitem><para>Object files</para>
+</listitem>
+</itemizedlist><para>The <command>mdb</command> debugger provides sophisticated debugging
+support for analyzing kernel problems. This section provides an overview of <command>mdb</command> features. For a complete discussion of <command>mdb</command>,
+refer to the
+<olink targetdoc="moddebug" remap="external"><citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink>.</para><para>Although <command>mdb</command> can be used to alter live kernel state, <command>mdb</command> lacks the kernel execution control that is provided by <command>kmdb</command>. As a result <command>kmdb</command> is preferred for runtime debugging.
+The <command>mdb</command> debugger is used more for static situations.</para><note><para>The prompt for <command>mdb</command> is <literal>&gt;</literal>.</para>
+</note><sect3 id="faapi"><title>Getting Started With the Modular Debugger</title><indexterm><primary><command>mdb</command> debugger</primary><secondary>running</secondary>
+</indexterm><para>The <command>mdb</command> debugger provides an extensive programming
+API for implementing debugger modules so that driver developers can implement
+custom debugging support. The <command>mdb</command> debugger also provides
+many usability features, such as command-line editing, command history, an
+output pager, and online help.</para><note><para>The <command>adb</command> macros should no longer be used. That
+functionality has largely been superseded by the dcmds in <command>mdb</command>.</para>
+</note><para>The <command>mdb</command> debugger provides a rich set of modules and
+dcmds. With these tools, you can debug the Solaris kernel, any associated
+modules, and device drivers. These facilities enable you to perform tasks
+such as:</para><itemizedlist><listitem><para>Formulate complex debugging queries</para>
+</listitem><listitem><para>Locate all the memory allocated by a particular thread</para>
+</listitem><listitem><para>Print a visual picture of a kernel STREAM</para>
+</listitem><listitem><para>Determine what type of structure a particular address refers
+to</para>
+</listitem><listitem><para>Locate leaked memory blocks in the kernel</para>
+</listitem><listitem><para>Analyze memory to locate stack traces</para>
+</listitem><listitem><para>Assemble dcmds into modules called <emphasis>dmods</emphasis> for
+creating customized operations</para>
+</listitem>
+</itemizedlist><para>To get started, switch to the crash directory and type <command>mdb</command>,
+specifying a system crash dump, as illustrated in the following example.</para><example id="fahpd"><title>Invoking <command>mdb</command> on a Crash Dump</title><screen><userinput>% cd /var/crash/testsystem</userinput>
+% <userinput>ls</userinput>
+bounds     unix.0    vmcore.0
+% <userinput>mdb unix.0 vmcore.0</userinput>
+Loading modules: [ unix krtld genunix ufs_log ip usba s1394 cpc nfs ]
+&gt; <userinput>::status</userinput>
+debugging crash dump vmcore.0 (64-bit) from testsystem
+operating system: 5.10 Generic (sun4u)
+panic message: zero
+dump content: kernel pages only</screen>
+</example><para>When <command>mdb</command> responds with the <literal>&gt;</literal> prompt,
+you can run commands.</para><para>To examine the running kernel on a live system, run <command>mdb</command> from
+the system prompt as follows.</para><example id="fahpg"><title>Invoking <command>mdb</command> on a Running Kernel</title><screen># <userinput>mdb -k</userinput>
+Loading modules: [ unix krtld genunix ufs_log ip usba s1394 ptm cpc ipc nfs ]
+&gt; <userinput>::status</userinput>
+debugging live kernel (64-bit) on testsystem
+operating system: 5.10 Generic (sun4u)</screen>
+</example>
+</sect3>
+</sect2><sect2 id="euxdg"><title>Useful Debugging Tasks With <command>kmdb</command> and <command>mdb</command></title><indexterm><primary>debugging</primary><secondary>common tasks</secondary>
+</indexterm><para><?Pub _bookmark Command="[Quick Mark]"?>This section provides examples
+of useful debugging tasks. The tasks in this section can be performed with
+either <command>mdb</command> or <command>kmdb</command> unless specifically
+noted. This section assumes a basic knowledge of the use of <command>kmdb</command> and <command>mdb</command>. Note that the information presented here is dependent on the
+type of system used. A <trademark>Sun Blade</trademark> 100 workstation running
+the 64-bit kernel was used to produce these examples.</para><caution><para>Because irreversible destruction of data can result from modifying
+data in kernel structures, you should exercise extreme caution. Do not modify
+or rely on data in structures that are not part of the Solaris DDI. See the <olink targetdoc="refman9s" targetptr="intro-9s" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page for information
+on structures that are part of the Solaris DDI.</para>
+</caution><sect3 id="ezsvz"><title>Exploring System Registers With <command>kmdb</command></title><indexterm><primary>debugging</primary><secondary>system registers</secondary>
+</indexterm><indexterm><primary>system registers</primary><secondary>reading and writing</secondary>
+</indexterm><para>The <command>kmdb</command> debugger can display machine registers as
+a group or individually. To display all registers as a group, use <command>$r</command> as
+shown in the following example.</para><example id="ezsuj"><title>Reading All Registers on a SPARC Processor With <command>kmdb</command></title><screen>[0]: <userinput>$r</userinput>
+
+g0    0                                 l0      0
+g1    100130a4      debug_enter         l1      edd00028
+g2    10411c00      tsbmiss_area+0xe00  l2      10449c90
+g3    10442000      ti_statetbl+0x1ba   l3      1b
+g4    3000061a004                       l4      10474400     ecc_syndrome_tab+0x80
+g5    0                                 l5      3b9aca00
+g6    0                                 l6      0
+g7    2a10001fd40                       l7      0
+o0    0                                 i0      0
+o1    c                                 i1      10449e50
+o2    20                                i2      0
+o3    300006b2d08                       i3      10
+o4    0                                 i4      0
+o5    0                                 i5      b0
+sp    2a10001b451                       fp      2a10001b521
+o7    1001311c      debug_enter+0x78    i7      1034bb24     zsa_xsint+0x2c4
+y     0
+tstate: 1604  (ccr=0x0, asi=0x0, pstate=0x16, cwp=0x4)
+pstate: ag:0 ie:1 priv:1 am:0 pef:1 mm:0 tle:0 cle:0 mg:0 ig:0
+winreg: cur:4 other:0 clean:7 cansave:1 canrest:5 wstate:14
+tba   0x10000000
+pc    edd000d8 edd000d8:        ta      %icc,%g0 + 125
+npc   edd000dc edd000dc:        nop</screen>
+</example><para>The debugger exports each register value to a variable with the same
+name as the register. If you read the variable, the current value of the register
+is returned. If you write to the variable, the value of the associated machine
+register is changed. The following example changes the value of the <literal>%o0</literal> register
+from 0 to 1 on an x86 machine.</para><example id="ezsul"><title>Reading and Writing Registers on an x86 Machine
+With <command>kmdb</command></title><screen>[0]&gt; <userinput>&amp;lt;eax</userinput>=K
+        c1e6e0f0
+[0]&gt; <userinput>0&gt;eax</userinput>
+[0]&gt; <userinput>&amp;lt;eax=K</userinput>
+        0
+[0]&gt;  <userinput>c1e6e0f0&gt;eax</userinput></screen>
+</example><para>If you need to inspect the registers of a different processor, you can
+use the <command>::cpuregs</command> dcmd. The ID of the processor to be examined
+can be supplied as either the address to the dcmd or as the value of the <option>c</option> option, as shown in the following example.</para><example id="fapkf"><title>Inspecting the Registers of a Different Processor</title><screen>[0]&gt; 0::cpuregs
+   %cs = 0x0158            %eax = 0xc1e6e0f0 kmdbmod`kaif_dvec
+   %ds = 0x0160            %ebx = 0x00000000</screen>
+</example><para>The following example switches from processor <literal>0</literal> to
+processor <literal>3</literal> on a SPARC machine. The <literal>%g3</literal> register
+is inspected and then cleared. To confirm the new value, <literal>%g3</literal> is
+read again.</para><example id="ezsuq"><title>Retrieving the Value of an Individual Register
+From a Specified Processor</title><screen>[0]&gt; <userinput>3::switch</userinput>
+[3]&gt; <userinput>&lt;g3=K</userinput>
+        24
+[3]&gt; <userinput>0&gt;g3</userinput>
+[3]&gt; <userinput>&lt;g3</userinput>
+        0</screen>
+</example>
+</sect3><sect3 id="fappb"><title>Detecting Kernel Memory Leaks</title><indexterm><primary><command>mdb</command></primary><secondary>detecting kernel memory leaks</secondary>
+</indexterm><indexterm><primary>memory leaks, detecting with <command>mdb</command></primary>
+</indexterm><indexterm><primary>detecting kernel memory leaks with <command>mdb</command></primary>
+</indexterm><indexterm><primary>kernel</primary><secondary>memory</secondary><tertiary>detecting leaks with <command>mdb</command></tertiary>
+</indexterm><indexterm><primary>debugging</primary><secondary>detecting kernel memory leaks</secondary>
+</indexterm><para>The <command>::findleaks</command> dcmd provides powerful, efficient
+detection of memory leaks in kernel crash dumps. The full set of kernel-memory
+debugging features must be enabled for <command>::findleaks</command> to be
+effective. For more information, see <olink targetptr="eupvp" remap="internal">Setting kmem_flags
+Debugging Flags</olink>. Run <command>::findleaks</command> during driver
+development and testing to detect code that leaks memory, thus wasting kernel
+resources. See <olink targetdoc="moddebug" targetptr="kmem-1" remap="external">Chapter 9, <citetitle remap="chapter">Debugging With the Kernel Memory Allocator,</citetitle> in <citetitle remap="book">Solaris Modular Debugger Guide</citetitle></olink> for a complete
+discussion of <command>::findleaks</command>.</para><note><para>Code that leaks kernel memory can render the system vulnerable
+to denial-of-service attacks.</para>
+</note>
+</sect3><sect3 id="fappc"><title>Writing Debugger Commands With <command>mdb</command></title><indexterm><primary><command>mdb</command></primary><secondary>writing commands</secondary>
+</indexterm><indexterm><primary>debugging</primary><secondary>writing <command>mdb</command> commands</secondary>
+</indexterm><para>The <command>mdb</command> debugger provides a powerful API for implementing
+debugger facilities that you customize to debug your driver. The
+<citetitle>Solaris Modular Debugger Guide</citetitle> explains
+the programming API in detail.</para><para>The <literal>SUNWmdbdm</literal> package installs sample <command>mdb</command> source
+code in the directory <filename>/usr/demo/mdb</filename>. You can use <command>mdb</command> to automate lengthy debugging chores or help to validate that your
+driver is behaving properly. You can also package your <command>mdb</command> debugging
+modules with your driver product. With packaging, these facilities are available
+to service personnel at a customer site.</para>
+</sect3><sect3 id="euxea"><title>Obtaining Kernel Data Structure Information</title><indexterm><primary>kernel data structures</primary>
+</indexterm><indexterm><primary>debugging</primary><secondary>displaying kernel data structures</secondary>
+</indexterm><para>The Solaris kernel provides data type information in structures that
+can be inspected with either <command>kmdb</command> or <command>mdb</command>.</para><note><para>The <command>kmdb</command> and <command>mdb</command> dcmds can
+be used only with objects that contain compressed symbolic debugging information
+that has been designed for use with <command>mdb</command>. This information
+is currently available only for certain Solaris kernel modules. The <literal>SUNWzlib</literal> package must be installed to process the symbolic debugging information.</para>
+</note><para>The following example demonstrates how to display the data in the <literal>scsi_pkt</literal> structure.</para><example id="fahqd"><title>Displaying Kernel Data Structures With a Debugger</title><screen>&gt; <userinput>7079ceb0::print -t 'struct scsi_pkt'</userinput>
+{
+    opaque_t pkt_ha_private = 0x7079ce20
+    struct scsi_address pkt_address = {
+        struct scsi_hba_tran *a_hba_tran = 0x70175e68
+        ushort_t a_target = 0x6
+        uchar_t a_lun = 0
+        uchar_t a_sublun = 0
+    }
+    opaque_t pkt_private = 0x708db4d0
+    int (*)() *pkt_comp = sd_intr
+    uint_t pkt_flags = 0
+    int pkt_time = 0x78
+    uchar_t *pkt_scbp = 0x7079ce74
+    uchar_t *pkt_cdbp = 0x7079ce64
+    ssize_t pkt_resid = 0
+    uint_t pkt_state = 0x37
+    uint_t pkt_statistics = 0
+    uchar_t pkt_reason = 0
+}</screen>
+</example><para>The size of a data structure can be useful in debugging. Use the <command>::sizeof</command> dcmd to obtain the size of a structure, as shown in the following
+example.</para><example id="fahpl"><title>Displaying the Size of a Kernel Data Structure</title><screen>&gt; <userinput>::sizeof struct scsi_pkt</userinput>
+sizeof (struct scsi_pkt) = 0x58</screen>
+</example><para>The address of a specific member within a structure is also useful in
+debugging. Several methods are available for determining a member's address.</para><para>Use the <command>::offsetof</command> dcmd to obtain the offset for
+a given member of a structure, as in the following example.</para><example id="fahpt"><title>Displaying the Offset to a Kernel Data Structure</title><screen>&gt; <userinput>::offsetof struct scsi_pkt pkt_state</userinput>
+offsetof (struct pkt_state) = 0x48</screen>
+</example><para>Use the <command>::print</command> dcmd with the <option>a</option> option
+to display the addresses of all members of a structure, as in the following
+example.</para><example id="fahph"><title>Displaying the Relative Addresses of a Kernel Data
+Structure</title><screen>&gt; <userinput>::print -a struct scsi_pkt</userinput>
+{
+    0 pkt_ha_private
+    8 pkt_address {
+    ...
+    }
+    18 pkt_private
+    ...
+}</screen>
+</example><para>If an address is specified with <command>::print</command> in conjunction
+with the <option>a</option> option, the absolute address for each member is
+displayed.</para><example id="fahqj"><title>Displaying the Absolute Addresses of a Kernel Data
+Structure</title><screen>&gt; <userinput>10000000::print -a struct scsi_pkt</userinput>
+{
+    10000000 pkt_ha_private
+    10000008 pkt_address {
+    ...
+    }
+    10000018 pkt_private
+    ...
+}</screen>
+</example><para>The <command>::print</command>, <command>::sizeof</command> and <command>::offsetof</command> dcmds enable you to debug problems when your driver interacts with
+the Solaris kernel.</para><caution><para>This facility provides access to <emphasis>raw</emphasis> kernel
+data structures. You can examine any structure whether or not that structure
+appears as part of the DDI. Therefore, you should refrain from relying on
+any data structure that is not explicitly part of the DDI.</para>
+</caution><note><para>These dcmds should be used only with objects that contain compressed
+symbolic debugging information that has been designed for use with <command>mdb</command>.
+Symbolic debugging information is currently available for certain Solaris
+kernel modules only. The <filename>SUNWzlib</filename> (32-bit) or <filename>SUNWzlibx</filename> (64-bit) decompression software must be installed to
+process the symbolic debugging information. The <command>kmdb</command> debugger
+can process symbolic type data with or without the <filename>SUNWzlib</filename> or <filename>SUNWzlibx</filename> packages.</para>
+</note>
+</sect3><sect3 id="fappd"><title>Obtaining Device Tree Information</title><indexterm><primary>device tree</primary><secondary>navigating, in debugger</secondary>
+</indexterm><indexterm><primary><command>mdb</command> debugger</primary><secondary>navigating device tree with</secondary>
+</indexterm><para>The <command>mdb</command> debugger provides the <command>::prtconf</command> dcmd
+for displaying the kernel device tree. The output of the <command>::prtconf</command> dcmd
+is similar to the output of the <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command.</para><example id="fahqi"><title>Using the <command>::prtconf</command> Dcmd</title><screen>&gt; <userinput>::prtconf</userinput>
+300015d3e08      SUNW,Sun-Blade-100
+    300015d3c28      packages (driver not attached)
+        300015d3868      SUNW,builtin-drivers (driver not attached)
+        300015d3688      deblocker (driver not attached)
+        300015d34a8      disk-label (driver not attached)
+        300015d32c8      terminal-emulator (driver not attached)
+        300015d30e8      obp-tftp (driver not attached)
+        300015d2f08      dropins (driver not attached)
+        300015d2d28      kbd-translator (driver not attached)
+        300015d2b48      ufs-file-system (driver not attached)
+    300015d3a48      chosen (driver not attached)
+    300015d2968      openprom (driver not attached)</screen>
+</example><para>You can display the node by using a macro, such as  the <command>::devinfo</command> dcmd,
+as shown in the following example.</para><example id="fahpi"><title>Displaying Device Information for an Individual
+Node</title><screen><userinput>&gt; 300015d3e08::devinfo</userinput>
+300015d3e08      SUNW,Sun-Blade-100
+        System properties at 0x300015abdc0:
+            name='relative-addressing' type=int items=1
+                value=00000001
+            name='MMU_PAGEOFFSET' type=int items=1
+                value=00001fff
+            name='MMU_PAGESIZE' type=int items=1
+                value=00002000
+            name='PAGESIZE' type=int items=1
+                value=00002000
+        Driver properties at 0x300015abe00:
+            name='pm-hardware-state' type=string items=1
+                value='no-suspend-resume'</screen>
+</example><para>Use <command>::prtconf</command> to see where your driver has attached
+in the device tree, and to display device properties. You can also specify
+the verbose (<option>v</option>) flag to <command>::prtconf</command> to display
+the properties for each device node, as follows.</para><example id="fahpu"><title>Using the <command>::prtconf</command> Dcmd in
+Verbose Mode</title><screen>&gt; <userinput>::prtconf -v</userinput>
+DEVINFO          NAME
+300015d3e08      SUNW,Sun-Blade-100
+        System properties at 0x300015abdc0:
+            name='relative-addressing' type=int items=1
+                value=00000001
+            name='MMU_PAGEOFFSET' type=int items=1
+                value=00001fff
+            name='MMU_PAGESIZE' type=int items=1
+                value=00002000
+            name='PAGESIZE' type=int items=1
+                value=00002000
+        Driver properties at 0x300015abe00:
+            name='pm-hardware-state' type=string items=1
+                value='no-suspend-resume'
+        ...
+        300015ce798      pci10b9,5229, instance #0
+                Driver properties at 0x300015ab980:
+                    name='target2-dcd-options' type=any items=4
+                        value=00.00.00.a4
+                    name='target1-dcd-options' type=any items=4
+                        value=00.00.00.a2
+                    name='target0-dcd-options' type=any items=4
+                        value=00.00.00.a4</screen>
+</example><para>Another way to locate instances of your driver is the <command>::devbindings</command> dcmd. Given a driver name, the command displays a list of all instances
+of the named driver as demonstrated in the following example.</para><example id="fahpr"><title>Using the <command>::devbindings</command> Dcmd
+to Locate Driver Instances</title><screen>&gt; <userinput>::devbindings dad</userinput>
+300015ce3d8      ide-disk (driver not attached)
+300015c9a60      dad, instance #0
+        System properties at 0x300015ab400:
+            name='lun' type=int items=1
+                value=00000000
+            name='target' type=int items=1
+                value=00000000
+            name='class_prop' type=string items=1
+                value='ata'
+            name='type' type=string items=1
+                value='ata'
+            name='class' type=string items=1
+                value='dada'
+...
+300015c9880      dad, instance #1
+        System properties at 0x300015ab080:
+            name='lun' type=int items=1
+                value=00000000
+            name='target' type=int items=1
+                value=00000002
+            name='class_prop' type=string items=1
+                value='ata'
+            name='type' type=string items=1
+                value='ata'
+            name='class' type=string items=1
+                value='dada'</screen>
+</example>
+</sect3><sect3 id="fappe"><title>Retrieving Driver Soft State Information</title><indexterm><primary><command>mdb</command> debugger</primary><secondary>retrieving soft state information</secondary>
+</indexterm><indexterm><primary>soft state information</primary><secondary>retrieving in <command>mdb</command></secondary>
+</indexterm><para>A common problem when debugging a driver is retrieving the <emphasis>soft
+state</emphasis> for a particular driver instance. The soft state is allocated
+with the <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> routine. The driver can obtain the
+soft state through <citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. The name of the <emphasis>soft state
+pointer</emphasis> is the first argument to <citerefentry><refentrytitle>ddi_soft_state_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry>). With the name,
+you can use <command>mdb</command> to retrieve the soft state for a particular
+driver instance through the <command>::softstate</command> dcmd:</para><screen>&gt; <userinput>*bst_state::softstate 0x3</userinput>
+702b7578</screen><para>In this case, <command>::softstate</command> is used to fetch the soft
+state for instance 3 of the <literal>bst</literal> sample driver. This pointer
+references a <structname>bst_soft</structname> structure that is used by the
+driver to track state for this instance.</para>
+</sect3><sect3 id="euxdx"><title>Modifying Kernel Variables</title><indexterm><primary>debugging</primary><secondary>using kernel variables</secondary>
+</indexterm><indexterm><primary>kernel variables</primary><secondary>use with debuggers</secondary>
+</indexterm><?Pub _bookmark Command="[Quick Mark]"?><para>You can use both <command>kmdb</command> and <command>mdb</command> to
+modify kernel variables or other kernel state. Kernel state modification with <command>mdb</command> should be done with care, because <command>mdb</command> does
+not stop the kernel before making modifications. Groups of modifications can
+be made atomically by using <command>kmdb</command>, because <command>kmdb</command> stops
+the kernel before allowing access by the user. The <command>mdb</command> debugger
+is capable of making single atomic modifications only.</para><itemizedlist><para>Be sure to use the proper format specifier to  perform the modification.
+ The formats are:</para><listitem><para><literal>w</literal> &ndash; Writes the lowest two bytes of
+the value of each expression to the target beginning at the location specified
+by dot</para>
+</listitem><listitem><para><literal>W</literal> &ndash; Writes the lowest 4 bytes of
+the value of each expression to the target beginning at the location specified
+by dot</para>
+</listitem><listitem><para><literal>Z</literal> &ndash; Write the complete 8 bytes of
+the value of each expression to the target beginning at the location specified
+by dot</para>
+</listitem>
+</itemizedlist><para>Use the <command>::sizeof</command> dcmd to determine the size of the
+variable to be modified.</para><para>The following example overwrites the value of <varname>moddebug</varname> with
+the value 0x80000000.</para><example id="fahpy"><title>Modifying a Kernel Variable With a Debugger</title><screen>&gt; <userinput>moddebug/W 0x80000000</userinput>
+    moddebug:       0 = 0x80000000</screen>
+</example>
+</sect3>
+</sect2>
+</sect1><sect1 id="euxde"><title>Tuning Drivers</title><indexterm><primary>device drivers</primary><secondary>tuning</secondary>
+</indexterm><indexterm><primary>tuning device drivers</primary>
+</indexterm><para>The Solaris OS provides kernel statistics structures so that you can
+implement counters for your driver. The DTrace facility enables you to analyze
+performance in real time. This section presents the following topics on device
+performance:</para><itemizedlist><listitem><para><olink targetptr="euqcp" remap="internal">Kernel Statistics</olink> &ndash;
+The Solaris OS provides a set of data structures and functions for capturing
+performance statistics in the kernel. Kernel statistics (called <emphasis>kstats</emphasis>)
+enable your driver to export continuous statistics while the system is running.
+The kstat data is handled programmatically by using the kstat functions.</para>
+</listitem><listitem><para><olink targetptr="eupre" remap="internal">DTrace for Dynamic Instrumentation</olink> &ndash;
+DTrace enables you to add instrumentation to your driver dynamically so that
+you can perform tasks like analyzing the system and measuring performance.
+DTrace takes advantage of predefined kstat structures.</para>
+</listitem>
+</itemizedlist><sect2 id="euqcp"><title>Kernel Statistics</title><indexterm><primary>device drivers</primary><secondary>using kstats</secondary>
+</indexterm><indexterm><primary>tuning device drivers</primary><secondary>kstats</secondary>
+</indexterm><indexterm><primary>kernel statistics</primary><see>kstats</see>
+</indexterm><indexterm><primary>kstats</primary><secondary>definition</secondary>
+</indexterm><para>To assist in performance tuning, the Solaris kernel provides the <olink targetdoc="refman3e" targetptr="kstat-3kstat" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></olink> facility. The kstat facility
+provides a set of functions and data structures for device drivers and other
+kernel modules to export module-specific kernel statistics.</para><para>A kstat is a data structure for recording quantifiable aspects of a
+device's usage. A kstat is stored as a null-terminated linked list. Each kstat
+has a common header section and a type-specific data section. The header section
+is defined by the <literal>kstat_t</literal> structure.</para><para>The article &ldquo;Using kstat From Within a Program in the Solaris
+OS&rdquo; on the Sun Developer Network at <ulink url="http://developers.sun.com/solaris/articles/kstat_api.html" type="url"></ulink> provides
+two practical examples on how to use the <citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry> and <olink targetdoc="refman3f" targetptr="libkstat-3lib" remap="external"><citerefentry><refentrytitle>libkstat</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> APIs to extract metrics
+from the Solaris OS. The examples include &ldquo;Walking Through All the kstat&rdquo;
+and &ldquo;Getting NIC kstat Output Using the Java Platform.&rdquo;</para><sect3 id="faptb"><title>Kernel Statistics Structure Members</title><para><indexterm><primary>kstats</primary><secondary>structure members</secondary></indexterm>The members of a kstat structure are:</para><variablelist><varlistentry><term><literal>ks_class[KSTAT_STRLEN]</literal></term><listitem><para>Categorizes the kstat type as <literal>bus</literal>, <literal>controller</literal>, <literal>device_error</literal>, <literal>disk</literal>, <literal>hat</literal>, <literal>kmem_cache</literal>, <literal>kstat</literal>, <literal>misc</literal>, <literal>net</literal>, <literal>nfs</literal>, <literal>pages</literal>, <literal>partition</literal>, <literal>rps</literal>, <literal>ufs</literal>, <literal>vm</literal>,
+or <literal>vmem</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_crtime</literal></term><listitem><para>Time at which the kstat was created. <literal>ks_crtime</literal> is
+commonly used in calculating rates of various counters.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_data</literal></term><listitem><para>Points to the data section for the kstat.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_data_size</literal></term><listitem><para>Total size of the data section in bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_instance</literal></term><listitem><para>The instance of the kernel module that created this kstat. <literal>ks_instance</literal> is combined with <literal>ks_module</literal> and <literal>ks_name</literal> to give the kstat a unique, meaningful name.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_kid</literal></term><listitem><para>Unique ID for the kstat.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_module[KSTAT_STRLEN]</literal></term><listitem><para>Identifies the kernel module that created this kstat. <literal>ks_module</literal> is combined with <literal>ks_instance</literal> and <literal>ks_name</literal> to
+give the kstat a unique, meaningful name. <literal>KSTAT_STRLEN</literal> sets
+the maximum length of <literal>ks_module</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_name[KSTAT_STRLEN]</literal></term><listitem><para>A name assigned to the kstat in combination with <literal>ks_module</literal> and <literal>ks_instance</literal>. <literal>KSTAT_STRLEN</literal> sets
+the maximum length of <literal>ks_module</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_ndata</literal></term><listitem><para>Indicates the number of data records for those kstat types
+that support multiple records: <literal>KSTAT_TYPE_RAW</literal>, <literal>KSTAT_TYPE_NAMED</literal>, and <literal>KSTAT_TYPE_TIMER</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_next</literal></term><listitem><para>Points to next kstat in the chain.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_resv</literal></term><listitem><para>A reserved field.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_snaptime</literal></term><listitem><para>The timestamp for the last data snapshot, useful in calculating
+rates.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ks_type</literal></term><listitem><para>The data type, which can be <literal>KSTAT_TYPE_RAW</literal> for
+binary data, <literal>KSTAT_TYPE_NAMED</literal> for name/value pairs, <literal>KSTAT_TYPE_INTR</literal> for interrupt statistics, <literal>KSTAT_TYPE_IO</literal> for
+I/O statistics, and <literal>KSTAT_TYPE_TIMER</literal> for event timers.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="faptd"><title>Kernel Statistics Structures</title><para><indexterm><primary>kstats</primary><secondary>structures</secondary></indexterm>The structures for the different kinds of kstats are:</para><variablelist><varlistentry><term><olink targetdoc="refman9s" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum>
+</citerefentry></olink></term><listitem><para>Each kernel statistic (kstat) that is exported by device drivers
+consists of a header section and a data section. The <citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure
+is the header portion of the statistic.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9s" targetptr="kstat-intr-9s" remap="external"><citerefentry><refentrytitle>kstat_intr</refentrytitle><manvolnum>9S</manvolnum>
+</citerefentry></olink></term><listitem><para>Structure for interrupt kstats. The types of interrupts are:</para><itemizedlist><listitem><para>Hard interrupt &ndash; Sourced from the hardware device itself</para>
+</listitem><listitem><para>Soft interrupt &ndash; Induced by the system through the use
+of some system interrupt source</para>
+</listitem><listitem><para>Watchdog interrupt &ndash; Induced by a periodic timer call</para>
+</listitem><listitem><para>Spurious interrupt &ndash; An interrupt entry point was entered
+but there was no interrupt to service</para>
+</listitem><listitem><para>Multiple service &ndash; An interrupt was detected and serviced
+just prior to returning from any of the other types</para>
+</listitem>
+</itemizedlist><para>Drivers generally report only claimed hard interrupts and soft interrupts
+from their handlers, but measurement of the spurious class of interrupts is
+useful for auto-vectored devices to locate any interrupt latency problems
+in a particular system configuration. Devices that have more than one interrupt
+of the same type should use multiple structures.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9s" targetptr="kstat-io-9s" remap="external"><citerefentry><refentrytitle>kstat_io</refentrytitle><manvolnum>9S</manvolnum>
+</citerefentry></olink></term><listitem><para>Structure for I/O kstats.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9s" targetptr="kstat-named-9s" remap="external"><citerefentry><refentrytitle>kstat_named</refentrytitle><manvolnum>9S</manvolnum>
+</citerefentry></olink></term><listitem><para>Structure for named kstats. A named kstat is an array of name-value
+pairs. These pairs are kept in the <structname>kstat_named</structname> structure.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="euxch"><title>Kernel Statistics Functions</title><para><indexterm><primary>kstats</primary><secondary>functions</secondary></indexterm>The functions for using kstats are:</para><variablelist><varlistentry><term><olink targetdoc="refman9f" targetptr="kstat-create-9f" remap="external"><citerefentry><refentrytitle>kstat_create</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocate and initialize a <olink targetdoc="refman9s" targetptr="kstat-9s" remap="external"><citerefentry><refentrytitle>kstat</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="kstat-delete-9f" remap="external"><citerefentry><refentrytitle>kstat_delete</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Remove a kstat from the system.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="kstat-install-9f" remap="external"><citerefentry><refentrytitle>kstat_install</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Add a fully initialized kstat to the system.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="kstat-named-init-9f" remap="external"><citerefentry><refentrytitle>kstat_named_init</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink>, <olink targetdoc="refman9f" targetptr="kstat-named-setstr-9f" remap="external"><citerefentry><refentrytitle>kstat_named_setstr</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>Initialize a named kstat. <function>kstat_named_setstr</function> associates <literal>str</literal>, a string, with the named kstat pointer.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman9f" targetptr="kstat-queue-9f" remap="external"><citerefentry><refentrytitle>kstat_queue</refentrytitle><manvolnum>9F</manvolnum>
+</citerefentry></olink></term><listitem><para>A large number of I/O subsystems have at least two basic queues
+of transactions to be managed. One queue is for transactions that have been
+accepted for processing but for which processing has yet to begin. The other
+queue is for transactions that are actively being processed but not yet done.
+For this reason, two cumulative time statistics are kept: <emphasis>wait time</emphasis> and <emphasis>run time</emphasis>. Wait time is prior to service. Run time is during the
+service. The <function>kstat_queue</function> family of functions manages
+these times based on the transitions between the driver wait queue and run
+queue:</para><itemizedlist><listitem><para><olink targetdoc="refman9f" targetptr="kstat-runq-back-to-waitq-9f" remap="external"><citerefentry><refentrytitle>kstat_runq_back_to_waitq</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9f" targetptr="kstat-runq-enter-9f" remap="external"><citerefentry><refentrytitle>kstat_runq_enter</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9f" targetptr="kstat-runq-exit-9f" remap="external"><citerefentry><refentrytitle>kstat_runq_exit</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9f" targetptr="kstat-waitq-enter-9f" remap="external"><citerefentry><refentrytitle>kstat_waitq_enter</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9f" targetptr="kstat-waitq-exit-9f" remap="external"><citerefentry><refentrytitle>kstat_waitq_exit</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman9f" targetptr="kstat-waitq-to-runq-9f" remap="external"><citerefentry><refentrytitle>kstat_waitq_to_runq</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="geyuk"><title>Kernel Statistics for Solaris Ethernet Drivers</title><indexterm><primary>kstats</primary><secondary>Ethernet drivers</secondary>
+</indexterm><para>The kstat interface described in the following table is an effective
+way to obtain Ethernet physical layer statistics from the driver. Ethernet
+drivers should export these statistics to guide users in better diagnosis
+and repair of Ethernet physical layer problems. With exception of <literal>link_up</literal>, all statistics have a default value of 0 when not present. The
+value of the <literal>link_up</literal> statistic should be assumed to be
+1.</para><para>The following example gives all the shared link setup. In this case <literal>mii</literal> is used to filter statistics.</para><programlisting>kstat ce:0:mii:link_*</programlisting><table frame="topbot" pgwide="1" id="geyul"><title>Ethernet MII/GMII Physical
+Layer Interface Kernel Statistics</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="15.00*"/><colspec colwidth="20.03*"/><colspec colwidth="39.97*"/><thead><row rowsep="1"><entry><para>Kstat Variable</para>
+</entry><entry><para>Type</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>xcvr_addr</literal></para>
+</entry><entry><para><type>KSTAT_DATA_UINT32</type></para>
+</entry><entry><para>Provides the MII address of the transceiver that is currently in use.</para><itemizedlist><listitem><para>(0) - (31) are for the MII address of the physical layer device
+in use for a given Ethernet device.</para>
+</listitem><listitem><para>(-1) is used where there is no externally accessible MII
+interface, and therefore the MII address is undefined or irrelevant.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>xcvr_id</literal></para>
+</entry><entry><para><type>KSTAT_DATA_UINT32</type></para>
+</entry><entry><para>Provides the specific vendor ID or device ID of the transceiver that
+is currently in use.</para>
+</entry>
+</row><row><entry><para><literal>xcvr_inuse</literal></para>
+</entry><entry><para><type>KSTAT_DATA_UINT32</type></para>
+</entry><entry><para>Indicates the type of transceiver that is currently in use. The IEEE <type>aPhytType</type> enumerates the following set:</para><itemizedlist><listitem><para>(0) other undefined</para>
+</listitem><listitem><para>(1) no MII interface is present, but no transceiver is connected</para>
+</listitem><listitem><para>(2) 10 Mbits/s Clause 7 10 Mbits/s Manchester</para>
+</listitem><listitem><para>(3) 100BASE-T4 Clause 23 100 Mbits/s 8B/6T</para>
+</listitem><listitem><para>(4) 100BASE-X Clause 24 100 Mbits/s 4B/5B</para>
+</listitem><listitem><para>(5) 100BASE-T2 Clause 32 100 Mbits/s PAM5X5</para>
+</listitem><listitem><para>(6) 1000BASE-X Clause 36 1000 Mbits/s 8B/10B</para>
+</listitem><listitem><para>(7) 1000BASE-T Clause 40 1000 Mbits/s 4D-PAM5</para>
+</listitem>
+</itemizedlist><para>This set is smaller than the set specified by <type>ifMauType</type>,
+which is defined to include all of the above plus their half duplex/full duplex
+options. Since this information can be provided by the <literal>cap_</literal>*
+statistics, the missing definitions can be derived from the combination of <literal>xcvr_inuse</literal> and <literal>cap_</literal>* to provide all the combinations
+of <type>ifMayType</type>.</para>
+</entry>
+</row><row><entry><para><literal>cap_1000fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 1 Gbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_1000hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 1 Gbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_100fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 100 Mbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_100hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 100 Mbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_10fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 10 Mbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_10hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is 10 Mbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>cap_asmpause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is capable of asymmetric pause Ethernet flow control.</para>
+</entry>
+</row><row><entry><para><literal>cap_pause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is capable of symmetric pause Ethernet flow control
+when <literal>cap_pause</literal> is set to 1 and <literal>cap_asmpause</literal> is
+set to 0. When <literal>cap_asmpause</literal> is set to 1, <literal>cap_pause</literal> has
+the following meaning:</para><itemizedlist><listitem><para><literal>cap_pause</literal> = 0 Transmit pauses based on
+receive congestion.</para>
+</listitem><listitem><para><literal>cap_pause</literal> = 1 Receive pauses and slow down
+transmit to avoid congestion.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>cap_rem_fault</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is capable of remote fault indication.</para>
+</entry>
+</row><row><entry><para><literal>cap_autoneg</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is capable of auto-negotiation.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_1000fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 1 Gbits/s full duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_1000hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 1 Gbits/s half duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_100fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 100 Mbits/s full duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_100hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 100 Mbits/s half duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_10fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 10 Mbits/s full duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_10hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising 10 Mbits/s half duplex capability.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_asmpause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising the capability of asymmetric pause
+Ethernet flow control.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_pause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising the capability of symmetric pause
+Ethernet flow control when <literal>adv_cap_pause</literal> is set to 1 and <literal>adv_cap_asmpause</literal> is set to 0. When <literal>adv_cap_asmpause</literal> is
+set to 1, <literal>adv_cap_pause</literal> has the following meaning:</para><itemizedlist><listitem><para><literal>adv_cap_pause</literal> = 0 Transmit pauses based
+on receive congestion.</para>
+</listitem><listitem><para><literal>adv_cap_pause</literal> = 1 Receive pauses and slow
+down transmit to avoid congestion.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>adv_rem_fault</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is experiencing a fault that it is going to forward
+to the link partner.</para>
+</entry>
+</row><row><entry><para><literal>adv_cap_autoneg</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the device is advertising the capability of auto-negotiation.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_1000fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 1 Gbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_1000hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 1 Gbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_100fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 100 Mbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_100hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 100 Mbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_10fdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 10 Mbits/s full duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_10hdx</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is 10 Mbits/s half duplex capable.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_asmpause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is capable of asymmetric pause Ethernet
+flow control.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_pause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is capable of symmetric pause Ethernet
+flow control when <literal>lp_cap_pause</literal> is set to 1 and <literal>lp_cap_asmpause</literal> is set to 0. When <literal>lp_cap_asmpause</literal> is set to
+1, <literal>lp_cap_pause</literal> has the following meaning:</para><itemizedlist><listitem><para><literal>lp_cap_pause</literal> = 0 Link partner will transmit
+pauses based on receive congestion.</para>
+</listitem><listitem><para><literal>lp_cap_pause</literal> = 1 Link partner will receive
+pauses and slow down transmit to avoid congestion.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>lp_rem_fault</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner is experiencing a fault with the link.</para>
+</entry>
+</row><row><entry><para><literal>lp_cap_autoneg</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link partner device is capable of auto-negotiation.</para>
+</entry>
+</row><row><entry><para><literal>link_asmpause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link is operating with asymmetric pause Ethernet flow
+control.</para>
+</entry>
+</row><row><entry><para><literal>link_pause</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the resolution of the pause capability. Indicates the link
+is operating with symmetric pause Ethernet flow control when <literal>link_pause</literal> is
+set to 1 and <literal>link_asmpause</literal> is set to 0. When <literal>link_asmpause</literal> is set to 1 and is relative to a local view of the link, <literal>link_pause</literal> has the following meaning:</para><itemizedlist><listitem><para><literal>link_pause</literal> = 0 This station will transmit
+pauses based on receive congestion.</para>
+</listitem><listitem><para><literal>link_pause</literal> = 1 This station will receive
+pauses and slow down transmit to avoid congestion.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>link_duplex</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates the link duplex.</para><itemizedlist><listitem><para><literal>link_duplex</literal> = 0 Link is down and duplex
+is unknown.</para>
+</listitem><listitem><para><literal>link_duplex</literal> = 1 Link is up and in half
+duplex mode.</para>
+</listitem><listitem><para><literal>link_duplex</literal> = 2 Link is up and in full
+duplex mode.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para><literal>link_up</literal></para>
+</entry><entry><para><type>KSTAT_DATA_CHAR</type></para>
+</entry><entry><para>Indicates whether the link is up or down.</para><itemizedlist><listitem><para><literal>link_up</literal> = 0 Link is down.</para>
+</listitem><listitem><para><literal>link_up</literal> = 1 Link is up.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3>
+</sect2><sect2 id="eupre"><title>DTrace for Dynamic Instrumentation</title><indexterm><primary>DTrace</primary><secondary>definition</secondary>
+</indexterm><?Pub _bookmark Command="[Quick Mark]"?><indexterm><primary>tuning device drivers</primary><secondary>DTrace</secondary>
+</indexterm><para>DTrace is a comprehensive dynamic tracing facility for examining the
+behavior of both user programs and the operating system itself. With DTrace,
+you can collect data at strategic locations in your environment, referred
+to as <emphasis>probes</emphasis>. DTrace enables you to record such data
+as stack traces, timestamps, the arguments to a function, or simply counts
+of how often the probe fires. Because DTrace enables you to insert probes
+dynamically, you do not need to recompile your code. For more information
+on DTrace, see the <olink targetdoc="dynmctrcggd" remap="external"><citetitle remap="book">Solaris
+Dynamic Tracing Guide </citetitle></olink> and the <olink targetdoc="dtrcug" remap="external"><citetitle remap="book">DTrace User Guide </citetitle></olink>. The <ulink url="http://www.sun.com/bigadmin/content/dtrace/" type="text">DTrace BigAdmin
+System Administration Portal</ulink> contains many links to articles, XPerts
+sessions, and other information about DTrace.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000101452 0?>

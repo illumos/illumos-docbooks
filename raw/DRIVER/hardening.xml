@@ -1,0 +1,1353 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="gevsi"><title>Hardening Solaris Drivers</title><highlights><para><indexterm><primary>hardening drivers</primary></indexterm><indexterm><primary>Predictive Self-Healing</primary><seealso>fault management</seealso></indexterm><indexterm><primary>Fault Management Architecture (FMA)</primary><see>fault management</see></indexterm><indexterm><primary>fault management</primary><secondary>I/O Fault Services</secondary></indexterm>Fault Management Architecture
+(FMA) I/O Fault Services enable driver developers to integrate fault management
+capabilities into I/O device drivers. The Solaris I/O fault services framework
+defines a set of interfaces that enable all drivers to coordinate and perform
+basic error handling tasks and activities. The Solaris FMA as a whole provides
+for error handling and fault diagnosis, in addition to response and recovery.
+FMA is a component of Sun's Predictive Self-Healing strategy.</para><para>A driver is considered hardened when it uses the defensive programming
+practices described in this document in addition to the I/O fault services
+framework for error handling and diagnosis. The driver hardening test harness
+tests that the I/O fault services and defensive programming requirements have
+been correctly fulfilled.</para><itemizedlist><para>This document contains the following sections:</para><listitem><para><olink targetptr="fmaiofs" remap="internal">Sun Fault Management Architecture
+I/O Fault Services</olink> provides a reference for driver developers who
+want to integrate fault management capabilities into I/O device drivers.</para>
+</listitem><listitem><para><olink targetptr="defensive-programming" remap="internal">Defensive Programming
+Techniques for Solaris Device Drivers</olink> provides general information
+about how to defensively write a Solaris device driver.</para>
+</listitem><listitem><para><olink targetptr="gemgi" remap="internal">Driver Hardening Test Harness</olink> is
+a driver development tool that injects simulated hardware faults when the
+driver under development accesses its hardware.</para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="fmaiofs"><title>Sun Fault Management Architecture I/O Fault Services</title><para>This section explains how to integrate fault management error reporting,
+error handling, and diagnosis for I/O device drivers. This section provides
+an in-depth examination of the I/O fault services framework and how to utilize
+the I/O fault service APIs within a device driver.</para><itemizedlist><para>This section discusses the following topics:</para><listitem><para><olink targetptr="gemgv" remap="internal">What Is Predictive Self-Healing?</olink> provides
+background and an overview of the Sun Fault Management Architecture.</para>
+</listitem><listitem><para><olink targetptr="gemgw" remap="internal">Solaris Fault Manager</olink> describes
+additional background with a focus on a high-level overview of the Solaris
+Fault Manager, <command>fmd</command>(1M).</para>
+</listitem><listitem><para><olink targetptr="gemgl" remap="internal">Error Handling</olink> is the primary
+section for driver developers. This section highlights the best practice coding
+techniques for high-availability and the use of I/O fault services in driver
+code to interact with the FMA.</para>
+</listitem><listitem><para><olink targetptr="gemfs" remap="internal">Diagnosing Faults</olink> describes
+how faults are diagnosed from the errors detected by drivers.</para>
+</listitem><listitem><para><olink targetptr="gemhe" remap="internal">Event Registry</olink> provides information
+on Sun's Event Registry.</para>
+</listitem>
+</itemizedlist><sect2 id="gemgv"><title>What Is Predictive Self-Healing?</title><indexterm><primary>Predictive Self-Healing</primary>
+</indexterm><indexterm><primary>fault</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>fault</secondary>
+</indexterm><indexterm><primary>ereport</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>ereport</secondary>
+</indexterm><indexterm><primary>ereport event</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>ereport events</secondary>
+</indexterm><indexterm><primary>diagnosis engine</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>diagnosis engine</secondary>
+</indexterm><indexterm><primary>fault event</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>fault event</secondary>
+</indexterm><indexterm><primary>agent</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>agent</secondary>
+</indexterm><para>Traditionally, systems have exported hardware and software error information
+directly to human administrators and to management software in the form of
+syslog messages. Often, error detection, diagnosis, reporting, and handling
+was embedded in the code of each driver.</para><para>A system like the Solaris OS predictive self-healing system is first
+and foremost self-diagnosing. Self-diagnosing means the system provides technology
+to automatically diagnose problems from observed symptoms, and the results
+of the diagnosis can then be used to trigger automated response and recovery.
+A <emphasis>fault</emphasis> in hardware or a defect in software can be associated
+with a set of possible observed symptoms called <emphasis>errors</emphasis>.
+The data generated by the system as the result of observing an error is called
+an error report or <emphasis>ereport</emphasis>.</para><para>In a system capable of self-healing, ereports are captured by the system
+and are encoded as a set of name-value pairs described by an extensible event
+protocol to form an <emphasis>ereport event</emphasis>. Ereport events and
+other data are gathered to facilitate self-healing, and are dispatched to
+software components called diagnosis engines designed to diagnose the underlying
+problems corresponding to the error symptoms observed by the system. A <emphasis>diagnosis engine</emphasis> runs in the background and silently consumes error
+telemetry until it can produce a diagnosis or predict a fault.</para><para>After processing sufficient telemetry to reach a conclusion, a diagnosis
+engine produces another event called a <emphasis>fault event</emphasis>. The
+fault event is then broadcast to all agents that are interested in the specific
+fault event. An <emphasis>agent</emphasis> is a software component that initiates
+recovery and responds to specific fault events. A software component known
+as the Solaris Fault Manager, <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>,
+manages the multiplexing of events between ereport generators, diagnosis engines,
+and agent software.</para>
+</sect2><sect2 id="gemgw"><title>Solaris Fault Manager</title><indexterm><primary><command>fmd</command> fault manager daemon</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>fault manager daemon <command>fmd</command></secondary>
+</indexterm><para>The Solaris Fault Manager, <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, is responsible for dispatching in-bound error telemetry
+events to the appropriate diagnosis engines. The diagnosis engine is responsible
+for identifying the underlying hardware faults or software defects that are
+producing the error symptoms. The <command>fmd</command>(1M) daemon is the
+Solaris OS implementation of a fault manager. It starts at boot time and loads
+all of the diagnosis engines and agents available on the system. The Solaris
+Fault Manager also provides interfaces for system administrators and service
+personnel to observe fault management activity.</para><sect3 id="gemft"><title>Diagnosis, Suspect Lists, and Fault Events</title><indexterm><primary>list suspect</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>list suspect</secondary>
+</indexterm><indexterm><primary>suspect list</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>suspect list</secondary>
+</indexterm><para>Once a diagnosis has been made, the diagnosis is output in the form
+of a <emphasis>list.suspect</emphasis> event. A list.suspect event is an event
+comprised of one or more possible fault or defect events. Sometimes the diagnosis
+cannot narrow the cause of errors to a single fault or defect. For example,
+the underlying problem might be a broken wire connecting controllers to the
+main system bus. The problem might be with a component on the bus or with
+the bus itself. In this specific case, the list.suspect event will contain
+multiple fault events: one for each controller attached to the bus, and one
+for the bus itself.</para><itemizedlist><para><indexterm><primary><command>fmdump</command> command</primary></indexterm><indexterm><primary>fault management</primary><secondary><command>fmdump</command> command</secondary></indexterm><indexterm><primary>Automated System Recovery Unit (ASRU)</primary><secondary>definition</secondary></indexterm><indexterm><primary>fault management</primary><secondary>Automated System Recovery Unit (ASRU)</secondary></indexterm><indexterm><primary>Field Replaceable Unit (FRU)</primary><secondary>definition</secondary></indexterm><indexterm><primary>fault management</primary><secondary>Field Replaceable Unit (FRU)</secondary></indexterm>In
+addition to describing the fault that was diagnosed, a fault event also contains
+four payload members for which the diagnosis is applicable.</para><listitem><para>The <emphasis>resource</emphasis> is the component that was
+diagnosed as faulty. The <olink targetdoc="group-refman" targetptr="fmdump-1m" remap="external"><citerefentry><refentrytitle>fmdump</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+shows this payload member as &ldquo;Problem in.&rdquo;</para>
+</listitem><listitem><para>The <emphasis>Automated System Recovery Unit</emphasis> (ASRU)
+is the hardware or software component that must be disabled to prevent further
+error symptoms from occurring. The <command>fmdump</command>(1M) command shows
+this payload member as &ldquo;Affects.&rdquo;</para>
+</listitem><listitem><para>The <emphasis>Field Replaceable Unit</emphasis> (FRU) is the
+component that must be replaced or repaired to fix the underlying problem.</para>
+</listitem><listitem><para>The <emphasis>Label</emphasis> payload is a string that gives
+the location of the FRU in the same form as it is printed on the chassis or
+motherboard, for example next to a DIMM slot or PCI card slot. The <command>fmdump</command>command shows this payload member as &ldquo;Location.&rdquo;</para>
+</listitem>
+</itemizedlist><para>For example, after receiving a certain number of ECC correctable errors
+in a given amount of time for a particular memory location, the CPU and memory
+diagnosis engine issues a diagnosis (list.suspect event) for a faulty DIMM.</para><screen># <userinput>fmdump -v -u 38bd6f1b-a4de-4c21-db4e-ccd26fa8573c</userinput>
+TIME                 UUID                                 SUNW-MSG-ID
+Oct 31 13:40:18.1864 38bd6f1b-a4de-4c21-db4e-ccd26fa8573c AMD-8000-8L
+100%  fault.cpu.amd.icachetag
+
+Problem in: hc:///motherboard=0/chip=0/cpu=0
+Affects: cpu:///cpuid=0
+FRU: hc:///motherboard=0/chip=0
+Location: SLOT 2</screen><para>In this example, <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> has
+identified a problem in a resource, specifically a CPU (<literal>hc:///motherboard=0/chip=0/cpu=0</literal>). To suppress further error symptoms and to prevent an uncorrectable
+error from occurring, an ASRU, (<literal>cpu:///cpuid=0</literal>), is identified
+for retirement. The component that needs to be replaced is the FRU (<literal>hc:///motherboard=0/chip=0</literal>).</para>
+</sect3><sect3 id="gemgg"><title>Response Agents</title><indexterm><primary><command>fmadm</command> command</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><command>fmadm</command> command</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>response agent</secondary>
+</indexterm><indexterm><primary>retire agent</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>retire agent</secondary>
+</indexterm><para>An agent is a software component that takes action in response to a
+diagnosis or repair. For example, the CPU and memory retire agent is designed
+to act on list.suspects that contain a fault.cpu.* event. The <literal>cpumem-retire</literal> agent will attempt to off-line a CPU or retire a physical memory
+page from service. If the agent is successful, an entry in the fault manager's
+ASRU cache is added for the page or CPU that was successfully retired. The <olink targetdoc="group-refman" targetptr="fmadm-1m" remap="external"><citerefentry><refentrytitle>fmadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility, as shown in the
+example below, shows an entry for a memory rank that has been diagnosed as
+having a fault. ASRUs that the system does not have the ability to off-line,
+retire, or disable, will also have an entry in the ASRU cache, but they will
+be seen as degraded. Degraded means the resource associated with the ASRU
+is faulty, but the ASRU is unable to be removed from service. Currently Solaris
+agent software cannot act upon I/O ASRUs (device instances). All faulty I/O
+resource entries in the cache are in the degraded state.</para><screen># <userinput>fmadm faulty</userinput>
+   STATE RESOURCE / UUID
+-------- ----------------------------------------------------------------------
+degraded mem:///motherboard=0/chip=1/memory-controller=0/dimm=3/rank=0
+         ccae89df-2217-4f5c-add4-d920f78b4faf
+-------- ----------------------------------------------------------------------</screen><para>The primary purpose of a <emphasis>retire agent</emphasis> is to isolate
+(safely remove from service) the piece of hardware or software that has been
+diagnosed as faulty.</para><itemizedlist><para>Agents can also take other important actions such as the following actions:</para><listitem><para>Send alerts via SNMP traps. This can translate a diagnosis
+into an alert for SNMP that plugs into existing software mechanisms.</para>
+</listitem><listitem><para>Post a syslog message. Message specific diagnoses (for example,
+syslog message agent) can take the result of a diagnosis and translate it
+into a syslog message that administrators can use to take a specific action.</para>
+</listitem><listitem><para>Other agent actions such as update the FRUID. Response agents
+can be platform-specific.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="gemfg"><title>Message IDs and Dictionary Files</title><indexterm><primary>fault management</primary><secondary>fault messages</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>list suspect</secondary>
+</indexterm><para>The syslog message agent takes the output of the diagnosis (the list.suspect
+event) and writes specific messages to the console or <filename>/var/adm/messages</filename>. Often console messages can be difficult to understand. FMA remedies
+this problem by providing a defined fault message structure that is generated
+every time a list.suspect event is delivered to a syslog message.</para><para><indexterm><primary>event registry</primary></indexterm><indexterm><primary>fault management</primary><secondary>event registry</secondary></indexterm><indexterm><primary sortas="dict dictionary files"><filename>.dict</filename> dictionary files</primary></indexterm><indexterm><primary>fault management</primary><secondary sortas="dict dictionary files"><filename>.dict</filename> dictionary files</secondary></indexterm><indexterm><primary sortas="po message files"><filename>.po</filename> message files</primary></indexterm><indexterm><primary>fault management</primary><secondary sortas="po message files"><filename>.po</filename> message files</secondary></indexterm>The syslog agent generates a message identifier
+(MSG ID). The event registry generates dictionary files (<filename>.dict</filename> files)
+that map a list.suspect event to a structured message identifier that should
+be used to identify and view the associated knowledge article. Message files,
+(<filename>.po</filename> files) map the message ID to localized messages
+for every possible list of suspected faults that the diagnosis engine can
+generate. The following is an example of a fault message emitted on a test
+system.</para><screen>SUNW-MSG-ID: AMD-8000-7U, TYPE: Fault, VER: 1, SEVERITY: Major
+EVENT-TIME: Fri Jul 28 04:26:51 PDT 2006
+PLATFORM: Sun Fire V40z, CSN: XG051535088, HOSTNAME: parity
+SOURCE: eft, REV: 1.16
+EVENT-ID: add96f65-5473-69e6-dbe1-8b3d00d5c47b
+DESC: The number of errors associated with this CPU has exceeded 
+acceptable levels. Refer to http://sun.com/msg/AMD-8000-7U for 
+more information.
+AUTO-RESPONSE: An attempt will be made to remove this CPU from service.
+IMPACT: Performance of this system may be affected.
+REC-ACTION: Schedule a repair procedure to replace the affected CPU. 
+Use fmdump -v -u &lt;EVENT_ID&gt; to identify the module.</screen>
+</sect3><sect3 id="gemfo"><title>System Topology</title><indexterm><primary>fault management</primary><secondary>topology of system</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>fault event</secondary>
+</indexterm><para>To identify where a fault might have occurred, diagnosis engines need
+to have the topology for a given software or hardware system represented.
+The <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> daemon
+provides diagnosis engines with a handle to a topology snapshot that can be
+used during diagnosis. Topology information is used to represent the resource,
+ASRU, and FRU found in each fault event. The topology can also be used to
+store the platform label, FRUID, and serial number identification.</para><para>The resource payload member in the fault event is always represented
+by the physical path location from the platform chassis outward. For example,
+a PCI controller function that is bridged from the main system bus to a PCI
+local bus is represented by its <literal>hc</literal> scheme path name:</para><programlisting>hc:///motherboard=0/hostbridge=1/pcibus=0/pcidev=13/pcifn=0</programlisting><para>The ASRU payload member in the fault event is typically represented
+by the Solaris device tree instance name that is bound to a hardware controller,
+device, or function. FMA uses the <literal>dev</literal> scheme to represent
+the ASRU in its native format for actions that might be taken by a future
+implementation of a retire agent specifically designed for I/O devices:</para><programlisting>dev:////pci@1e,600000/ide@d</programlisting><para>The FRU payload representation in the fault event varies depending on
+the closest replaceable component to the I/O resource that has been diagnosed
+as faulty. For example, a fault event for a broken embedded PCI controller
+might name the motherboard of the system as the FRU that needs to be replaced:</para><programlisting>hc:///motherboard=0</programlisting><para>The label payload is a string that gives the location of the FRU in
+the same form as it is printed on the chassis or motherboard, for example
+next to a DIMM slot or PCI card slot:</para><programlisting>Label: SLOT 2</programlisting>
+</sect3>
+</sect2><sect2 id="gemgl"><title>Error Handling</title><indexterm><primary>fault management</primary><secondary>error handling</secondary>
+</indexterm><para>This section describes how to use I/O fault services APIs to handle
+errors within a driver. This section discusses how drivers should indicate
+and initialize their fault management capabilities, generate error reports,
+and register the driver's error handler routine.</para><para><indexterm><primary><literal>bge</literal> driver code</primary></indexterm>Excerpts are provided from source code examples that demonstrate
+the use of the I/O fault services API from the Broadcom 1Gb NIC driver, <literal>bge</literal>. Follow these examples as a model for how to integrate fault
+management capability into your own drivers. Take the following steps to study
+the complete <literal>bge</literal> driver code:</para><itemizedlist><listitem><para>Go to <ulink url="http://www.opensolaris.org/os/" type="text_url">OpenSolaris</ulink>.</para>
+</listitem><listitem><para>Click <ulink url="http://cvs.opensolaris.org/source/" type="text_url">Source Browser</ulink> under the Code heading in the menu
+on the left side of the page.</para>
+</listitem><listitem><para>Enter <literal>bge</literal> in the File Path field.</para>
+</listitem><listitem><para>Click the Search button.</para>
+</listitem>
+</itemizedlist><para>Drivers that have been instrumented to provide FMA error report telemetry
+detect errors and determine the impact of those errors on the services provided
+by the driver. Following the detection of an error, the driver should determine
+when its services have been impacted and to what degree.</para><itemizedlist><para>An I/O driver must respond immediately to detected errors. Appropriate
+responses include:</para><listitem><para>Attempt recovery</para>
+</listitem><listitem><para>Retry an I/O transaction</para>
+</listitem><listitem><para>Attempt fail-over techniques</para>
+</listitem><listitem><para>Report the error to the calling application/stack</para>
+</listitem><listitem><para>If the error cannot be constrained any other way, then panic</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>fault management</primary><secondary>ereport</secondary></indexterm>Errors detected by the driver are communicated to the fault management
+daemon as an <emphasis>ereport</emphasis>. An ereport is a structured event
+defined by the FMA event protocol. The event protocol is a specification for
+a set of common data fields that must be used to describe all possible error
+and fault events, in addition to the list of suspected faults. Ereports are
+gathered into a flow of error telemetry and dispatched to the diagnosis engine.</para><sect3 id="gemfi"><title>Declaring Fault Management Capabilities</title><indexterm><primary>fault management</primary><secondary>fault management capabilities, declaring</secondary>
+</indexterm><indexterm><primary><function>ddi_fm_init</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_init</function> function</secondary>
+</indexterm><para>A hardened device driver must declare its fault management capabilities
+to the I/O Fault Management framework. Use the <interfacename>ddi_fm_init</interfacename>(9F)
+function to declare the fault management capabilities of your driver.</para><programlisting>void ddi_fm_init(dev_info_t *<replaceable>dip</replaceable>, int *<replaceable>fmcap</replaceable>, ddi_iblock_cookie_t *<replaceable>ibcp</replaceable>)</programlisting><para><indexterm><primary>fault management</primary><secondary>fault management capabilities</secondary></indexterm>The <function>ddi_fm_init</function> function
+can be called from kernel context in a driver <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. The <function>ddi_fm_init</function> function usually is called from the <function>attach</function> entry
+point. The <function>ddi_fm_init</function> function allocates and initializes
+resources according to <replaceable>fmcap</replaceable>. The <replaceable>fmcap</replaceable> parameter
+must be set to the bitwise-inclusive-OR of the following fault management
+capabilities:</para><itemizedlist><listitem><para><type>DDI_FM_EREPORT_CAPABLE</type> - Driver is responsible
+for and capable of generating FMA protocol error events (ereports) upon detection
+of an error condition.</para>
+</listitem><listitem><para><type>DDI_FM_ACCCHK_CAPABLE</type> - Driver is responsible
+for and capable of checking for errors upon completion of one or more access
+I/O transactions.</para>
+</listitem><listitem><para><type>DDI_FM_DMACHK_CAPABLE</type> - Driver is responsible
+for and capable of checking for errors upon completion of one or more DMA
+I/O transactions.</para>
+</listitem><listitem><para><type>DDI_FM_ERRCB_CAPABLE</type> - Driver has an error callback
+function.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>fault management</primary><secondary>fault management capability properties</secondary></indexterm>A hardened leaf driver generally
+sets all these capabilities. However, if its parent nexus is not capable of
+supporting any one of the requested capabilities, the associated bit is cleared
+and returned as such to the driver. Before returning from <interfacename>ddi_fm_init</interfacename>(9F), the I/O fault services framework creates a set of fault
+management capability properties: <property>fm-ereport-capable</property>, <property>fm-accchk-capable</property>, <property>fm-dmachk-capable</property> and <property>fm-errcb-capable</property>. The currently supported fault management capability
+level is observable by using the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para><para>To make your driver support administrative selection of fault management
+capabilities, export and set the fault management capability level properties
+to the values described above in the <olink targetdoc="refman4" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> file. The <property>fm-capable</property> properties
+must be set and read prior to calling <function>ddi_fm_init</function> with
+the desired capability list.</para><para><indexterm><primary><function>pci_ereport_setup</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function> pci_ereport_setup</function> function</secondary></indexterm>The following example from the <literal>bge</literal> driver shows the <function>bge_fm_init</function> function,
+which calls the <interfacename>ddi_fm_init</interfacename>(9F) function. The <function>bge_fm_init</function> function is called in the <function>bge_attach</function> function.</para><programlisting>static void
+bge_fm_init(bge_t *bgep)
+{
+        ddi_iblock_cookie_t iblk;
+
+        /* Only register with IO Fault Services if we have some capability */
+        if (bgep-&gt;fm_capabilities) {
+                bge_reg_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+                bge_desc_accattr.devacc_attr_access = DDI_FLAGERR_ACC;
+                dma_attr.dma_attr_flags = DDI_DMA_FLAGERR;
+                /* 
+                 * Register capabilities with IO Fault Services
+                 */
+                ddi_fm_init(bgep-&gt;devinfo, &amp;bgep-&gt;fm_capabilities, &amp;iblk);
+                /*
+                 * Initialize pci ereport capabilities if ereport capable
+                 */
+                if (DDI_FM_EREPORT_CAP(bgep-&gt;fm_capabilities) ||
+                    DDI_FM_ERRCB_CAP(bgep-&gt;fm_capabilities))
+                        pci_ereport_setup(bgep-&gt;devinfo);
+                /*
+                 * Register error callback if error callback capable
+                 */
+                if (DDI_FM_ERRCB_CAP(bgep-&gt;fm_capabilities))
+                        ddi_fm_handler_register(bgep-&gt;devinfo,
+                        bge_fm_error_cb, (void*) bgep);
+        } else {
+                /*
+                 * These fields have to be cleared of FMA if there are no
+                 * FMA capabilities at runtime.
+                 */
+                bge_reg_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+                bge_desc_accattr.devacc_attr_access = DDI_DEFAULT_ACC;
+                dma_attr.dma_attr_flags = 0;
+        }
+}</programlisting>
+</sect3><sect3 id="gemhm"><title>Cleaning Up Fault Management Resources</title><indexterm><primary>fault management</primary><secondary>fault management resources, cleaning up</secondary>
+</indexterm><indexterm><primary><function>ddi_fm_fini</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_fini</function> function</secondary>
+</indexterm><para>The <interfacename>ddi_fm_fini</interfacename>(9F) function cleans up
+resources allocated to support fault management for <replaceable>dip</replaceable>.</para><programlisting>void ddi_fm_fini(dev_info_t *<replaceable>dip</replaceable>)</programlisting><para>The <function>ddi_fm_fini</function> function can be called from kernel
+context in a driver <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><para><indexterm><primary><function>pci_ereport_teardown</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_teardown</function> function</secondary></indexterm>The following example from the <literal>bge</literal> driver shows the <function>bge_fm_fini</function> function,
+which calls the <interfacename>ddi_fm_fini</interfacename>(9F) function. The <function>bge_fm_fini</function> function is called in the <function>bge_unattach</function> function,
+which is called in both the <function>bge_attach</function> and <function>bge_detach</function> functions.</para><programlisting>static void
+bge_fm_fini(bge_t *bgep)
+{
+        /* Only unregister FMA capabilities if we registered some */
+        if (bgep-&gt;fm_capabilities) {
+                /*
+                 * Release any resources allocated by pci_ereport_setup()
+                 */
+                if (DDI_FM_EREPORT_CAP(bgep-&gt;fm_capabilities) ||
+                    DDI_FM_ERRCB_CAP(bgep-&gt;fm_capabilities))
+                        pci_ereport_teardown(bgep-&gt;devinfo);
+                /*
+                 * Un-register error callback if error callback capable
+                 */
+                if (DDI_FM_ERRCB_CAP(bgep-&gt;fm_capabilities))
+                        ddi_fm_handler_unregister(bgep-&gt;devinfo);
+                /*
+                 * Unregister from IO Fault Services
+                 */
+                ddi_fm_fini(bgep-&gt;devinfo);
+        }
+}</programlisting>
+</sect3><sect3 id="gemgx"><title>Getting the Fault Management Capability Bit Mask</title><indexterm><primary>fault management</primary><secondary>fault management capability bit mask</secondary>
+</indexterm><indexterm><primary><function>ddi_fm_capable</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_capable</function> function</secondary>
+</indexterm><para>The <interfacename>ddi_fm_capable</interfacename>(9F) function returns
+the capability bit mask currently set for <replaceable>dip</replaceable>.</para><programlisting>void ddi_fm_capable(dev_info_t *<replaceable>dip</replaceable>)</programlisting>
+</sect3><sect3 id="gemfl"><title>Reporting Errors</title><itemizedlist><para>This section provides information about the following topics:</para><listitem><para><olink targetptr="gemfu" remap="internal">Queueing an Error Event</olink> discusses
+how to queue error events.</para>
+</listitem><listitem><para><olink targetptr="gemfk" remap="internal">Detecting and Reporting PCI-Related
+Errors</olink> describes how to report PCI-related errors.</para>
+</listitem><listitem><para><olink targetptr="gemha" remap="internal">Reporting Standard I/O Controller
+Errors</olink> describes how to report standard I/O controller errors.</para>
+</listitem><listitem><para><olink targetptr="gemgp" remap="internal">Service Impact Function</olink> discusses
+how to report whether an error has impacted the services provided by a device.</para>
+</listitem>
+</itemizedlist><sect4 id="gemfu"><title>Queueing an Error Event</title><indexterm><primary><function>ddi_fm_ereport_post</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_ereport_post</function> function</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>ereport events</secondary>
+</indexterm><indexterm><primary>ENA (Error Numeric Association)</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>ENA (Error Numeric Association)</secondary>
+</indexterm><para>The <interfacename>ddi_fm_ereport_post</interfacename>(9F) function
+causes an ereport event to be queued for delivery to the fault manager daemon, <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><programlisting>void ddi_fm_ereport_post(dev_info_t *<replaceable>dip</replaceable>, 
+                         const char *<replaceable>error_class</replaceable>, 
+                         uint64_t <replaceable>ena</replaceable>, 
+                         int <replaceable>sflag</replaceable>, ...)</programlisting><para>The <replaceable>sflag</replaceable> parameter indicates whether the
+caller is willing to wait for system memory and event channel resources to
+become available.</para><para>The ENA indicates the <emphasis>Error Numeric Association</emphasis> (ENA)
+for this error report. The ENA might have been initialized and obtained from
+another error detecting software module such as a bus nexus driver. If the
+ENA is set to 0, it will be initialized by <function>ddi_fm_ereport_post</function>.</para><para>The name-value pair (<replaceable>nvpair</replaceable>) variable argument
+list contains one or more name, type, value pointer <replaceable>nvpair</replaceable> tuples
+for non-array <literal>data_type_t</literal> types or one or more name, type,
+number of element, value pointer tuples for <literal>data_type_t</literal> array
+types. The <replaceable>nvpair</replaceable> tuples make up the ereport event
+payload required for diagnosis. The end of the argument list is specified
+by <literal>NULL</literal>.</para><para><indexterm><primary>event registry</primary></indexterm><indexterm><primary>fault management</primary><secondary>event registry</secondary></indexterm><indexterm><primary>Eversholt fault tree (eft) rules</primary></indexterm><indexterm><primary>fault management</primary><secondary>Eversholt fault tree (eft) rules</secondary></indexterm>The ereport class names and
+payloads described in <olink targetptr="gemha" remap="internal">Reporting Standard I/O Controller
+Errors</olink> for I/O controllers are used as appropriate for <replaceable>error_class</replaceable>. Other ereport class names and payloads can be defined, but
+they must be registered in the Sun <emphasis>event registry</emphasis> and
+accompanied by driver specific diagnosis engine software, or the Eversholt
+fault tree (eft) rules. For more information about the Sun event registry
+and about Eversholt fault tree rules, see the <ulink url="http://www.opensolaris.org/os/community/fm/" type="text_url">Fault Management
+community</ulink> on <ulink url="http://www.opensolaris.org/os/" type="text_url">OpenSolaris</ulink>.</para><programlisting>void
+bge_fm_ereport(bge_t *bgep, char *detail)
+{
+        uint64_t ena;
+        char buf[FM_MAX_CLASS];
+        (void) snprintf(buf, FM_MAX_CLASS, "%s.%s", DDI_FM_DEVICE, detail);
+        ena = fm_ena_generate(0, FM_ENA_FMT1);
+        if (DDI_FM_EREPORT_CAP(bgep-&gt;fm_capabilities)) {
+                ddi_fm_ereport_post(bgep-&gt;devinfo, buf, ena, DDI_NOSLEEP,
+                    FM_VERSION, DATA_TYPE_UINT8, FM_EREPORT_VERS0, NULL);
+        }
+}</programlisting>
+</sect4><sect4 id="gemfk"><title>Detecting and Reporting PCI-Related Errors</title><indexterm><primary><function>pci_ereport_post</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_post</function> function</secondary>
+</indexterm><indexterm><primary><function>pci_ereport_setup</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_seetup</function> function</secondary>
+</indexterm><indexterm><primary><function>pci_ereport_teardown</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_teardown</function> function</secondary>
+</indexterm><para>PCI-related errors, including PCI, PCI-X, and PCI-E, are automatically
+detected and reported when you use <interfacename>pci_ereport_post</interfacename>(9F).</para><programlisting>void pci_ereport_post(dev_info_t *<replaceable>dip</replaceable>, ddi_fm_error_t *<replaceable>derr</replaceable>, uint16_t *<replaceable>xx_status</replaceable>)</programlisting><para>Drivers do not need to generate driver-specific ereports for errors
+that occur in the PCI Local Bus configuration status registers. The <function>pci_ereport_post</function> function can report data parity errors, master aborts, target
+aborts, signaled system errors, and much more.</para><para>If <function>pci_ereport_post</function> is to be used by a driver,
+then <interfacename>pci_ereport_setup</interfacename>(9F) must have been previously
+called during the driver's <interfacename>attach</interfacename>(9E) routine,
+and <interfacename>pci_ereport_teardown</interfacename>(9F) must subsequently
+be called during the driver's <interfacename>detach</interfacename>(9E) routine.</para><para>The <literal>bge</literal> code samples below show the <literal>bge</literal> driver
+invoking the <function>pci_ereport_post</function> function from the driver's
+error handler. See also  <olink targetptr="gemie" remap="internal">Registering an Error Handler</olink>.</para><programlisting>/*
+ * The I/O fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+bge_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+     /*
+      * as the driver can always deal with an error 
+      * in any dma or access handle, we can just return 
+      * the fme_status value.
+      */
+     pci_ereport_post(dip, err, NULL);
+     return (err-&gt;fme_status);
+}</programlisting>
+</sect4><sect4 id="gemha"><title>Reporting Standard I/O Controller Errors</title><indexterm><primary>fault management</primary><secondary>eft diagnosis engine</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>event registry</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>DDI_FM_* I/O controller errors</secondary>
+</indexterm><para>A standard set of device ereports is defined for commonly seen errors
+for I/O controllers. These ereports should be generated whenever one of the
+error symptoms described in this section is detected.</para><para>The ereports described in this section are dispatched for diagnosis
+to the eft diagnosis engine, which uses a common set of standard rules to
+diagnose them. Any other errors detected by device drivers must be defined
+as ereport events in the Sun event registry and must be accompanied by device
+specific diagnosis software or eft rules.</para><variablelist termlength="wholeline"><varlistentry><term>DDI_FM_DEVICE_INVAL_STATE</term><listitem><para>The driver has detected that the device is in an invalid state.</para><para>A driver should post an error when it detects that the data it transmits
+or receives appear to be invalid. For example, in the <literal>bge</literal> code,
+the <function>bge_chip_reset</function> and <function>bge_receive_ring</function> routines
+generate the <literal>ereport.io.device.inval_state</literal> error when these
+routines detect invalid data.</para><programlisting>/*
+ * The SEND INDEX registers should be reset to zero by the
+ * global chip reset; if they're not, there'll be trouble
+ * later on.
+ */
+sx0 = bge_reg_get32(bgep, NIC_DIAG_SEND_INDEX_REG(0));
+if (sx0 != 0) {
+    BGE_REPORT((bgep, "SEND INDEX - device didn't RESET"));
+    bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
+    return (DDI_FAILURE);
+}
+/* ... */
+/*
+ * Sync (all) the receive ring descriptors
+ * before accepting the packets they describe
+ */
+DMA_SYNC(rrp-&gt;desc, DDI_DMA_SYNC_FORKERNEL);
+if (*rrp-&gt;prod_index_p &gt;= rrp-&gt;desc.nslots) {
+    bgep-&gt;bge_chip_state = BGE_CHIP_ERROR;
+    bge_fm_ereport(bgep, DDI_FM_DEVICE_INVAL_STATE);
+    return (NULL);
+}</programlisting>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FM_DEVICE_INTERN_CORR</term><listitem><para>The device has reported a self-corrected internal error. For
+example, a correctable ECC error has been detected by the hardware in an internal
+buffer within the device.</para><para>This error flag is not used in the <literal>bge</literal> driver. See
+the <filename>nxge_fm.c</filename> file on OpenSolaris for examples that use
+this error. Take the following steps to study the <literal>nxge</literal> driver
+code:</para><itemizedlist><listitem><para>Go to <ulink url="http://www.opensolaris.org/os/" type="text_url">OpenSolaris</ulink>.</para>
+</listitem><listitem><para>Click <ulink url="http://cvs.opensolaris.org/source/" type="text_url">Source Browser</ulink> under the Code heading in the menu
+on the left side of the page.</para>
+</listitem><listitem><para>Enter <literal>nxge</literal> in the File Path field.</para>
+</listitem><listitem><para>Click the Search button.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FM_DEVICE_INTERN_UNCORR</term><listitem><para>The device has reported an uncorrectable internal error. For
+example, an uncorrectable ECC error has been detected by the hardware in an
+internal buffer within the device.</para><para>This error flag is not used in the <literal>bge</literal> driver. See
+the <filename>nxge_fm.c</filename> file on OpenSolaris for examples that use
+this error.</para>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FM_DEVICE_STALL</term><listitem><para>The driver has detected that data transfer has stalled unexpectedly.</para><para>The <function>bge_factotum_stall_check</function> routine provides an
+example of stall detection.</para><programlisting>dogval = bge_atomic_shl32(&amp;bgep-&gt;watchdog, 1);
+if (dogval &lt; bge_watchdog_count)
+    return (B_FALSE);
+
+BGE_REPORT((bgep, "Tx stall detected, 
+watchdog code 0x%x", dogval));
+bge_fm_ereport(bgep, DDI_FM_DEVICE_STALL);
+return (B_TRUE);</programlisting>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FM_DEVICE_NO_RESPONSE</term><listitem><para>The device is not responding to a driver command.</para><programlisting>bge_chip_poll_engine(bge_t *bgep, bge_regno_t regno,
+        uint32_t mask, uint32_t val)
+{
+        uint32_t regval;
+        uint32_t n;
+
+        for (n = 200; n; --n) {
+                regval = bge_reg_get32(bgep, regno);
+                if ((regval &amp; mask) == val)
+                        return (B_TRUE);
+                drv_usecwait(100);
+        }
+        bge_fm_ereport(bgep, DDI_FM_DEVICE_NO_RESPONSE);
+        return (B_FALSE);
+}</programlisting>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FM_DEVICE_BADINT_LIMIT</term><listitem><para>The device has raised too many consecutive invalid interrupts.</para><para><indexterm><primary><function>ddi_fm_ereport_post</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_ereport_post</function> function</secondary></indexterm>The <function>bge_intr</function> routine
+within the <literal>bge</literal> driver provides an example of stuck interrupt
+detection. The <function>bge_fm_ereport</function> function is a wrapper for
+the <interfacename>ddi_fm_ereport_post</interfacename>(9F) function. See the <function>bge_fm_ereport</function> example in <olink targetptr="gemfu" remap="internal">Queueing an
+Error Event</olink></para><programlisting>if (bgep-&gt;missed_dmas &gt;= bge_dma_miss_limit) {
+    /*
+     * If this happens multiple times in a row,
+     * it means DMA is just not working.  Maybe
+     * the chip has failed, or maybe there's a
+     * problem on the PCI bus or in the host-PCI
+     * bridge (Tomatillo).
+     *
+     * At all events, we want to stop further
+     * interrupts and let the recovery code take
+     * over to see whether anything can be done
+     * about it ...
+     */
+    bge_fm_ereport(bgep,
+        DDI_FM_DEVICE_BADINT_LIMIT);
+    goto chip_stop;
+}</programlisting>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect4><sect4 id="gemgp"><title>Service Impact Function</title><indexterm><primary><function>ddi_fm_service_impact</function> function</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_service_impact</function> function</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>access or DMA handle error</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>DDI_SERVICE_* service impact values</secondary>
+</indexterm><para>A fault management capable driver must indicate whether or not an error
+has impacted the services provided by a device. Following detection of an
+error and, if necessary, a shutdown of services, the driver should invoke
+the <interfacename>ddi_fm_service_impact</interfacename>(9F) routine to reflect
+the current service state of the device instance. The service state can be
+used by diagnosis and recovery software to help identify or react to the problem.</para><para>The <function>ddi_fm_service_impact</function> routine should be called
+both when an error has been detected by the driver itself, and when the framework
+has detected an error and marked an access or DMA handle as faulty.</para><programlisting>void ddi_fm_service_impact(dev_info_t *<replaceable>dip</replaceable>, int <replaceable>svc_impact</replaceable>)</programlisting><para>The following service impact values (<replaceable>svc_impact</replaceable>)
+are accepted by <function>ddi_fm_service_impact</function>:</para><variablelist><varlistentry><term>DDI_SERVICE_LOST</term><listitem><para>The service provided by the device is unavailable due to a
+device fault or software defect.</para>
+</listitem>
+</varlistentry><varlistentry><term>DDI_SERVICE_DEGRADED</term><listitem><para>The driver is unable to provide normal service, but the driver
+can provide a partial or degraded level of service. For example, the driver
+might have to make repeated attempts to perform an operation before it succeeds,
+or it might be running at less that its configured speed.</para>
+</listitem>
+</varlistentry><varlistentry><term>DDI_SERVICE_UNAFFECTED</term><listitem><para>The driver has detected an error, but the services provided
+by the device instance are unaffected.</para>
+</listitem>
+</varlistentry><varlistentry><term>DDI_SERVICE_RESTORED</term><listitem><para>All of the device's services have been restored.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The call to <function>ddi_fm_service_impact</function> generates the
+following ereports on behalf of the driver, based on the service impact argument
+to the service impact routine:</para><itemizedlist><listitem><para><literal>ereport.io.service.lost</literal></para>
+</listitem><listitem><para><literal>ereport.io.service.degraded</literal></para>
+</listitem><listitem><para><literal>ereport.io.service.unaffected</literal></para>
+</listitem><listitem><para><literal>ereport.io.service.restored</literal></para>
+</listitem>
+</itemizedlist><para>In the following <literal>bge</literal> code, the driver determines
+that it is unable to successfully restart transmitting or receiving packets
+as the result of an error. The service state of the device transitions to
+DDI_SERVICE_LOST.</para><programlisting>/*
+ * All OK, reinitialize hardware and kick off GLD scheduling
+ */
+mutex_enter(bgep-&gt;genlock);
+if (bge_restart(bgep, B_TRUE) != DDI_SUCCESS) {
+    (void) bge_check_acc_handle(bgep, bgep-&gt;cfg_handle);
+    (void) bge_check_acc_handle(bgep, bgep-&gt;io_handle);
+    ddi_fm_service_impact(bgep-&gt;devinfo, DDI_SERVICE_LOST);
+    mutex_exit(bgep-&gt;genlock);
+    return (DDI_FAILURE);
+}</programlisting><note><para>The <function>ddi_fm_service_impact</function> function should
+not be called from the registered callback routine.</para>
+</note>
+</sect4>
+</sect3><sect3 id="gemhz"><title>Access Attributes Structure</title><indexterm><primary>fault management</primary><secondary>access attributes</secondary><tertiary>programmed I/O access errors</tertiary>
+</indexterm><indexterm><primary><structname>ddi_device_acc_attr</structname> structure</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><structname>ddi_device_acc_attr</structname> structure</secondary>
+</indexterm><para>A <type>DDI_FM_ACCCHK_CAPABLE</type> device driver must set its access
+attributes to indicate that it is capable of handling programmed I/O (PIO)
+access errors that occur during a register read or write. The <structfield>devacc_attr_access</structfield> field in the <olink targetdoc="refman9s" targetptr="ddi-device-acc-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_device_acc_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+should be set as an indicator to the system that the driver is capable of
+checking for and handling data path errors. The <structname>ddi_device_acc_attr</structname> structure
+contains the following members:</para><programlisting>ushort_t devacc_attr_version;
+uchar_t devacc_attr_endian_flags;
+uchar_t devacc_attr_dataorder;
+uchar_t devacc_attr_access;             /* access error protection */</programlisting><para>Errors detected in the data path to or from a device can be processed
+by one or more of the device driver's nexus parents.</para><para>The <structfield>devacc_attr_access</structfield> field can be set to
+the following values:</para><variablelist><varlistentry><term>DDI_DEFAULT_ACC</term><listitem><para>This flag indicates the system will take the default action
+(panic if appropriate) when an error occurs. This attribute cannot be used
+by DDI_FM_ACCCHK_CAPABLE drivers.</para>
+</listitem>
+</varlistentry><varlistentry><term>DDI_FLAGERR_ACC</term><listitem><para><indexterm><primary><function>ddi_fm_acc_err_get</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_acc_err_get</function> function</secondary></indexterm>This flag indicates
+that the system will attempt to handle and recover from an error associated
+with the access handle. The driver should use the techniques described in <olink targetptr="defensive-programming" remap="internal">Defensive Programming Techniques for Solaris
+Device Drivers</olink> and should use <interfacename>ddi_fm_acc_err_get</interfacename>(9F)
+to regularly check for errors before the driver allows data to be passed back
+to the calling application.</para><itemizedlist><para>The DDI_FLAGERR_ACC flag provides:</para><listitem><para>Error notification via the driver callback</para>
+</listitem><listitem><para>An error condition observable via <interfacename>ddi_fm_acc_err_get</interfacename>(9F)</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term>DDI_CAUTIOUS_ACC</term><listitem><para><indexterm><primary>fault management</primary><secondary>DDI_CAUTIOUS_ACC flag</secondary></indexterm>The DDI_CAUTIOUS_ACC flag provides a high level
+of protection for each Programmed I/O access made by the driver.</para><note><para><indexterm><primary>fault management</primary><secondary><literal>fme_status</literal> flag</secondary></indexterm><indexterm><primary><function>ddi_peek</function> function</primary></indexterm><indexterm><primary><function>ddi_poke</function> function</primary></indexterm>Use of this flag will cause a significant impact on the performance
+of the driver.</para>
+</note><para>The DDI_CAUTIOUS_ACC flag signifies that an error is anticipated by
+the accessing driver. The system attempts to handle and recover from an error
+associated with this handle as gracefully as possible. No error reports are
+generated as a result, but the handle's <literal>fme_status</literal> flag
+is set to DDI_FM_NONFATAL. This flag is functionally equivalent to <olink targetdoc="refman9f" targetptr="ddi-peek-9f" remap="external"><citerefentry><refentrytitle>ddi_peek</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="ddi-poke-9f" remap="external"><citerefentry><refentrytitle>ddi_poke</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm><primary><function>ddi_fm_handler_register</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_handler_register</function> function</secondary></indexterm><indexterm><primary><function>ddi_fm_acc_err_get</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_acc_err_get</function> function</secondary></indexterm>The use of the DDI_CAUTIOUS_ACC provides:</para><itemizedlist><listitem><para>Exclusive access to the bus</para>
+</listitem><listitem><para>On trap protection - (<function>ddi_peek</function> and <function>ddi_poke</function>)</para>
+</listitem><listitem><para>Error notification through the driver callback registered
+with <interfacename>ddi_fm_handler_register</interfacename>(9F)</para>
+</listitem><listitem><para>An error condition observable through <interfacename>ddi_fm_acc_err_get</interfacename>(9F)</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry>
+</variablelist><para>Generally, drivers should check for data path errors at appropriate
+junctures in the code path to guarantee consistent data and to ensure that
+proper error status is presented in the I/O software stack.</para><para>DDI_FM_ACCCHK_CAPABLE device drivers must set their <structfield>devacc_attr_access</structfield> field to DDI_FLAGERR_ACC or DDI_CAUTIOUS_ACC.</para>
+</sect3><sect3 id="gemhh"><title>DMA Attributes Structure</title><indexterm><primary>fault management</primary><secondary>DMA errors</secondary>
+</indexterm><indexterm><primary><structname>ddi_dma_attr</structname> structure</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><structname>ddi_dma_attr</structname> structure</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>DDI_DMA_FLAGERR</secondary>
+</indexterm><para>As with access handle setup, a DDI_FM_DMACHK_CAPABLE device driver must
+set the <structfield>dma_attr_flag</structfield> field of its <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+to the DDI_DMA_FLAGERR flag. The system attempts to recover from an error
+associated with a handle that has DDI_DMA_FLAGERR set. The <structname>ddi_dma_attr</structname> structure contains the following members:</para><programlisting>uint_t          dma_attr_version;       /* version number */
+uint64_t        dma_attr_addr_lo;       /* low DMA address range */
+uint64_t        dma_attr_addr_hi;       /* high DMA address range */
+uint64_t        dma_attr_count_max;     /* DMA counter register */
+uint64_t        dma_attr_align;         /* DMA address alignment */
+uint_t          dma_attr_burstsizes;    /* DMA burstsizes */
+uint32_t        dma_attr_minxfer;       /* min effective DMA size */
+uint64_t        dma_attr_maxxfer;       /* max DMA xfer size */
+uint64_t        dma_attr_seg;           /* segment boundary */
+int             dma_attr_sgllen;        /* s/g length */
+uint32_t        dma_attr_granular;      /* granularity of device */
+uint_t          dma_attr_flags;         /* Bus specific DMA flags */</programlisting><para><indexterm><primary><function>ddi_fm_dma_err_get</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_dma_err_get</function> function</secondary></indexterm>Drivers that set the DDI_DMA_FLAGERR
+flag should use the techniques described in <olink targetptr="defensive-programming" remap="internal">Defensive Programming Techniques for Solaris
+Device Drivers</olink> and should use <interfacename>ddi_fm_dma_err_get</interfacename>(9F)
+to check for data path errors whenever DMA transactions are completed or at
+significant points within the code path. This ensures consistent data and
+proper error status presented to the I/O software stack.</para><itemizedlist><para>Use of DDI_DMA_FLAGERR provides:</para><listitem><para>Error notification via the driver callback registered with <function>ddi_fm_handler_register</function></para>
+</listitem><listitem><para>An error condition observable by calling <function>ddi_fm_dma_err_get</function></para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="gemfy"><title>Getting Error Status</title><para>If a fault has occurred that affects the resource mapped by the handle,
+the error status structure is updated to reflect error information captured
+during error handling by a bus or other device driver in the I/O data path.</para><programlisting>void ddi_fm_dma_err_get(ddi_dma_handle_t handle, ddi_fm_error_t *de, int version)
+
+void ddi_fm_acc_err_get(ddi_acc_handle_t handle, ddi_fm_error_t *de, int version)</programlisting><para>The <interfacename>ddi_fm_acc_err_get</interfacename>(9F) and <interfacename>ddi_fm_dma_err_get</interfacename>(9F) functions return the error status for
+a DMA or access handle respectively. The version field should be set to DDI_FME_VERSION.</para><para><indexterm><primary><function>ddi_fm_acc_err_clear</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_acc_err_clear</function> function</secondary></indexterm>An error for an access handle
+means that an error has been detected that has affected PIO transactions to
+or from the device using that access handle. Any data received by the driver,
+for example via a recent <olink targetdoc="refman9f" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> call,
+should be considered potentially corrupt. Any data sent to the device, for
+example via a recent <olink targetdoc="refman9f" targetptr="ddi-put32-9f" remap="external"><citerefentry><refentrytitle>ddi_put32</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> call
+might also have been corrupted or might not have been received at all. The
+underlying fault might, however, be transient, and the driver can therefore
+attempt to recover by calling <interfacename>ddi_fm_acc_err_clear</interfacename>(9F),
+resetting the device to get it back into a known state, and retrying any potentially
+failed transactions.</para><para>If an error is indicated for a DMA handle, it implies that an error
+has been detected that has (or will) affect DMA transactions between the device
+and the memory currently bound to the handle (or most recently bound, if the
+handle is currently unbound). Possible causes include the failure of a component
+in the DMA data path, or an attempt by the device to make an invalid DMA access.
+The driver might be able to continue by retrying and reallocating memory.
+The contents of the memory currently (or previously) bound to the handle should
+be regarded as indeterminate and should be released back to the system. The
+fault indication associated with the current transaction is lost once the
+handle is bound or re-bound, but because the fault might persist, future DMA
+operations might not succeed.</para>
+</sect3><sect3 id="gemfr"><title>Clearing Errors</title><para>These routines should be called when the driver wants to retry a request
+after an error was detected by the handle without needing to free and reallocate
+the handle first.</para><programlisting>void ddi_fm_acc_err_clear(ddi_acc_handle_t handle, int version)
+
+void ddi_fm_dma_err_clear(ddi_dma_handle_t handle, int version)</programlisting>
+</sect3><sect3 id="gemie"><title>Registering an Error Handler</title><para>Error handling activity might begin at the time that the error is detected
+by the operating system via a trap or error interrupt. If the software responsible
+for handling the error (the error handler) cannot immediately isolate the
+device that was involved in the failed I/O operation, it must attempt to find
+a software module within the device tree that can perform the error isolation.
+The Solaris device tree provides a structural means to propagate nexus driver
+error handling activities to children who might have a more detailed understanding
+of the error and can capture error state and isolate the problem device.</para><para><indexterm><primary>fault management</primary><secondary>error handler callback</secondary></indexterm><indexterm><primary>fault management</primary><secondary>ereport events</secondary></indexterm><indexterm><primary><structname>ddi_fm_error</structname> structure</primary></indexterm><indexterm><primary>fault management</primary><secondary><structname>ddi_fm_error</structname> structure</secondary></indexterm>A driver can register an error handler callback with the I/O Fault
+Services Framework. The error handler should be specific to the type of error
+and subsystem where error detection has occurred. When the driver's error
+handler routine is invoked, the driver must check for any outstanding errors
+associated with device transactions and generate ereport events. The driver
+must also return error handler status in its <structname>ddi_fm_error</structname> structure.
+For example, if it has been determined that the system's integrity has been
+compromised, the most appropriate action might be for the error handler to
+panic the system.</para><para>The callback is invoked by a parent nexus driver when an error might
+be associated with a particular device instance. Device drivers that register
+error handlers must be DDI_FM_ERRCB_CAPABLE.</para><programlisting>void ddi_fm_handler_register(dev_info_t *<replaceable>dip</replaceable>, ddi_err_func_t <replaceable>handler</replaceable>, void *<replaceable>impl_data</replaceable>)</programlisting><para><indexterm><primary><function>ddi_fm_handler_register</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_handler_register</function> function</secondary></indexterm>The <interfacename>ddi_fm_handler_register</interfacename>(9F) routine registers an error handler callback with the
+I/O fault services framework. The <function>ddi_fm_handler_register</function> function
+should be called in the driver's <olink targetdoc="refman9e" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for callback
+registration following driver fault management initialization (<function>ddi_fm_init</function>).</para><itemizedlist><para><indexterm><primary><function>pci_ereport_post</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_post</function> function</secondary></indexterm>The error handler callback function
+must do the following:</para><listitem><para>Check for any outstanding hardware errors associated with
+device transactions, and generate ereport events for diagnosis. For a PCI,
+PCI-x, or PCI express device this can generally be done using <function>pci_ereport_post</function> as described in <olink targetptr="gemfk" remap="internal">Detecting and Reporting
+PCI-Related Errors</olink>.</para>
+</listitem><listitem><para><indexterm><primary><structname>ddi_fm_error</structname> structure</primary></indexterm><indexterm><primary>fault management</primary><secondary><structname>ddi_fm_error</structname> structure</secondary></indexterm>Return error handler
+status in its <structname>ddi_fm_error</structname> structure:</para><itemizedlist><listitem><para>DDI_FM_OK</para>
+</listitem><listitem><para>DDI_FM_FATAL</para>
+</listitem><listitem><para>DDI_FM_NONFATAL</para>
+</listitem><listitem><para>DDI_FM_UNKNOWN</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><itemizedlist><para>Driver error handlers receive the following:</para><listitem><para>A pointer to a device instance (<replaceable>dip</replaceable>)
+under the driver's control</para>
+</listitem><listitem><para>A data structure (<structname>ddi_fm_error</structname>) that
+contains common fault management data and status for error handling</para>
+</listitem><listitem><para>A pointer to any implementation specific data (<replaceable>impl_data</replaceable>) specified at the time of the handler's registration</para>
+</listitem>
+</itemizedlist><itemizedlist><para><indexterm><primary><function>ddi_fm_handler_unregister</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>ddi_fm_handler_unregister</function> function</secondary></indexterm>The <function>ddi_fm_handler_register</function> and <function>ddi_fm_handler_unregister</function> routines
+must be called from kernel context in a driver's <interfacename>attach</interfacename>(9E)
+or <interfacename>detach</interfacename>(9E) entry point. The registered error
+handler callback can be called from kernel, interrupt, or high-level interrupt
+context. Therefore the error handler:</para><listitem><para>Must not hold locks</para>
+</listitem><listitem><para>Must not sleep waiting for resources</para>
+</listitem>
+</itemizedlist><itemizedlist><para>A device driver is responsible for:</para><listitem><para>Isolating the device instance that might have caused errors</para>
+</listitem><listitem><para>Recovering transactions associated with errors</para>
+</listitem><listitem><para>Reporting the service impact of errors</para>
+</listitem><listitem><para>Scheduling device shutdown for errors considered fatal</para>
+</listitem>
+</itemizedlist><para>These actions can be carried out within the error handler function.
+However, because of the restrictions on locking and because the error handler
+function does not always know the context of what the driver was doing at
+the point where the fault occurred, it is  more usual for these actions to
+be carried out following inline calls to <interfacename>ddi_fm_acc_err_get</interfacename>(9F)
+and <interfacename>ddi_fm_dma_err_get</interfacename>(9F) within the normal
+paths of the driver as described previously.</para><programlisting>/*
+ * The I/O fault service error handling callback function
+ */
+/*ARGSUSED*/
+static int
+bge_fm_error_cb(dev_info_t *dip, ddi_fm_error_t *err, const void *impl_data)
+{
+     /*
+      * as the driver can always deal with an error 
+      * in any dma or access handle, we can just return 
+      * the fme_status value.
+      */
+     pci_ereport_post(dip, err, NULL);
+     return (err-&gt;fme_status);
+}</programlisting>
+</sect3><sect3 id="gemhd"><title>Fault Management Data and Status Structure</title><indexterm><primary>fault management</primary><secondary>ENA (Error Numeric Association)</secondary>
+</indexterm><indexterm><primary><structname>ddi_fm_error</structname> structure</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary><structname>ddi_fm_error</structname> structure</secondary>
+</indexterm><para>Driver error handling callbacks are passed a pointer to a data structure
+that contains common fault management data and status for error handling.</para><para>The data structure <structname>ddi_fm_error</structname> contains an
+FMA protocol ENA for the current error, the status of the error handler callback,
+an error expectation flag, and any potential access or DMA handles associated
+with an error detected by the parent nexus.</para><variablelist><varlistentry><term><structfield>fme_ena</structfield></term><listitem><para>This field is initialized by the calling parent nexus and
+might have been incremented along the error handling propagation chain before
+reaching the driver's registered callback routine. If the driver detects a
+related error of its own, it should increment this ENA prior to calling <function>ddi_fm_ereport_post</function>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>fme_acc_handle</structfield>, <structfield>fme_dma_handle</structfield></term><listitem><para>These fields contain a valid access or DMA handle if the parent
+was able to associate an error detected at its level to a handle mapped or
+bound by the device driver.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>fme_flag</structfield></term><listitem><para>The <literal>fme_flag</literal> is set to DDI_FM_ERR_EXPECTED
+if the calling parent determines the error was the result of a DDI_CAUTIOUS_ACC
+protected operation. In this case, the <literal>fme_acc_handle</literal> is
+valid and the driver should check for and report only errors not associated
+with the DDI_CAUTIOUS_ACC protected operation. Otherwise, <literal>fme_flag</literal> is
+set to DDI_FM_ERR_UNEXPECTED and the driver must perform the full range of
+error handling tasks.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>fme_status</structfield></term><listitem><para>Upon return from its error handler callback, the driver must
+set <literal>fme_status</literal> to one of the following values:</para><itemizedlist><listitem><para>DDI_FM_OK &ndash; No errors were detected and the operational
+state of this device instance remains the same.</para>
+</listitem><listitem><para><indexterm><primary><function>pci_ereport_post</function> function</primary></indexterm><indexterm><primary>fault management</primary><secondary><function>pci_ereport_post</function> function</secondary></indexterm>DDI_FM_FATAL &ndash;
+An error has occurred and the driver considers it to be fatal to the system.
+For example, a call to <interfacename>pci_ereport_post</interfacename>(9F)
+might have detected a system fatal error. In this case, the driver should
+report any additional error information it might have in the context of the
+driver.</para>
+</listitem><listitem><para>DDI_FM_NONFATAL &ndash; An error has been detected by the
+driver but is not considered fatal to the system. The driver has identified
+the error and has either isolated the error or is committing that it will
+isolate the error.</para>
+</listitem><listitem><para>DDI_FM_UNKNOWN &ndash; An error has been detected, but the
+driver is unable to isolate the device or determine the impact of the error
+on the operational state of the system.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="gemfs"><title>Diagnosing Faults</title><indexterm><primary><command>fmd</command> fault manager daemon</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>fault manager daemon <command>fmd</command></secondary>
+</indexterm><indexterm><primary>DE (diagnosis engine)</primary><secondary>definition</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>DE (diagnosis engine)</secondary>
+</indexterm><indexterm><primary>Eversholt fault tree (eft) rules</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>Eversholt fault tree (eft) rules</secondary>
+</indexterm><indexterm><primary>eft diagnosis rules</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>eft diagnosis rules</secondary>
+</indexterm><para>The fault management daemon, <olink targetdoc="group-refman" targetptr="fmd-1m" remap="external"><citerefentry><refentrytitle>fmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, provides a programming interface for the development
+of diagnosis engine (DE) plug-in modules. A DE can be written to consume and
+diagnose any error telemetry or specific error telemetries. The eft DE was
+designed to diagnose any number of ereport classes based on diagnosis rules
+specified in the Eversholt language.</para><sect3 id="gemge"><title>Standard Leaf Device Diagnosis</title><para>Most I/O subsystems use the eft DE and rules sets to diagnose device
+and device driver related problems. A standard set of ereports, listed in <olink targetptr="gemha" remap="internal">Reporting Standard I/O Controller Errors</olink>, has been
+specified for PCI leaf devices. Accompanying these ereports are eft diagnosis
+rules that take the telemetry and identify the associated device fault. Drivers
+that generate these ereports do not need to deliver any additional diagnosis
+software or eft rules.</para><para>The detection and generation of these ereports produces the following
+fault events:</para><variablelist><varlistentry><term><literal>fault.io.pci.bus-linkerr</literal></term><listitem><para>A hardware fault on the PCI bus</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pci.device-interr</literal></term><listitem><para>A hardware fault within the device</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pci.device-invreq</literal></term><listitem><para>A hardware fault in the device or a defect in the driver that
+causes the device to send an invalid request</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pci.device-noresp</literal></term><listitem><para>A hardware fault in the device that causes the driver not
+to respond to a valid request</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pciex.bus-linkerr</literal></term><listitem><para>A hardware fault on the link</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pciex.bus-noresp</literal></term><listitem><para>The link going down so that a device cannot respond to a valid
+request</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pciex.device-interr</literal></term><listitem><para>A hardware fault within the device</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pciex.device-invreq</literal></term><listitem><para>A hardware fault in the device or a defect in the driver that
+causes the device to send an invalid request</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>fault.io.pciex.device-noresp</literal></term><listitem><para>A hardware fault in the device causing it not to respond to
+a valid request</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="gemia"><title>Specialized Device Diagnosis</title><para>Driver developers who want to generate additional ereports or provide
+more specialized diagnosis software or eft rules can do so by writing a C-based
+DE or an eft diagnosis rules set. See the  <ulink url="http://www.opensolaris.org/os/community/fm/" type="text_url">Fault Management
+community</ulink> on <ulink url="http://www.opensolaris.org/os/" type="text_url">OpenSolaris</ulink> for information.</para>
+</sect3>
+</sect2><sect2 id="gemhe"><title>Event Registry</title><indexterm><primary>event registry</primary>
+</indexterm><indexterm><primary>fault management</primary><secondary>event registry</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>DE (diagnosis engine)</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>eft diagnosis rules</secondary>
+</indexterm><indexterm><primary>fault management</primary><secondary>suspect list</secondary>
+</indexterm><para>The Sun event registry is the central repository of all class names,
+ereports, faults, defects, upsets and suspect lists (list.suspect) events.
+The event registry also contains the current definitions of all event member
+payloads, as well as important non-payload information like internal documentation,
+suspect lists, dictionaries, and knowledge articles. For example, <literal>ereport.io</literal> and <literal>fault.io</literal> are two of the base class names
+that are of particular importance to I/O driver developers.</para><para>The FMA event protocol defines a base set of payload members that is
+supplied with each of the registered events. Developers can also define additional
+events that help diagnosis engines (or eft rules) to narrow a suspect list
+down to a specific fault.</para>
+</sect2><sect2 id="gemgu"><title>Glossary</title><para>This section uses the following terms:</para><glosslist><glossentry><glossterm>Agent</glossterm><glossdef><para>A generic term used to describe fault manager modules that
+subscribe to fault.* or list.* events. Agents are used to retire faulty resources,
+communicate diagnosis results to Administrators, and bridge to higher-level
+management frameworks.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>ASRU (Automated System Reconfiguration Unit)</glossterm><glossdef><para>The ASRU is a resource that can be disabled by software or
+hardware in order to isolate a problem in the system and suppress further
+error reports.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>DE (Diagnosis Engine)</glossterm><glossdef><para>A fault management module whose purpose is to diagnose problems
+by subscribing to one or more classes of incoming error events and using these
+events to solve cases associated with each problem on the system.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>ENA (Error Numeric Association)</glossterm><glossdef><para>An Error Numeric Association (ENA) is an encoded integer that
+uniquely identifies an error report within a given fault region and time period.
+The ENA also indicates the relationship of the error to previous errors as
+a secondary effect.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>Error</glossterm><glossdef><para>An unexpected condition, result, signal, or datum. An error
+is the symptom of a problem on the system. Each problem typically produces
+many different kinds of errors.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>ereport (Error Report)</glossterm><glossdef><para>The data captured with a particular error. Error report formats
+are defined in advance by creating a class naming the error report and defining
+a schema using the Sun event registry.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>ereport event (Error Event)</glossterm><glossdef><para>The data structure that represents an instance of an error
+report. Error events are represented as name-value pair lists.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>Fault</glossterm><glossdef><para>Malfunctioning behavior of a hardware component.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>Fault Boundary</glossterm><glossdef><para>Logical partition of hardware or software elements for which
+a specific set of faults can be enumerated.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>Fault Event</glossterm><glossdef><para>An instance of a fault diagnosis encoded in the protocol.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>Fault Manager</glossterm><glossdef><para>Software component responsible for fault diagnosis via one
+or more diagnosis engines and state management.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>FMRI (Fault Managed Resource Identifier)</glossterm><glossdef><para>An FMRI is a URL-like identifier that acts as the canonical
+name for a particular resource in the fault management system. Each FMRI includes
+a scheme that identifies the type of resource, and one or more values that
+are specific to the scheme. An FMRI can be represented as URL-like string
+or as a name-value pair list data structure.</para>
+</glossdef>
+</glossentry><glossentry><glossterm>FRU (Field Replaceable Unit)</glossterm><glossdef><para>The FRU is a resource that can be replaced in the field by
+a customer or service provider. FRUs can be defined for hardware (for example
+system boards) or for software (for example software packages or patches).</para>
+</glossdef>
+</glossentry>
+</glosslist>
+</sect2><sect2 id="gemhq"><title>Resources</title><itemizedlist><para>The following resources provide additional information:</para><listitem><para><ulink url="http://www.opensolaris.org/os/community/fm/" type="text_url">Fault Management OpenSolaris community</ulink></para>
+</listitem><listitem><para><ulink url="http://www.sun.com/msg/" type="text_url">FMA Messaging
+web site</ulink></para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="defensive-programming"><title>Defensive Programming Techniques
+for Solaris Device Drivers</title><para>This section offers techniques for device drivers to avoid system panics
+and hangs, wasting system resources, and spreading data corruption. A driver
+is considered hardened when it uses these defensive programming practices
+in addition to the I/O fault services framework for error handling and diagnosis.</para><itemizedlist><para>All Solaris drivers should follow these coding practices:</para><listitem><para>Each piece of hardware should be controlled by a separate
+instance of the device driver. See <olink targetptr="autoconf-60641" remap="internal">Device
+Configuration Concepts</olink>.</para>
+</listitem><listitem><para>Programmed I/O (PIO) must be performed <emphasis>only</emphasis> through
+the DDI access functions, using the appropriate data access handle. See <olink targetptr="devaccess-3" remap="internal">Chapter&nbsp;7, Device Access: Programmed I/O</olink>.</para>
+</listitem><listitem><para>The device driver must assume that data that is received from
+the device might be corrupted. The driver must check the integrity of the
+data before the data is used.</para>
+</listitem><listitem><para>The driver must avoid releasing bad data to the rest of the
+system.</para>
+</listitem><listitem><para>Use only documented DDI functions and interfaces in your driver.</para>
+</listitem><listitem><para>The driver must ensure that the device writes only into pages
+of memory in the DMA buffers (<literal>DDI_DMA_READ</literal>) that are controlled
+entirely by the driver. This technique prevents a DMA fault from corrupting
+an arbitrary part of the system's main memory.</para>
+</listitem><listitem><para>The device driver must not be an unlimited drain on system
+resources if the device locks up. The driver should time out if a device claims
+to be continuously busy. The driver should also detect a pathological (stuck)
+interrupt request and take appropriate action.</para>
+</listitem><listitem><para>The device driver must support hotplugging in the Solaris
+OS.</para>
+</listitem><listitem><para>The device driver must use callbacks instead of waiting on
+resources.</para>
+</listitem><listitem><para>The driver must free up resources after a fault. For example,
+the system must be able to close all minor devices and detach driver instances
+even after the hardware fails.</para>
+</listitem>
+</itemizedlist><sect2 id="device-driver-instances"><title>Using Separate Device Driver Instances</title><indexterm><primary>driver instances</primary>
+</indexterm><para>The Solaris kernel allows multiple instances of a driver. Each instance
+has its own data space but shares the text and some global data with other
+instances. The device is managed on a per-instance basis. Drivers should use
+a separate instance for each piece of hardware unless the driver is designed
+to handle any failover internally. Multiple instances of a driver per slot
+can occur, for example, with multifunction cards.</para>
+</sect2><sect2 id="use-of-ddi-handles"><title>Exclusive Use of DDI Access Handles</title><indexterm><primary>access handles</primary>
+</indexterm><indexterm><primary>programmed I/O</primary><secondary>use with DDI access routines</secondary>
+</indexterm><indexterm><primary><function>ddi_get</function><replaceable>X</replaceable> functions</primary>
+</indexterm><indexterm><primary><function>ddi_put</function><replaceable>X</replaceable> functions</primary>
+</indexterm><indexterm><primary><function>ddi_rep_get</function><replaceable>X</replaceable> functions</primary>
+</indexterm><indexterm><primary><function>ddi_rep_put</function><replaceable>X</replaceable> functions</primary>
+</indexterm><para>All PIO access by a driver must use Solaris DDI access functions from
+the following families of routines:</para><itemizedlist><listitem><para><literal>ddi_get</literal><replaceable>X</replaceable></para>
+</listitem><listitem><para><literal>ddi_put</literal><replaceable>X</replaceable></para>
+</listitem><listitem><para><literal>ddi_rep_get</literal><replaceable>X</replaceable></para>
+</listitem><listitem><para><literal>ddi_rep_put</literal><replaceable>X</replaceable></para>
+</listitem>
+</itemizedlist><para><indexterm><primary><function>ddi_regs_map_setup</function> function</primary></indexterm>The driver should not directly access the mapped registers by
+the address that is returned from <olink targetdoc="refman9f" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Avoid the <olink targetdoc="refman9f" targetptr="ddi-peek-9f" remap="external"><citerefentry><refentrytitle>ddi_peek</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="ddi-poke-9f" remap="external"><citerefentry><refentrytitle>ddi_poke</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines
+because these routines do not use access handles.</para><para>The DDI access mechanism is important because DDI access provides an
+opportunity to control how data is read into the kernel.</para>
+</sect2><sect2 id="detecting-corrupted-data"><title>Detecting Corrupted Data</title><indexterm><primary>data corruption</primary><secondary>detecting</secondary>
+</indexterm><para>The following sections describe where data corruption can occur and
+how to detect corruption.</para><sect3 id="data-corruption"><title>Corruption of Device Management and Control
+Data</title><indexterm><primary>data corruption</primary><secondary>device management data</secondary>
+</indexterm><indexterm><primary>data corruption</primary><secondary>control data</secondary>
+</indexterm><para><indexterm><primary>data corruption</primary><secondary>malignant, definition of</secondary></indexterm>The driver should assume that any data obtained
+from the device, whether by PIO or DMA, could have been corrupted. In particular,
+extreme care should be taken with pointers, memory offsets, and array indexes
+that are based on data from the device. Such values can be <emphasis>malignant</emphasis>,
+in that these values can cause a kernel panic if dereferenced. All such values
+should be checked for range and alignment (if required) before use.</para><para><indexterm><primary>data corruption</primary><secondary>misleading, definition of</secondary></indexterm>Even a pointer that is not malignant
+can still be misleading. For example, a pointer can point to a valid but not
+correct instance of an object. Where possible, the driver should cross-check
+the pointer with the object to which it is pointing, or otherwise validate
+the data obtained through that pointer.</para><para>Other types of data can also be misleading, such as packet lengths,
+status words, or channel IDs. These data types should be checked to the extent
+possible. A packet length can be range-checked to ensure that the length is
+neither negative nor larger than the containing buffer. A status word can
+be checked for &rdquo;impossible&rdquo; bits. A channel ID can be matched
+against a list of valid IDs.</para><para>Where a value is used to identify a stream, the driver must ensure that
+the stream still exists. The asynchronous nature of processing STREAMS means
+that a stream can be dismantled while device interrupts are still outstanding.</para><para>The driver should not reread data from the device. The data should be
+read once, validated, and stored in the driver's local state. This technique
+avoids the hazard of data that is correct when initially read, but is incorrect
+when reread later.</para><para>The driver should also ensure that all loops are bounded. For example,
+a device that returns a continuous <literal>BUSY</literal> status should not
+be able to lock up the entire system.</para>
+</sect3><sect3 id="received-data-corruption"><title>Corruption of Received Data</title><indexterm><primary>data corruption</primary><secondary>of received data</secondary>
+</indexterm><para>Device errors can result in corrupted data being placed in receive buffers.
+Such corruption is indistinguishable from corruption that occurs beyond the
+domain of the device, for example, within a network. Typically, existing software
+is already in place to handle such corruption. One example is the integrity
+checks at the transport layer of a protocol stack. Another example is integrity
+checks within the application that uses the device.</para><para>If the received data is not to be checked for integrity at a higher
+layer, the data can be integrity-checked within the driver itself. Methods
+of detecting corruption in received data are typically device-specific. Checksums
+and CRC are examples of the kinds of checks that can be done.</para>
+</sect3>
+</sect2><sect2 id="dma-isolation"><title>DMA Isolation</title><para>A defective device might initiate an improper DMA transfer over the
+bus. This data transfer could corrupt good data that was previously delivered.
+A device that fails might generate a corrupt address that can contaminate
+memory that does not even belong to its own driver.</para><para>In systems with an IOMMU, a device can write only to pages mapped as
+writable for DMA. Therefore, such pages should be owned solely by one driver
+instance. These pages should not be shared with any other kernel structure.
+While the page in question is mapped as writable for DMA, the driver should
+be suspicious of data in that page. The page must be unmapped from the IOMMU
+before the page is passed beyond the driver, and before any validation of
+the data.</para><para><indexterm><primary><function>ddi_umem_alloc</function> function</primary></indexterm><indexterm><primary><function>ddi_ptob</function> function</primary></indexterm><indexterm><primary><function>ddi_dma_sync</function> function</primary></indexterm>You can use <olink targetdoc="refman9f" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to guarantee that a whole aligned page is allocated,
+or allocate multiple pages and ignore the memory below the first page boundary.
+You can find the size of an IOMMU page by using <olink targetdoc="refman9f" targetptr="ddi-ptob-9f" remap="external"><citerefentry><refentrytitle>ddi_ptob</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>Alternatively, the driver can choose to copy the data into a safe part
+of memory before processing it. If this is done, the data must first be synchronized
+using <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>Calls to <function>ddi_dma_sync</function> should specify <literal>SYNC_FOR_DEV</literal> before using DMA to transfer data to a device, and <literal>SYNC_FOR_CPU</literal> after using DMA to transfer data from the device to memory.</para><para><indexterm><primary>IOMMU</primary></indexterm><indexterm><primary>PCI dual address cycles</primary></indexterm>On some PCI-based systems with an
+IOMMU, devices can use PCI dual address cycles (64-bit addresses) to bypass
+the IOMMU. This capability gives the device the potential to corrupt any region
+of main memory. Device drivers must not attempt to use such a mode and should
+disable it.</para>
+</sect2><sect2 id="stuck-interrupts"><title>Handling Stuck Interrupts</title><indexterm><primary>interrupts</primary><secondary>invalid</secondary>
+</indexterm><para>The driver must identify stuck interrupts because a persistently asserted
+interrupt severely affects system performance, almost certainly stalling a
+single-processor machine.</para><para>Sometimes the driver might have difficulty identifying a particular
+interrupt as invalid. For network drivers, if a receive interrupt is indicated
+but no new buffers have been made available, no work was needed. When this
+situation is an isolated occurrence, it is not a problem, since the actual
+work might already have been completed by another routine such as a read service.</para><para>On the other hand, continuous interrupts with no work for the driver
+to process can indicate a stuck interrupt line. For this reason, platforms
+allow a number of apparently invalid interrupts to occur before taking defensive
+action.</para><para>While appearing to have work to do, a hung device might be failing to
+update its buffer descriptors. The driver should defend against such repetitive
+requests.</para><para>In some cases, platform-specific bus drivers might be capable of identifying
+a persistently unclaimed interrupt and can disable the offending device. However,
+this relies on the driver's ability to identify the valid interrupts and return
+the appropriate value. The driver should return a <literal>DDI_INTR_UNCLAIMED</literal> result
+unless the driver detects that the device legitimately asserted an interrupt.
+The interrupt is legitimate only if the device actually requires the driver
+to do some useful work.</para><para>The legitimacy of other, more incidental, interrupts is much harder
+to certify. An interrupt-expected flag is a useful tool for evaluating whether
+an interrupt is valid. Consider an interrupt such as <emphasis>descriptor
+free</emphasis>, which can be generated if all the device's descriptors had
+been previously allocated. If the driver detects that it has taken the last
+descriptor from the card, it can set an interrupt-expected flag. If this flag
+is not set when the associated interrupt is delivered, the interrupt is suspicious.</para><para>Some informative interrupts might not be predictable, such as one that
+indicates that a medium has become disconnected or frame sync has been lost.
+The easiest method of detecting whether such an interrupt is stuck is to mask
+this particular source on first occurrence until the next polling cycle.</para><para>If the interrupt occurs again while disabled, the interrupt should be
+considered false. Some devices have interrupt status bits that can be read
+even if the mask register has disabled the associated source and might not
+be causing the interrupt. You can devise a more appropriate algorithm specific
+to your devices.</para><para>Avoid looping on interrupt status bits indefinitely. Break such loops
+if none of the status bits set at the start of a pass requires any real work.</para>
+</sect2><sect2 id="programming-considerations"><title>Additional Programming Considerations</title><itemizedlist><para>In addition to the requirements discussed in the previous sections,
+consider the following issues:</para><listitem><para>Thread interaction</para>
+</listitem><listitem><para>Threats from top-down requests</para>
+</listitem><listitem><para>Adaptive strategies</para>
+</listitem>
+</itemizedlist><sect3 id="thread-interaction"><title>Thread Interaction</title><para><indexterm id="sol8wddappendix-ix55"><primary>threads</primary><secondary>interactions</secondary></indexterm>Kernel panics in a device driver are often caused
+by unexpected interaction of kernel threads after a device failure. When a
+device fails, threads can interact in ways that you did not anticipate.</para><para>If processing routines terminate early, the condition variable waiters
+are blocked because an expected signal is never given. Attempting to inform
+other modules of the failure or handling unanticipated callbacks can result
+in undesirable thread interactions. Consider the sequence of mutex acquisition
+and relinquishing that can occur during device failures.</para><para><indexterm id="sol8wddappendix-ix57"><primary>M_ERROR</primary></indexterm><indexterm id="sol8wddappendix-ix58"><primary><function>putnext</function> function</primary></indexterm>Threads that originate in an upstream STREAMS module
+can become involved in unfortunate paradoxes if those threads are used to
+return to that module unexpectedly. Consider using alternative threads to
+handle exception messages. For instance, a procedure might use a read-side
+service routine to communicate an <literal>M_ERROR</literal>, rather than
+handling the error directly with a read-side <olink targetdoc="refman9f" targetptr="putnext-9f" remap="external"><citerefentry><refentrytitle>putnext</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm id="sol8wddappendix-ix59"><primary>STREAMS</primary><secondary>stale pointers</secondary></indexterm>A failing STREAMS device that cannot be quiesced
+during close because of a fault can generate an interrupt after the stream
+has been dismantled. The interrupt handler must not attempt to use a stale
+stream pointer to try to process the message.</para>
+</sect3><sect3 id="top-down-threats"><title>Threats From Top-Down Requests</title><indexterm><primary>drivers</primary><secondary>requests from user applications</secondary>
+</indexterm><indexterm><primary>user applications</primary><secondary>requests from</secondary>
+</indexterm><para>While protecting the system from defective hardware, you also need to
+protect against driver misuse.  Although the driver can assume that the kernel
+infrastructure is always correct (a trusted core), user requests passed to
+it can be potentially destructive.</para><para>For example, a user can request an action to be performed upon a user-supplied
+data block (<literal>M_IOCTL</literal>) that is smaller than the block size
+that is indicated in the control part of the message. The driver should never
+trust a user application.</para><para>Consider the construction of each type of <literal>ioctl</literal> that
+your driver can receive and the potential harm that the <literal>ioctl</literal> could
+cause. The driver should perform checks to ensure that it does not process
+a malformed <literal>ioctl</literal>.</para>
+</sect3><sect3 id="adaptive-strategies"><title>Adaptive Strategies</title><para>A driver can continue to provide service using faulty hardware. The
+driver can attempt to work around the identified problem by using an alternative
+strategy for accessing the device. Given that broken hardware is unpredictable
+and given the risk associated with additional design complexity, adaptive
+strategies are not always wise. At most, these strategies should be limited
+to periodic interrupt polling and retry attempts. Periodically retrying the
+device tells the driver when a device has recovered. Periodic polling can
+control the interrupt mechanism after a driver has been forced to disable
+interrupts.</para><para>Ideally, a system always has an alternative device to provide a vital
+system service. Service multiplexors in kernel or user space offer the best
+method of maintaining system services when a device fails. Such practices
+are beyond the scope of this section.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="gemgi"><title>Driver Hardening Test Harness</title><indexterm><primary>testing</primary><secondary>driver hardening test harness</secondary>
+</indexterm><indexterm><primary>testing</primary><secondary>injecting hardware faults</secondary>
+</indexterm><indexterm><primary>hardware faults</primary><secondary>testing</secondary>
+</indexterm><para>The driver hardening test harness tests that the I/O fault services
+and defensive programming requirements have been correctly fulfilled. Hardened
+device drivers are resilient to potential hardware faults. You must test the
+resilience of device drivers as part of the driver development process. This
+type of testing requires that the driver handle a wide range of typical hardware
+faults in a controlled and repeatable way. The driver hardening test harness
+enables you to simulate such hardware faults in software.</para><para><indexterm><primary>errdef</primary><secondary>error-injection specification</secondary></indexterm>The driver hardening test harness is a Solaris device
+driver development tool. The test harness injects a wide range of simulated
+hardware faults when the driver under development accesses its hardware. This
+section describes how to configure the test harness, create error-injection
+specifications (referred to as <emphasis>errdefs</emphasis>), and execute
+the tests on your device driver.</para><para>The test harness intercepts calls from the driver to various DDI routines,
+then corrupts the result of the calls as if the hardware had caused the corruption.
+In addition, the harness allows for corruption of accesses to specific registers
+as well as definition of more random types of corruption.</para><para>The test harness can generate test scripts automatically by tracing
+all register accesses as well as direct memory access (DMA) and interrupt
+usage during the running of a specified workload. A script is generated that
+reruns that workload while injecting a set of faults into each access.</para><para>The driver tester should remove duplicate test cases from the generated
+scripts.</para><para><indexterm><primary>bofi (bus_ops fault injection) driver</primary></indexterm><indexterm><primary><command>th_define</command> command</primary></indexterm><indexterm><primary><command>th_manage</command> command</primary></indexterm>The test harness is implemented as a device driver called <literal>bofi</literal>, which stands for bus_ops fault injection, and two user-level utilities, <olink targetdoc="group-refman" targetptr="th-define-1m" remap="external"><citerefentry><refentrytitle>th_define</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="th-manage-1m" remap="external"><citerefentry><refentrytitle>th_manage</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><itemizedlist><para>The test harness does the following tasks:</para><listitem><para>Validates compliant use of Solaris DDI services</para>
+</listitem><listitem><para>Facilitates controlled corruption of programmed I/O (PIO)
+and DMA requests and interference with interrupts, thus simulating faults
+that occur in the hardware managed by the driver</para>
+</listitem><listitem><para>Facilitates simulation of failures in the data path between
+the CPU and the device, which are reported from parent nexus drivers</para>
+</listitem><listitem><para>Monitors a driver's access during a specified workload and
+generates fault-injection scripts</para>
+</listitem>
+</itemizedlist><sect2 id="fault-injection"><title>Fault Injection</title><indexterm><primary>fault injection</primary>
+</indexterm><para>The driver hardening test harness intercepts and, when requested, corrupts
+each access a driver makes to its hardware. This section provides information
+you should understand to create faults to test the resilience of your driver.</para><para><indexterm><primary>devinfo tree</primary></indexterm><indexterm><primary>device instances</primary></indexterm><indexterm><primary>leaf nodes</primary></indexterm><indexterm><primary>nexus nodes</primary></indexterm><indexterm><primary>bus nodes</primary></indexterm><indexterm><primary>bus nexus</primary></indexterm>Solaris devices are managed inside a tree-like structure called
+the device tree (devinfo tree). Each node of the devinfo tree stores information
+that relates to a particular instance of a device in the system. Each leaf
+node corresponds to a device driver, while all other nodes are called <emphasis>nexus
+nodes</emphasis>. Typically, a nexus represents a bus. A bus node isolates
+leaf drivers from bus dependencies, which enables architecturally independent
+drivers to be produced.</para><para>Many of the DDI functions, particularly the data access functions, result
+in upcalls to the bus nexus drivers. When a leaf driver accesses its hardware,
+it passes a handle to an access routine. The bus nexus understands how to
+manipulate the handle and fulfill the request. A DDI-compliant driver only
+accesses hardware through use of these DDI access routines. The test harness
+intercepts these upcalls before they reach the specified bus nexus. If the
+data access matches the criteria specified by the driver tester, the access
+is corrupted. If the data access does not match the criteria, it is given
+to the bus nexus to handle in the usual way.</para><para><indexterm><primary><function>ddi_regs_map_setup</function> function</primary></indexterm>A driver obtains an access handle by using the <olink targetdoc="refman9f" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function:</para><programlisting>ddi_regs_map_setup(<replaceable>dip</replaceable>, <replaceable>rset</replaceable>, <replaceable>ma</replaceable>, <replaceable>offset</replaceable>, <replaceable>size</replaceable>, <replaceable>handle</replaceable>)</programlisting><para>The arguments specify which &ldquo;offboard&rdquo; memory is to be mapped.
+The driver must use the returned handle when it references the mapped I/O
+addresses, since handles are meant to isolate drivers from the details of
+bus hierarchies. Therefore, do not directly use the returned mapped address, <replaceable>ma</replaceable>. Direct use of the mapped address destroys the current and
+future uses of the data access function mechanism.</para><itemizedlist><para><indexterm><primary><function>ddi_get</function><replaceable>X</replaceable> functions</primary></indexterm><indexterm><primary><function>ddi_put</function><replaceable>X</replaceable> functions</primary></indexterm>For programmed I/O, the suite
+of data access functions is:</para><listitem><para>I/O to Host:</para><programlisting>ddi_get<replaceable>X</replaceable>(<replaceable>handle</replaceable>, <replaceable>ma</replaceable>)
+ddi_rep_get<replaceable>X</replaceable>(<replaceable>handle</replaceable>, <replaceable>buf</replaceable>, <replaceable>ma</replaceable>, <replaceable>repcnt</replaceable>, <replaceable>flag</replaceable>)</programlisting>
+</listitem><listitem><para>Host to I/O:</para><programlisting>ddi_put<replaceable>X</replaceable>(<replaceable>handle</replaceable>, <replaceable>ma</replaceable>, <replaceable>value</replaceable>)
+ddi_rep_put<replaceable>X</replaceable>()</programlisting>
+</listitem>
+</itemizedlist><para><replaceable>X</replaceable> and <replaceable>repcnt</replaceable> are
+the number of bytes to be transferred. <replaceable>X</replaceable> is the
+bus transfer size of 8, 16, 32, or 64 bytes.</para><para>DMA has a similar, yet richer, set of data access functions.</para>
+</sect2><sect2 id="setup-test-harness"><title>Setting Up the Test Harness</title><para>The driver hardening test harness is part of the Solaris Developer Cluster.
+If you have not installed this Solaris cluster, you must manually install
+the test harness packages appropriate for your platform.</para><sect3 id="install-test-harness"><title>Installing the Test Harness</title><indexterm><primary><command>pkgadd</command> command</primary>
+</indexterm><para>To install the test harness packages (SUNWftduu and SUNWftdur), use
+the <olink targetdoc="group-refman" targetptr="pkgadd-1m" remap="external"><citerefentry><refentrytitle>pkgadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para><para>As superuser, go to the directory in which the packages are located
+and type:</para><screen># <userinput>pkgadd -d . SUNWftduu SUNWftdur</userinput></screen>
+</sect3><sect3 id="config-test-harness"><title>Configuring the Test Harness</title><indexterm><primary><filename>bofi.conf</filename> file</primary>
+</indexterm><para>After the test harness is installed, set the properties in the <filename>/kernel/drv/bofi.conf</filename> file to configure the harness to interact with your driver. When
+the harness configuration is complete, reboot the system to load the harness
+driver.</para><para>The test harness behavior is controlled by boot-time properties that
+are set in the <filename>/kernel/drv/bofi.conf</filename> configuration file.</para><para>When the harness is first installed, enable the harness to intercept
+the DDI accesses to your driver by setting these properties:</para><variablelist><varlistentry><term><property>bofi-nexus</property></term><listitem><para>Bus nexus type, such as the PCI bus</para>
+</listitem>
+</varlistentry><varlistentry><term><property>bofi-to-test</property></term><listitem><para>Name of the driver under test</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For example, to test a PCI bus network driver called <literal>xyznetdrv</literal>,
+set the following property values:</para><programlisting>bofi-nexus="pci"
+bofi-to-test="xyznetdrv"</programlisting><para>Other properties relate to the use and harness checking of the Solaris
+DDI data access mechanisms for reading and writing from peripherals that use
+PIO and transferring data to and from peripherals that use DMA.</para><variablelist><varlistentry><term><property>bofi-range-check</property></term><listitem><para>When this property is set, the test harness checks the consistency
+of the arguments that are passed to PIO data access functions.</para>
+</listitem>
+</varlistentry><varlistentry><term><property>bofi-ddi-check</property></term><listitem><para><indexterm><primary><function>ddi_regs_map_setup</function> function</primary></indexterm>When this property is set, the test harness verifies
+that the mapped address that is returned by <interfacename>ddi_map_regs_setup</interfacename>(9F)
+is not used outside of the context of the data access functions.</para>
+</listitem>
+</varlistentry><varlistentry><term><property>bofi-sync-check</property></term><listitem><para><indexterm><primary><function>ddi_dma_sync</function> function</primary></indexterm>When this property is set, the test harness verifies correct usage
+of DMA functions and ensures that the driver makes compliant use of <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="testing-driver"><title>Testing the Driver</title><indexterm><primary>testing</primary><secondary>injecting hardware faults</secondary>
+</indexterm><indexterm><primary>hardware faults</primary><secondary>testing</secondary>
+</indexterm><indexterm><primary><command>th_define</command> command</primary>
+</indexterm><indexterm><primary><command>th_manage</command> command</primary>
+</indexterm><para>This section describes how to create and inject faults by using the <olink targetdoc="group-refman" targetptr="th-define-1m" remap="external"><citerefentry><refentrytitle>th_define</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="th-manage-1m" remap="external"><citerefentry><refentrytitle>th_manage</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> commands.</para><sect3 id="create-faults"><title>Creating Faults</title><indexterm><primary>errdef</primary><secondary>definition</secondary>
+</indexterm><para>The <command>th_define</command> utility provides an interface to the <literal>bofi</literal> device driver for defining errdefs. An <emphasis>errdef</emphasis> corresponds
+to a specification for how to corrupt a device driver's accesses to its hardware.
+The <command>th_define</command> command-line arguments determine the precise
+nature of the fault to be injected. If the supplied arguments define a consistent
+errdef, the <command>th_define</command> process stores the errdef with the <literal>bofi</literal> driver. The process suspends itself until the criteria given
+by the errdef becomes satisfied. In practice, the suspension ends when the
+access counts go to zero (0).</para>
+</sect3><sect3 id="inject-faults"><title>Injecting Faults</title><indexterm><primary>fault injection</primary>
+</indexterm><itemizedlist><para>The test harness operates at the level of data accesses. A data access
+has the following characteristics:</para><listitem><para>Type of hardware being accessed (driver name)</para>
+</listitem><listitem><para>Instance of the hardware being accessed (driver instance)</para>
+</listitem><listitem><para>Register set being tested</para>
+</listitem><listitem><para>Subset of the register set that is targeted</para>
+</listitem><listitem><para>Direction of the transfer (read or write)</para>
+</listitem><listitem><para>Type of access (PIO or DMA)</para>
+</listitem>
+</itemizedlist><itemizedlist><para>The test harness intercepts data accesses and injects appropriate faults
+into the driver. An errdef, specified by the <command>th_define</command>(1M)
+command, encodes the following information:</para><listitem><para>The driver instance and register set being tested (<option>n</option> <replaceable>name</replaceable>, <option>i</option> <replaceable>instance</replaceable>,
+and <option>r</option> <replaceable>reg_number</replaceable>).</para>
+</listitem><listitem><para>The subset of the register set eligible for corruption. This
+subset is indicated by providing an offset into the register set and a length
+from that offset (<option>l</option> <replaceable>offset</replaceable> <literal>[</literal><replaceable>len</replaceable><literal>]</literal>).</para>
+</listitem><listitem><para>The kind of access to be intercepted: <literal>log</literal>, <literal>pio</literal>, <literal>dma</literal>, <literal>pio_r</literal>, <literal>pio_w</literal>, <literal>dma_r</literal>, <literal>dma_w</literal>, <literal>intr</literal> (<option>a</option> <replaceable>acc_types</replaceable>).</para>
+</listitem><listitem><para>How many accesses should be faulted (<option>c</option> <replaceable>count</replaceable> <literal>[</literal><replaceable>failcount</replaceable><literal>]</literal>).</para>
+</listitem><listitem><para>The kind of corruption that should be applied to a qualifying
+access (<option>o</option> <replaceable>operator</replaceable> <literal>[</literal><replaceable>operand</replaceable><literal>]</literal>).</para><itemizedlist><listitem><para>Replace datum with a fixed value (EQUAL)</para>
+</listitem><listitem><para>Perform a bitwise operation on the datum (AND, OR, XOR)</para>
+</listitem><listitem><para>Ignore the transfer (for host to I/O accesses NO_TRANSFER)</para>
+</listitem><listitem><para>Lose, delay, or inject spurious interrupts (LOSE, DELAY, EXTRA)</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><para>Use the <option>a</option> <replaceable>acc_chk</replaceable> option
+to simulate framework faults in an errdef.</para>
+</sect3><sect3 id="fault-in-process"><title>Fault-Injection Process</title><indexterm><primary><command>th_define</command> command</primary>
+</indexterm><indexterm><primary><command>th_manage</command> command</primary>
+</indexterm><orderedlist><para>The process of injecting a fault involves two phases:</para><listitem><para>Use the <olink targetdoc="group-refman" targetptr="th-define-1m" remap="external"><citerefentry><refentrytitle>th_define</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to create errdefs.</para><para>Create errdefs by passing test definitions
+to the <literal>bofi</literal> driver, which stores the definitions so they
+can be accessed by using the <olink targetdoc="group-refman" targetptr="th-manage-1m" remap="external"><citerefentry><refentrytitle>th_manage</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para>
+</listitem><listitem><para>Create a workload, then use the <command>th_manage</command> command
+to activate and manage the errdef.</para><para>The <command>th_manage</command> command
+is a user interface to the various ioctls that are recognized by the <literal>bofi</literal> harness driver. The <command>th_manage</command> command operates
+at the level of driver names and instances and includes these commands: <command>get_handles</command> to list access handles, <command>start</command> to
+activate errdefs, and <command>stop</command> to deactivate errdefs.</para><para>The activation of an errdef results in qualifying data accesses to be
+faulted. The <command>th_manage</command> utility supports these commands: <command>broadcast</command> to provide the current state of the errdef and <command>clear_errors</command> to clear the errdef.</para><para>See the <command>th_define</command>(1M) and <command>th_manage</command>(1M)
+man pages for more information.</para>
+</listitem>
+</orderedlist>
+</sect3><sect3 id="testing-warnings"><title>Test Harness Warnings</title><itemizedlist><para>You can configure the test harness to handle warning messages in the
+following ways:</para><listitem><para>Write warning messages to the console</para>
+</listitem><listitem><para>Write warning messages to the console and then panic the system</para>
+</listitem>
+</itemizedlist><para>Use the second method to help pinpoint the root cause of a problem.</para><para>When the <property>bofi-range-check</property> property value is set
+to <literal>warn</literal>, the harness prints the following messages (or
+panics if set to panic) when it detects a range violation of a DDI function
+by your driver:</para><programlisting>ddi_get<replaceable>X</replaceable>() out of range addr %x not in %x
+ddi_put<replaceable>X</replaceable>() out of range addr %x not in %x
+ddi_rep_get<replaceable>X</replaceable>() out of range addr %x not in %x
+ddi_rep_put<replaceable>X</replaceable>() out of range addr %x not in %x</programlisting><para><replaceable>X</replaceable> is 8, 16, 32, or 64.</para><para>When the harness has been requested to insert over 1000 extra interrupts,
+the following message is printed if the driver does not detect interrupt jabber:</para><programlisting>undetected interrupt jabber - %s %d</programlisting>
+</sect3>
+</sect2><sect2 id="testing-scripts"><title>Using Scripts to Automate the Test Process</title><indexterm><primary><command>th_define</command> command</primary>
+</indexterm><para>You can create fault-injection test scripts by using the logging access
+type of the <olink targetdoc="group-refman" targetptr="th-define-1m" remap="external"><citerefentry><refentrytitle>th_define</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility:</para><screen># <userinput>th_define -n <replaceable>name</replaceable> -i <replaceable>instance</replaceable> -a <replaceable>log</replaceable> [-e <replaceable>fixup_script</replaceable>]</userinput></screen><para>The <command>th_define</command> command takes the instance offline
+and brings it back online. Then <command>th_define</command> runs the workload
+that is described by the <replaceable>fixup_script</replaceable> and logs
+I/O accesses that are made by the driver instance.</para><para>The <replaceable>fixup_script</replaceable> is called twice with the
+set of optional arguments. The script is called once just before the instance
+is taken offline, and it is called again after the instance has been brought
+online.</para><para>The following variables are passed into the environment of the called
+executable:</para><variablelist><varlistentry><term>DRIVER_PATH</term><listitem><para>Device path of the instance</para>
+</listitem>
+</varlistentry><varlistentry><term>DRIVER_INSTANCE</term><listitem><para>Instance number of the driver</para>
+</listitem>
+</varlistentry><varlistentry><term>DRIVER_UNCONFIGURE</term><listitem><para>Set to 1 when the instance is about to be taken offline</para>
+</listitem>
+</varlistentry><varlistentry><term>DRIVER_CONFIGURE</term><listitem><para>Set to 1 when the instance has just been brought online</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Typically, the <replaceable>fixup_script</replaceable> ensures that
+the device under test is in a suitable state to be taken offline (unconfigured)
+or in a suitable state for error injection (for example, configured, error
+free, and servicing a workload). The following script is a minimal script
+for a network driver:</para><programlisting>#!/bin/ksh
+driver=xyznetdrv
+ifnum=$driver$DRIVER_INSTANCE
+ 
+if [[ $DRIVER_CONFIGURE = 1 ]]; then
+   ifconfig $ifnum plumb	
+   ifconfig $ifnum ...	
+   ifworkload start $ifnum
+elif [[ $DRIVER_UNCONFIGURE = 1 ]]; then	
+   ifworkload stop $ifnum	
+   ifconfig $ifnum down	
+   ifconfig $ifnum unplumb
+fi
+exit $?</programlisting><note><para>The <literal>ifworkload</literal> command should initiate the
+workload as a background task. The fault injection occurs after the <replaceable>fixup_script</replaceable> configures the driver under test and brings it
+online (DRIVER_CONFIGURE is set to 1).</para>
+</note><para>If the <option>e</option> <replaceable>fixup_script</replaceable> option
+is present, it must be the last option on the command line. If the <option>e</option> option
+is not present, a default script is used. The default script repeatedly attempts
+to bring the device under test offline and online. Thus the workload consists
+of the driver's <function>attach</function> and <function>detach</function> paths.</para><para>The resulting log is converted into a set of executable scripts that
+are suitable for running unassisted fault-injection tests. These scripts are
+created in a subdirectory of the current directory with the name <filename>driver.test.id</filename>. The scripts inject faults, one at a time, into the driver while
+running the workload that is described by the <replaceable>fixup_script</replaceable>.</para><para><indexterm><primary><command>th_define</command> command</primary></indexterm>The driver tester has substantial control over the errdefs that
+are produced by the test automation process. See the <olink targetdoc="group-refman" targetptr="th-define-1m" remap="external"><citerefentry><refentrytitle>th_define</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para><para>If the tester chooses a suitable range of workloads for the test scripts,
+the harness gives good coverage of the hardening aspects of the driver. However,
+to achieve full coverage, the tester might need to create additional test
+cases manually. Add these cases to the test scripts. To ensure that testing
+completes in a timely manner, you might need to manually delete duplicate
+test cases.</para><sect3 id="auto-testing"><title>Automated Test Process</title><orderedlist><para>The following process describes automated testing:</para><listitem><para>Identify the aspects of the driver to be tested.</para><itemizedlist><para>Test all aspects of the driver that interact with the hardware:</para><listitem><para>Attach and detach</para>
+</listitem><listitem><para>Plumb and unplumb under a stack</para>
+</listitem><listitem><para>Normal data transfer</para>
+</listitem><listitem><para>Documented debug modes</para>
+</listitem>
+</itemizedlist><para>A separate workload script (<replaceable>fixup_script</replaceable>)
+must be generated for each mode of use.</para>
+</listitem><listitem><para>For each mode of use, prepare an executable program (<replaceable>fixup_script</replaceable>) that configures and unconfigures the device, and
+creates and terminates a workload.</para>
+</listitem><listitem><para>Run the <command>th_define</command>(1M) command with the
+errdefs, together with an access type of <option>a</option> <replaceable>log</replaceable>.</para>
+</listitem><listitem><para>Wait for the logs to fill.</para><para>The logs contain a
+dump of the <literal>bofi</literal> driver's internal buffers. This data is
+included at the front of the script.</para><para>Because it can take from a few seconds to several minutes to create
+the logs, use the <command>th_manage&nbsp;broadcast</command> command to check
+the progress.</para>
+</listitem><listitem><para>Change to the created test directory and run the master test
+script.</para><para>The master script runs each generated test script in sequence.
+Separate test scripts are generated per register set.</para>
+</listitem><listitem><para>Store the results for analysis.</para><para>Successful test
+results, such as <literal>success (corruption reported)</literal> and <literal>success
+(corruption undetected)</literal>, show that the driver under test is behaving
+properly. The results are reported as <literal>failure (no service impact
+reported)</literal> if the harness detects that the driver has failed to report
+the service impact after reporting a fault, or if the driver fails to detect
+that an access or DMA handle has been marked as faulted.</para><para>It is fine for a few <literal>test not triggered</literal> failures
+to appear in the output. However, several such failures indicate that the
+test is not working properly. These failures can appear when the driver does
+not access the same registers as when the test scripts were generated.</para>
+</listitem><listitem><para>Run the test on multiple instances of the driver concurrently
+to test the multithreading of error paths.</para><para>For example, each <command>th_define</command> command creates a separate directory that contains test
+scripts and a master script:</para><screen># <userinput>th_define -n xyznetdrv -i 0 -a log -e script</userinput>
+# <userinput>th_define -n xyznetdrv -i 1 -a log -e script</userinput></screen><para>Once created, run the master scripts in parallel.</para><note><para>The generated scripts produce only simulated fault injections
+that are based on what was logged during the time the logging errdef was active.
+When you define a workload, ensure that the required results are logged. Also
+analyze the resulting logs and fault-injection specifications. Verify that
+the hardware access coverage that the resulting test scripts created is what
+is required.</para>
+</note>
+</listitem>
+</orderedlist>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000127405 0?>

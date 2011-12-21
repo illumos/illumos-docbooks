@@ -1,0 +1,146 @@
+<chapter id="chp-dtrace"><title><literal>dtrace</literal> Provider</title><highlights><para>The <literal>dtrace</literal> provider provides several probes related to DTrace itself. You can use these probes to initialize state before tracing begins, process state after tracing has completed, and handle unexpected execution errors in other probes.</para>
+</highlights><sect1 id="chp-dtrace-entry"><title><literal>BEGIN</literal> Probe</title><para><indexterm><primary><literal>BEGIN</literal> probe</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>BEGIN</literal></secondary></indexterm>The <literal>BEGIN</literal> probe fires before any other probe. No other probe will fire until all <literal>BEGIN</literal> clauses have completed. This probe can be used to initialize any state that is needed in other probes. The following example shows how to use the <literal>BEGIN</literal> probe to initialize an associative array to map between <olink targetdoc="refman2" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> protection bits and a textual representation:</para><programlisting>BEGIN
+{
+	prot[0] = "---";
+	prot[1] = "r--";
+	prot[2] = "-w-";
+	prot[3] = "rw-";
+	prot[4] = "--x";
+	prot[5] = "r-x";
+	prot[6] = "-wx";
+	prot[7] = "rwx";
+}
+
+syscall::mmap:entry
+{
+	printf("mmap with prot = %s", prot[arg2 &amp; 0x7]);
+}</programlisting><para>The <literal>BEGIN</literal> probe fires in an unspecified context. This means that the output of <function>stack</function> or <function>ustack</function>, and the value of context-specific variables (for example, <literal>execname</literal>), are all arbitrary. These values should not be relied upon or interpreted to infer any meaningful information. No arguments are defined for the <literal>BEGIN</literal> probe.</para>
+</sect1><sect1 id="chp-dtrace-end"><title>The <literal>END</literal> Probe</title><para><indexterm><primary><literal>END</literal> probe</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>END</literal></secondary></indexterm>The <literal>END</literal> probe fires after all other probes. This probe will not fire until all other probe clauses have completed. This probe can be used to process state that has been gathered or to format the output. The <function>printa</function> action is therefore often used in the <literal>END</literal> probe. The <literal>BEGIN</literal> and <literal>END</literal> probes can be used together to measure the total time spent tracing:</para><programlisting>BEGIN
+{
+	start = timestamp;
+}
+
+/*
+ * ... other tracing actions...
+ */
+
+END
+{
+	printf("total time: %d secs", (timestamp - start) / 1000000000);
+}</programlisting><para>See <olink targetptr="chp-aggs-normalization" remap="internal">Data Normalization</olink> and <olink targetptr="chp-fmt-printa" remap="internal">printa()</olink> for other common uses of the <literal>END</literal> probe.</para><para>As with the <literal>BEGIN</literal> probe, no arguments are defined for the <literal>END</literal> probe. The context in which the <literal>END</literal> probe fires is arbitrary and should not be depended upon.</para><para>When tracing with the <literal>bufpolicy</literal> option set to <literal>fill</literal>, adequate space is reserved to accommodate any records traced in the <literal>END</literal> probe. See <olink targetptr="chp-buf-fillandend" remap="internal">fill Policy and END Probes</olink> for details.</para><note><para>The <function>exit</function> action causes tracing to stop and the <literal>END</literal> probe to fire. However, there is some delay between the invocation of the <function>exit</function> action and the <literal>END</literal> probe firing. During this delay, no probes will fire. After a probe invokes the <function>exit</function> action, the <literal>END</literal> probe is not fired until the DTrace consumer determines that <function>exit</function> has been called and stops tracing. The rate at which the exit status is checked can be set using <literal>statusrate</literal> option. For more information, see <olink targetptr="chp-opt" remap="internal">Chapter&nbsp;16, Options and Tunables</olink>.</para>
+</note>
+</sect1><sect1 id="chp-dtrace-error"><title><literal>ERROR</literal> Probe</title><para><indexterm><primary><literal>ERROR</literal> probe</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>ERROR</literal></secondary></indexterm>The <literal>ERROR</literal> probe fires when a run-time error occurs in executing a clause for a DTrace probe. For example, if a clause attempts to dereference a <literal>NULL</literal> pointer, the <literal>ERROR</literal> probe will fire, as shown in the following example.</para><example id="chp-dtrace-error.d"><title><filename>error.d</filename>: Record Errors</title><programlisting>BEGIN
+{
+	*(char *)NULL;
+}
+
+ERROR
+{
+	printf("Hit an error!");
+}</programlisting>
+</example><para>When you run this program, you will see output like the following example:</para><screen><userinput># dtrace -s ./error.d</userinput>
+dtrace: script './error.d' matched 2 probes
+CPU     ID                    FUNCTION:NAME
+  2      3                           :ERROR Hit an error!
+dtrace: error on enabled probe ID 1 (ID 1: dtrace:::BEGIN): invalid address
+(0x0) in action #1 at DIF offset 12
+dtrace: 1 error on CPU 2</screen><para>The output shows that the <literal>ERROR</literal> probe fired, and also illustrates <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> reporting the error. <command>dtrace</command> has its own enabling of the <literal>ERROR</literal> probe to allow it to report errors. Using the <literal>ERROR</literal> probe, you can create your own custom error handling.</para><para>The arguments to the <literal>ERROR</literal> probe are as follows:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="6.02in"?><colspec colname="colspec0" colwidth="0.91*"/><colspec colname="colspec1" colwidth="1.09*"/><tbody><row><entry><para><literal>arg1</literal></para>
+</entry><entry><para>The enabled probe identifier (<acronym>EPID</acronym>) of the probe that caused the error</para>
+</entry>
+</row><row><entry><para><literal>arg2</literal></para>
+</entry><entry><para>The index of the action that caused the fault</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>arg3</literal></para>
+</entry><entry colname="colspec1"><para>The <acronym>DIF</acronym> offset into that action or <literal>-1</literal> if not applicable</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>arg4</literal></para>
+</entry><entry colname="colspec1"><para>The fault type</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>arg5</literal></para>
+</entry><entry colname="colspec1"><para>Value particular to the fault type</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The table below describes the various fault types and the value that <literal>arg5</literal> will have for each:</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec3" colwidth="33*"/><colspec colname="colspec4" colwidth="33*"/><colspec colname="colspec5" colwidth="33*"/><thead><row rowsep="1"><entry><para><literal>arg4</literal> Value</para>
+</entry><entry><para>Description</para>
+</entry><entry><para><literal>arg5</literal> Meaning</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec3"><para><literal>DTRACEFLT_UNKNOWN</literal></para>
+</entry><entry colname="colspec4"><para>Unknown fault type</para>
+</entry><entry colname="colspec5"><para>None</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_BADADDR</literal></para>
+</entry><entry colname="colspec4"><para>Access to unmapped or invalid address</para>
+</entry><entry colname="colspec5"><para>Address accessed</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_BADALIGN</literal></para>
+</entry><entry colname="colspec4"><para>Unaligned memory access</para>
+</entry><entry colname="colspec5"><para>Address accessed</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_ILLOP</literal></para>
+</entry><entry colname="colspec4"><para>Illegal or invalid operation</para>
+</entry><entry colname="colspec5"><para>None</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_DIVZERO</literal></para>
+</entry><entry colname="colspec4"><para>Integer divide by zero</para>
+</entry><entry colname="colspec5"><para>None</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_NOSCRATCH</literal></para>
+</entry><entry colname="colspec4"><para>Insufficient scratch space to satisfy scratch allocation</para>
+</entry><entry colname="colspec5"><para>None</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_KPRIV</literal></para>
+</entry><entry colname="colspec4"><para>Attempt to access a kernel address or property without sufficient privileges</para>
+</entry><entry colname="colspec5"><para>Address accessed or <literal>0</literal> if not applicable</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_UPRIV</literal></para>
+</entry><entry colname="colspec4"><para>Attempt to access a user address or property without sufficient privileges</para>
+</entry><entry colname="colspec5"><para>Address accessed or <literal>0</literal> if not applicable</para>
+</entry>
+</row><row><entry colname="colspec3"><para><literal>DTRACEFLT_TUPOFLOW</literal></para>
+</entry><entry colname="colspec4"><para>DTrace internal parameter stack overflow</para>
+</entry><entry colname="colspec5"><para>None</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>If the actions taken in the <literal>ERROR</literal> probe itself cause an error, that error is silently dropped &mdash; the <literal>ERROR</literal> probe will not be recursively invoked.</para>
+</sect1><sect1 id="chp-dtrace-stability"><title>Stability</title><para><indexterm><primary><literal>dtrace</literal> probe stability</primary></indexterm><indexterm><primary>stability</primary><secondary>of <literal>dtrace</literal> probes</secondary></indexterm>The <literal>dtrace</literal> provider uses DTrace's stability mechanism to describe its stabilities as shown in the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para>Stable</para>
+</entry><entry><para><acronym>Common</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

@@ -1,0 +1,457 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-structs"><title>Structs and Unions</title><highlights><para>Collections of related variables can be grouped together into composite
+data objects called <firstterm>structs</firstterm> and <firstterm>unions</firstterm>.
+You can define these objects in D by creating new type definitions for them.
+You can use your new types for any D variables, including associative array
+values. This chapter explores the syntax and semantics for creating and manipulating
+these composite types and the D operators that interact with them. The syntax
+for structs and unions is illustrated using several example programs that
+demonstrate the use of the DTrace <literal>fbt</literal> and <literal>pid</literal> providers.</para>
+</highlights><sect1 id="chp-structs-1"><title>Structs</title><para><indexterm><primary><literal>struct</literal></primary></indexterm>The
+D keyword <literal>struct</literal>, short for <firstterm>structure</firstterm>,
+is used to introduce a new type composed of a group of other types. The new
+struct type can be used as the type for D variables and arrays, enabling you
+to define groups of related variables under a single name. D structs are the
+same as the corresponding construct in C and C++. If you have programmed in
+the Java programming language, think of a D struct as a class, but one with
+data members only and no methods.</para><para>Let's suppose you want to create a more sophisticated system call tracing
+program in D that records a number of things about each <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call executed by your
+shell, such as the elapsed time, number of calls, and the largest byte count
+passed as an argument. You could write a D clause to record these properties
+in three separate associative arrays as shown in the following example:</para><programlisting>syscall::read:entry, syscall::write:entry
+/pid == 12345/
+{
+	ts[probefunc] = timestamp;
+	calls[probefunc]++;
+	maxbytes[probefunc] = arg2 &gt; maxbytes[probefunc] ?
+	    arg2 : maxbytes[probefunc];
+}</programlisting><para>However, this clause is inefficient because DTrace must create three
+separate associative arrays and store separate copies of the identical tuple
+values corresponding to <literal>probefunc</literal> for each one. Instead,
+you can conserve space and make your program easier to read and maintain by
+using a struct. First, declare a new struct type at the top of the program
+source file:</para><programlisting>struct callinfo {
+	uint64_t ts;      /* timestamp of last syscall entry */
+	uint64_t elapsed; /* total elapsed time in nanoseconds */
+	uint64_t calls;   /* number of calls made */
+	size_t maxbytes;  /* maximum byte count argument */
+};</programlisting><para>The <literal>struct</literal> keyword is followed by an optional identifier
+used to refer back to our new type, which is now known as <literal>struct
+callinfo</literal>. The struct members are then enclosed in a set of braces <literal>{ }</literal> and the entire declaration is terminated by a semicolon (<literal>;</literal>). Each struct member is defined using the same syntax as a D variable
+declaration, with the type of the member listed first followed by an identifier
+naming the member and another semicolon (<literal>;</literal>).</para><para>The struct declaration itself simply defines the new type; it does not
+create any variables or allocate any storage in DTrace. Once declared, you
+can use <literal>struct callinfo</literal> as a type throughout the remainder
+of your D program, and each variable of type <literal>struct callinfo</literal> will
+store a copy of the four variables described by our structure template. The
+members will be arranged in memory in order according to the member list,
+with padding space introduced between members as required for data object
+alignment purposes.</para><para>You can use the member identifier names to access the individual member
+values using the &ldquo;<literal>.</literal>&rdquo; operator by writing an
+expression of the form:</para><para><replaceable>variable-name</replaceable><literal>.</literal><replaceable>member-name</replaceable></para><para>The following example is an improved program using the new structure
+type. Go to your editor and type in the following D program and save it in
+a file named <filename>rwinfo.d</filename>:</para><example id="ex-rwinfo.d"><title><filename>rwinfo.d</filename>: Gather <citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry> and <citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry> Statistics</title><programlisting>struct callinfo {
+	uint64_t ts;      /* timestamp of last syscall entry */
+	uint64_t elapsed; /* total elapsed time in nanoseconds */
+	uint64_t calls;   /* number of calls made */
+	size_t maxbytes;  /* maximum byte count argument */
+};
+
+struct callinfo i[string];	/* declare i as an associative array */
+
+syscall::read:entry, syscall::write:entry
+/pid == $1/
+{
+	i[probefunc].ts = timestamp;
+	i[probefunc].calls++;
+	i[probefunc].maxbytes = arg2 &gt; i[probefunc].maxbytes ?
+		arg2 : i[probefunc].maxbytes;
+}
+
+syscall::read:return, syscall::write:return
+/i[probefunc].ts != 0 &amp;&amp; pid == $1/
+{
+	i[probefunc].elapsed += timestamp - i[probefunc].ts;
+}
+
+END
+{
+	printf("        calls  max bytes  elapsed nsecs\n");
+	printf("------  -----  ---------  -------------\n");
+	printf("  read  %5d  %9d  %d\n",
+	    i["read"].calls, i["read"].maxbytes, i["read"].elapsed);
+	printf(" write  %5d  %9d  %d\n",
+	    i["write"].calls, i["write"].maxbytes, i["write"].elapsed);
+}</programlisting>
+</example><para>After you type in the program, run <command>dtrace -q -s rwinfo.d</command>,
+specifying one of your shell processes. Then go type in a few commands in
+your shell and, when you're done entering your shell commands, type Control-C
+in the <command>dtrace</command> terminal to fire the <literal>END</literal> probe
+and print the results:</para><screen><userinput># dtrace -q -s rwinfo.d `pgrep -n ksh`</userinput>
+<userinput>^C</userinput>
+        calls  max bytes  elapsed nsecs
+------  -----  ---------  -------------
+  read     36       1024  3588283144
+ write     35         59  14945541
+#</screen>
+</sect1><sect1 id="chp-structs-2"><title>Pointers to Structs</title><para><indexterm><primary><literal>struct</literal></primary><secondary>and pointers</secondary></indexterm><indexterm><primary>pointers</primary><secondary>and <literal>struct</literal></secondary></indexterm>Referring
+to structs using pointers is very common in C and D. You can use the operator <literal>-&gt;</literal> to access struct members through a pointer. If a <literal>struct
+s</literal> has a member <literal>m</literal> and you have a pointer to this
+struct named <literal>sp</literal> (that is, <literal>sp</literal> is a variable
+of type <literal>struct s *</literal>), you can either use the <literal>*</literal> operator
+to first dereference <literal>sp</literal> pointer in order to access the
+member:</para><programlisting>struct s *sp;
+
+(*sp).m</programlisting><para>or you can use the <literal>-&gt;</literal> operator as a shorthand for
+this notation. The following two D fragments are equivalent in meaning if <literal>sp</literal> is a pointer to a struct:</para><programlisting>(*sp).m				sp-&gt;m</programlisting><para><indexterm><primary>built-in variables</primary></indexterm>DTrace provides
+several built-in variables which are pointers to structs, including <literal>curpsinfo</literal> and <literal>curlwpsinfo</literal>. These pointers refer to the
+structs <literal>psinfo</literal> and <literal>lwpsinfo</literal> respectively,
+and their content provides a snapshot of information about the state of the
+current process and lightweight process (LWP) associated with the thread that
+has fired the current probe. A Solaris LWP is the kernel's representation
+of a user thread, upon which the Solaris threads and POSIX threads interfaces
+are built. For convenience, DTrace exports this information in the same form
+as the <filename>/proc</filename> filesystem files <filename>/proc/<replaceable>pid</replaceable>/psinfo</filename> and <filename>/proc/<replaceable>pid</replaceable>/lwps/<replaceable>lwpid</replaceable>/lwpsinfo</filename>. The <filename>/proc</filename> structures
+are used by observability and debugging tools such as <olink targetdoc="refman1" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="refman1" targetptr="pgrep-1" remap="external"><citerefentry><refentrytitle>pgrep</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>,
+and <olink targetdoc="refman1" targetptr="truss-1" remap="external"><citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, and are defined
+in the system header file <filename>&lt;sys/procfs.h&gt;</filename> and are described
+in the <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page. Here are few example expressions using <literal>curpsinfo</literal>,
+their types, and their meanings:</para><informaltable frame="none"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="1.50in"/><colspec colwidth="1.00in"/><colspec colwidth="2.00in"/><tbody><row><entry><para><literal>curpsinfo-&gt;pr_pid</literal></para>
+</entry><entry><para><literal>pid_t</literal></para>
+</entry><entry><para>current process ID</para>
+</entry>
+</row><row><entry><para><literal>curpsinfo-&gt;pr_fname</literal></para>
+</entry><entry><para><literal>char []</literal></para>
+</entry><entry><para>executable file name</para>
+</entry>
+</row><row><entry><para><literal>curpsinfo-&gt;pr_psargs</literal></para>
+</entry><entry><para><literal>char []</literal></para>
+</entry><entry><para>initial command line arguments</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para><indexterm><primary><literal>struct</literal></primary><secondary>example of use</secondary></indexterm>You should review the complete structure definition
+later by examining the <filename>&lt;sys/procfs.h&gt;</filename> header file
+and the corresponding descriptions in <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. The next example uses the <literal>pr_psargs</literal> member
+to identify a process of interest by matching command-line arguments.</para><para>Structs are used frequently to create complex data structures in C programs,
+so the ability to describe and reference structs from D also provides a powerful
+capability for observing the inner workings of the Solaris operating system
+kernel and its system interfaces. In addition to using the aforementioned <literal>curpsinfo</literal> struct, the next example examines some kernel structs
+as well by observing the relationship between the <olink targetdoc="refman7" targetptr="ksyms-7d" remap="external"><citerefentry><refentrytitle>ksyms</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> driver and <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> requests. The driver makes
+use of two common structs, known as <olink targetdoc="refman9s" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> and <olink targetdoc="refman9s" targetptr="iovec-9s" remap="external"><citerefentry><refentrytitle>iovec</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>,
+to respond to requests to read from the character device file <filename>/dev/ksyms</filename>.</para><para>The <literal>uio</literal> struct, accessed using the name <literal>struct
+uio</literal> or type alias <literal>uio_t</literal>, is described in the <olink targetdoc="refman9s" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> man page and is used to describe
+an I/O request that involves copying data between the kernel and a user process.
+The <literal>uio</literal> in turn contains an array of one or more <olink targetdoc="refman9s" targetptr="iovec-9s" remap="external"><citerefentry><refentrytitle>iovec</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structures which each describe
+a piece of the requested I/O, in the event that multiple chunks are requested
+using the <olink targetdoc="refman2" targetptr="readv-2" remap="external"><citerefentry><refentrytitle>readv</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> or <olink targetdoc="refman2" targetptr="writev-2" remap="external"><citerefentry><refentrytitle>writev</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls. One of the kernel
+device driver interface (DDI) routines that operates on <literal>struct uio</literal> is
+the function <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>,
+which is one of a family of functions kernel drivers use to respond to user
+process <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> requests
+and copy data back to user processes.</para><para>The <literal>ksyms</literal> driver manages a character device file
+named <filename>/dev/ksyms</filename>, which appears to be an ELF file containing
+information about the kernel's symbol table, but is in fact an illusion created
+by the driver using the set of modules that are currently loaded into the
+kernel. The driver uses the <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine
+to respond to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> requests.
+The next example illustrates that the arguments and calls to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> from <filename>/dev/ksyms</filename> match
+the calls by the driver to <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to
+copy the results back into the user address space at the location specified
+to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>We can use the <olink targetdoc="refman1" targetptr="strings-1" remap="external"><citerefentry><refentrytitle>strings</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> utility
+with the <option>a</option> option to force a bunch of reads from <filename>/dev/ksyms</filename>. Try running <command>strings -a /dev/ksyms</command> in your
+shell and see what output it produces. In an editor, type in the first clause
+of the example script and save it in a file named <filename>ksyms.d</filename>:</para><programlisting>syscall::read:entry
+/curpsinfo-&gt;pr_psargs == "strings -a /dev/ksyms"/
+{
+	printf("read %u bytes to user address %x\n", arg2, arg1);
+}</programlisting><para>This first clause uses the expression <literal>curpsinfo-&gt;pr_psargs</literal> to
+access and match the command-line arguments of our <olink targetdoc="refman1" targetptr="strings-1" remap="external"><citerefentry><refentrytitle>strings</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command so that the script
+selects the correct <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> requests
+before tracing the arguments. Notice that by using operator <literal>==</literal> with
+a left-hand argument that is an array of <literal>char</literal> and a right-hand
+argument that is a string, the D compiler infers that the left-hand argument
+should be promoted to a string and a string comparison should be performed.
+Type in and execute the command <command>dtrace -q -s ksyms.d</command> in
+one shell, and then type in the command <command>strings -a /dev/ksyms</command> in
+another shell. As <olink targetdoc="refman1" targetptr="strings-1" remap="external"><citerefentry><refentrytitle>strings</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> executes,
+you will see output from DTrace similar to the following example:</para><screen><userinput># dtrace -q -s ksyms.d</userinput>
+read 8192 bytes to user address 80639fc
+read 8192 bytes to user address 80639fc
+read 8192 bytes to user address 80639fc
+read 8192 bytes to user address 80639fc
+...
+<userinput>^C</userinput>
+#</screen><para>This example can be extended using a common D programming technique
+to follow a thread from this initial <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> request deeper into the kernel. Upon entry to the
+kernel in <literal>syscall::read:entry</literal>, the next script sets a thread-local
+flag variable indicating this thread is of interest, and clears this flag
+on <literal>syscall::read:return</literal>. Once the flag is set, it can be
+used as a predicate on other probes to instrument kernel functions such as <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The DTrace function boundary
+tracing (<literal>fbt</literal>) provider publishes probes for entry and return
+to functions defined within the kernel, including those in the DDI. Type in
+the following source code which uses the <literal>fbt</literal> provider to
+instrument <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and
+again save it in the file <filename>ksyms.d</filename>:</para><example id="ex-ksyms.d"><title><filename>ksyms.d</filename>: Trace <citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry> and <citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry> Relationship</title><programlisting>/*
+ * When our strings(1) invocation starts a read(2), set a watched flag on
+ * the current thread.  When the read(2) finishes, clear the watched flag.
+ */
+syscall::read:entry
+/curpsinfo-&gt;pr_psargs == "strings -a /dev/ksyms"/
+{
+	printf("read %u bytes to user address %x\n", arg2, arg1);
+	self-&gt;watched = 1;
+}
+
+syscall::read:return
+/self-&gt;watched/
+{
+	self-&gt;watched = 0;
+}
+
+/*
+ * Instrument uiomove(9F).  The prototype for this function is as follows:
+ * int uiomove(caddr_t addr, size_t nbytes, enum uio_rw rwflag, uio_t *uio);
+ */
+fbt::uiomove:entry
+/self-&gt;watched/
+{
+	this-&gt;iov = args[3]-&gt;uio_iov;
+
+	printf("uiomove %u bytes to %p in pid %d\n",
+	    this-&gt;iov-&gt;iov_len, this-&gt;iov-&gt;iov_base, pid);
+}</programlisting>
+</example><para>The final clause of the example uses the thread-local variable <literal>self-&gt;watched</literal> to identify when a kernel thread of interest enters the DDI routine <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Once there, the script uses
+the built-in <literal>args</literal> array to access the fourth argument (<literal>args[3]</literal>) to <function>uiomove</function>, which is a pointer to
+the <literal>struct uio</literal> representing the request. The D compiler
+automatically associates each member of the <literal>args</literal> array
+with the type corresponding to the C function prototype for the instrumented
+kernel routine. The <literal>uio_iov</literal> member contains a pointer to
+the <literal>struct iovec</literal> for the request. A copy of this pointer
+is saved for use in our clause in the clause-local variable <literal>this-&gt;iov</literal>.
+In the final statement, the script dereferences <literal>this-&gt;iov</literal> to
+access the <literal>iovec</literal> members <literal>iov_len</literal> and <literal>iov_base</literal>, which represent the length in bytes and destination base
+address for <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>,
+respectively. These values should match the input parameters to the <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call issued on the
+driver. Go to your shell and run <command>dtrace -q -s ksyms.d</command> and
+then again enter the command <command>strings -a /dev/ksyms</command> in another
+shell. You should see output similar to the following example:</para><screen><userinput># dtrace -q -s ksyms.d</userinput>
+read 8192 bytes at user address 80639fc
+uiomove 8192 bytes to 80639fc in pid 101038
+read 8192 bytes at user address 80639fc
+uiomove 8192 bytes to 80639fc in pid 101038
+read 8192 bytes at user address 80639fc
+uiomove 8192 bytes to 80639fc in pid 101038
+read 8192 bytes at user address 80639fc
+uiomove 8192 bytes to 80639fc in pid 101038
+...
+<userinput>^C</userinput>
+#</screen><para>The addresses and process IDs will be different in your output, but
+you should observe that the input arguments to <olink targetdoc="refman2" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> match the parameters passed to <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> by the <literal>ksyms</literal> driver.</para>
+</sect1><sect1 id="chp-structs-3"><title>Unions</title><para><indexterm><primary>unions</primary></indexterm>Unions are another kind
+of composite type supported by ANSI-C and D, and are closely related to structs.
+A union is a composite type where a set of members of different types are
+defined and the member objects all occupy the same region of storage. A union
+is therefore an object of variant type, where only one member is valid at
+any given time, depending on how the union has been assigned. Typically, some
+other variable or piece of state is used to indicate which union member is
+currently valid. The size of a union is the size of its largest member, and
+the memory alignment used for the union is the maximum alignment required
+by the union members.</para><para><indexterm><primary><literal>kstat</literal> framework</primary><secondary>and structs</secondary></indexterm><indexterm><primary>unions</primary><secondary>and the <literal>kstat</literal> framework</secondary></indexterm>The
+Solaris <literal>kstat</literal> framework defines a struct containing a union
+that is used in the following example to illustrate and observe C and D unions.
+The <literal>kstat</literal> framework is used to export a set of named counters
+representing kernel statistics such as memory usage and I/O throughput. The
+framework is used to implement utilities such as <olink targetdoc="refman1m" targetptr="mpstat-1m" remap="external"><citerefentry><refentrytitle>mpstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="refman1m" targetptr="iostat-1m" remap="external"><citerefentry><refentrytitle>iostat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. This framework uses <literal>struct
+kstat_named</literal> to represent a named counter and its value and is defined
+as follows:</para><programlisting>struct kstat_named {
+	char name[KSTAT_STRLEN]; /* name of counter */
+	uchar_t data_type;	/* data type */
+	union {
+		char c[16];
+		int32_t i32;
+		uint32_t ui32;
+		long l;
+		ulong_t ul;
+		...
+	} value;	/* value of counter */
+};	</programlisting><para>The examined declaration is shortened for illustrative purposes.
+The complete structure definition can be found in the <filename>&lt;sys/kstat.h&gt;</filename> header
+file and is described in <olink targetdoc="refman9s" targetptr="kstat-named-9s" remap="external"><citerefentry><refentrytitle>kstat_named</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>. The declaration above is valid in both ANSI-C and
+D, and defines a struct containing as one of its members a union value with
+members of various types, depending on the type of the counter. Notice that
+since the union itself is declared inside of another type, <literal>struct
+kstat_named</literal>, a formal name for the union type is omitted. This declaration
+style is known as an <firstterm>anonymous union</firstterm>. The member named <literal>value</literal> is of a union type described by the preceding declaration,
+but this union type itself has no name because it does not need to be used
+anywhere else. The struct member <literal>data_type</literal> is assigned
+a value that indicates which union member is valid for each object of type <literal>struct kstat_named</literal>. A set of C preprocessor tokens are defined for
+the values of <literal>data_type</literal>. For example, the token <literal>KSTAT_DATA_CHAR</literal> is equal to zero and indicates that the member <literal>value.c</literal> is
+where the value is currently stored.</para><para><indexterm><primary>examples</primary><secondary>of union use</secondary></indexterm><indexterm><primary>unions</primary><secondary>example of use</secondary></indexterm><olink targetptr="ex-kstat.d" remap="internal">Example&nbsp;7&ndash;3</olink> demonstrates
+accessing the <literal>kstat_named.value</literal> union by tracing a user
+process. The <literal>kstat</literal> counters can be sampled from a user
+process using the <olink targetdoc="refman3e" targetptr="kstat-data-lookup-3kstat" remap="external"><citerefentry><refentrytitle>kstat_data_lookup</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></olink> function,
+which returns a pointer to a <literal>struct kstat_named</literal>. The <olink targetdoc="refman1m" targetptr="mpstat-1m" remap="external"><citerefentry><refentrytitle>mpstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility calls this function
+repeatedly as it executes in order to sample the latest counter values. Go
+to your shell and try running <command>mpstat 1</command> and observe the
+output. Press Control-C in your shell to abort <command>mpstat</command> after
+a few seconds. To observe counter sampling, we would like to enable a probe
+that fires each time the <command>mpstat</command> command calls the <olink targetdoc="refman3e" targetptr="kstat-data-lookup-3kstat" remap="external"><citerefentry><refentrytitle>kstat_data_lookup</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></olink> function in <filename>libkstat</filename>. To do so,
+we're going to make use of a new DTrace provider: <literal>pid</literal>.
+The <literal>pid</literal> provider permits you to dynamically create probes
+in user processes at C symbol locations such as function entry points. You
+can ask the <literal>pid</literal> provider to create a probe at a user function
+entry and return sites by writing probe descriptions of the form:</para><literallayout><literal>pid</literal><replaceable>process-ID</replaceable><literal>:</literal><replaceable>object-name</replaceable><literal>:</literal><replaceable>function-name</replaceable><literal>:entry</literal>
+<literal>pid</literal><replaceable>process-ID</replaceable><literal>:</literal><replaceable>object-name</replaceable><literal>:</literal><replaceable>function-name</replaceable><literal>:return</literal></literallayout><para>For example, if you wanted to create a probe in process ID 12345 that
+fires on entry to <olink targetdoc="refman3e" targetptr="kstat-data-lookup-3kstat" remap="external"><citerefentry><refentrytitle>kstat_data_lookup</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></olink>, you
+would write the following probe description:</para><programlisting>pid12345:libkstat:kstat_data_lookup:entry</programlisting><para>The <literal>pid</literal> provider inserts dynamic instrumentation
+into the specified user process at the program location corresponding to the
+probe description. The probe implementation forces each user thread that reaches
+the instrumented program location to trap into the operating system kernel
+and enter DTrace, firing the corresponding probe. So although the instrumentation
+location is associated with a user process, the DTrace predicates and actions
+you specify still execute in the context of the operating system kernel. The <literal>pid</literal> provider is described in further detail in <olink targetptr="chp-pid" remap="internal">Chapter&nbsp;30, pid Provider</olink>.</para><para><indexterm><primary>macro variables</primary></indexterm><indexterm><primary>dollar sign (<literal>$</literal>)</primary></indexterm><indexterm><primary><literal>$</literal> (dollar sign)</primary></indexterm>Instead of
+having to edit your D program source each time you wish to apply your program
+to a different process, you can insert identifiers called <firstterm>macro
+variables</firstterm> into your program that are evaluated at the time your
+program is compiled and replaced with the additional <command>dtrace</command> command-line
+arguments. Macro variables are specified using a dollar sign <literal>$</literal> followed
+by an identifier or digit. If you execute the command <command>dtrace -s <replaceable>script</replaceable> foo bar baz</command>, the D compiler will automatically
+define the macro variables <literal>$1</literal>, <literal>$2</literal>, and <literal>$3</literal> to be the tokens <literal>foo</literal>, <literal>bar</literal>,
+and <literal>baz</literal> respectively. You can use macro variables in D
+program expressions or in probe descriptions. For example, the following probe
+descriptions instrument whatever process ID is specified as an additional
+argument to <command>dtrace</command>:</para><programlisting>pid$1:libkstat:kstat_data_lookup:entry
+{
+	self-&gt;ksname = arg1;
+}
+
+pid$1:libkstat:kstat_data_lookup:return
+/self-&gt;ksname != NULL &amp;&amp; arg1 != NULL/
+{
+	this-&gt;ksp = (kstat_named_t *)copyin(arg1, sizeof (kstat_named_t));
+	printf("%s has ui64 value %u\n", copyinstr(self-&gt;ksname),
+	    this-&gt;ksp-&gt;value.ui64);
+}
+
+pid$1:libkstat:kstat_data_lookup:return
+/self-&gt;ksname != NULL &amp;&amp; arg1 == NULL/
+{
+	self-&gt;ksname = NULL;
+}</programlisting><para>Macro variables and reusable scripts are described in further detail
+in <olink targetptr="chp-script" remap="internal">Chapter&nbsp;15, Scripting</olink>. Now that
+we know how to instrument user processes using their process ID, let's return
+to sampling unions. Go to your editor and type in the source code for our
+complete example and save it in a file named <filename>kstat.d</filename>:</para><example id="ex-kstat.d"><title><filename>kstat.d</filename>: Trace Calls
+to <citerefentry><refentrytitle>kstat_data_lookup</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></title><programlisting>pid$1:libkstat:kstat_data_lookup:entry
+{
+	self-&gt;ksname = arg1;
+}
+
+pid$1:libkstat:kstat_data_lookup:return
+/self-&gt;ksname != NULL &amp;&amp; arg1 != NULL/
+{
+	this-&gt;ksp = (kstat_named_t *) copyin(arg1, sizeof (kstat_named_t));
+	printf("%s has ui64 value %u\n",
+	    copyinstr(self-&gt;ksname), this-&gt;ksp-&gt;value.ui64);
+}
+
+pid$1:libkstat:kstat_data_lookup:return
+/self-&gt;ksname != NULL &amp;&amp; arg1 == NULL/
+{
+	self-&gt;ksname = NULL;
+}</programlisting>
+</example><para>Now go to one of your shells and execute the command <command>mpstat
+1</command> to start <olink targetdoc="refman1m" targetptr="mpstat-1m" remap="external"><citerefentry><refentrytitle>mpstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> running
+in a mode where it samples statistics and reports them once per second. Once <command>mpstat</command> is running, execute the command <command>dtrace -q -s kstat.d
+`pgrep mpstat`</command> in your other shell. You will see output corresponding
+to the statistics that are being accessed. Press Control-C to abort <command>dtrace</command> and return to the shell prompt.</para><screen><userinput># dtrace -q -s kstat.d `pgrep mpstat`</userinput>
+cpu_ticks_idle has ui64 value 41154176
+cpu_ticks_user has ui64 value 1137
+cpu_ticks_kernel has ui64 value 12310
+cpu_ticks_wait has ui64 value 903
+hat_fault has ui64 value 0
+as_fault has ui64 value 48053
+maj_fault has ui64 value 1144
+xcalls has ui64 value 123832170
+intr has ui64 value 165264090
+intrthread has ui64 value 124094974
+pswitch has ui64 value 840625
+inv_swtch has ui64 value 1484
+cpumigrate has ui64 value 36284
+mutex_adenters has ui64 value 35574
+rw_rdfails has ui64 value 2
+rw_wrfails has ui64 value 2
+...
+<userinput>^C</userinput>
+<userinput>#</userinput></screen><para>If you capture the output in each terminal window and subtract each
+value from the value reported by the previous iteration through the statistics,
+you should be able to correlate the <command>dtrace</command> output with
+the <command>mpstat</command> output. The example program records the counter
+name pointer on entry to the lookup function, and then performs most of the
+tracing work on return from <olink targetdoc="refman3e" targetptr="kstat-data-lookup-3kstat" remap="external"><citerefentry><refentrytitle>kstat_data_lookup</refentrytitle><manvolnum>3KSTAT</manvolnum></citerefentry></olink>. The
+D built-in functions <function>copyinstr</function> and <function>copyin</function> copy
+the function results from the user process back into DTrace when <literal>arg1</literal> (the
+return value) is not <literal>NULL</literal>. Once the <literal>kstat</literal> data
+has been copied, the example reports the <literal>ui64</literal> counter value
+from the union. This simplified example assumes that <command>mpstat</command> samples
+counters that use the <literal>value.ui64</literal> member. As an exercise,
+try recoding <filename>kstat.d</filename> to use multiple predicates and print
+out the union member corresponding to the <literal>data_type</literal> member.
+You can also try to create a version of <filename>kstat.d</filename> that
+computes the difference between successive data values and actually produces
+output similar to <command>mpstat</command>.</para>
+</sect1><sect1 id="chp-structs-4"><title>Member Sizes and Offsets</title><para><indexterm><primary><literal>sizeof</literal></primary></indexterm><indexterm><primary><literal>offsetof</literal></primary></indexterm><indexterm><primary>offsets</primary></indexterm><indexterm><primary>member sizes</primary></indexterm>You
+can determine the size in bytes of any D type or expression, including a struct
+or union, using the <literal>sizeof</literal> operator. The <literal>sizeof</literal> operator
+can be applied either to an expression or to the name of a type surrounded
+by parentheses, as illustrated by the following two examples:</para><programlisting>sizeof <replaceable>expression</replaceable>				sizeof (<replaceable>type-name</replaceable>)</programlisting><para>For example, the expression <literal>sizeof (uint64_t)</literal> would
+return the value 8, and the expression <literal>sizeof (callinfo.ts)</literal> would
+also return 8 if inserted into the source code of our example program above.
+The formal return type of the <literal>sizeof</literal> operator is the type
+alias <literal>size_t</literal>, which is defined to be an unsigned integer
+of the same size as a pointer in the current data model, and is used to represent
+byte counts. When the <literal>sizeof</literal> operator is applied to an
+expression, the expression is validated by the D compiler but the resulting
+object size is computed at compile time and no code for the expression is
+generated. You can use <literal>sizeof</literal> anywhere an integer constant
+is required.</para><para>You can use the companion operator <literal>offsetof</literal> to determine
+the offset in bytes of a struct or union member from the start of the storage
+associated with any object of the struct or union type. The <literal>offsetof</literal> operator
+is used in an expression of the following form:</para><programlisting>offsetof (<replaceable>type-name</replaceable>, <replaceable>member-name</replaceable>)</programlisting><para>Here <replaceable>type-name</replaceable> is the name of any struct
+or union type or type alias, and <replaceable>member-name</replaceable> is
+the identifier naming a member of that struct or union. Similar to <literal>sizeof</literal>, <literal>offsetof</literal> returns a <literal>size_t</literal> and
+can be used anywhere in a D program that an integer constant can be used.</para>
+</sect1><sect1 id="chp-structs-5"><title>Bit-Fields</title><para><indexterm><primary>bit-fields</primary></indexterm>D also permits the
+definition of integer struct and union members of arbitrary numbers of bits,
+known as <firstterm>bit-fields</firstterm>. A bit-field is declared by specifying
+a signed or unsigned integer base type, a member name, and a suffix indicating
+the number of bits to be assigned for the field, as shown in the following
+example:</para><programlisting>struct s {
+	int a : 1;
+	int b : 3;
+	int c : 12;
+};</programlisting><para>The bit-field width is an integer constant separated from the member
+name by a trailing colon. The bit-field width must be positive and must be
+of a number of bits not larger than the width of the corresponding integer
+base type. Bit-fields larger than 64 bits may not be declared in D. D bit-fields
+provide compatibility with and access to the corresponding ANSI-C capability.
+Bit-fields are typically used in situations when memory storage is at a premium
+or when a struct layout must match a hardware register layout.</para><para>A bit-field is a compiler construct that automates the layout of an
+integer and a set of masks to extract the member values. The same result can
+be achieved by simply defining the masks yourself and using the <literal>&amp;</literal> operator.
+C and D compilers try to pack bits as efficiently as possible, but they are
+free to do so in any order or fashion they desire, so bit-fields are not guaranteed
+to produce identical bit layouts across differing compilers or architectures.
+If you require stable bit layout, you should construct the bit masks yourself
+and extract the values using the <literal>&amp;</literal> operator.</para><para>A bit-field member is accessed by simply specifying its name in combination
+with the &ldquo;<literal>.</literal>&rdquo; or <literal>-&gt;</literal> operators
+like any other struct or union member. The bit-field is automatically promoted
+to the next largest integer type for use in any expressions. Because bit-field
+storage may not be aligned on a byte boundary or be a round number of bytes
+in size, you may not apply the <literal>sizeof</literal> or <literal>offsetof</literal> operators
+to a bit-field member. The D compiler also prohibits you from taking the address
+of a bit-field member using the <literal>&amp;</literal> operator.</para>
+</sect1>
+</chapter><?Pub *0000039575 0?>

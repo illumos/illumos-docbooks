@@ -1,0 +1,168 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Memory Allocation Logging - Solaris Modular Debugger Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-10-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Modular Debugger Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-26.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-34.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="intro-1.html">1.&nbsp;&nbsp;Modular Debugger Overview</a></p>
+<p class="toc level1 tocsp"><a href="concepts-1.html">2.&nbsp;&nbsp;Debugger Concepts</a></p>
+<p class="toc level1 tocsp"><a href="syntax-7.html">3.&nbsp;&nbsp;MDB Language Syntax</a></p>
+<p class="toc level1 tocsp"><a href="interaction-3.html">4.&nbsp;&nbsp;Using MDB Commands Interactively</a></p>
+<p class="toc level1 tocsp"><a href="commands-1.html">5.&nbsp;&nbsp;Built-In Commands</a></p>
+<p class="toc level1 tocsp"><a href="chp-exec.html">6.&nbsp;&nbsp;Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="chp-kmdb.html">7.&nbsp;&nbsp;Kernel Execution Control</a></p>
+<p class="toc level1 tocsp"><a href="modules-1.html">8.&nbsp;&nbsp;Kernel Debugging Modules</a></p>
+<p class="toc level1 tocsp"><a href="kmem-1.html">9.&nbsp;&nbsp;Debugging With the Kernel Memory Allocator</a></p>
+<p class="toc level2"><a href="casestudy-13.html">Getting Started: Creating a Sample Crash Dump</a></p>
+<p class="toc level2"><a href="casestudy-18.html">Allocator Basics</a></p>
+<p class="toc level2"><a href="casestudy-27.html">Kernel Memory Caches</a></p>
+<p class="toc level2"><a href="casestudy-26.html">Detecting Memory Corruption</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Memory Allocation Logging</a></p>
+</div>
+<p class="toc level2"><a href="casestudy-34.html">Advanced Memory Analysis</a></p>
+<p class="toc level1 tocsp"><a href="api-5.html">10.&nbsp;&nbsp;Module Programming API</a></p>
+<p class="toc level1 tocsp"><a href="options-1.html">A.&nbsp;&nbsp;Options</a></p>
+<p class="toc level1 tocsp"><a href="notes-1.html">B.&nbsp;&nbsp;Notes</a></p>
+<p class="toc level1 tocsp"><a href="adb-trans-1.html">C.&nbsp;&nbsp;Transition From <tt>adb</tt> and <tt>kadb</tt></a></p>
+<p class="toc level1 tocsp"><a href="crash-4.html">D.&nbsp;&nbsp;Transition From <tt>crash</tt></a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="casestudy-31"></a><h3>Memory Allocation Logging</h3>
+<p>This section explains the logging features of the kernel memory allocator and how
+you can employ them to debug system crashes.</p>
+
+<a name="casestudy-32"></a><h4>Buftag Data Integrity</h4>
+<p><a name="indexterm-469"></a>As explained earlier, the second half of each buftag contains extra information about
+the corresponding buffer.  Some of this data is debugging information, and some
+is data private to the allocator.  While this auxiliary data can take
+several different forms, it is collectively known as &ldquo;Buffer Control&rdquo; or <b>bufctl</b> data.</p><p>However, the allocator needs to know whether a buffer's bufctl pointer is valid,
+since this pointer might also have been corrupted by malfunctioning code.  The
+allocator confirms the integrity of its auxiliary pointer by storing the pointer <b>and</b>
+an encoded version of that pointer, and then cross-checking the two versions. 
+</p><p><a name="indexterm-470"></a><a name="indexterm-471"></a>As shown in <a href="#casestudy-fig-47">Figure&nbsp;9-5</a>, these pointers are the <b>bcp</b> (buffer control pointer) and
+<b>bxstat</b> (buffer control XOR status).  The allocator arranges bcp and bxstat so
+that the expression <tt>bcp XOR bxstat</tt> equals a well-known value.</p><a name="casestudy-fig-47"></a><h6>Figure&nbsp;9-5 Extra Debugging Data in the Buftag</h6><img src="figures/redzone.fig5.gif" alt="Graphic is described by context."></img><p>In the event that one or both of these pointers becomes corrupted,
+the allocator can easily detect such corruption and panic the system. When a
+buffer is <b>allocated</b>, <tt>bcp XOR bxstat = 0xa110c8ed</tt> (&ldquo;allocated&rdquo;). When a buffer is free, <tt>bcp XOR bxstat = 0xf4eef4ee</tt> (&ldquo;freefree&rdquo;). </p>
+<hr><p><b>Note - </b>You might find it helpful to re-examine the example provided in <a href="casestudy-26.html#casestudy-25">Freed Buffer Checking: <tt>0xdeadbeef</tt></a>,
+in order to confirm that the buftag pointers shown there are consistent.</p>
+<hr>
+<p>In the event that the allocator finds a corrupt buftag, it panics
+the system and produces a message similar to the following: </p><pre>kernel memory allocator: boundary tag corrupted
+    bcp ^ bxstat = 0xffeef4ee, should be f4eef4ee</pre><p>Remember, if bcp is corrupt, it is still possible to retrieve its
+value by taking the value of <tt>bxstat XOR 0xf4eef4ee</tt> or <tt>bxstat XOR 0xa110c8ed</tt>, depending on whether the
+buffer is allocated or free.</p>
+
+<a name="casestudy-33"></a><h4>The <tt>bufctl</tt> Pointer</h4>
+<p><a name="indexterm-472"></a><a name="indexterm-473"></a><a name="indexterm-474"></a>The buffer control (bufctl) pointer contained in the buftag region can have different
+meanings, depending on the cache's <tt>kmem_flags</tt>.  The behavior toggled by the
+<tt>KMF_AUDIT</tt> flag is of particular interest: when the KMF_AUDIT flag is <b>not</b> set, the
+kernel memory allocator allocates a <tt>kmem_bufctl_t</tt> structure for each buffer.  This structure
+contains some minimal accounting information about each buffer.  When the <tt>KMF_AUDIT</tt> flag
+<b>is</b> set, the allocator instead allocates a <tt>kmem_bufctl_audit_t</tt>, an extended version of the <tt>kmem_bufctl_t</tt>.
+ </p><p>This section presumes the <tt>KMF_AUDIT</tt> flag is set. For caches that do not
+have this bit set, the amount of available debugging information is reduced.</p><p>The <tt>kmem_bufctl_audit_t</tt> (<tt>bufctl_audit</tt> for short) contains additional information about the last transaction that
+occurred on this buffer. The following example shows how to apply the <tt>bufctl_audit</tt>
+macro to examine an audit record.  The buffer shown is the
+example buffer used in <a href="casestudy-26.html">Detecting Memory Corruption</a>:</p><pre>&gt; 0x70a9ae00,5/KKn
+0x70a9ae00:     5               4ef83
+                0               0
+                1               bbddcafe
+                feedface        139d
+                70ae3200        d1befaed</pre><p><a name="indexterm-475"></a>Using the techniques presented above, it is easy to see that <tt>0x70ae3200</tt>
+points to the <tt>bufctl_audit</tt> record: it is the first pointer following the redzone.
+ To examine the <tt>bufctl_audit</tt> record it points to, apply the <tt>bufctl_audit</tt>
+macro:</p><pre>&gt; 0x70ae3200$&lt;bufctl_audit
+0x70ae3200:     next            addr            slab
+                70378000        70a9ae00        707c86a0
+0x70ae320c:     cache           timestamp       thread
+                70039928        e1bd0e26afe     70aac4e0
+0x70ae321c:     lastlog         contents        stackdepth
+                7011c7c0        7018a0b0        4
+0x70ae3228:
+                kmem_zalloc+0x30
+                pid_assign+8
+                getproc+0x68
+                cfork+0x60</pre><p>The 'addr' field is the address of the buffer corresponding to this bufctl_audit
+record.  This is the original address: <tt>0x70a9ae00</tt>. The 'cache' field points at
+the kmem_cache that allocated this buffer. You can use the <tt>::kmem_cache</tt> dcmd to
+examine it as follows: </p><pre>&gt; 0x70039928::kmem_cache
+ADDR     NAME                      FLAG  CFLAG  BUFSIZE  BUFTOTL
+70039928 kmem_alloc_24             020f 000000       24      612</pre><p>The 'timestamp' field represents the time this transaction occurred. This time is expressed
+in the same manner as <a href="http://docs.sun.com/doc/819-2243/gethrtime-3c?a=view"><tt>gethrtime</tt>(3C)</a>. </p><p>'thread' is a pointer to the thread that performed the last transaction on
+this buffer.  The 'lastlog' and 'contents' pointers point to locations in the
+allocator's <b>transaction logs</b>.  These logs are discussed in detail in <a href="casestudy-34.html#casestudy-38">Allocator Logging Facility</a>. </p><p>Typically, the most useful piece of information provided by <tt>bufctl_audit</tt> is the
+stack trace recorded at the point at which the transaction took place. 
+In this case, the transaction was an allocation called as part of executing
+<a href="http://docs.sun.com/doc/819-2241/fork-2?a=view"><tt>fork</tt>(2)</a>.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="casestudy-26.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="casestudy-34.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

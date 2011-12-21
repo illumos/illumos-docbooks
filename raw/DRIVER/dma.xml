@@ -1,0 +1,854 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="dma-29901"><title>Direct Memory Access (DMA)</title><highlights><para>Many devices can temporarily take control of the bus. These devices
+can perform data transfers that involve main memory and other devices. Because
+the device is doing the work without the help of the CPU, this type of data
+transfer is known as <emphasis>direct memory access</emphasis> (DMA). The
+following types of DMA transfers can be performed:</para><itemizedlist><listitem><para>Between two devices</para>
+</listitem><listitem><para>Between a device and memory</para>
+</listitem><listitem><para>Between memory and memory</para>
+</listitem>
+</itemizedlist><para>This chapter explains transfers between a device and memory only. The
+chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="dma-1" remap="internal">DMA Model</olink></para>
+</listitem><listitem><para><olink targetptr="dma-2" remap="internal">Types of Device DMA</olink></para>
+</listitem><listitem><para><olink targetptr="dma-6a" remap="internal">Types of Host Platform DMA</olink></para>
+</listitem><listitem><para><olink targetptr="dma-7" remap="internal">DMA Software Components:  Handles,
+Windows, and Cookies</olink></para>
+</listitem><listitem><para><olink targetptr="dma-36180" remap="internal">DMA Operations</olink></para>
+</listitem><listitem><para><olink targetptr="dma-6" remap="internal">Managing DMA Resources</olink></para>
+</listitem><listitem><para><olink targetptr="dma-35348" remap="internal">DMA Windows</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="dma-1"><title>DMA Model</title><para>The Solaris Device Driver Interface/Driver-Kernel Interface (DDI/DKI)
+provides a high-level, architecture-independent model for DMA. This model
+enables the framework, that is, the DMA routines, to hide architecture-specific
+details such as the following:</para><itemizedlist><listitem><para>Setting up DMA mappings</para>
+</listitem><listitem><para>Building scatter-gather lists</para>
+</listitem><listitem><para>Ensuring that I/O and CPU caches are consistent</para>
+</listitem>
+</itemizedlist><para>Several abstractions  are used in the DDI/DKI to describe aspects of
+a DMA transaction:</para><itemizedlist><listitem><para><indexterm id="dma-ix295"><primary>DMA</primary><secondary>object</secondary></indexterm><emphasis role="strong">DMA object</emphasis> &ndash;
+Memory that is the source or destination of a DMA transfer.</para>
+</listitem><listitem><para><indexterm id="dma-ix296"><primary>DMA</primary><secondary>handle</secondary></indexterm><indexterm><primary>handle, DMA</primary></indexterm><emphasis role="strong">DMA handle</emphasis> &ndash; An opaque object returned from
+a successful <olink targetdoc="refman9f" targetptr="ddi-dma-alloc-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_alloc_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> call. The DMA handle can be used in subsequent DMA
+subroutine calls to refer to such DMA objects.</para>
+</listitem><listitem><para><indexterm id="dma-ix297"><primary>DMA</primary><secondary>cookie</secondary></indexterm><indexterm id="dma-ix298"><primary>cookies</primary><secondary>DMA</secondary></indexterm><emphasis role="strong">DMA cookie</emphasis> &ndash;
+A <olink targetdoc="refman9s" targetptr="ddi-dma-cookie-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_cookie</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure (<filename>ddi_dma_cookie_t</filename>)
+describes a contiguous portion of a DMA object that is entirely addressable
+by the device. The cookie contains DMA addressing information that is required
+to program the DMA engine.</para>
+</listitem>
+</itemizedlist><para>Rather than map an object directly into memory, device drivers allocate
+DMA <emphasis>resources</emphasis> for a memory object. The DMA routines then
+perform any platform-specific operations that are needed to set up the object
+for DMA access. The driver receives a DMA <emphasis>handle</emphasis> to identify
+the DMA resources that are allocated for the object. This handle is opaque
+to the device driver. The driver must save the handle and pass the handle
+in subsequent calls to DMA routines. The driver should not interpret the handle
+in any way.</para><para>Operations that provide the following services are defined on a DMA
+handle:</para><itemizedlist><listitem><para>Manipulating DMA resources</para>
+</listitem><listitem><para>Synchronizing DMA objects</para>
+</listitem><listitem><para>Retrieving attributes of the allocated resources</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="dma-2"><title>Types of Device DMA</title><para>Devices perform one of the following three types of DMA:</para><itemizedlist><listitem><para>Bus-master DMA</para>
+</listitem><listitem><para>Third-party DMA</para>
+</listitem><listitem><para>First-party DMA</para>
+</listitem>
+</itemizedlist><sect2 id="dma-3"><title>Bus-Master DMA</title><para><indexterm><primary>bus-master DMA</primary></indexterm>The driver should
+program the device's DMA registers directly in cases where the device  acts
+like a true <emphasis>bus master</emphasis>.  For example, a device acts like
+a bus master  when  the DMA engine resides on the device board. The transfer
+address and count are obtained from the DMA cookie to be passed on to the
+device.</para>
+</sect2><sect2 id="dma-4"><title>Third-Party DMA</title><para><indexterm><primary>third-party DMA</primary></indexterm>Third-party
+DMA uses a system DMA engine resident on the main system board, which has
+several DMA channels that are available for use by devices. The device relies
+on the system's DMA engine to perform the data transfers between the device
+and memory. The driver uses DMA engine routines (see the <olink targetdoc="refman9f" targetptr="ddi-dmae-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function)
+to initialize and program the DMA engine. For each DMA data transfer, the
+driver programs the DMA engine and then gives the device a command to initiate
+the transfer in cooperation with that engine.</para>
+</sect2><sect2 id="dma-5"><title>First-Party DMA</title><para><indexterm><primary>first-party DMA</primary></indexterm>Under first-party
+DMA, the device  uses a channel from the system's DMA engine to drive that
+device's DMA bus cycles. Use the <olink targetdoc="refman9f" targetptr="ddi-dmae-1stparty-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae_1stparty</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to configure this
+channel in a cascade mode so that the DMA engine does not interfere with the
+transfer.</para>
+</sect2>
+</sect1><sect1 id="dma-6a"><title>Types of Host Platform DMA</title><para>The platform on which the device operates provides either direct memory
+access (DMA) or direct virtual memory access (DVMA).</para><para><indexterm id="dma-ix300"><primary>physical DMA</primary></indexterm><indexterm id="dma-ix301"><primary>DMA</primary><secondary>physical addresses</secondary></indexterm>On platforms that support DMA, the system provides the device
+with a physical address in order to perform transfers. In this case, the transfer
+of a DMA object can actually consist of a number of physically discontiguous
+transfers. An example is when an application transfers a buffer that spans
+several contiguous virtual pages that map to physically discontiguous pages.
+To deal with the discontiguous memory, devices for these platforms usually
+have some kind of scatter-gather DMA capability. Typically, x86 systems provide
+physical addresses for direct memory transfers.</para><para><indexterm id="dma-ix302"><primary>virtual DMA</primary></indexterm><indexterm id="dma-ix303"><primary>DVMA</primary><secondary>virtual addresses</secondary></indexterm><indexterm id="dma-ix304"><primary>DMA</primary><secondary>virtual addresses</secondary></indexterm>On platforms that support DVMA, the system
+provides the device with a virtual address to perform transfers. In this case,
+memory management units (MMU) provided by the underlying platform  translate
+device accesses to these virtual addresses into the proper physical addresses.
+The device transfers to and from a contiguous virtual image that can be mapped
+to discontiguous physical pages. Devices that operate in these platforms do
+not need scatter-gather DMA capability. Typically, SPARC platforms provide
+virtual addresses for direct memory transfers.</para>
+</sect1><sect1 id="dma-7"><title>DMA Software Components:  Handles, Windows, and Cookies</title><para><indexterm id="dma-ix305"><primary>DMA</primary><secondary>handle</secondary></indexterm>A DMA <emphasis>handle</emphasis> is an opaque pointer that represents
+an object, usually a memory buffer or address. A DMA handle enables a device
+to perform DMA transfers. Several different calls to DMA routines use the
+handle to identify the DMA resources that are allocated for the object.</para><para><indexterm id="dma-ix306"><primary>DMA</primary><secondary>cookie</secondary></indexterm>An object represented by a DMA handle is completely covered by
+one or more <emphasis>DMA cookies</emphasis>. A DMA cookie represents a contiguous
+piece of memory that is used in data transfers by the DMA engine. The system
+divides objects into multiple cookies based on the following information:</para><itemizedlist><listitem><para>The <literal>ddi_dma_attr(9S)</literal> attribute structure
+provided by the driver</para>
+</listitem><listitem><para>Memory location of the target object</para>
+</listitem><listitem><para>Alignment of the target object</para>
+</listitem>
+</itemizedlist><para><indexterm id="dma-ix307"><primary>DMA</primary><secondary>windows</secondary></indexterm><indexterm id="dma-ix308"><primary><function>ddi_dma_getwin</function> function</primary></indexterm>If an object does not fit within the limitations of
+the DMA engine, that object must be broken into multiple <emphasis>DMA windows</emphasis>.
+You can only activate and allocate resources for one window at a time. Use
+the <olink targetdoc="refman9f" targetptr="ddi-dma-getwin-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_getwin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to position between windows within an object.
+Each DMA window consists of one or more DMA cookies. For more information,
+see <olink targetptr="dma-35348" remap="internal">DMA Windows</olink>.</para><para><indexterm><primary>scatter-gather</primary><secondary>DMA engines</secondary></indexterm><indexterm id="dma-ix309a"><primary><function>ddi_dma_nextseg</function> function</primary></indexterm>Some DMA engines can accept more than one cookie. Such
+engines perform scatter-gather I/O without the help of the system. If multiple
+cookies are returned from a bind, the driver should call <olink targetdoc="refman9f" targetptr="ddi-dma-nextcookie-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_nextcookie</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> repeatedly to retrieve each cookie. These cookies
+must then be programmed into the engine. The device can then be programmed
+to transfer the total number of bytes covered by the aggregate of these DMA
+cookies.</para>
+</sect1><sect1 id="dma-36180"><title>DMA Operations</title><indexterm id="dma-ix310"><primary>DMA</primary><secondary>operations</secondary>
+</indexterm><para><indexterm id="dma-ix311"><primary>DMA</primary><secondary>transfers</secondary></indexterm>The steps in a DMA transfer are similar among the types of DMA.
+The following sections present methods for performing DMA transfers.</para><note><para>You do not need to ensure that the DMA object is locked in memory
+in block drivers for buffers that come from the file system. The file system
+has already locked the data in memory.</para>
+</note><sect2 id="dma-9"><title>Performing Bus-Master DMA Transfers</title><para><indexterm id="dma-ix312"><primary>bus-master DMA</primary></indexterm>The
+driver should perform the following steps for bus-master DMA.</para><orderedlist><listitem><para>Describe the DMA attributes. This step enables the routines
+to ensure that the device is able to access the buffer.</para>
+</listitem><listitem><para>Allocate a DMA handle.</para>
+</listitem><listitem><para>Ensure that the DMA object is locked in memory. See the <olink targetdoc="refman9f" targetptr="physio-9f" remap="external"><citerefentry><refentrytitle>physio</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-umem-lock-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_lock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>Allocate DMA resources for the object.</para>
+</listitem><listitem><para>Program the DMA engine on the device.</para>
+</listitem><listitem><para>Start the engine.</para>
+</listitem><listitem><para>When the transfer is complete, continue the bus master operation.</para>
+</listitem><listitem><para>Perform any required object synchronizations.</para>
+</listitem><listitem><para>Release the DMA resources.</para>
+</listitem><listitem><para>Free the DMA handle.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="dma-10"><title>Performing First-Party DMA Transfers</title><para><indexterm id="dma-ix313"><primary>first-party DMA</primary></indexterm>The
+driver should perform the following steps for first-party DMA.</para><orderedlist><listitem><para>Allocate a DMA channel.</para>
+</listitem><listitem><para>Use <olink targetdoc="refman9f" targetptr="ddi-dmae-1stparty-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae_1stparty</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to configure the channel.</para>
+</listitem><listitem><para>Ensure that the DMA object is locked in memory. See the <olink targetdoc="refman9f" targetptr="physio-9f" remap="external"><citerefentry><refentrytitle>physio</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-umem-lock-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_lock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>Allocate DMA resources for the object.</para>
+</listitem><listitem><para>Program the DMA engine on the device.</para>
+</listitem><listitem><para>Start the engine.</para>
+</listitem><listitem><para>When the transfer is complete, continue the bus-master operation.</para>
+</listitem><listitem><para>Perform any required object synchronizations.</para>
+</listitem><listitem><para>Release the DMA resources.</para>
+</listitem><listitem><para>Deallocate the DMA channel.</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="dma-11"><title>Performing Third-Party DMA Transfers</title><para><indexterm id="dma-ix314"><primary>third-party DMA</primary></indexterm>The
+driver should perform these steps for third-party DMA.</para><orderedlist><listitem><para>Allocate a DMA channel.</para>
+</listitem><listitem><para>Retrieve the system's DMA engine attributes with <olink targetdoc="refman9f" targetptr="ddi-dmae-getattr-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae_getattr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Lock the DMA object in memory. See the <olink targetdoc="refman9f" targetptr="physio-9f" remap="external"><citerefentry><refentrytitle>physio</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-umem-lock-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_lock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>Allocate DMA resources for the object.</para>
+</listitem><listitem><para>Use <olink targetdoc="refman9f" targetptr="ddi-dmae-prog-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae_prog</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to program the system DMA engine to perform the transfer.</para>
+</listitem><listitem><para>Perform any required object synchronizations.</para>
+</listitem><listitem><para>Use <olink targetdoc="refman9f" targetptr="ddi-dmae-stop-9f" remap="external"><citerefentry><refentrytitle>ddi_dmae_stop</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to stop the DMA engine.</para>
+</listitem><listitem><para>Release the DMA resources.</para>
+</listitem><listitem><para>Deallocate the DMA channel.</para>
+</listitem>
+</orderedlist><para>Certain hardware platforms restrict DMA capabilities in a bus-specific
+way. Drivers should use  <olink targetdoc="refman9f" targetptr="ddi-slaveonly-9f" remap="external"><citerefentry><refentrytitle>ddi_slaveonly</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to determine whether the device is in a slot in which
+DMA is possible.</para>
+</sect2><sect2 id="dma-39813"><title>DMA Attributes</title><para><indexterm id="dma-ix315"><primary>DMA</primary><secondary>restrictions</secondary></indexterm>DMA attributes describe the attributes and limits of a DMA engine,
+which include:</para><itemizedlist><listitem><para>Limits on addresses that the device can access</para>
+</listitem><listitem><para>Maximum transfer count</para>
+</listitem><listitem><para>Address alignment restrictions</para>
+</listitem>
+</itemizedlist><para>A device driver must inform the system about any DMA engine limitations
+through the <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. This action ensures that DMA resources
+that are allocated by the system can be accessed by the device's DMA engine.
+ The system can impose additional restrictions on the device attributes, but
+the system never removes any of the driver-supplied restrictions.</para><sect3 id="dma-12"><title><structname>ddi_dma_attr</structname> Structure</title><para><indexterm><primary><structname>ddi_dma_attr</structname> structure</primary></indexterm>The DMA attribute structure has the following members:</para><programlisting>typedef struct ddi_dma_attr {
+    uint_t      dma_attr_version;       /* version number */
+    uint64_t    dma_attr_addr_lo;       /* low DMA address range */
+    uint64_t    dma_attr_addr_hi;       /* high DMA address range */
+    uint64_t    dma_attr_count_max;     /* DMA counter register */
+    uint64_t    dma_attr_align;         /* DMA address alignment */
+    uint_t      dma_attr_burstsizes;    /* DMA burstsizes */
+    uint32_t    dma_attr_minxfer;       /* min effective DMA size */
+    uint64_t    dma_attr_maxxfer;       /* max DMA xfer size */
+    uint64_t    dma_attr_seg;           /* segment boundary */
+    int         dma_attr_sgllen;        /* s/g length */
+    uint32_t    dma_attr_granular;      /* granularity of device */
+    uint_t      dma_attr_flags;         /* Bus specific DMA flags */
+} ddi_dma_attr_t;</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>dma_attr_version</structfield></term><listitem><para>Version number of the attribute structure. <structfield>dma_attr_version</structfield> should be set to DMA_ATTR_V0.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_addr_lo</structfield></term><listitem><para>Lowest bus address that the DMA engine can access.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_addr_hi</structfield></term><listitem><para>Highest bus address that the DMA engine can access.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_count_max</structfield></term><listitem><para>Specifies the maximum transfer count that the DMA engine can
+handle in one cookie. The limit is expressed as the maximum count minus one.
+This count is used as a bit mask, so the count must also be one less than
+a power of two.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_align</structfield></term><listitem><para>Specifies alignment requirements when allocating memory from <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. An example of an alignment requirement is alignment
+on a page boundary. The <structfield>dma_attr_align</structfield> field is
+used only when allocating memory. This field is ignored during bind operations.
+For bind operations, the driver must ensure that the buffer is aligned appropriately.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_burstsizes</structfield></term><listitem><para>Specifies the <emphasis>burst sizes</emphasis> that the device
+supports. A burst size is the amount of data the device can transfer before
+relinquishing the bus. This member is a binary encoding of burst sizes, which
+are assumed to be powers of two. For example, if the device is capable of
+doing 1-byte, 2-byte, 4-byte, and 16-byte bursts, this field should be set
+to 0x17. The system also uses this field to determine alignment restrictions.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_minxfer</structfield></term><listitem><para>Minimum effective transfer size that the device can perform.
+This size also influences restrictions on alignment and on padding.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_maxxfer</structfield></term><listitem><para>Describes the maximum number of bytes that the DMA engine
+can accommodate in one I/O command. This limitation is only significant if <structfield>dma_attr_maxxfer</structfield> is less than <literal>(dma_attr_count_max +
+1) * dma_attr_sgllen</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_seg</structfield></term><listitem><para>Upper bound of the DMA engine's address register. <structfield>dma_attr_seg</structfield> is often used where the upper 8 bits of an address register
+are a latch that contains a segment number. The lower 24 bits are used to
+address a segment. In this case, <structfield>dma_attr_seg</structfield> would
+be set to 0xFFFFFF, which prevents the system from crossing a 24-bit segment
+boundary when allocating resources for the object.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_sgllen</structfield></term><listitem><para>Specifies the maximum number of entries in the scatter-gather
+list. <structfield>dma_attr_sgllen</structfield> is the number of cookies
+that the DMA engine can consume in one I/O request to the device. If the DMA
+engine has no scatter-gather list, this field should be set to 1.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_granular</structfield></term><listitem><para>This field gives the granularity in bytes of the DMA transfer
+ability of the device. An example of how this value is used is to specify
+the sector size of a mass storage device. When a bind      operation requires
+a partial mapping, this field is used to ensure that the sum of the sizes
+of the cookies in a DMA window is a whole multiple of granularity. However,
+if the device does not have a scatter-gather capability, it is impossible
+for the DDI to ensure the granularity. For this case, the value of the <structfield>dma_attr_granular</structfield> field should be 1.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>dma_attr_flags</structfield></term><listitem><para>This field can be set to <literal>DDI_DMA_FORCE_PHYSICAL</literal>,
+which indicates that the system should return physical rather than virtual
+I/O addresses if the system  supports both. If the  system does not support
+physical DMA, the  return  value from <literal>ddi_dma_alloc_handle(9F)</literal> is <literal>DDI_DMA_BADATTR</literal>. In this case, the driver has  to  clear <literal>DDI_DMA_FORCE_PHYSICAL</literal> and retry the operation.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="dma-13"><title>SBus Example</title><para>A DMA engine on an SBus in a SPARC machine has the following attributes:</para><itemizedlist><listitem><para>Access to addresses ranging from 0xFF000000 to 0xFFFFFFFF
+only    </para>
+</listitem><listitem><para>32-bit DMA counter register</para>
+</listitem><listitem><para>Ability to handle byte-aligned transfers</para>
+</listitem><listitem><para>Support for 1-byte, 2-byte, and 4-byte burst sizes</para>
+</listitem><listitem><para>Minimum effective transfer size of 1 byte</para>
+</listitem><listitem><para>32-bit address register</para>
+</listitem><listitem><para>No scatter-gather list</para>
+</listitem><listitem><para>Operation on sectors only, for example, a disk</para>
+</listitem>
+</itemizedlist><para>A DMA engine on an SBus in a SPARC machine has the following attribute
+structure:</para><programlisting>static ddi_dma_attr_t attributes = {
+    DMA_ATTR_V0,   /* Version number */
+    0xFF000000,    /* low address */
+    0xFFFFFFFF,    /* high address */
+    0xFFFFFFFF,    /* counter register max */
+    1,             /* byte alignment */
+    0x7,           /* burst sizes: 0x1 | 0x2 | 0x4 */
+    0x1,           /* minimum transfer size */
+    0xFFFFFFFF,    /* max transfer size */
+    0xFFFFFFFF,    /* address register max */
+    1,             /* no scatter-gather */
+    512,           /* device operates on sectors */
+    0,             /* attr flag: set to 0 */
+};</programlisting>
+</sect3><sect3 id="dma-15"><title>ISA Bus Example</title><para>A DMA engine on an ISA bus in an x86 machine has the following attributes:</para><itemizedlist><listitem><para>Access to the first 16 megabytes of memory only</para>
+</listitem><listitem><para>Inability to cross a 1-megabyte boundary in a single DMA transfer</para>
+</listitem><listitem><para>16-bit counter register</para>
+</listitem><listitem><para>Ability to handle byte-aligned transfers</para>
+</listitem><listitem><para>Support for 1-byte, 2-byte, and 4-byte burst sizes</para>
+</listitem><listitem><para>Minimum effective transfer size of 1 byte</para>
+</listitem><listitem><para>Ability to hold up to 17 scatter-gather transfers</para>
+</listitem><listitem><para>Operation on sectors only, for example, a disk</para>
+</listitem>
+</itemizedlist><para>A DMA engine on an ISA bus in an x86 machine has the following attribute
+structure:</para><programlisting>static ddi_dma_attr_t attributes = {
+    DMA_ATTR_V0,   /* Version number */
+    0x00000000,    /* low address */
+    0x00FFFFFF,    /* high address */
+    0xFFFF,        /* counter register max */
+    1,             /* byte alignment */
+    0x7,           /* burst sizes */
+    0x1,           /* minimum transfer size */
+    0xFFFFFFFF,    /* max transfer size */
+    0x000FFFFF,    /* address register max */
+    17,            /* scatter-gather */
+    512,           /* device operates on sectors */
+    0,             /* attr flag: set to 0 */
+};</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="dma-6"><title>Managing DMA Resources</title><para>This section describes how to manage DMA resources.</para><sect2 id="dma-16"><title>Object Locking</title><para><indexterm id="dma-ix316"><primary>object locking</primary></indexterm><indexterm id="dma-ix317"><primary>DMA</primary><secondary>object locking</secondary></indexterm>Before allocating the DMA resources for a memory object, the object
+must be prevented from moving. Otherwise, the system can remove the object
+from memory while the device is trying to write to that object. A missing
+object would cause the data transfer to fail and possibly corrupt the system.
+The process of preventing memory objects from moving during a DMA transfer
+is known as <emphasis>locking down the object</emphasis>.</para><itemizedlist><para>The following object types do not require explicit locking:</para><listitem><para>Buffers coming from the file system through <olink targetdoc="refman9e" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. These buffers
+are already locked by the file system.</para>
+</listitem><listitem><para>Kernel memory allocated within the device driver, such as
+that allocated by <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist><para>For other objects such as buffers from user space,  <olink targetdoc="refman9f" targetptr="physio-9f" remap="external"><citerefentry><refentrytitle>physio</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-umem-lock-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_lock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> must be used to lock down
+the objects. Locking down objects with these functions is usually performed
+in the  <olink targetdoc="refman9e" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> or
+ <olink targetdoc="refman9e" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routines
+of a character device driver. See <olink targetptr="character-22917" remap="internal">Data
+Transfer Methods</olink> for an example.</para>
+</sect2><sect2 id="dma-17"><title>Allocating a DMA Handle</title><para><indexterm><primary>DMA</primary><secondary>handle</secondary></indexterm><indexterm><primary>handle, DMA</primary></indexterm>A DMA handle is an opaque object
+that is used as a reference to subsequently allocated DMA resources. The 
+DMA handle is usually allocated in the driver's <function>attach</function> entry
+point that uses <olink targetdoc="refman9f" targetptr="ddi-dma-alloc-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_alloc_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The <function>ddi_dma_alloc_handle</function> function
+takes the device information that is referred to by <replaceable>dip</replaceable> and
+the device's DMA attributes described by a <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure as parameters.
+The <function>ddi_dma_alloc_handle</function> function has the following syntax:</para><programlisting>int ddi_dma_alloc_handle(dev_info_t *dip,
+    ddi_dma_attr_t *attr, int (*callback)(caddr_t),
+    caddr_t arg, ddi_dma_handle_t *handlep);</programlisting><para>where:</para><variablelist><varlistentry><term><parameter>dip</parameter></term><listitem><para>Pointer to the device's <literal>dev_info</literal> structure.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>attr</parameter></term><listitem><para>Pointer to a <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure, as described in <olink targetptr="dma-39813" remap="internal">DMA Attributes</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>callback</parameter></term><listitem><para>Address of the callback function for handling resource allocation
+failures.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>arg</parameter></term><listitem><para>Argument to be passed to the callback function.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>handlep</parameter></term><listitem><para>Pointer to a DMA handle to store the returned handle.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="dma-18"><title>Allocating DMA Resources</title><indexterm id="dma-ix318"><primary>DMA</primary><secondary>resource allocation</secondary>
+</indexterm><para>Two interfaces allocate DMA resources:</para><itemizedlist><listitem><para><olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> &ndash; Used
+with <literal>buf(9S)</literal> structures</para>
+</listitem>
+</itemizedlist><itemizedlist><listitem><para><olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> &ndash; Used
+with virtual addresses</para>
+</listitem>
+</itemizedlist><para>DMA resources are usually allocated in the driver's <function>xxstart</function> routine,
+if an <function>xxstart</function> routine exists. See <olink targetptr="block-54698" remap="internal">Asynchronous Data Transfers (Block Drivers)</olink> for
+a discussion of <function>xxstart</function>. These two interfaces have the
+following syntax:</para><programlisting>int ddi_dma_addr_bind_handle(ddi_dma_handle_t handle,
+    struct as *as, caddr_t addr,
+    size_t len, uint_t flags, int (*callback)(caddr_t),
+    caddr_t arg, ddi_dma_cookie_t *cookiep, uint_t *ccountp);
+
+int ddi_dma_buf_bind_handle(ddi_dma_handle_t handle,
+    struct buf *bp, uint_t flags,
+    int (*callback)(caddr_t), caddr_t arg,
+    ddi_dma_cookie_t *cookiep, uint_t *ccountp);</programlisting><para>The following arguments are common to both <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>:</para><variablelist><varlistentry><term><parameter>handle</parameter></term><listitem><para>DMA handle and the object for allocating resources.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>flags</parameter></term><listitem><para>Set of flags that indicate the transfer direction and other
+attributes. <literal>DDI_DMA_READ</literal> indicates a data transfer from
+device to memory. <literal>DDI_DMA_WRITE</literal> indicates a data transfer
+from memory to device. See the <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page for a complete discussion of the available
+flags.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>callback</parameter></term><listitem><para>Address of callback function for handling resource allocation
+failures. See the <olink targetdoc="refman9f" targetptr="ddi-dma-alloc-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_alloc_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>arg</parameter></term><listitem><para>Argument to pass to the callback function.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>cookiep</parameter></term><listitem><para>Pointer to the first DMA cookie for this object.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>ccountp</parameter></term><listitem><para>Pointer to the number of DMA cookies for this object.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the object is described by an address range with
+the following parameters:</para><variablelist><varlistentry><term><parameter>as</parameter></term><listitem><para>Pointer to an address space structure. The value of <parameter>as</parameter> must be <literal>NULL</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>addr</parameter></term><listitem><para>Base kernel address of the object.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>len</parameter></term><listitem><para>Length of the object in bytes.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the object is described by a <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure pointed to by <literal>bp</literal>.</para><sect3 id="dma-20"><title>Device Register Structure</title><para><indexterm id="dma-ix319"><primary>DMA</primary><secondary>register structure</secondary></indexterm><indexterm><primary>register structure, DMA</primary></indexterm>DMA-capable devices require more registers than were used in the
+previous examples.</para><para>The following fields are used in the device register structure to support
+DMA-capable device with no scatter-gather support:</para><programlisting>uint32_t      dma_addr;      /* starting address for DMA */
+uint32_t      dma_size;      /* amount of data to transfer */</programlisting><para>The following fields are used in the device register structure to support
+DMA-capable devices with scatter-gather support:</para><programlisting>struct sglentry {
+    uint32_t    dma_addr;
+    uint32_t    dma_size;
+} sglist[SGLLEN];
+
+caddr_t       iopb_addr;     /* When written, informs the device of the next */
+                             /* command's parameter block address. */
+                             /* When read after an interrupt, contains */
+                             /* the address of the completed command. */</programlisting>
+</sect3><sect3 id="dma-21"><title>DMA Callback Example</title><para><indexterm id="dma-ix320"><primary>callback functions</primary><secondary>example of</secondary></indexterm>In <olink targetptr="dma-17617" remap="internal">Example&nbsp;9&ndash;1</olink>, <function>xxstart</function> is used as the callback function. The per-device state
+structure is used as the argument to <function>xxstart</function>. The <function>xxstart</function> function attempts to start the command. If the command
+cannot be started because resources are not available, <function>xxstart</function> is
+scheduled to be called later when resources are available.</para><para>Because <function>xxstart</function> is used as a DMA callback, <function>xxstart</function> must adhere to the following rules, which are imposed on DMA callbacks:</para><itemizedlist><listitem><para>Resources cannot be assumed to be available. The callback
+must try to allocate resources again.</para>
+</listitem><listitem><para>The callback must indicate to the system whether allocation
+succeeded. <returnvalue>DDI_DMA_CALLBACK_RUNOUT</returnvalue> should be returned
+if the callback fails to allocate resources, in which case <function>xxstart</function> needs
+to be called again later. <returnvalue>DDI_DMA_CALLBACK_DONE</returnvalue> indicates
+success, so that no further callback is necessary.</para>
+</listitem>
+</itemizedlist><example id="dma-17617"><title>DMA Callback Example</title><programlisting>static int
+xxstart(caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    struct device_reg *regp;
+    int flags;
+    mutex_enter(&amp;xsp-&gt;mu);
+    if (xsp-&gt;busy) {
+        /* transfer in progress */
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_DMA_CALLBACK_RUNOUT);
+    }
+    xsp-&gt;busy = 1;
+    regp = xsp-&gt;regp;
+    if ( /* transfer is a read */ ) {
+        flags = DDI_DMA_READ;
+    } else {
+        flags = DDI_DMA_WRITE;
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    if (ddi_dma_buf_bind_handle(xsp-&gt;handle,xsp-&gt;bp,flags, xxstart,
+        (caddr_t)xsp, &amp;cookie, &amp;ccount) != DDI_DMA_MAPPED) {
+        /* really should check all return values in a switch */
+        mutex_enter(&amp;xsp-&gt;mu);
+        xsp-&gt;busy=0;
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_DMA_CALLBACK_RUNOUT);
+    }
+    /* Program the DMA engine. */
+    return (DDI_DMA_CALLBACK_DONE);
+}</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="dma-22"><title>Determining Maximum Burst Sizes</title><para><indexterm><primary>burst sizes, DMA</primary></indexterm><indexterm><primary>DMA</primary><secondary>burst sizes</secondary></indexterm>Drivers
+specify the DMA burst sizes that their device supports in the <structfield>dma_attr_burstsizes</structfield>field of the <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. This field is
+a bitmap of the supported burst sizes. However, when DMA resources are allocated,
+the system might impose further restrictions on the burst sizes that might
+be actually used by the device. The  <olink targetdoc="refman9f" targetptr="ddi-dma-burstsizes-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_burstsizes</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine can
+be used to obtain the allowed burst sizes. This routine returns the appropriate
+burst size bitmap for the device. When DMA resources are allocated, a driver
+can ask the system for appropriate burst sizes to use for its DMA engine.</para><example id="dma-ex-3"><title>Determining Burst Size</title><programlisting>#define BEST_BURST_SIZE 0x20 /* 32 bytes */
+
+    if (ddi_dma_buf_bind_handle(xsp-&gt;handle,xsp-&gt;bp, flags, xxstart,
+        (caddr_t)xsp, &amp;cookie, &amp;ccount) != DDI_DMA_MAPPED) {
+        /* error handling */
+    }
+    burst = ddi_dma_burstsizes(xsp-&gt;handle);
+    /* check which bit is set and choose one burstsize to */
+    /* program the DMA engine */
+    if (burst &amp; BEST_BURST_SIZE) {
+        /* program DMA engine to use this burst size */
+    } else {
+        /* other cases */
+    }</programlisting>
+</example>
+</sect2><sect2 id="dma-100"><title>Allocating Private DMA Buffers</title><indexterm id="dma-ix325"><primary>DMA</primary><secondary>private buffer allocation</secondary>
+</indexterm><para><indexterm id="dma-ix326"><primary>DMA</primary><secondary>buffer allocation</secondary></indexterm><indexterm><primary>buffer allocation, DMA</primary></indexterm>Some device drivers might need to allocate memory for DMA transfers
+in addition to performing transfers requested by user threads and the kernel.
+Some examples of allocating private DMA buffers are setting up shared memory
+for communication with the device and allocating intermediate transfer buffers.
+Use <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate memory for DMA transfers. </para><programlisting>int ddi_dma_mem_alloc(ddi_dma_handle_t handle, size_t length,
+    ddi_device_acc_attr_t *accattrp, uint_t flags,
+    int (*waitfp)(caddr_t), caddr_t arg, caddr_t *kaddrp,
+    size_t *real_length, ddi_acc_handle_t *handlep);</programlisting><para>where:</para><variablelist><varlistentry><term><parameter>handle</parameter></term><listitem><para>DMA handle</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>length</parameter></term><listitem><para>Length in bytes of the desired allocation</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>accattrp</parameter></term><listitem><para>Pointer to a device access attribute structure</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>flags</parameter></term><listitem><para>Data transfer mode flags. Possible values are <literal>DDI_DMA_CONSISTENT</literal> and <literal>DDI_DMA_STREAMING</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>waitfp</parameter></term><listitem><para>Address of callback function for handling resource allocation
+failures. See the <olink targetdoc="refman9f" targetptr="ddi-dma-alloc-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_alloc_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>arg</parameter></term><listitem><para>Argument to pass to the callback function</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>kaddrp</parameter></term><listitem><para>Pointer on a successful return that contains the address of
+the allocated storage</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>real_length</parameter></term><listitem><para>Length in bytes that was allocated</para>
+</listitem>
+</varlistentry><varlistentry><term><parameter>handlep</parameter></term><listitem><para>Pointer to a data access handle</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <parameter>flags</parameter> parameter should be set to <literal>DDI_DMA_CONSISTENT</literal> if the device accesses in a nonsequential fashion. Synchronization
+steps that use <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> should be as lightweight as possible due to frequent
+application to small objects. This type of access is commonly known as <emphasis>consistent</emphasis> access. Consistent access is particularly useful for
+I/O parameter blocks that are used for communication between a device and
+the driver.</para><para>On the x86 platform, allocation of DMA memory that is physically contiguous
+has these requirements:</para><itemizedlist><listitem><para>The length of the scatter-gather list <structfield>dma_attr_sgllen</structfield> in the <olink targetdoc="refman9s" targetptr="ddi-dma-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure must be set to 1.</para>
+</listitem><listitem><para>Do not specify <literal>DDI_DMA_PARTIAL</literal>. <literal>DDI_DMA_PARTIAL</literal> allows partial resource allocation.</para>
+</listitem>
+</itemizedlist><para>The following example shows how to allocate IOPB memory and the necessary
+DMA resources to access this memory. DMA resources must still be allocated,
+and the <literal>DDI_DMA_CONSISTENT</literal> flag must be passed to the allocation
+function.</para><example id="dma-35641"><title>Using <literal>ddi_dma_mem_alloc(9F)</literal></title><programlisting>if (ddi_dma_mem_alloc(xsp-&gt;iopb_handle, size, &amp;accattr,
+    DDI_DMA_CONSISTENT, DDI_DMA_SLEEP, NULL, &amp;xsp-&gt;iopb_array,
+    &amp;real_length, &amp;xsp-&gt;acchandle) != DDI_SUCCESS) {
+    /* error handling */
+    goto failure;
+}
+if (ddi_dma_addr_bind_handle(xsp-&gt;iopb_handle, NULL,
+    xsp-&gt;iopb_array, real_length,
+    DDI_DMA_READ | DDI_DMA_CONSISTENT, DDI_DMA_SLEEP,
+    NULL, &amp;cookie, &amp;count) != DDI_DMA_MAPPED) {
+    /* error handling */
+    ddi_dma_mem_free(&amp;xsp-&gt;acchandle);
+    goto failure;
+}</programlisting>
+</example><para><indexterm><primary>streaming access</primary></indexterm>The <parameter>flags</parameter> parameter should be set to <literal>DDI_DMA_STREAMING</literal> for
+memory transfers that are sequential, unidirectional, block-sized, and block-aligned.
+This type of access is commonly known as <emphasis>streaming</emphasis> access.</para><para>In some cases, an I/O transfer can be sped up by using an I/O cache.
+I/O cache  transfers one cache line at a minimum. The <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine rounds <literal>size</literal> to
+a multiple of the cache line to avoid data corruption.</para><para>The <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function returns the actual size of the allocated
+memory object. Because of padding and alignment requirements, the actual size
+might be larger than the requested size. The <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+requires the actual length.</para><para>Use the <olink targetdoc="refman9f" targetptr="ddi-dma-mem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to free the memory allocated by <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><note><para>Drivers must ensure that buffers are aligned appropriately. Drivers
+for devices that have alignment requirements on down bound DMA buffers might
+need to copy the data into a driver intermediate buffer that meets the requirements,
+and then bind that intermediate buffer to the DMA handle for DMA. Use <citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to allocate the driver intermediate buffer. Always use <citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> instead of <citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to allocate memory for the device
+to access.</para>
+</note>
+</sect2><sect2 id="dma-200"><title>Handling Resource Allocation Failures</title><para>The resource-allocation routines provide the driver with several options
+when handling allocation failures. The <parameter>waitfp</parameter> argument
+indicates whether the allocation routines block, return immediately, or schedule
+a callback, as shown in the following table.</para><table frame="topbot" id="dma-tbl-5"><title>Resource Allocation Handling</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colnum="1" colname="column1" colwidth="3*"/><colspec colnum="2" colname="column2" colwidth="6*"/><thead><row rowsep="1"><entry><para><parameter>waitfp</parameter> value</para>
+</entry><entry><para>Indicated Action</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><returnvalue>DDI_DMA_DONTWAIT</returnvalue></para>
+</entry><entry><para>Driver does not want to wait for resources to become available</para>
+</entry>
+</row><row><entry><para><returnvalue>DDI_DMA_SLEEP</returnvalue></para>
+</entry><entry><para>Driver is willing to wait indefinitely for resources to become available</para>
+</entry>
+</row><row><entry><para>Other values</para>
+</entry><entry><para>The address of a function to be called when resources are likely to
+be available</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="dma-23"><title>Programming the DMA Engine</title><para>When the resources have been successfully allocated, the device must
+be programmed. Although programming a DMA engine is device specific, all DMA
+engines require a starting address and a transfer count. Device drivers retrieve
+these two values from the <emphasis>DMA cookie</emphasis> returned by a successful
+call from  <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, or <olink targetdoc="refman9f" targetptr="ddi-dma-getwin-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_getwin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. These functions
+all return the first DMA cookie and a cookie count indicating whether the
+DMA object consists of more than one cookie. If the cookie count <replaceable>N</replaceable> is
+greater than 1, <olink targetdoc="refman9f" targetptr="ddi-dma-nextcookie-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_nextcookie</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> must be called <replaceable>N</replaceable>-1 times
+to retrieve all the remaining cookies.</para><para>A DMA cookie is of type <olink targetdoc="refman9s" targetptr="ddi-dma-cookie-9s" remap="external"><citerefentry><refentrytitle>ddi_dma_cookie</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink>. This type of cookie has
+the following fields:</para><programlisting>uint64_t    _dmac_ll;       /* 64-bit DMA address */
+uint32_t    _dmac_la[2];    /* 2 x 32-bit address */
+size_t      dmac_size;      /* DMA cookie size */
+uint_t      dmac_type;      /* bus specific type bits */</programlisting><para>The <structfield>dmac_laddress</structfield> specifies a 64-bit I/O
+address that is  appropriate for programming the device's DMA engine. If a
+device has a 64-bit DMA address register, a driver should use this field to
+program the DMA engine. The <structfield>dmac_address</structfield> field
+specifies a 32-bit I/O address that should be used for devices that have a
+32-bit DMA address register. The <literal>dmac_size</literal> field contains
+the transfer count. Depending on the bus architecture, the <literal>dmac_type</literal> field
+in the cookie might be required by the driver. The driver should not perform
+any manipulations, such as logical or arithmetic, on the cookie.</para><example id="dma-ex-4"><title><literal>ddi_dma_cookie(9S)</literal> Example</title><programlisting>ddi_dma_cookie_t            cookie;
+
+     if (ddi_dma_buf_bind_handle(xsp-&gt;handle,xsp-&gt;bp, flags, xxstart,
+     (caddr_t)xsp, &amp;cookie, &amp;xsp-&gt;ccount) != DDI_DMA_MAPPED) {
+         /* error handling */
+      }
+     sglp = regp-&gt;sglist;
+     for (cnt = 1; cnt &lt;= SGLLEN; cnt++, sglp++) {
+     /* store the cookie parms into the S/G list */
+     ddi_put32(xsp-&gt;access_hdl, &amp;sglp-&gt;dma_size,
+         (uint32_t)cookie.dmac_size);
+     ddi_put32(xsp-&gt;access_hdl, &amp;sglp-&gt;dma_addr,
+         cookie.dmac_address);
+     /* Check for end of cookie list */
+     if (cnt == xsp-&gt;ccount)
+         break;
+     /* Get next DMA cookie */
+     (void) ddi_dma_nextcookie(xsp-&gt;handle, &amp;cookie);
+     }
+     /* start DMA transfer */
+     ddi_put8(xsp-&gt;access_hdl, &amp;regp-&gt;csr,
+     ENABLE_INTERRUPTS | START_TRANSFER);</programlisting>
+</example>
+</sect2><sect2 id="dma-41838"><title>Freeing the DMA Resources</title><indexterm id="dma-ix321"><primary>DMA</primary><secondary>freeing resources</secondary>
+</indexterm><para>After a DMA transfer is completed, usually in the interrupt routine,
+the driver can release DMA resources by calling <olink targetdoc="refman9f" targetptr="ddi-dma-unbind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_unbind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>As described in <olink targetptr="dma-15727" remap="internal">Synchronizing Memory Objects</olink>,
+ <olink targetdoc="refman9f" targetptr="ddi-dma-unbind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_unbind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> calls  <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, eliminating the need for
+any explicit synchronization. After calling  <olink targetdoc="refman9f" targetptr="ddi-dma-unbind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_unbind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, the DMA
+resources become invalid, and further references to the resources have undefined
+results. The following example shows how to use  <olink targetdoc="refman9f" targetptr="ddi-dma-unbind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_unbind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><example id="dma-34731"><title>Freeing DMA Resources</title><programlisting>static uint_t
+xxintr(caddr_t arg)
+{
+     struct xxstate *xsp = (struct xxstate *)arg;
+     uint8_t    status;
+     volatile   uint8_t   temp;
+     mutex_enter(&amp;xsp-&gt;mu);
+     /* read status */
+     status = ddi_get8(xsp-&gt;access_hdl, &amp;xsp-&gt;regp-&gt;csr);
+     if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_INTR_UNCLAIMED);
+     }
+     ddi_put8(xsp-&gt;access_hdl, &amp;xsp-&gt;regp-&gt;csr, CLEAR_INTERRUPT);
+     /* for store buffers */
+     temp = ddi_get8(xsp-&gt;access_hdl, &amp;xsp-&gt;regp-&gt;csr);
+     ddi_dma_unbind_handle(xsp-&gt;handle);
+     /* Check for errors. */
+     xsp-&gt;busy = 0;
+     mutex_exit(&amp;xsp-&gt;mu);
+     if ( /* pending transfers */ ) {
+        (void) xxstart((caddr_t)xsp);
+     }
+     return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example><para>The DMA resources should be released. The DMA resources should be reallocated
+if a different object is to be used in the next transfer. However, if the
+same object is always used, the resources can be allocated once. The resources
+can then be reused as long as  intervening calls to <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> remain.</para>
+</sect2><sect2 id="dma-24"><title>Freeing the DMA Handle</title><para><indexterm><primary>DMA</primary><secondary>freeing handle</secondary></indexterm><indexterm><primary>handle, DMA</primary></indexterm>When the
+driver is detached, the DMA handle must be freed. The <olink targetdoc="refman9f" targetptr="ddi-dma-free-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_free_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+destroys the DMA handle and destroys any residual resources that the system
+is caching on the handle. Any further references of the DMA handle will have
+undefined results.</para>
+</sect2><sect2 id="dma-28600"><title>Canceling DMA Callbacks</title><para><indexterm id="dma-ix322"><primary>DMA</primary><secondary>callbacks</secondary></indexterm>DMA callbacks cannot be canceled. Canceling a DMA callback requires
+some additional code in the driver's <olink targetdoc="refman9e" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. The <function>detach</function> routine must not return <command>DDI_SUCCESS</command> if any
+outstanding callbacks exist. See <olink targetptr="dma-36458" remap="internal">Example&nbsp;9&ndash;6</olink>. When DMA callbacks occur, the <function>detach</function> routine
+must wait for the callback to run. When the callback has finished, <function>detach</function> must prevent the callback from rescheduling itself. Callbacks
+can be prevented from rescheduling through additional fields in the state
+structure, as shown in the following example.</para><example id="dma-36458"><title>Canceling DMA Callbacks</title><programlisting>static int
+xxdetach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+     /* ... */
+     mutex_enter(&amp;xsp-&gt;callback_mutex);
+     xsp-&gt;cancel_callbacks = 1;
+     while (xsp-&gt;callback_count &gt; 0) {
+        cv_wait(&amp;xsp-&gt;callback_cv, &amp;xsp-&gt;callback_mutex);
+     }
+     mutex_exit(&amp;xsp-&gt;callback_mutex);
+     /* ... */
+ }
+
+static int
+xxstrategy(struct buf *bp)
+{
+     /* ... */
+     mutex_enter(&amp;xsp-&gt;callback_mutex);
+       xsp-&gt;bp = bp;
+     error = ddi_dma_buf_bind_handle(xsp-&gt;handle, xsp-&gt;bp, flags,
+         xxdmacallback, (caddr_t)xsp, &amp;cookie, &amp;ccount);
+     if (error == DDI_DMA_NORESOURCES)
+       xsp-&gt;callback_count++;
+     mutex_exit(&amp;xsp-&gt;callback_mutex);
+     /* ... */
+}
+
+static int
+xxdmacallback(caddr_t callbackarg)
+{
+     struct xxstate *xsp = (struct xxstate *)callbackarg;
+     /* ... */
+     mutex_enter(&amp;xsp-&gt;callback_mutex);
+     if (xsp-&gt;cancel_callbacks) {
+        /* do not reschedule, in process of detaching */
+        xsp-&gt;callback_count--;
+        if (xsp-&gt;callback_count == 0)
+           cv_signal(&amp;xsp-&gt;callback_cv);
+        mutex_exit(&amp;xsp-&gt;callback_mutex);
+        return (DDI_DMA_CALLBACK_DONE);    /* don't reschedule it */
+     }
+     /*
+      * Presumably at this point the device is still active
+      * and will not be detached until the DMA has completed.
+      * A return of 0 means try again later
+      */
+     error = ddi_dma_buf_bind_handle(xsp-&gt;handle, xsp-&gt;bp, flags,
+         DDI_DMA_DONTWAIT, NULL, &amp;cookie, &amp;ccount);
+     if (error == DDI_DMA_MAPPED) {
+        /* Program the DMA engine. */
+        xsp-&gt;callback_count--;
+        mutex_exit(&amp;xsp-&gt;callback_mutex);
+        return (DDI_DMA_CALLBACK_DONE);
+     }
+     if (error != DDI_DMA_NORESOURCES) {
+        xsp-&gt;callback_count--;
+        mutex_exit(&amp;xsp-&gt;callback_mutex);
+        return (DDI_DMA_CALLBACK_DONE);
+     }
+     mutex_exit(&amp;xsp-&gt;callback_mutex);
+     return (DDI_DMA_CALLBACK_RUNOUT);
+}</programlisting>
+</example>
+</sect2><sect2 id="dma-15727"><title>Synchronizing Memory Objects</title><para>In the process of accessing the memory object, the driver might need
+to synchronize the memory object with respect to various caches. This section
+provides guidelines on when and how to synchronize memory objects.</para><sect3 id="dma-25"><title>Cache</title><para><indexterm id="dma-ix323"><primary>cache</primary><secondary>description of</secondary></indexterm>CPU cache is a very high-speed memory that sits
+between the CPU and the system's main memory. I/O cache sits between the device
+and the system's main memory, as shown in the following figure.</para><figure id="dma-fig-26"><title id="dma-29833">CPU and System I/O Caches</title><mediaobject><imageobject><imagedata entityref="dma.cpucache.epsi"/>
+</imageobject><textobject><simpara>Diagram shows how the cache is used to speed data transfers
+involving devices.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>When an attempt is made to read data from main memory, the associated
+cache checks for the requested data. If the data is available, the cache supplies
+the data quickly. If the cache does not have the data, the cache retrieves
+the data from main memory. The cache then passes the data on to the requester
+and saves the data in case of a subsequent request.</para><para>Similarly, on a write cycle, the data is stored in the cache quickly.
+The CPU or device is allowed to continue executing, that is, transferring
+data. Storing data in a cache takes much less time than waiting for the data
+to be written to memory.</para><para>With this model, after a device transfer is complete, the data can still
+be in the I/O cache with no data in main memory. If the CPU accesses the memory,
+the CPU might read the wrong data from the CPU cache. The driver must call
+a synchronization routine to flush the data from the I/O cache and update
+the CPU cache with the new data. This action ensures a consistent view of
+the memory for the CPU. Similarly, a synchronization step is required if data
+modified by the CPU is to be accessed by a device.</para><para>You can create additional caches and buffers between the device and
+memory, such as bus extenders and bridges. Use <literal>ddi_dma_sync(9F)</literal> to
+synchronize <emphasis>all</emphasis> applicable caches.</para>
+</sect3><sect3 id="dma-27"><title><function>ddi_dma_sync</function> Function</title><para>A memory object might have multiple mappings, such as for the CPU and
+for a device, by means of a DMA handle. A driver with multiple mappings needs
+to call <olink targetdoc="refman9f" targetptr="ddi-dma-sync-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_sync</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> if any mappings are used to modify the memory object.
+Calling <function>ddi_dma_sync</function> ensures that the modification of
+the memory object is complete before the object is accessed through a different
+mapping. The <function>ddi_dma_sync</function> function can also inform other
+mappings of the object if any cached references to the object are now stale.
+Additionally, <function>ddi_dma_sync</function> flushes or invalidates stale
+cache references as necessary.</para><para>Generally, the driver must call <function>ddi_dma_sync</function> when
+a DMA transfer completes. The exception to this rule is if deallocating the
+DMA resources with <olink targetdoc="refman9f" targetptr="ddi-dma-unbind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_unbind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> does an implicit <function>ddi_dma_sync</function> on behalf of the driver. The syntax for <function>ddi_dma_sync</function> is as follows:</para><programlisting>int ddi_dma_sync(ddi_dma_handle_t handle, off_t off,
+size_t length, uint_t type);</programlisting><para>If the object is going to be read by the DMA engine of the device, the
+device's view of the object must be synchronized by setting <replaceable>type</replaceable> to <literal>DDI_DMA_SYNC_FORDEV</literal>. If the DMA engine of the device has written
+to the memory object and the object is going to be read by the CPU, the CPU's
+view of the object must be synchronized by setting <replaceable>type</replaceable> to <literal>DDI_DMA_SYNC_FORCPU</literal>.</para><para>The following example demonstrates synchronizing a DMA object for the
+CPU:</para><programlisting>if (ddi_dma_sync(xsp-&gt;handle, 0, length, DDI_DMA_SYNC_FORCPU)
+    == DDI_SUCCESS) {
+    /* the CPU can now access the transferred data */
+    /* ... */
+} else {
+    /* error handling */
+}</programlisting><para>Use the flag <literal>DDI_DMA_SYNC_FORKERNEL</literal> if the only mapping
+is for the kernel, as in the case of memory that is allocated by <olink targetdoc="refman9f" targetptr="ddi-dma-mem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_mem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The system tries to synchronize the kernel's view
+more quickly than the CPU's view. If the system cannot synchronize the kernel
+view faster, the system acts as if the <literal>DDI_DMA_SYNC_FORCPU</literal> flag
+were set.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="dma-35348"><title>DMA Windows</title><para><indexterm id="gbgtz"><primary>DMA</primary><secondary>windows</secondary></indexterm><indexterm><primary>windows, DMA</primary></indexterm>If an object
+does not fit within the limitations of the DMA engine, the transfer must be
+broken into a series of smaller transfers. The driver can break up the transfer
+itself. Alternatively, the driver can allow the system to allocate resources
+for only part of the object, thereby creating a series of DMA <emphasis>windows</emphasis>.
+Allowing the system to allocate resources is the preferred solution, because
+the system can manage the resources more effectively than the driver can manage
+the resources.</para><para>A DMA window has two attributes. The <replaceable>offset</replaceable> attribute
+is measured from the beginning of the object. The  <replaceable>length</replaceable> attribute
+is the number of bytes of memory to be allocated. After a partial allocation,
+only a range of <replaceable>length</replaceable> bytes that starts at <replaceable>offset</replaceable> has allocated resources.</para><para>A DMA window is requested by specifying the <literal>DDI_DMA_PARTIAL</literal> flag
+as a parameter to <olink targetdoc="refman9f" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="refman9f" targetptr="ddi-dma-addr-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_addr_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Both functions return <literal>DDI_DMA_PARTIAL_MAP</literal> if
+a window can be established. However, the system might allocate resources
+for the entire object, in which case <literal>DDI_DMA_MAPPED</literal> is
+returned. The driver should check the return value to determine whether DMA
+windows are in use. See the following example.</para><example id="dma-23815"><title>Setting Up DMA Windows</title><programlisting>static int
+xxstart (caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    struct device_reg *regp = xsp-&gt;reg;
+    ddi_dma_cookie_t cookie;
+    int status;
+    mutex_enter(&amp;xsp-&gt;mu);
+    if (xsp-&gt;busy) {
+        /* transfer in progress */
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_DMA_CALLBACK_RUNOUT);
+    }
+    xsp-&gt;busy = 1;
+    mutex_exit(&amp;xsp-&gt;mu);
+    if ( /* transfer is a read */) {
+        flags = DDI_DMA_READ;
+    } else {
+        flags = DDI_DMA_WRITE;
+    }
+    flags |= DDI_DMA_PARTIAL;
+    status = ddi_dma_buf_bind_handle(xsp-&gt;handle, xsp-&gt;bp,
+        flags, xxstart, (caddr_t)xsp, &amp;cookie, &amp;ccount);
+    if (status != DDI_DMA_MAPPED &amp;&amp;
+        status != DDI_DMA_PARTIAL_MAP)
+        return (DDI_DMA_CALLBACK_RUNOUT);
+    if (status == DDI_DMA_PARTIAL_MAP) {
+        ddi_dma_numwin(xsp-&gt;handle, &amp;xsp-&gt;nwin);
+        xsp-&gt;partial = 1;
+        xsp-&gt;windex = 0;
+    } else {
+        xsp-&gt;partial = 0;
+    }
+    /* Program the DMA engine. */
+    return (DDI_DMA_CALLBACK_DONE);
+}</programlisting>
+</example><para>Two functions operate with DMA windows. The first, <olink targetdoc="refman9f" targetptr="ddi-dma-numwin-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_numwin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, returns
+the number of DMA windows for a particular DMA object. The other function, <olink targetdoc="refman9f" targetptr="ddi-dma-getwin-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_getwin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, allows repositioning
+within the object, that is, reallocation of system resources. The <function>ddi_dma_getwin</function> function shifts the current window to a new window within the
+object. Because <function>ddi_dma_getwin</function> reallocates system resources
+to the new window, the previous window becomes invalid.</para><caution><para>Do not move the DMA windows with a call to <function>ddi_dma_getwin</function> before transfers into the current window are complete. Wait until
+the transfer to the current window is complete, which is when the interrupt
+arrives. Then call <function>ddi_dma_getwin</function> to avoid data corruption.</para>
+</caution><para>The <function>ddi_dma_getwin</function> function is normally called
+from an interrupt routine, as shown in <olink targetptr="dma-41452" remap="internal">Example&nbsp;9&ndash;8</olink>. The first DMA transfer is initiated as a result of a call to the
+driver. Subsequent transfers are started from the interrupt routine.</para><para>The interrupt routine examines the status of the device to determine
+whether the device completes the transfer successfully. If not, normal error
+recovery occurs. If the transfer is successful, the routine must determine
+whether the logical transfer is complete. A complete transfer includes the
+entire object as specified by the <olink targetdoc="refman9s" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+ In a partial transfer, only one DMA window is moved. In a partial transfer,
+the interrupt routine moves the window with <olink targetdoc="refman9f" targetptr="ddi-dma-getwin-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_getwin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, retrieves a new cookie,
+and starts another DMA transfer.</para><para>If the logical request has been completed, the interrupt routine checks
+for pending requests. If necessary, the interrupt routine starts a transfer.
+Otherwise, the routine returns without invoking another DMA transfer. The
+following example illustrates the usual flow control.</para><example id="dma-41452"><title>Interrupt Handler Using DMA Windows</title><programlisting>static uint_t
+xxintr(caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    uint8_t    status;
+    volatile   uint8_t   temp;
+    mutex_enter(&amp;xsp-&gt;mu);
+    /* read status */
+    status = ddi_get8(xsp-&gt;access_hdl, &amp;xsp-&gt;regp-&gt;csr);
+    if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_INTR_UNCLAIMED);
+    }
+    ddi_put8(xsp-&gt;access_hdl,&amp;xsp-&gt;regp-&gt;csr, CLEAR_INTERRUPT);
+    /* for store buffers */
+    temp = ddi_get8(xsp-&gt;access_hdl, &amp;xsp-&gt;regp-&gt;csr);
+    if ( /* an error occurred during transfer */ ) {
+        bioerror(xsp-&gt;bp, EIO);
+        xsp-&gt;partial = 0;
+    } else {
+        xsp-&gt;bp-&gt;b_resid -= /* amount transferred */ ;
+    }
+
+    if (xsp-&gt;partial &amp;&amp; (++xsp-&gt;windex &lt; xsp-&gt;nwin)) {
+        /* device still marked busy to protect state */
+        mutex_exit(&amp;xsp-&gt;mu);
+        (void) ddi_dma_getwin(xsp-&gt;handle, xsp-&gt;windex,
+            &amp;offset, &amp;len, &amp;cookie, &amp;ccount);
+        /* Program the DMA engine with the new cookie(s). */
+        return (DDI_INTR_CLAIMED);
+    }
+    ddi_dma_unbind_handle(xsp-&gt;handle);
+    biodone(xsp-&gt;bp);
+    xsp-&gt;busy = 0;
+    xsp-&gt;partial = 0;
+    mutex_exit(&amp;xsp-&gt;mu);
+    if ( /* pending transfers */ ) {
+        (void) xxstart((caddr_t)xsp);
+    }
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example>
+</sect1>
+</chapter><?Pub *0000073606 0?>

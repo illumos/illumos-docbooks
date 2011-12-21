@@ -1,0 +1,931 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()chapter(9)?><chapter id="api-5"><title>Module Programming API</title><highlights><para>This chapter describes the structures and functions contained in the
+MDB debugger module API. The header file <literal>&lt;sys/mdb_modapi.h&gt;</literal> contains
+prototypes for these functions, and the SUNWmdbdm package provides source
+code for an example module in the directory <literal>/usr/demo/mdb</literal>.</para>
+</highlights><sect1 id="api-1"><title>Debugger Module Linkage</title><sect2 id="api-6"><title><function>_mdb_init</function></title><programlisting>const mdb_modinfo_t *_mdb_init(void);</programlisting><para><indexterm><primary><function>_mdb_init</function></primary></indexterm><indexterm><primary><literal>mdb_modinfo_t</literal></primary></indexterm>Each debugger
+module is required to provide, for linkage and identification purposes, a
+function named <function>_mdb_init</function>. This function returns a pointer
+to a persistent (that is, not declared as an automatic variable) <literal>mdb_modinfo_t</literal> structure, as defined in <literal>&lt;sys/mdb_modapi.h&gt;</literal>:</para><programlisting>typedef struct mdb_modinfo {
+        ushort_t mi_dvers;               /* Debugger API version number */
+        const mdb_dcmd_t *mi_dcmds;      /* NULL-terminated list of dcmds */
+        const mdb_walker_t *mi_walkers;  /* NULL-terminated list of walks */
+} mdb_modinfo_t;</programlisting><para><indexterm><primary><literal>MDB_API_VERSION</literal></primary></indexterm>The <replaceable>mi_dvers</replaceable> member is used to identify
+the API version number, and should always be set to <literal>MDB_API_VERSION</literal>.
+The current version number is therefore compiled into each debugger module,
+allowing the debugger to identify and verify the application binary interface
+used by the module. The debugger does not load modules that are compiled for
+an API version that is more recent than the debugger itself.</para><para>The <replaceable>mi_dcmds</replaceable> and <replaceable>mi_walkers</replaceable> members,
+if not NULL, point to arrays of dcmd and walker definition structures, respectively.
+Each array must be terminated by a NULL element. These dcmds and walkers are
+installed and registered with the debugger as part of the module loading process.
+The debugger will refuse to load the module if one or more dcmds or walkers
+are defined improperly or if they have conflicting or invalid names. Dcmd
+and walker names are prohibited from containing characters that have special
+meaning to the debugger, such as quotation marks and parentheses.</para><para>The module can also execute code in <function>_mdb_init</function> using
+the module API to determine if it is appropriate to load. For example, a module
+can only be appropriate for a particular target if certain symbols are present.
+If these symbols are not found, the module can return NULL from the <function>_mdb_init</function> function. In this case, the debugger will refuse to load the module
+and an appropriate error message is printed.  </para>
+</sect2><sect2 id="api-7"><title><function>_mdb_fini</function></title><programlisting>void _mdb_fini(void);</programlisting><para><indexterm><primary><function>_mdb_fini</function></primary></indexterm>If
+the module performs certain tasks prior to unloading, such as freeing persistent
+memory previously allocated with <function>mdb_alloc</function>, it can declare
+a function named <function>_mdb_fini</function> for this purpose. This function
+is not required by the debugger. If declared, it is called once prior to unloading
+the module. Modules are unloaded when the user requests that the debugger
+terminate or when the user explicitly unloads a module using the <command>::unload</command> built-in dcmd. </para>
+</sect2>
+</sect1><sect1 id="api-2"><title>Dcmd Definitions</title><programlisting>int dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv);</programlisting><para>A dcmd is implemented with a function similar to the <function>dcmd</function> declaration.
+This function receives four arguments and returns an integer status. The function
+arguments are:</para><variablelist termlength="xtranarrow"><varlistentry><term><replaceable>addr</replaceable></term><listitem><para>Current address, also called dot. At the start of the dcmd,
+this address corresponds to the value of the dot <?Pub _nolinebreak?>&ldquo;<literal>.</literal>&rdquo;<?Pub /_nolinebreak?> variable in the debugger. </para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>flags</replaceable></term><listitem><para>Integer containing the logical OR of one or more of the following
+flags:</para><variablelist termlength="medium"><varlistentry><term><literal>DCMD_ADDRSPEC</literal></term><listitem><para><indexterm><primary><literal>DCMD_ADDRSPEC</literal></primary></indexterm>An explicit address was specified to the left of <command>::dcmd</command>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_LOOP</literal></term><listitem><para><indexterm><primary><literal>DCMD_LOOP</literal></primary></indexterm>The dcmd was invoked in a loop using the <literal>,count</literal> syntax,
+or the dcmd was invoked in a loop by a pipeline.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_LOOPFIRST</literal></term><listitem><para><indexterm><primary><literal>DCMD_LOOPFIRST</literal></primary></indexterm>This invocation of the dcmd function corresponds to the first
+loop or pipeline invocation.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_PIPE</literal></term><listitem><para><indexterm><primary><literal>DCMD_PIPE</literal></primary></indexterm>The dcmd was invoked with input from a pipeline.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_PIPE_OUT</literal></term><listitem><para><indexterm><primary><literal>DCMD_PIPE_OUT</literal></primary></indexterm>The dcmd was invoked with output set to a pipeline.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>As a convenience, the <function>DCMD_HDRSPEC</function> macro is provided
+to allow a dcmd to test its flags to determine if it should print a header
+line (that is, it was not invoked as part of a loop, or it was invoked as
+the first iteration of a loop or pipeline).</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>argc</replaceable></term><listitem><para>Number of arguments in the <replaceable>argv</replaceable> array.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>argv</replaceable></term><listitem><para>Array of arguments specified to the right of <command>::dcmd</command> on
+the command line. These arguments can be either strings or integer values.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The dcmd function is expected to return one of the following integer
+values, defined in <literal>&lt;sys/mdb_modapi.h&gt;</literal>.</para><variablelist termlength="narrow"><varlistentry><term><literal>DCMD_OK</literal></term><listitem><para><indexterm><primary><literal>DCMD_OK</literal></primary></indexterm>The dcmd completed successfully.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_ERR</literal></term><listitem><para><indexterm><primary><literal>DCMD_ERR</literal></primary></indexterm>The dcmd failed for some reason.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_USAGE</literal></term><listitem><para><indexterm><primary><literal>DCMD_USAGE</literal></primary></indexterm>The dcmd failed because invalid arguments were specified. When
+this value is returned, the dcmd usage message (described below) prints automatically.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_NEXT</literal></term><listitem><para><indexterm><primary><literal>DCMD_NEXT</literal></primary></indexterm>The next dcmd definition (if one is present) is automatically
+invoked with the same arguments. </para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DCMD_ABORT</literal></term><listitem><para><indexterm><primary><literal>DCMD_ABORT</literal></primary></indexterm>The dcmd failed, and the current loop or pipeline should be aborted.
+This is like <literal>DCMD_ERR</literal>, but indicates that no further progress
+is possible in the current loop or pipe.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary><structname>mdb_dcmd_t</structname></primary></indexterm>Each dcmd consists of a function defined according to the example <function>dcmd</function> prototype, and a corresponding <structname>mdb_dcmd_t</structname> structure,
+as defined in <?Pub _nolinebreak?><literal>&lt;sys/mdb_modapi.h&gt;</literal><?Pub
+/_nolinebreak?>.  This structure consists of the following fields:</para><variablelist><varlistentry><term><literal>const char *dc_name</literal></term><listitem><para>The string name of the dcmd, without the leading &ldquo;<command>::</command>&rdquo;. The name cannot contain any of the MDB meta-characters,
+such as $<literal></literal> or <literal>`</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>const char *dc_usage</literal></term><listitem><para>An optional usage string for the dcmd, to be printed when
+the dcmd returns <literal>DCMD_USAGE</literal>.  For example, if the dcmd
+accepts options <option>a</option> and <option>b</option>, <literal>dc_usage</literal> might
+be specified as &ldquo;<literal>[</literal><option>ab</option><literal>]</literal>&rdquo;.
+ If the dcmd accepts no arguments, <literal>dc_usage</literal> can be set
+to NULL.  If the usage string begins with &ldquo;<command>:</command>&rdquo;,
+this is shorthand for indicating that the dcmd requires an explicit address
+(that is, it requires <literal>DCMD_ADDRSPEC</literal> to be set in its flags
+parameter). If the usage string begins with &ldquo;<literal>?</literal>&rdquo;,
+this indicates that the dcmd optionally accepts an address. These hints modify
+the usage message accordingly.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>const char *dc_descr</literal></term><listitem><para>A mandatory description string, briefly explaining the purpose
+of the dcmd. This string should consist of only a single line of text.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>mdb_dcmd_f *dc_funcp</literal></term><listitem><para>A pointer to the function that will be called to execute the
+dcmd.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>void (*dc_help)(void)</literal></term><listitem><para>An optional function pointer to a help function for the dcmd.
+If this pointer is not NULL, this function will be called when the user executes <command>::help</command> <replaceable>dcmd</replaceable>. This function can use <function>mdb_printf</function> to display further information or examples.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="api-3"><title>Walker Definitions</title><programlisting>int walk_init(mdb_walk_state_t *wsp);
+int walk_step(mdb_walk_state_t *wsp);
+void walk_fini(mdb_walk_state_t *wsp);</programlisting><para>A walker is composed of three functions, <literal>init</literal>, <literal>step</literal>, and <literal>fini</literal>, which are defined according to
+the example prototypes above.  A walker is invoked by the debugger when one
+of the walk functions (such as <function>mdb_walk</function>) is called, or
+when the user executes the <command>::walk</command> built-in dcmd.  When
+the walk begins, MDB calls the walker's init function, passing it the address
+of a new <structname>mdb_walk_state_t</structname> structure, as defined in <?Pub
+_nolinebreak?><literal>&lt;sys/mdb_modapi.h&gt;</literal><?Pub /_nolinebreak?>:</para><programlisting>typedef struct mdb_walk_state {
+			mdb_walk_cb_t walk_callback;    /* Callback to issue */
+			void *walk_cbdata;              /* Callback private data */
+			uintptr_t walk_addr;            /* Current address */
+			void *walk_data;                /* Walk private data */
+			void *walk_arg;                 /* Walk private argument */
+			void *walk_layer;               /* Data from underlying layer */
+} mdb_walk_state_t;</programlisting><para><indexterm><primary><literal>mdb_walk_state_t</literal></primary></indexterm>A separate <structname>mdb_walk_state_t</structname> is created
+for each walk, so that multiple instances of the same walker can be active
+simultaneously. The state structure contains the callback the walker should
+invoke at each step (<replaceable>walk_callback</replaceable>), and the private
+data for the callback (<replaceable>walk_cbdata</replaceable>), as specified
+to <function>mdb_walk</function>, for example.  The <replaceable>walk_cbdata</replaceable> pointer
+is opaque to the walker: it must not modify or dereference this value, nor
+can it assume it is a pointer to valid memory.</para><para>The starting address for the walk is stored in <replaceable>walk_addr</replaceable>.
+This is either NULL if <function>mdb_walk</function> was called, or the address
+parameter specified to <function>mdb_pwalk</function>. If the <command>::walk</command> built-in
+was used, <replaceable>walk_addr</replaceable> will be non-NULL if an explicit
+address was specified on the left-hand side of <command>::walk</command>.
+A walk with a starting address of NULL is referred to as <emphasis>global</emphasis>.
+A walk with an explicit non-NULL starting address is referred to as <emphasis>local</emphasis>. </para><para>The <replaceable>walk_data</replaceable> and <replaceable>walk_arg</replaceable> fields
+are provided for use as private storage for the walker.  Complex walkers might
+need to allocate an auxiliary state structure and set <replaceable>walk_data</replaceable> to
+point to this structure.  Each time a walk is initiated, <replaceable>walk_arg</replaceable> is
+initialized to the value of the <literal>walk_init_arg</literal> member of
+the corresponding walker's <literal>mdb_walker_t</literal> structure.  </para><para>In some cases, it is useful to have several walkers share the same init,
+step, and fini routines.  For example, the MDB <literal>genunix</literal> module
+provides walkers for each kernel memory cache.  These share the same init,
+step, and fini functions, and use the <literal>walk_init_arg</literal> member
+of the <literal>mdb_walker_t</literal> to specify the address of the appropriate
+cache as the <replaceable>walk_arg</replaceable>.</para><para>If the walker calls <function>mdb_layered_walk</function> to instantiate
+an underlying layer, then the underlying layer will reset <replaceable>walk_addr</replaceable> and <replaceable>walk_layer</replaceable> prior to each call to the walker's step function.
+ The underlying layer sets <replaceable>walk_addr</replaceable> to the target
+virtual address of the underlying object, and set <replaceable>walk_layer</replaceable> to
+point to the walker's local copy of the underlying object.  For more information
+on layered walks, refer to the discussion of <function>mdb_layered_walk</function> below. </para><para>The walker init and step functions are expected to return one of the
+following status values:</para><variablelist termlength="narrow"><varlistentry><term><literal>WALK_NEXT</literal></term><listitem><para><indexterm><primary><literal>WALK_NEXT</literal></primary></indexterm>Proceed to the next step.  When the walk init function returns <literal>WALK_NEXT</literal>, MDB invokes the walk step function. When the walk step
+function returns <literal>WALK_NEXT</literal>, this indicates that MDB should
+call the step function again.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>WALK_DONE</literal></term><listitem><para><indexterm><primary><literal>WALK_DONE</literal></primary></indexterm>The walk has completed successfully. <literal>WALK_DONE</literal> can
+be returned by either the step function to indicate that the walk is complete,
+or by the init function to indicate that no steps are needed (for example,
+if the given data structure is empty).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>WALK_ERR</literal></term><listitem><para><indexterm><primary><literal>WALK_ERR</literal></primary></indexterm>The walk has terminated due to an error.  If <literal>WALK_ERR</literal> is
+returned by the init function, <function>mdb_walk</function> (or any of its
+counterparts) returns &ndash;1 to indicate that the walker failed to initialize.
+ If <literal>WALK_ERR</literal> is returned by the step function, the walk
+terminates but <function>mdb_walk</function> returns success.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <replaceable>walk_callback</replaceable> is also expected to return
+one of the values above. Therefore, the walk step function's job is to determine
+the address of the next object, read in a local copy of this object, call
+the <replaceable>walk_callback</replaceable> function, then return its status.
+ The step function can also return <literal>WALK_DONE</literal> or <literal>WALK_ERR</literal> without invoking the callback if the walk is complete or if an
+error occurred.</para><para>The walker itself is defined using the <structname>mdb_walker_t</structname> structure,
+defined in :</para><programlisting>typedef struct mdb_walker {
+        const char *walk_name;                 /* Walk type name */
+        const char *walk_descr;                /* Walk description */
+        int (*walk_init)(mdb_walk_state_t *);  /* Walk constructor */
+        int (*walk_step)(mdb_walk_state_t *);  /* Walk iterator */
+        void (*walk_fini)(mdb_walk_state_t *); /* Walk destructor */
+        void *walk_init_arg;                   /* Constructor argument */
+} mdb_walker_t;</programlisting><para><indexterm><primary><literal>mdb_walker_t</literal></primary></indexterm>The <literal>walk_name</literal> and <literal>walk_descr</literal> fields should be initialized
+to point to strings containing the name and a brief description of the walker,
+respectively. A walker is required to have a non-NULL name and description,
+and the name cannot contain any of the MDB meta-characters.  The description
+string is printed by the <command>::walkers</command> and <command>::dmods</command> built-in
+dcmds.</para><para>The <literal>walk_init</literal>, <literal>walk_step</literal>, and <literal>walk_fini</literal> members refer to the walk functions themselves, as described
+earlier. The <literal>walk_init</literal> and <literal>walk_fini</literal> members
+can be set to NULL to indicate that no special initialization or cleanup actions
+need to be taken. The <literal>walk_step</literal> member cannot be set to
+NULL. The <literal>walk_init_arg</literal> member is used to initialize the <literal>walk_arg</literal> member of each new <literal>mdb_walk_state_t</literal> created
+for the given walker, as described earlier. <olink targetptr="api-fig-54" remap="internal">Figure&nbsp;10&ndash;1</olink> shows a flowchart for the algorithm of a typical walker.</para><figure id="api-fig-54"><title>Sample Walker</title><mediaobject><imageobject><imagedata entityref="proc-t"/>
+</imageobject><textobject><simpara>Graphic is described by context.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The walker is designed to iterate over the list of <structname>proc_t</structname> structures
+in the kernel. The head of the list is stored in the global <literal>practive</literal> variable,
+and each element's <literal>p_next</literal> pointer points to the next <structname>proc_t</structname> in the list. The list is terminated with a NULL pointer.
+In the walker's <literal>init</literal> routine, the <literal>practive</literal> symbol
+is located using <function>mdb_lookup_by_name</function> step (1), and its
+value is copied into the <structname>mdb_walk_state_t</structname> pointed
+to by <replaceable>wsp</replaceable>. </para><para>In the walker's step function, the next <structname>proc_t</structname> structure
+in the list is copied into the debugger's address space using <function>mdb_vread</function> step (2), the callback function is invoked with a pointer to this
+local copy, step (3), and then the <structname>mdb_walk_state_t</structname> is
+updated with the address of the <structname>proc_t</structname> structure
+for the next iteration. This update corresponds to following the pointer,
+step (4), to the next element in the list. </para><para>These steps demonstrate the structure of a typical walker: the init
+routine locates the global information for a particular data structure, the
+step function reads in a local copy of the next data item and passes it to
+the callback function, and the address of the next element is read. Finally,
+when the walk terminates, the fini function frees any private storage.</para>
+</sect1><sect1 id="api-4"><title>API Functions</title><sect2 id="api-43"><title><function>mdb_pwalk</function></title><programlisting>int mdb_pwalk(const char *name, mdb_walk_cb_t func, void *data,
+              uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_pwalk</function></primary></indexterm>Initiate
+a local walk starting at <replaceable>addr</replaceable> using the walker
+specified by <replaceable>name</replaceable>, and invoke the callback function <replaceable>func</replaceable> at each step.  If <replaceable>addr</replaceable> is NULL,
+a global walk is performed (that is, the <function>mdb_pwalk</function> invocation
+is equivalent to the identical call to <function>mdb_walk</function> without
+the trailing <replaceable>addr</replaceable> parameter).  This function returns
+0 for success, or -1 for error.  The <function>mdb_pwalk</function> function
+fails if the walker itself returns a fatal error, or if the specified walker
+name is not known to the debugger. The walker name may be scoped using the
+backquote (<literal>`</literal>) operator if there are naming conflicts. The <replaceable>data</replaceable> parameter is an opaque argument that has meaning only to
+the caller; it is passed back to <replaceable>func</replaceable> at each step
+of the walk.</para>
+</sect2><sect2 id="api-42"><title><function>mdb_walk</function></title><programlisting>int mdb_walk(const char *name, mdb_walk_cb_t func, void *data);</programlisting><para><indexterm><primary><function>mdb_walk</function></primary></indexterm>Initiate
+a global walk starting at <replaceable>addr</replaceable> using the walker
+specified by <replaceable>name</replaceable>, and invoke the callback function <replaceable>func</replaceable> at each step.  This function returns 0 for success, or
+-1 for error.  The <function>mdb_walk</function> function fails if the walker
+itself returns a fatal error, or if the specified walker name is not known
+to the debugger. The walker name can be scoped using the backquote (<literal>`</literal>)
+operator if there are naming conflicts. The data parameter is an opaque argument
+that has meaning only to the caller; it is passed back to <replaceable>func</replaceable> at
+each step of the walk.</para>
+</sect2><sect2 id="api-41"><title><function>mdb_pwalk_dcmd</function></title><programlisting>int mdb_pwalk_dcmd(const char *wname, const char *dcname, int argc,
+			const mdb_arg_t *argv, uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_pwalk_dcmd</function></primary></indexterm>Initiate a local walk starting at <replaceable>addr</replaceable> using
+the walker specified by <replaceable>wname</replaceable>, and invoke the dcmd
+specified by <replaceable>dcname</replaceable> with the specified <replaceable>argc</replaceable> and <replaceable>argv</replaceable> at each step. This function
+returns 0 for success, or -1 for error.  The function fails if the walker
+itself returns a fatal error, if the specified walker name or dcmd name is
+not known to the debugger, or if the dcmd itself returns <literal>DCMD_ABORT</literal> or <literal>DCMD_USAGE</literal> to the walker. The walker name and dcmd name can each
+be scoped using the backquote (<literal>`</literal>) operator if there are
+naming conflicts.  When invoked from <function>mdb_pwalk_dcmd</function>,
+the dcmd will have the <literal>DCMD_LOOP</literal> and <literal>DCMD_ADDRSPEC</literal> bits
+set in its flags parameter, and the first call will have <literal>DCMD_LOOPFIRST</literal> set.</para>
+</sect2><sect2 id="api-44"><title><function>mdb_walk_dcmd</function></title><programlisting>int mdb_walk_dcmd(const char *wname, const char *dcname, int argc,
+			const mdb_arg_t *argv);</programlisting><para><indexterm><primary><function>mdb_walk_dcmd</function></primary></indexterm>Initiate a global walk using the walker specified by <replaceable>wname</replaceable>, and invoke the dcmd specified by <replaceable>dcname</replaceable> with
+the specified <replaceable>argc</replaceable> and <replaceable>argv</replaceable> at
+each step.  This function returns 0 for success, or -1 for error. The function
+fails if the walker itself returns a fatal error, if the specified walker
+name or dcmd name is not known to the debugger, or if the dcmd itself returns <literal>DCMD_ABORT</literal> or <literal>DCMD_USAGE</literal> to the walker. The walker
+name and dcmd name can each be scoped using the backquote (<literal>`</literal>)
+operator if there are naming conflicts.  When invoked from <function>mdb_walk_dcmd</function>, the dcmd will have the <literal>DCMD_LOOP</literal> and <literal>DCMD_ADDRSPEC</literal> bits set in its flags parameter, and the first call will have <literal>DCMD_LOOPFIRST</literal> set.</para>
+</sect2><sect2 id="api-45"><title><function>mdb_call_dcmd</function></title><programlisting>int mdb_call_dcmd(const char *name, uintptr_t addr, uint_t flags, 
+			int argc, const mdb_arg_t *argv);</programlisting><para><indexterm><primary><function>mdb_call_dcmd</function></primary></indexterm>Invoke the specified dcmd name with the given parameters.  The
+dot variable is reset to <replaceable>addr</replaceable>, and <replaceable>addr</replaceable>, <replaceable>flags</replaceable>, <replaceable>argc</replaceable>, and <replaceable>argv</replaceable> are
+passed to the dcmd.  The function returns 0 for success, or -1 for error.
+The function fails if the dcmd returns <literal>DCMD_ERR</literal>, <literal>DCMD_ABORT</literal>, or <literal>DCMD_USAGE</literal>, or if the specified dcmd name
+is not known to the debugger.  The dcmd name can be scoped using the backquote
+(<literal>`</literal>) operator if there are naming conflicts.</para>
+</sect2><sect2 id="api-46"><title><function>mdb_layered_walk</function></title><programlisting>int mdb_layered_walk(const char *name, mdb_walk_state_t *wsp);</programlisting><para><indexterm><primary><function>mdb_layered_walk</function></primary></indexterm>Layer the walk denoted by <replaceable>wsp</replaceable> on top
+of a walk initiated using the specified walker <replaceable>name</replaceable>.
+The name can be scoped using the backquote (<literal>`</literal>) operator
+if there are naming conflicts. Layered walks can be used, for example, to
+facilitate constructing walkers for data structures that are embedded in other
+data structures. </para><para>For example, suppose that each CPU structure in the kernel contains
+a pointer to an embedded structure. To write a walker for the embedded structure
+type, you could replicate the code to iterate over CPU structures and dereference
+the appropriate member of each CPU structure, or you could layer the embedded
+structure's walker on top of the existing CPU walker.</para><para>The <function>mdb_layered_walk</function> function is used from within
+a walker's init routine to add a new layer to the current walk.  The underlying
+layer is initialized as part of the call to <function>mdb_layered_walk</function>.
+The calling walk routine passes in a pointer to its current walk state; this
+state is used to construct the layered walk. Each layered walk is cleaned
+up after the caller's walk fini function is called.  If more than one layer
+is added to a walk, the caller's walk step function will step through each
+element returned by the first layer, then the second layer, and so forth.</para><para>The <function>mdb_layered_walk</function> function returns 0 for success,
+or -1 for error. The function fails if the specified walker name is not known
+to the debugger, if the <replaceable>wsp</replaceable> pointer is not a valid,
+active walk state pointer, if the layered walker itself fails to initialize,
+or if the caller attempts to layer the walker on top of itself.</para>
+</sect2><sect2 id="api-37"><title><function>mdb_add_walker</function></title><programlisting>int mdb_add_walker(const mdb_walker_t *w);</programlisting><para><indexterm><primary><function>mdb_add_walker</function></primary></indexterm>Register a new walker with the debugger. The walker is added to
+the module's namespace, and to the debugger's global namespace according to
+the name resolution rules described in <olink targetptr="syntax-13" remap="internal">Dcmd and
+Walker Name Resolution</olink>. This function returns 0 for success, or -1
+for error if the given walker name is already registered by this module, or
+if the walker structure <replaceable>w</replaceable> is improperly constructed.
+The information in the <structfield>mdb_walker_t</structfield> <replaceable>w</replaceable> is
+copied to internal debugger structures, so the caller can reuse or free this
+structure after the call to <function>mdb_add_walker</function>.         
+        </para>
+</sect2><sect2 id="api-36"><title><function>mdb_remove_walker</function></title><programlisting>int mdb_remove_walker(const char *name);</programlisting><para><indexterm><primary><function>mdb_remove_walker</function></primary></indexterm>Remove the walker with the specified <replaceable>name</replaceable>.
+This function returns 0 for success, or -1 for error. The walker is removed
+from the current module's namespace. The function fails if the walker name
+is unknown, or is registered only in another module's namespace. The <function>mdb_remove_walker</function> function can be used to remove walkers that were added dynamically
+using <function>mdb_add_walker</function>, or walkers that were added statically
+as part of the module's linkage structure. The scoping operator cannot be
+used in the walker name; it is not legal for the caller of <function>mdb_remove_walker</function> to attempt to remove a walker exported by a different module.</para>
+</sect2><sect2 id="api-35"><title><function>mdb_vread</function> and <function>mdb_vwrite</function></title><programlisting>ssize_t mdb_vread(void *buf, size_t nbytes, uintptr_t addr);
+ssize_t mdb_vwrite(const void *buf, size_t nbytes, uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_vread</function></primary></indexterm><indexterm><primary><function>mdb_vwrite</function></primary></indexterm>These functions
+provide the ability to read and write data from a given target virtual address,
+specified by the <replaceable>addr</replaceable> parameter. The <function>mdb_vread</function> function returns <replaceable>nbytes</replaceable> for success,
+or -1 for error; if a read is truncated because only a portion of the data
+can be read from the specified address, -1 is returned. The <function>mdb_vwrite</function> function
+returns the number of bytes actually written upon success; -1 is returned
+upon error.</para>
+</sect2><sect2 id="api-59"><title><function>mdb_fread</function> and <function>mdb_fwrite</function></title><programlisting>ssize_t mdb_fread(void *buf, size_t nbytes, uintptr_t addr);
+ssize_t mdb_fwrite(const void *buf, size_t nbytes, uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_fread</function></primary></indexterm><indexterm><primary><function>mdb_fwrite</function></primary></indexterm>These functions
+provide the ability to read and write data from the object file location corresponding
+to the given target virtual address, specified by the <literal>addr</literal> parameter.
+ The <function>mdb_fread</function> function returns <literal>nbytes</literal> for
+success, or -1 for error; if a read is truncated because only a portion of
+the data can be read from the specified address, -1 is returned.  The <function>mdb_fwrite</function> function returns the number of bytes actually written upon success;
+-1 is returned upon error.</para>
+</sect2><sect2 id="api-34"><title><function>mdb_pread</function> and <function>mdb_pwrite</function></title><programlisting>ssize_t mdb_pread(void *buf, size_t nbytes, uint64_t addr);
+ssize_t mdb_pwrite(const void *buf, size_t nbytes, uint64_t addr);</programlisting><para><indexterm><primary><function>mdb_pread</function></primary></indexterm><indexterm><primary><function>mdb_pwrite</function></primary></indexterm>These functions
+provide the ability to read and write data from a given target physical address,
+specified by the <replaceable>addr</replaceable> parameter. The <function>mdb_pread</function> function returns <replaceable>nbytes</replaceable> for success,
+or -1 for error; if a read is truncated because only a portion of the data
+can be read from the specified address, -1 is returned. The <function>mdb_pwrite</function> function
+returns the number of bytes actually written upon success; -1 is returned
+upon error.</para>
+</sect2><sect2 id="api-33"><title><function>mdb_readstr</function></title><programlisting>ssize_t mdb_readstr(char *s, size_t nbytes, uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_readstr</function></primary></indexterm>The <function>mdb_readstr</function> function reads a null-terminated C string beginning
+at the target virtual address <replaceable>addr</replaceable> into the buffer
+addressed by <replaceable>s</replaceable>. The size of the buffer is specified
+by <replaceable>nbytes</replaceable>. If the string is longer than can fit
+in the buffer, the string is truncated to the buffer size and a null byte
+is stored at <literal>s[nbytes - 1]</literal>. The length of the string stored
+in <replaceable>s</replaceable> (not including the terminating null byte)
+is returned upon success; otherwise -1 is returned to indicate an error.</para>
+</sect2><sect2 id="api-32"><title><function>mdb_writestr</function></title><programlisting>ssize_t mdb_writestr(const char *s, uintptr_t addr);</programlisting><para><indexterm><primary><function>mdb_writestr</function></primary></indexterm>The <function>mdb_writestr</function> function writes a null-terminated
+C string from <replaceable>s</replaceable> (including the trailing null byte)
+to the target's virtual address space at the address specified by <replaceable>addr</replaceable>. The number of bytes written (not including the terminating
+null byte) is returned upon success; otherwise, -1 is returned to indicate
+an error.</para>
+</sect2><sect2 id="api-47"><title><function>mdb_readsym</function></title><programlisting>ssize_t mdb_readsym(void *buf, size_t nbytes, const char *name);</programlisting><para><indexterm><primary><function>mdb_readsym</function></primary></indexterm><function>mdb_readsym</function> is similar to <function>mdb_vread</function>, except
+that the virtual address at which reading begins is obtained from the value
+of the symbol specified by <replaceable>name</replaceable>. If no symbol by
+that name is found or a read error occurs, -1 is returned; otherwise <replaceable>nbytes</replaceable> is returned for success. </para><para>The caller can first look up the symbol separately if it is necessary
+to distinguish between symbol lookup failure and read failure. The primary
+executable's symbol table is used for the symbol lookup; if the symbol resides
+in another symbol table, you must first apply <function>mdb_lookup_by_obj</function>,
+then <function>mdb_vread</function>.</para>
+</sect2><sect2 id="api-30"><title><function>mdb_writesym</function></title><programlisting>ssize_t mdb_writesym(const void *buf, size_t nbytes, const char *name);</programlisting><para><indexterm><primary><function>mdb_writesym</function></primary></indexterm><function>mdb_writesym</function> is identical to <function>mdb_vwrite</function>, except that the virtual address at which writing begins is obtained
+from the value of the symbol specified by name. If no symbol by that name
+is found, -1 is returned. Otherwise, the number of bytes successfully written
+is returned on success, and -1 is returned on error. The primary executable's
+symbol table is used for the symbol lookup; if the symbol resides in another
+symbol table, you must first apply <function>mdb_lookup_by_obj</function>,
+then <function>mdb_vwrite</function>.</para>
+</sect2><sect2 id="api-29"><title><function>mdb_readvar</function> and <function>mdb_writevar</function></title><programlisting>ssize_t mdb_readvar(void *buf, const char *name);
+ssize_t mdb_writevar(const void *buf, const char *name);</programlisting><para><indexterm><primary><function>mdb_readvar</function></primary></indexterm><indexterm><primary><function>mdb_writevar</function></primary></indexterm><function>mdb_readvar</function> is similar to <function>mdb_vread</function>, except that the
+virtual address at which reading begins and the number of bytes to read are
+obtained from the value and size of the symbol specified by <replaceable>name</replaceable>.
+ If no symbol by that name is found, -1 is returned. The symbol size (the
+number of bytes read) is returned on success; -1 is returned on error. This
+is useful for reading well-known variables whose sizes are fixed. For example:</para><programlisting>				int hz; 	/* system clock rate */
+				mdb_readvar(&amp;hz, "hz");</programlisting><para>The caller can first look up the symbol separately if it is necessary
+to distinguish between symbol lookup failure and read failure.  The caller
+must also carefully check the definition of the symbol of interest in order
+to make sure that the local declaration is the exact same type as the target's
+definition. For example, if the caller declares an <literal>int</literal>,
+and the symbol of interest is actually a <literal>long</literal>, and the
+debugger is examining a 64-bit kernel target, <function>mdb_readvar</function> copies
+back 8 bytes to the caller's buffer, corrupting the 4 bytes following the
+storage for the <literal>int</literal>.</para><para><function>mdb_writevar</function> is identical to <function>mdb_vwrite</function>,
+except that the virtual address at which writing begins and the number of
+bytes to write are obtained from the value and size of the symbol specified
+by name.  If no symbol by that name is found, -1 is returned. Otherwise, the
+number of bytes successfully written is returned on success, and -1 is returned
+on error.</para><para>For both functions, the primary executable's symbol table is used for
+the symbol lookup; if the symbol resides in another symbol table, you must
+first apply <function>mdb_lookup_by_obj</function>, then <function>mdb_vread</function> or <function>mdb_vwrite</function>.</para>
+</sect2><sect2 id="api-28"><title><function>mdb_lookup_by_name</function> and <function>mdb_lookup_by_obj</function></title><programlisting>int mdb_lookup_by_name(const char *name, GElf_Sym *sym);
+int mdb_lookup_by_obj(const char *object, const char *name, GElf_Sym *sym);</programlisting><para><indexterm><primary><function>mdb_lookup_by_name</function></primary></indexterm><indexterm><primary><function>mdb_lookup_by_obj</function></primary></indexterm>Look up the specified symbol name and copy the ELF symbol information
+into the <structfield>GElf_Sym</structfield> pointed to by <replaceable>sym</replaceable>.
+If the symbol is found, the function returns 0; otherwise, -1 is returned.
+The <replaceable>name</replaceable> parameter specifies the symbol name. The <replaceable>object</replaceable> parameter tells the debugger where to look for the symbol.
+For the <function>mdb_lookup_by_name</function> function, the object file
+defaults to <literal>MDB_OBJ_EXEC</literal>. For <function>mdb_lookup_by_obj</function>,
+the object name should be one of the following:</para><variablelist termlength="narrow"><varlistentry><term><literal>MDB_OBJ_EXEC</literal></term><listitem><para><indexterm><primary><literal>MDB_OBJ_EXEC</literal></primary></indexterm>Look in the executable's symbol table (<literal>.symtab</literal> section).
+For kernel crash dumps, this corresponds to the symbol table from the <literal>unix.X</literal> file or from <literal>/dev/ksyms</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OBJ_RTLD</literal></term><listitem><para><indexterm><primary><literal>MDB_OBJ_RTLD</literal></primary></indexterm>Look in the runtime link-editor's symbol table. For kernel crash
+dumps, this corresponds to the symbol table for the <literal>krtld</literal> module.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OBJ_EVERY</literal></term><listitem><para><indexterm><primary><literal>MDB_OBJ_EVERY</literal></primary></indexterm>Look in all known symbol tables. For kernel crash dumps, this
+includes the <literal>.symtab</literal> and <literal>.dynsym</literal> sections
+from the  <literal>unix.X</literal> file or <literal>/dev/ksyms</literal>,
+as well as per-module symbol tables if these have been processed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>object</literal></term><listitem><para>If the name of a particular load object is explicitly specified,
+the search is restricted to the symbol table of this object. The object can
+be named according to the naming convention for load objects described in <olink targetptr="syntax-16" remap="internal">Symbol Name Resolution</olink>.       </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="api-48"><title><function>mdb_lookup_by_addr</function></title><programlisting>int mdb_lookup_by_addr(uintptr_t addr, uint_t flag, char *buf,
+				size_t len, GElf_Sym *sym);</programlisting><para><indexterm><primary><function>mdb_lookup_by_addr</function></primary></indexterm>Locate the symbol corresponding to the specified address and copy
+the ELF symbol information into the <structfield>GElf_Sym</structfield> pointed
+to by <replaceable>sym</replaceable> and the symbol name into the character
+array addressed by <replaceable>buf</replaceable>. If a corresponding symbol
+is found, the function returns 0; otherwise -1 is returned.</para><para>The flag parameter specifies the lookup mode and should be one of the
+following:</para><variablelist termlength="narrow"><varlistentry><term><literal>MDB_SYM_FUZZY</literal></term><listitem><para><indexterm><primary><literal>MDB_SYM_FUZZY</literal></primary></indexterm>Allow fuzzy matching to take place, based on the current symbol
+distance setting. The symbol distance can be controlled using the <command>::set</command> <option>s</option> built-in. If an explicit symbol distance has been set (absolute
+mode), the address can match a symbol if the distance from the symbol's value
+to the address does not exceed the absolute symbol distance. If smart mode
+is enabled (symbol distance = 0), then the address can match the symbol if
+it is in the range [symbol value, symbol value + symbol size).      </para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_SYM_EXACT</literal></term><listitem><para><indexterm><primary><literal>MDB_SYM_EXACT</literal></primary></indexterm>Disallow fuzzy matching. The symbol can match only the address
+if the symbol value exactly equals the specified address.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>If a symbol match occurs, the name of the symbol is copied into the <replaceable>buf</replaceable> supplied by the caller. The <replaceable>len</replaceable> parameter
+specifies the length of this buffer in bytes. The caller's <replaceable>buf</replaceable> should
+be at least of size <literal>MDB_SYM_NAMLEN</literal> bytes. The debugger
+copies the name to this buffer and appends a trailing null byte. If the name
+length exceeds the length of the buffer, the name is truncated but always
+includes a trailing null byte.</para>
+</sect2><sect2 id="api-26"><title><function>mdb_getopts</function></title><programlisting>int mdb_getopts(int argc, const mdb_arg_t *argv, ...);</programlisting><para><indexterm><primary><function>mdb_getopts</function></primary></indexterm>Parse
+and process options and option arguments from the specified argument array
+(<replaceable>argv</replaceable>). The <replaceable>argc</replaceable> parameter
+denotes the length of the argument array. This function processes each argument
+in order, and stops and returns the array index of the first argument that
+could not be processed. If all arguments are processed successfully,
+<replaceable>argc</replaceable> is returned.</para><para>Following the <replaceable>argc</replaceable> and
+<replaceable>argv</replaceable> parameters,
+the <function>mdb_getopts</function> function accepts a variable list of arguments
+describing the options that are expected to appear in the <replaceable>argv</replaceable> array.
+ Each option is described by an option letter (<literal>char</literal> argument),
+an option type (<literal>uint_t</literal> argument), and one or two additional
+arguments, as shown in the table below. The list of option arguments is terminated
+with a NULL argument.  The type should be one of one of the following:</para><variablelist termlength="medium"><varlistentry><term><literal>MDB_OPT_SETBITS</literal></term><listitem><para>The option will <literal>OR</literal> the specified bits into
+a flag word. The option is described by these parameters:</para><para><literal>char c, uint_t type, uint_t bits, uint_t *p</literal></para><para><indexterm><primary><literal>MDB_OPT_SETBITS</literal></primary></indexterm>If type is <literal>MDB_OPT_SETBITS</literal> and option
+<replaceable>c</replaceable> is detected in the <replaceable>argv</replaceable> list, the
+debugger will <literal>OR</literal> bits into the integer referenced by pointer
+<replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OPT_CLRBITS</literal></term><listitem><para>The option clears the specified bits from a flag word. The
+option is described by these parameters:</para><para><literal>char c, uint_t type, uint_t bits, uint_t *p</literal></para><para><indexterm><primary><literal>MDB_OPT_CLRBITS</literal></primary></indexterm>If type is <literal>MDB_OPT_CLRBITS</literal> and option
+<replaceable>c</replaceable> is detected in the <replaceable>argv</replaceable> list, the
+debugger clears bits from the integer referenced by pointer <replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OPT_STR</literal></term><listitem><para>The option accepts a string argument. The option is described
+by these parameters:</para><para><literal>char c, uint_t type, const char **p</literal></para><para><indexterm><primary><literal>MDB_OPT_STR</literal></primary></indexterm>If
+type is <literal>MDB_OPT_STR</literal> and option <replaceable>c</replaceable> is
+detected in the <replaceable>argv</replaceable> list, the debugger stores
+a pointer to the string argument following <replaceable>c</replaceable> in
+the pointer referenced by <replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OPT_UINTPTR</literal></term><listitem><para>The option accepts a <literal>uintptr_t</literal> argument.
+The option is described by these parameters:</para><para><literal>char c, uint_t type, uintptr_t *p</literal></para><para><indexterm><primary><literal>MDB_OPT_UINTPTR</literal></primary></indexterm>If type is <literal>MDB_OPT_UINTPTR</literal> and option c is
+detected in the <replaceable>argv</replaceable> list, the debugger stores
+the integer argument following <replaceable>c</replaceable> in the <literal>uintptr_t</literal> referenced by <replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OPT_UINTPTR_SET</literal></term><listitem><para>The option accepts a <literal>uintptr_t</literal> argument.
+ The option is described by these parameters:</para><para><literal>char c, uint_t type, boolean_t *flag, uintptr_t *p</literal></para><para>If type is <literal>MDB_OPT_UINTPTR_SET</literal> and option
+<replaceable>c</replaceable> is detected in the <replaceable>argv</replaceable> list, the
+debugger stores the value '1' (TRUE) into the <literal>boolean_t</literal> referenced
+by <replaceable>flag</replaceable>, and the integer argument following
+<replaceable>c</replaceable> in the <literal>uintptr_t</literal> referenced by
+<replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_OPT_UINT64</literal></term><listitem><para>The option accepts a <literal>uint64_t</literal> argument.
+The option is described by these parameters:</para><para><literal>char c, uint_t type, uint64_t *p</literal></para><para><indexterm><primary><literal>MDB_OPT_UINT64</literal></primary></indexterm>If type is <literal>MDB_OPT_UINT64</literal> and option
+<replaceable>c</replaceable> is detected in the <replaceable>argv</replaceable> list, the
+debugger stores the integer argument following <replaceable>c</replaceable> in
+the <literal>uint64_t</literal> referenced by <replaceable>p</replaceable>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For example, the following source code:</para><programlisting>int
+dcmd(uintptr_t addr, uint_t flags, int argc, const mdb_arg_t *argv)
+{
+        uint_t opt_v = FALSE;
+        const char *opt_s = NULL;
+
+        if (mdb_getopts(argc, argv,
+            'v', MDB_OPT_SETBITS, TRUE, &amp;opt_v,
+            's', MDB_OPT_STR, &amp;opt_s, NULL) != argc)
+                return (DCMD_USAGE);
+
+        /* ... */
+}</programlisting><para>demonstrates how <function>mdb_getopts</function> might be used in a
+dcmd to accept a boolean option &ldquo;<option>v</option>&rdquo; that sets
+the <replaceable>opt_v</replaceable> variable to TRUE, and an option &ldquo;<option>s</option>&rdquo; that accepts a string argument that is stored in the
+<replaceable>opt_s</replaceable> variable. The <function>mdb_getopts</function> function
+also automatically issues warning messages if it detects an invalid option
+letter or missing option argument before returning to the caller. The storage
+for argument strings and the <replaceable>argv</replaceable> array is automatically
+garbage-collected by the debugger upon completion of the dcmd.</para>
+</sect2><sect2 id="api-25"><title><function>mdb_strtoull</function></title><programlisting>u_longlong_t mdb_strtoull(const char *s);</programlisting><para><indexterm><primary><function>mdb_strtoull</function></primary></indexterm>Convert the specified string <replaceable>s</replaceable> to an <literal>unsigned long long</literal> representation. This function is intended for
+use in processing and converting string arguments in situations where <function>mdb_getopts</function> is not appropriate. If the string argument cannot be converted
+to a valid integer representation, the function fails by printing an appropriate
+error message and aborting the dcmd. Therefore, error checking code is not
+required. The string can be prefixed with any of the valid base specifiers
+(0i, 0I, 0o, 0O, 0t, 0T, 0x, or 0X); otherwise, it is interpreted using the
+default base. The function will fail and abort the dcmd if any of the characters
+in <replaceable>s</replaceable> are not appropriate for the base, or if integer
+overflow occurs.</para>
+</sect2><sect2 id="api-24"><title><function>mdb_alloc</function>, <function>mdb_zalloc</function> and <function>mdb_free</function></title><programlisting>void *mdb_alloc(size_t size, uint_t flags);
+void *mdb_zalloc(size_t size, uint_t flags);
+void mdb_free(void *buf, size_t size);</programlisting><para><indexterm><primary><function>mdb_alloc</function></primary></indexterm><indexterm><primary><function>mdb_zalloc</function></primary></indexterm><indexterm><primary><function>mdb_free</function></primary></indexterm><function>mdb_alloc</function> allocates
+<replaceable>size</replaceable> bytes of debugger memory and returns a pointer to the allocated
+memory. The allocated memory is at least double-word aligned, so it can hold
+any C data structure.  No greater alignment can be assumed. The
+<replaceable>flags</replaceable> parameter should be the bitwise <literal>OR</literal> of one
+or more of the following values:</para><variablelist termlength="narrow"><varlistentry><term><literal>UM_NOSLEEP</literal></term><listitem><para><indexterm><primary><literal>UM_NOSLEEP</literal></primary></indexterm>If sufficient memory to fulfill the request is not immediately
+available, return NULL to indicate failure. The caller must check for NULL
+and handle this case appropriately.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>UM_SLEEP</literal></term><listitem><para><indexterm><primary><literal>UM_SLEEP</literal></primary></indexterm>If sufficient memory to fulfill the request is not immediately
+available, sleep until such time as the request can be fulfilled. As a result, <literal>UM_SLEEP</literal> allocations are guaranteed to succeed. The caller need
+not check for a NULL return value.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>UM_GC</literal></term><listitem><para><indexterm><primary><literal>UM_GC</literal></primary></indexterm>Garbage-collect allocation automatically at the end of this debugger
+command. The caller should not subsequently call <function>mdb_free</function> on
+this block, as the debugger will take care of deallocation automatically.
+ All memory allocation from within a dcmd must use <literal>UM_GC</literal> so
+that if the dcmd is interrupted by the user, the debugger can garbage-collect
+the memory.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><function>mdb_zalloc</function> is like <function>mdb_alloc</function>,
+but the allocated memory is filled with zeroes before returning it to the
+caller. No guarantees are made about the initial contents of memory returned
+by <function>mdb_alloc</function>.  <function>mdb_free</function> is used
+to free previously allocated memory (unless it was allocated <literal>UM_GC</literal>).
+ The buffer address and size must exactly match the original allocation. It
+is not legal to free only a portion of an allocation with <function>mdb_free</function>.
+It is not legal to free an allocation more than once. An allocation of zero
+bytes always returns NULL; freeing a NULL pointer with size zero always succeeds.</para>
+</sect2><sect2 id="api-18"><title><function>mdb_printf</function></title><programlisting>void mdb_printf(const char *format, ...);</programlisting><para><indexterm><primary><function>mdb_printf</function></primary></indexterm>Print
+formatted output using the specified format string and arguments. Module writers
+should use <function>mdb_printf</function> for all output, except for warning
+and error messages. This function automatically triggers the built-in output
+pager when appropriate. The <function>mdb_printf</function> function is similar
+to <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>,
+with certain exceptions: the <literal>%C</literal>, <literal>%S</literal>,
+and <literal>%ws</literal> specifiers for wide character strings are not supported,
+the <literal>%f</literal> floating-point format is not supported, the <literal>%e</literal>, <literal>%E</literal>, <literal>%g</literal>, and <literal>%G</literal> specifiers
+for alternative double formats produce only a single style of output, and
+precision specifications of the form <literal>%.n</literal> are not supported.
+The list of specifiers that are supported follows:</para><sect3 id="api-23"><title>Flag Specifiers</title><indexterm><primary>flag specifiers</primary>
+</indexterm><variablelist termlength="xtranarrow"><varlistentry><term><literal>%#</literal></term><listitem><para>If the <literal>#</literal> sign is found in the format string,
+this selects the alternate form of the given format.  Not all formats have
+an alternate form; the alternate form is different depending on the format.
+Refer to the format descriptions below for details on the alternate format.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%+</literal></term><listitem><para>When printing signed values, always display the sign (prefix
+with either '+' or '-').  Without <literal>%+</literal>, positive values have
+no sign prefix, and negative values have a '-' prefix prepended to them.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%-</literal></term><listitem><para>Left-justify the output within the specified field width.
+If the width of the output is less than the specified field width, the output
+will be padded with blanks on the right-hand side. Without <literal>%-</literal>,
+values are right-justified by default.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%0</literal></term><listitem><para>Zero-fill the output field if the output is right-justified
+and the width of the output is less than the specified field width. Without <literal>%0</literal>, right-justified values are prepended with blanks in order to
+fill the field.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="api-19"><title>Field Width Specifiers</title><indexterm><primary>field width specifiers</primary>
+</indexterm><variablelist termlength="xtranarrow"><varlistentry><term><literal>%n</literal></term><listitem><para>Field width is set to the specified decimal value.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%?</literal></term><listitem><para>Field width is set to the maximum width of a hexadecimal pointer
+value. This is 8 in an ILP32 environment, and 16 in an LP64 environment.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%*</literal></term><listitem><para>Field width is set to the value specified at the current position
+in the argument list. This value is assumed to be an <literal>int</literal>.
+Note that in the 64-bit compilation environment, it may be necessary to cast <literal>long</literal> values to <literal>int</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="api-20"><title>Integer Specifiers</title><indexterm><primary>integer specifiers</primary>
+</indexterm><variablelist termlength="xtranarrow"><varlistentry><term><literal>%h</literal></term><listitem><para>Integer value to be printed is a <literal>short</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%l</literal></term><listitem><para>Integer value to be printed is a <literal>long</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%ll</literal></term><listitem><para>Integer value to be printed is a <literal>long long</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="api-22"><title>Terminal Attribute Specifiers</title><indexterm><primary>terminal attribute specifiers</primary>
+</indexterm><para>If standard output for the debugger is a terminal, and terminal attributes
+can be obtained by the terminfo database, the following terminal escape constructs
+can be used:</para><variablelist termlength="xtranarrow"><varlistentry><term><literal>%&lt;n&gt;</literal></term><listitem><para>Enable the terminal attribute corresponding to <replaceable>n</replaceable>.
+Only a single attribute can be enabled with each instance of <literal>%&lt;&gt;</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%&lt;/n&gt;</literal></term><listitem><para>Disable the terminal attribute corresponding to <replaceable>n</replaceable>.
+Note that in the case of reverse video, dim text, and bold text, the terminal
+codes to disable these attributes might be identical. Therefore, it might
+not be possible to disable these attributes independently of one another.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>If no terminal information is available, each terminal attribute construct
+is ignored by <function>mdb_printf</function>. For more information on terminal
+attributes, see <olink targetdoc="refman4" targetptr="terminfo-4" remap="external"><citerefentry><refentrytitle>terminfo</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.
+The available terminfo attributes are:</para><variablelist termlength="xtranarrow"><varlistentry><term><literal>a</literal></term><listitem><para>Alternate character set</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>b</literal></term><listitem><para>Bold text</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>d</literal></term><listitem><para>Dim text</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>r</literal></term><listitem><para>Reverse video</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>s</literal></term><listitem><para>Best standout capability</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>u</literal></term><listitem><para>Underlining</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="api-21"><title>Format Specifiers</title><indexterm><primary>format specifiers</primary>
+</indexterm><variablelist termlength="xtranarrow"><varlistentry><term><literal>%%</literal></term><listitem><para>The '<literal>%</literal>' symbol is printed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%a</literal></term><listitem><para>Prints an address in symbolic form. The minimum size of the
+value associated with <literal>%a</literal> is a <literal>uintptr_t</literal>;
+specifying <literal>%la</literal> is not necessary. If address-to-symbol conversion
+is on, the debugger will attempt to convert the address to a symbol name followed
+by an offset in the current output radix and print this string; otherwise,
+the value is printed in the default output radix.  If <literal>%#a</literal> is
+used, the alternate format adds a '<literal>:</literal>' suffix to the output.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%A</literal></term><listitem><para>This format is identical to <literal>%a</literal>, except
+when an address cannot be converted to a symbol name plus an offset, nothing
+is printed. If <literal>%#A</literal> is used, the alternate format prints
+a '<literal>?</literal>' when address conversion fails.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%b</literal></term><listitem><para><indexterm><primary><structname>mdb_bitmask_t</structname></primary></indexterm>Decode and print a bit field in symbolic form. This specifier
+expects two consecutive arguments: the bit field value (<literal>int</literal> for <literal>%b</literal>, <literal>long</literal> for <literal>%lb</literal>, and so forth),
+and a pointer to an array of <structname>mdb_bitmask_t</structname> structures:</para><programlisting>typedef struct mdb_bitmask {
+		const char *bm_name;       /* String name to print */
+		u_longlong_t bm_mask;      /* Mask for bits */
+		u_longlong_t bm_bits;      /* Result for value &amp; mask */
+} mdb_bitmask_t;</programlisting><para>The array should be terminated by a structure whose <literal>bm_name</literal> field
+is set to NULL. When <literal>%b</literal> is used, the debugger reads the
+value argument, then iterates through each <structname>mdb_bitmask</structname> structure
+checking to see if:</para><para><literal>(value &amp; bitmask-&gt;bm_mask) == bitmask-&gt;bm_bits</literal></para><para>If this expression is true, the <literal>bm_name</literal> string is
+printed. Each string printed is separated by a comma. The following example
+shows how <literal>%b</literal> can be used to decode the <literal>t_flag</literal> field
+in a <literal>kthread_t</literal>:</para><programlisting>const mdb_bitmask_t t_flag_bits[] = {
+		{ "T_INTR_THREAD", T_INTR_THREAD, T_INTR_THREAD },
+		{ "T_WAKEABLE", T_WAKEABLE, T_WAKEABLE },
+		{ "T_TOMASK", T_TOMASK, T_TOMASK },
+		{ "T_TALLOCSTK", T_TALLOCSTK, T_TALLOCSTK },
+			...
+		{ NULL, 0, 0 }
+};
+
+void
+thr_dump(kthread_t *t)
+{
+		mdb_printf("t_flag = &lt;%hb&gt;\n", t-&gt;t_flag, t_flag_bits);
+
+		...
+}</programlisting><para>If <literal>t_flag</literal> was set to 0x000a, the function would print:</para><programlisting>t_flag = &lt;T_WAKEABLE,T_TALLOCSTK&gt;</programlisting><para>If <literal>%#b</literal> is specified, the union of all bits that were
+not matched by an element in the bitmask array is printed as a hexadecimal
+value following the decoded names. </para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%c</literal></term><listitem><para>Print the specified integer as an ASCII character.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%d</literal></term><listitem><para>Print the specified integer as a signed decimal value. Same
+as <literal>%i</literal>. If <literal>%#d</literal> is specified, the alternate
+format prefixes the value with '<literal>0t</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%e</literal></term><listitem><para>Print the specified double in the floating-point format <?Pub
+_nolinebreak?><literal>[+/-]d.ddddddde[+/-]dd</literal><?Pub /_nolinebreak?>,
+where there is one digit before the radix character, seven digits of precision,
+and at least two digits following the exponent.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%E</literal></term><listitem><para>Print the specified double using the same rules as <literal>%e</literal>,
+except that the exponent character will be '<literal>E</literal>' instead
+of '<literal>e</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%g</literal></term><listitem><para>Print the specified double in the same floating-point format
+as <literal>%e</literal>, but with sixteen digits of precision. If <literal>%llg</literal> is
+specified, the argument is expected to be of type <type>long double</type> (quad-precision
+floating-point value).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%G</literal></term><listitem><para>Print the specified double using the same rules as <literal>%g</literal>,
+except that the exponent character will be '<literal>E</literal>' instead
+of '<literal>e</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%i</literal></term><listitem><para>Print the specified integer as a signed decimal value. Same
+as <literal>%d</literal>. If <literal>%#i</literal> is specified, the alternate
+format prefixes the value with '<literal>0t</literal>'. </para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%I</literal></term><listitem><para>Print the specified 32-bit unsigned integer as an Internet
+IPv4 address in dotted-decimal format (for example, the hexadecimal value <literal>0xffffffff</literal> would print as <literal>255.255.255.255</literal>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%m</literal></term><listitem><para>Print a margin of whitespace. If no field is specified, the
+default output margin width is used; otherwise, the field width determines
+the number of characters of white space that are printed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%o</literal></term><listitem><para>Print the specified integer as an unsigned octal value. If <literal>%#o</literal> is used, the alternate format prefixes the output with '<literal>0</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%p</literal></term><listitem><para>Print the specified pointer (<literal>void *</literal>) as
+a hexadecimal value.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%q</literal></term><listitem><para>Print the specified integer as a signed octal value. If <literal>%#o</literal> is used, the alternate format prefixes the output with '<literal>0</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%r</literal></term><listitem><para>Print the specified integer as an unsigned value in the current
+output radix. The user can change the output radix using the <command>$d</command> dcmd.
+If <literal>%#r</literal> is specified, the alternate format prefixes the
+value with the appropriate base prefix: '<literal>0i</literal>' for binary,
+'<literal>0o</literal>' for octal, '<literal>0t</literal>' for decimal, or
+'<literal>0x</literal>' for hexadecimal.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%R</literal></term><listitem><para>Print the specified integer as a signed value in the current
+output radix. If <literal>%#R</literal> is specified, the alternate format
+prefixes the value with the appropriate base prefix.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%s</literal></term><listitem><para>Print the specified string (<literal>char *</literal>). If
+the string pointer is NULL, the string '<literal>&lt;NULL&gt;</literal>' is printed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%t</literal></term><listitem><para>Advance one or more tab stops. If no width is specified, output
+advances to the next tab stop; otherwise the field width determines how many
+tab stops are advanced.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%T</literal></term><listitem><para>Advance the output column to the next multiple of the field
+width. If no field width is specified, no action is taken. If the current
+output column is not a multiple of the field width, white space is added to
+advance the output column.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%u</literal></term><listitem><para>Print the specified integer as an unsigned decimal value.
+If <literal>%#u</literal> is specified, the alternate format prefixes the
+value with '<literal>0t</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%x</literal></term><listitem><para>Print the specified integer as a hexadecimal value. The characters
+a-f are used as the digits for the values 10-15. If <literal>%#x</literal> is
+specified, the alternate format prefixes the value with '<literal>0x</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%X</literal></term><listitem><para>Print the specified integer as a hexadecimal value. The characters
+A-F are used as the digits for the values 10-15. If <literal>%#X</literal> is
+specified, the alternate format prefixes the value with '<literal>0X</literal>'.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>%Y</literal></term><listitem><para>The specified <literal>time_t</literal> is printed as the
+string  '<literal>year month day HH:MM:SS</literal>'.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="api-17"><title><function>mdb_snprintf</function></title><programlisting>size_t mdb_snprintf(char *buf, size_t len, const char *format, ...);</programlisting><para><indexterm><primary><function>mdb_snprintf</function></primary></indexterm>Construct a formatted string based on the specified format string
+and arguments, and store the resulting string into the specified
+<replaceable>buf</replaceable>. The <function>mdb_snprintf</function> function accepts the
+same format specifiers and arguments as the <function>mdb_printf</function> function.
+The <replaceable>len</replaceable> parameter specifies the size of
+<replaceable>buf</replaceable> in bytes.  No more than <replaceable>len</replaceable> - 1
+formatted bytes are placed in <replaceable>buf</replaceable>; <function>mdb_snprintf</function>  always terminates <replaceable>buf</replaceable> with a null
+byte. The function returns the number of bytes required for the complete formatted
+string, not including the terminating null byte. If the <replaceable>buf</replaceable> parameter
+is NULL and <replaceable>len</replaceable> is set to zero, the function will
+not store any characters to <replaceable>buf</replaceable> and returns the
+number of bytes required for the complete formatted string; this technique
+can be used to determine the appropriate size of a buffer for dynamic memory
+allocation.</para>
+</sect2><sect2 id="api-16"><title><function>mdb_warn</function></title><programlisting>void mdb_warn(const char *format, ...);</programlisting><para><indexterm><primary><function>mdb_warn</function></primary></indexterm>Print
+an error or warning message to standard error. The <function>mdb_warn</function> function
+accepts a format string and variable argument list that can contain any of
+the specifiers documented for <function>mdb_printf</function>. However, the
+output of <function>mdb_warn</function> is sent to standard error, which is
+not buffered and is not sent through the output pager or processed as part
+of a dcmd pipeline.  All error messages are automatically prefixed with the
+string &ldquo;<literal>mdb:</literal>&rdquo;.  </para><para>In addition, if the <replaceable>format</replaceable> parameter does
+not contain a newline (<literal>\n</literal>) character, the format string
+is implicitly suffixed with the string <?Pub _nolinebreak?>&ldquo;<literal>:
+%s\n</literal>&rdquo;,<?Pub /_nolinebreak?> where <literal>%s</literal> is
+replaced by the error message string corresponding to the last error recorded
+by a module API function. For example, the following source code:</para><programlisting>if (mdb_lookup_by_name("no_such_symbol", &amp;sym) == -1)
+       mdb_warn("lookup_by_name failed");</programlisting><para>produces this output:</para><programlisting>mdb: lookup_by_name failed: unknown symbol name</programlisting>
+</sect2><sect2 id="api-56"><title><function>mdb_flush</function></title><programlisting>void mdb_flush(void);</programlisting><para><indexterm><primary><function>mdb_flush</function></primary></indexterm>Flush
+all currently buffered output. Normally, <literal>mdb</literal>'s standard
+output is line-buffered; output generated using <function>mdb_printf</function> is
+not flushed to the terminal (or other standard output destination) until a
+newline is encountered, or at the end of the current dcmd. However, in some
+situations you might want to explicitly flush standard output prior to printing
+a newline; <function>mdb_flush</function> can be used for this purpose.</para>
+</sect2><sect2 id="api-60"><title><function>mdb_nhconvert</function></title><programlisting>void mdb_nhconvert(void *dst, const void *src, size_t nbytes);</programlisting><para><indexterm><primary><function>mdb_nhconvert</function></primary></indexterm>Convert a sequence of <literal>nbytes</literal> bytes stored at
+the address specified by <literal>src</literal> from network byte order to
+host byte order and store the result at the address specified by <literal>dst</literal>.
+ The <literal>src</literal> and <literal>dst</literal> parameters may be the
+same, in which case the object is converted in place.  This function may be
+used to convert from host order to network order or from network order to
+host order, since the conversion is the same in either case.</para>
+</sect2><sect2 id="api-61"><title><function>mdb_dumpptr</function> and <function>mdb_dump64</function></title><programlisting>int mdb_dumpptr(uintptr_t addr, size_t nbytes, uint_t flags,
+                     mdb_dumpptr_cb_t func, void *data);
+int mdb_dump64(uint64_t addr, uint64_t nbytes, uint_t flags,
+                     mdb_dump64_cb_t func, void *data);</programlisting><para><indexterm><primary><function>mdb_dumpptr</function></primary></indexterm><indexterm><primary><function>mdb_dump64</function></primary></indexterm>These functions
+can be used to generate formatted hexadecimal and ASCII       data dumps that
+are printed to standard output.  Each function accepts an <literal>addr</literal> parameter
+specifying the starting location, a <literal>nbytes</literal> parameter specifying
+the number of bytes to display, a set of flags described below, a func callback
+function to use to read the data to display, and a data parameter that is
+passed to each invocation of the callback func as its last argument.  The
+functions are identical in every regard except that <literal>mdb_dumpptr</literal> uses <literal>uintptr_t</literal> for its address parameters and <literal>mdb_dump64</literal> uses <literal>uint64_t</literal>.  This distinction is useful when combining <literal>mdb_dump64</literal> with <literal>mdb_pread</literal>, for example.  The built-in <command>::dump</command> dcmd uses these functions to perform its data display.</para><para>The flags parameter should be the bitwise OR of one or more of the following
+values:</para><variablelist><varlistentry><term><literal>MDB_DUMP_RELATIVE</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_RELATIVE</literal></primary></indexterm>Number lines relative to the start address instead of with the
+explicit address of each line.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_ALIGN</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_ALIGN</literal></primary></indexterm>Align the output at a paragraph boundary.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_PEDANT</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_PEDANT</literal></primary></indexterm>Display full-width addresses instead of truncating the address
+to fit the output in 80 columns.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_ASCII</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_ASCII</literal></primary></indexterm>Display ASCII values next to the hexadecimal data.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_HEADER</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_HEADER</literal></primary></indexterm>Display a header line about the data.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_TRIM</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_TRIM</literal></primary></indexterm>Only read from and display the contents of the specified addresses,
+instead of reading and printing entire lines.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_SQUISH</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_SQUISH</literal></primary></indexterm>Elide repeated lines by placing a &ldquo;*&rdquo; on a line that
+is a repeat of the previous line.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_NEWDOT</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_NEWDOT</literal></primary></indexterm>Update the value of dot to the address beyond the last address
+read by the function.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_ENDIAN</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_ENDIAN</literal></primary></indexterm>Adjust for endianness.  This option assumes that the word size
+is equal to the current group size, specified by <function>MDB_DUMP_GROUP</function>.
+ This option will always turn off alignment, headers, and ASCII display to
+avoid confusing output.  If <literal>MDB_DUMP_TRIM</literal> is set with <literal>MDB_DUMP_ENDIAN</literal>, the number of bytes dumped will be rounded down
+to the nearest word size bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_WIDTH(</literal><replaceable>width</replaceable><literal>)</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_WIDTH</literal></primary></indexterm>Increase the number of 16-byte paragraphs per line that are displayed.
+ The default value of <replaceable>width</replaceable> is one, and the maximum
+value is 16.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>MDB_DUMP_GROUP(</literal><replaceable>group</replaceable><literal>)</literal></term><listitem><para><indexterm><primary><literal>MDB_DUMP_GROUP</literal></primary></indexterm>Set the byte group size to <replaceable>group</replaceable>. 
+The default <replaceable>group</replaceable> size is four bytes.  The
+<replaceable>group</replaceable> size must be a power of two that divides the line width.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="api-15"><title><function>mdb_one_bit</function></title><programlisting>const char *mdb_one_bit(int width, int bit, int on);</programlisting><para><indexterm><primary><function>mdb_one_bit</function></primary></indexterm>The <function>mdb_one_bit</function> function can be used to print a graphical representation
+of a bit field in which a single bit of interest is turned on or off. This
+function is useful for creating verbose displays of bit fields similar to
+the output from <literal>snoop(1M) -v</literal>.  For example, the following
+source code:</para><programlisting>#define FLAG_BUSY       0x1
+
+uint_t flags;
+
+/* ... */
+
+mdb_printf("%s = BUSY\n", mdb_one_bit(8, 0, flags &amp; FLAG_BUSY));</programlisting><para>produces this output:</para><programlisting>.... ...1 = BUSY</programlisting><para>Each bit in the bit field is printed as a period (<literal>.</literal>),
+with each 4-bit sequence separated by a white space. The bit of interest is
+printed as 1 or 0, depending on the setting of the <replaceable>on</replaceable> parameter.
+The total <replaceable>width</replaceable> of the bit field in bits is specified
+by the width parameter, and the bit position of the bit of interest is specified
+by the <replaceable>bit</replaceable> parameter. Bits are numbered starting
+from zero. The function returns a pointer to an appropriately sized, null-terminated
+string containing the formatted bit representation.  The string is automatically
+garbage-collected upon completion of the current dcmd.</para>
+</sect2><sect2 id="api-14"><title><function>mdb_inval_bits</function></title><programlisting>const char *mdb_inval_bits(int width, int start, int stop);</programlisting><para><indexterm><primary><function>mdb_inval_bits</function></primary></indexterm>The <function>mdb_inval_bits</function> function is used, along
+with <function>mdb_one_bit</function>, to print a graphical representation
+of a bit field. This function marks a sequence of bits as invalid or reserved
+by displaying an '<literal>x</literal>' at the appropriate bit location. Each
+bit in the bit field is represented as a period (<literal>.</literal>), except
+for those bits in the range of bit positions specified by the start and stop
+parameters. Bits are numbered starting from zero. For example, the following
+source code:</para><programlisting>mdb_printf("%s = reserved\n", mdb_inval_bits(8, 7, 7));</programlisting><para>produces this output:</para><programlisting>x... .... = reserved</programlisting><para>The function returns a pointer to an appropriately sized, null-terminated
+string containing the formatted bit representation. The string is automatically
+garbage-collected upon completion of the current dcmd.</para>
+</sect2><sect2 id="api-13"><title><function>mdb_inc_indent</function> and <function>mdb_dec_indent</function></title><programlisting>ulong_t mdb_inc_indent(ulong_t n);
+ulong_t mdb_dec_indent(ulong_t n);</programlisting><para><indexterm><primary><function>mdb_inc_indent</function></primary></indexterm><indexterm><primary><function>mdb_dec_indent</function></primary></indexterm>These functions increment and decrement the numbers of columns
+that MDB will auto-indent with white space before printing a line of output.
+The size of the delta is specified by <replaceable>n</replaceable>, a number
+of columns. Each function returns the previous absolute value of the indent.
+Attempts to decrement the indent below zero have no effect. Following a call
+to either function, subsequent calls to <function>mdb_printf</function> are
+indented appropriately. If the dcmd completes or is forcibly terminated by
+the user, the indent is restored automatically to its default setting by the
+debugger.</para>
+</sect2><sect2 id="api-12"><title><function>mdb_eval</function></title><programlisting>int mdb_eval(const char *s);</programlisting><para><indexterm><primary><function>mdb_eval</function></primary></indexterm>Evaluate
+and execute the specified command string <replaceable>s</replaceable>, as
+if it had been read from standard input by the debugger. This function returns
+0 for success, or -1 for error.  <function>mdb_eval</function> fails if the
+command string contains a syntax error, or if the command string executed
+by <function>mdb_eval</function> is forcibly aborted by the user using the
+pager or by issuing an interrupt.</para>
+</sect2><sect2 id="api-49"><title><function>mdb_set_dot</function> and <function>mdb_get_dot</function></title><programlisting>void mdb_set_dot(uintmax_t dot);
+uintmax_t mdb_get_dot(void);</programlisting><para><indexterm><primary><function>mdb_set_dot</function></primary></indexterm><indexterm><primary><function>mdb_get_dot</function></primary></indexterm>Set or get
+the current value of dot (the &ldquo;<literal>.</literal>&rdquo; variable).
+ Module developers might want to reposition dot so that, for example, it refers
+to the address following the last address read by the dcmd.</para>
+</sect2><sect2 id="api-50"><title><function>mdb_get_pipe</function></title><programlisting>void mdb_get_pipe(mdb_pipe_t *p);</programlisting><para><indexterm><primary><function>mdb_get_pipe</function></primary></indexterm>Retrieve the contents of the pipeline input buffer for the current
+dcmd. The <function>mdb_get_pipe</function> function is intended to be used
+by dcmds that want to consume the complete set of pipe input and execute only
+once, instead of being invoked repeatedly by the debugger for each pipe input
+element. Once <function>mdb_get_pipe</function> is invoked, the dcmd will
+not be invoked again by the debugger as part of the current command. This
+can be used, for example, to construct a dcmd that sorts a set of input values. </para><para>The pipe contents are placed in an array that is garbage-collected upon
+termination of the dcmd, and the array pointer is stored in <literal>p-&gt;pipe_data</literal>.  The length of the array is placed in <literal>p-&gt;pipe_len</literal>.
+ If the dcmd was not executed on the right-hand side of a pipeline (that is,
+the <literal>DCMD_PIPE</literal> flag was not set in its <literal>flags</literal> parameter), <literal>p-&gt;pipe_data</literal> is set to NULL and <literal>p-&gt;pipe_len</literal> is
+set to zero.</para>
+</sect2><sect2 id="api-51"><title><function>mdb_set_pipe</function></title><programlisting>void mdb_set_pipe(const mdb_pipe_t *p);</programlisting><para>Set the pipeline output buffer to the contents described by the pipe
+structure <replaceable>p</replaceable>. The pipe values are placed in the
+array <literal>p-&gt;pipe_data</literal>, and the length of the array is stored
+in <literal>p-&gt;pipe_len</literal>.  The debugger makes its own copy of this
+information, so the caller must remember to free <literal>p-&gt;pipe_data</literal> if
+necessary. If the pipeline output buffer was previously non-empty, its contents
+are replaced by the new array. If the dcmd was not executed on the left side
+of a pipeline (that is, the <literal>DCMD_PIPE_OUT</literal> flag was not
+set in its flags parameter), this function has no effect.</para>
+</sect2><sect2 id="api-52"><title><function>mdb_get_xdata</function></title><programlisting>ssize_t mdb_get_xdata(const char *name, void *buf, size_t nbytes);</programlisting><para><indexterm><primary><function>mdb_get_xdata</function></primary></indexterm><indexterm><primary>dcmds</primary><secondary sortas="xdata"><command>::xdata</command></secondary></indexterm>Read the contents of the target external
+data buffer specified by name into the buffer specified by <replaceable>buf</replaceable>.
+The size of <replaceable>buf</replaceable> is specified by the
+<replaceable>nbytes</replaceable> parameter; no more than <replaceable>nbytes</replaceable> will
+be copied to the caller's buffer. The total number of bytes read will be returned
+upon success; -1 will be returned upon error. If the caller wants to determine
+the size of a particular named buffer, <replaceable>buf</replaceable> should
+be specified as NULL and <replaceable>nbytes</replaceable> should be specified
+as zero. In this case, <function>mdb_get_xdata</function> will return the
+total size of the buffer in bytes but no data will be read. External data
+buffers provide module writers access to target data that is not otherwise
+accessible through the module API. The set of named buffers exported by the
+current target can be viewed using the <command>::xdata</command> built-in
+dcmd.</para>
+</sect2><sect2 id="api-57"><title>Additional Functions</title><para><indexterm><primary>string functions</primary></indexterm>Additionally,
+module writers can use the following <olink targetdoc="refman3a" targetptr="string-3c" remap="external"><citerefentry><refentrytitle>string</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> and <olink targetdoc="refman3a" targetptr="bstring-3c" remap="external"><citerefentry><refentrytitle>bstring</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> functions.  They are guaranteed
+to have the same semantics as the functions described in the corresponding
+Solaris man page.</para><programlisting>strcat()           strcpy()                strncpy()
+strchr()           strrchr()               strcmp()
+strncmp()          strcasecmp()            strncasecmp()
+strlen()           bcmp()                  bcopy()
+bzero()            bsearch()               qsort()</programlisting>
+</sect2>
+</sect1>
+</chapter><?Pub *0000090588 0?>

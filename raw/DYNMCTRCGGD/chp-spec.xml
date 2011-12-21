@@ -1,0 +1,345 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-spec"><title>Speculative Tracing</title><highlights><para>This chapter discusses the DTrace facility for <firstterm>speculative
+tracing</firstterm>, the ability to tentatively trace data and then later
+decide whether to <firstterm>commit</firstterm> the data to a tracing buffer
+or <firstterm>discard</firstterm> it. In DTrace, the primary mechanism for
+filtering out uninteresting events is the <firstterm>predicate</firstterm> mechanism,
+discussed in <olink targetptr="chp-prog" remap="internal">Chapter&nbsp;4, D Program Structure</olink>.
+Predicates are useful when you know at the time that a probe fires whether
+or not the probe event is of interest. For example, if you are only interested
+in activity associated with a certain process or a certain file descriptor,
+you know when the probe fires if it is associated with the process or file
+descriptor of interest. However, in other situations, you might not know whether
+a given probe event is of interest until some time <emphasis>after</emphasis> the
+probe fires.</para><para>For example, if a system call is occasionally failing with a common
+error code (for example, <literal>EIO</literal> or <literal>EINVAL</literal>),
+you might want to examine the code path leading to the error condition. To
+capture the code path, you could enable every probe &mdash; but only if the
+failing call can be isolated in such a way that a meaningful predicate can
+be constructed. If the failures are sporadic or nondeterministic, you would
+be forced to trace all events that <emphasis>might</emphasis> be interesting,
+and later postprocess the data to filter out the ones that were not associated
+with the failing code path. In this case, even though the number of interesting
+events may be reasonably small, the number of events that must be traced is
+very large, making postprocessing difficult.</para><para>You can use the speculative tracing facility in these situations to
+tentatively trace data at one or more probe locations, and then decide to
+commit the data to the principal buffer at another probe location. As a result,
+your trace data contains only the output of interest, no postprocessing is
+required, and the DTrace overhead is minimized.</para>
+</highlights><sect1 id="chp-spec-1"><title>Speculation Interfaces</title><para><indexterm><primary>speculation</primary></indexterm>The following table
+describes the DTrace speculation functions:</para><table frame="topbot" id="tbl-specfuncs"><title>DTrace Speculation Functions</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="1.00in"/><colspec colwidth="0.50in"/><colspec colwidth="3.50in"/><thead><row rowsep="1"><entry><para>Function Name</para>
+</entry><entry><para>Args</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>speculation</literal></para>
+</entry><entry><para>None</para>
+</entry><entry><para>Returns an identifier for a new speculative buffer</para>
+</entry>
+</row><row><entry><para><literal>speculate</literal></para>
+</entry><entry><para>ID</para>
+</entry><entry><para>Denotes that the remainder of the clause should be traced to the speculative
+buffer specified by ID</para>
+</entry>
+</row><row><entry><para><literal>commit</literal></para>
+</entry><entry><para>ID</para>
+</entry><entry><para>Commits the speculative buffer associated with ID</para>
+</entry>
+</row><row><entry><para><literal>discard</literal></para>
+</entry><entry><para>ID</para>
+</entry><entry><para>Discards the speculative buffer associated with ID</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="chp-spec-2"><title>Creating a Speculation</title><para><indexterm><primary>speculation</primary><secondary>creating</secondary></indexterm><indexterm><primary><function>speculation</function> function</primary></indexterm>The <function>speculation</function> function allocates a speculative
+buffer, and returns a speculation identifier. The speculation identifier should
+be used in subsequent calls to the <function>speculate</function> function.
+Speculative buffers are a finite resource: if no speculative buffer is available
+when <function>speculation</function> is called, an ID of zero is returned
+and a corresponding DTrace error counter is incremented. An ID of zero is
+always invalid, but may be passed to <function>speculate</function>, <function>commit</function> or <function>discard</function>. If a call to <function>speculation</function> fails,
+a <command>dtrace</command> message similar to the following example is generated:</para><screen>dtrace: 2 failed speculations (no speculative buffer space available)</screen><para>The number of speculative buffers defaults to one, but may be optionally
+tuned higher. See <olink targetptr="chp-spec-7" remap="internal">Speculation Options and Tuning</olink> for
+more information.</para>
+</sect1><sect1 id="chp-spec-3"><title>Using a Speculation</title><para><indexterm><primary>speculation</primary><secondary>use</secondary></indexterm>To use a speculation, an identifier returned from <function>speculation</function> must be passed to the <function>speculate</function> function
+in a clause <emphasis>before</emphasis> any data-recording actions. All subsequent
+data-recording actions in a clause containing a <function>speculate</function> will
+be speculatively traced. The D compiler will generate a compile-time error
+if a call to <function>speculate</function> follows data recording actions
+in a D probe clause. Therefore, clauses may contain speculative tracing or
+non-speculative tracing requests, but not both.</para><para>Aggregating actions, destructive actions, and the <literal>exit</literal> action
+may never be speculative. Any attempt to take one of these actions in a clause
+containing a <function>speculate</function> results in a compile-time error.
+A <function>speculate</function> may not follow a <function>speculate</function>:
+only one speculation is permitted per clause. A clause that contains <emphasis>only</emphasis> a <function>speculate</function> will speculatively trace the
+default action, which is defined to trace only the enabled probe ID. See <olink targetptr="chp-actsub" remap="internal">Chapter&nbsp;10, Actions and Subroutines</olink> for
+a description of the default action.</para><para>Typically, you assign the result of <function>speculation</function> to
+a thread-local variable and then use that variable as a subsequent predicate
+to other probes as well as an argument to <function>speculate</function>.
+For example:</para><programlisting>syscall::open:entry
+{
+	self-&gt;spec = speculation();
+}
+
+syscall:::
+/self-&gt;spec/
+{
+	speculate(self-&gt;spec);
+	printf("this is speculative");
+}</programlisting>
+</sect1><sect1 id="chp-spec-4"><title>Committing a Speculation</title><para><indexterm><primary>speculation</primary><secondary>committing</secondary></indexterm>You commit speculations using the <function>commit</function> function.
+When a speculative buffer is committed, its data is copied into the principal
+buffer. If there is more data in the specified speculative buffer than there
+is available space in the principal buffer, no data is copied and the drop
+count for the buffer is incremented. If the buffer has been speculatively
+traced to on more than one CPU, the speculative data on the committing CPU
+is copied immediately, while speculative data on other CPUs is copied some
+time after the <function>commit</function>. Thus, some time might elapse between
+a <function>commit</function> beginning on one CPU and the data being copied
+from speculative buffers to principal buffers on all CPUs. This time is guaranteed
+to be no longer than the time dictated by the cleaning rate. See <olink targetptr="chp-spec-7" remap="internal">Speculation Options and Tuning</olink> for more details.</para><para>A committing speculative buffer will not be made available to subsequent <function>speculation</function> calls until each per-CPU speculative buffer has been
+completely copied into its corresponding per-CPU principal buffer. Similarly,
+subsequent calls to <function>speculate</function> to the committing buffer
+will be silently discarded, and subsequent calls to <function>commit</function> or <function>discard</function> will silently fail. Finally, a clause containing a <function>commit</function> cannot contain a data recording action, but a clause may contain
+multiple <function>commit</function> calls to commit disjoint buffers.</para>
+</sect1><sect1 id="chp-spec-5"><title>Discarding a Speculation</title><para><indexterm><primary>speculation</primary><secondary>discarding</secondary></indexterm>You discard speculations using the <function>discard</function> function.
+When a speculative buffer is discarded, its contents are thrown away. If the
+speculation has only been active on the CPU calling <function>discard</function>,
+the buffer is immediately available for subsequent calls to <function>speculation</function>. If the speculation has been active on more than one CPU, the
+discarded buffer will be available for subsequent <function>speculation</function> some
+time after the call to <function>discard</function>. The time between a <function>discard</function> on one CPU and the buffer being made available for subsequent
+speculations is guaranteed to be no longer than the time dictated by the cleaning
+rate. If, at the time <function>speculation</function> is called, no buffer
+is available because <emphasis>all</emphasis> speculative buffers are currently
+being discarded or committed, a<command>dtrace</command> message similar to
+the following example is generated:</para><screen>dtrace: 905 failed speculations (available buffer(s) still busy)</screen><para>The likelihood of all buffers being unavailable can be reduced by tuning
+the number of speculation buffers or the cleaning rate. See <olink targetptr="chp-spec-7" remap="internal">Speculation Options and Tuning</olink>, for details.</para>
+</sect1><sect1 id="chp-spec-6"><title>Speculation Example</title><para><indexterm><primary>speculation</primary><secondary>example of use</secondary></indexterm><indexterm><primary>examples</primary><secondary>speculation</secondary></indexterm>One potential use for speculations is to highlight a particular
+code path. The following example shows the entire code path under the <olink targetdoc="refman2" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call only when the <function>open</function> fails:</para><example id="ex-specopen.d"><title><filename>specopen.d</filename>: Code Flow
+for Failed <citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></title><programlisting>#!/usr/sbin/dtrace -Fs
+
+syscall::open:entry,
+syscall::open64:entry
+{
+	/*
+	 * The call to speculation() creates a new speculation.  If this fails,
+	 * dtrace(1M) will generate an error message indicating the reason for
+	 * the failed speculation(), but subsequent speculative tracing will be
+	 * silently discarded.
+	 */
+	self-&gt;spec = speculation();
+	speculate(self-&gt;spec);
+
+	/*
+	 * Because this printf() follows the speculate(), it is being 
+	 * speculatively traced; it will only appear in the data buffer if the
+	 * speculation is subsequently commited.
+	 */
+	printf("%s", stringof(copyinstr(arg0)));
+}
+
+fbt:::
+/self-&gt;spec/
+{
+	/*
+	 * A speculate() with no other actions speculates the default action:
+	 * tracing the EPID.
+	 */
+	speculate(self-&gt;spec);
+}
+
+syscall::open:return,
+syscall::open64:return
+/self-&gt;spec/
+{
+	/*
+	 * To balance the output with the -F option, we want to be sure that
+	 * every entry has a matching return.  Because we speculated the
+	 * open entry above, we want to also speculate the open return.
+	 * This is also a convenient time to trace the errno value.
+	 */
+	speculate(self-&gt;spec);
+	trace(errno);
+}
+
+syscall::open:return,
+syscall::open64:return
+/self-&gt;spec &amp;&amp; errno != 0/
+{
+	/*
+	 * If errno is non-zero, we want to commit the speculation.
+	 */
+	commit(self-&gt;spec);
+	self-&gt;spec = 0;
+}
+
+syscall::open:return,
+syscall::open64:return
+/self-&gt;spec &amp;&amp; errno == 0/
+{
+	/*
+	 * If errno is not set, we discard the speculation.
+	 */
+	discard(self-&gt;spec);
+	self-&gt;spec = 0;
+}</programlisting>
+</example><para>Running the above script produces output similar to the following example:</para><screen><userinput># ./specopen.d</userinput>
+dtrace: script './specopen.d' matched 24282 probes
+CPU FUNCTION                                 
+  1  =&gt; open                                  /var/ld/ld.config
+  1    -&gt; open                                
+  1      -&gt; copen                             
+  1        -&gt; falloc                          
+  1          -&gt; ufalloc                       
+  1            -&gt; fd_find                     
+  1              -&gt; mutex_owned               
+  1              &lt;- mutex_owned               
+  1            &lt;- fd_find                     
+  1            -&gt; fd_reserve                  
+  1              -&gt; mutex_owned               
+  1              &lt;- mutex_owned               
+  1              -&gt; mutex_owned               
+  1              &lt;- mutex_owned               
+  1            &lt;- fd_reserve                  
+  1          &lt;- ufalloc                       
+  1          -&gt; kmem_cache_alloc              
+  1            -&gt; kmem_cache_alloc_debug      
+  1              -&gt; verify_and_copy_pattern   
+  1              &lt;- verify_and_copy_pattern   
+  1              -&gt; file_cache_constructor    
+  1                -&gt; mutex_init              
+  1                &lt;- mutex_init              
+  1              &lt;- file_cache_constructor    
+  1              -&gt; tsc_gethrtime             
+  1              &lt;- tsc_gethrtime             
+  1              -&gt; getpcstack                
+  1              &lt;- getpcstack                
+  1              -&gt; kmem_log_enter            
+  1              &lt;- kmem_log_enter            
+  1            &lt;- kmem_cache_alloc_debug      
+  1          &lt;- kmem_cache_alloc              
+  1          -&gt; crhold                        
+  1          &lt;- crhold                        
+  1        &lt;- falloc                          
+  1        -&gt; vn_openat                       
+  1          -&gt; lookupnameat                  
+  1            -&gt; copyinstr                   
+  1            &lt;- copyinstr                   
+  1            -&gt; lookuppnat                  
+  1              -&gt; lookuppnvp                
+  1                -&gt; pn_fixslash             
+  1                &lt;- pn_fixslash             
+  1                -&gt; pn_getcomponent         
+  1                &lt;- pn_getcomponent         
+  1                -&gt; ufs_lookup              
+  1                  -&gt; dnlc_lookup           
+  1                    -&gt; bcmp                
+  1                    &lt;- bcmp                
+  1                  &lt;- dnlc_lookup           
+  1                  -&gt; ufs_iaccess           
+  1                    -&gt; crgetuid            
+  1                    &lt;- crgetuid            
+  1                    -&gt; groupmember         
+  1                      -&gt; supgroupmember    
+  1                      &lt;- supgroupmember
+  1                    &lt;- groupmember         
+  1                  &lt;- ufs_iaccess           
+  1                &lt;- ufs_lookup              
+  1                -&gt; vn_rele                 
+  1                &lt;- vn_rele                 
+  1                -&gt; pn_getcomponent         
+  1                &lt;- pn_getcomponent         
+  1                -&gt; ufs_lookup              
+  1                  -&gt; dnlc_lookup           
+  1                    -&gt; bcmp                
+  1                    &lt;- bcmp                
+  1                  &lt;- dnlc_lookup           
+  1                  -&gt; ufs_iaccess           
+  1                    -&gt; crgetuid            
+  1                    &lt;- crgetuid            
+  1                  &lt;- ufs_iaccess           
+  1                &lt;- ufs_lookup              
+  1                -&gt; vn_rele                 
+  1                &lt;- vn_rele                 
+  1                -&gt; pn_getcomponent         
+  1                &lt;- pn_getcomponent         
+  1                -&gt; ufs_lookup              
+  1                  -&gt; dnlc_lookup           
+  1                    -&gt; bcmp                
+  1                    &lt;- bcmp                
+  1                  &lt;- dnlc_lookup           
+  1                  -&gt; ufs_iaccess           
+  1                    -&gt; crgetuid            
+  1                    &lt;- crgetuid            
+  1                  &lt;- ufs_iaccess           
+  1                  -&gt; vn_rele               
+  1                  &lt;- vn_rele               
+  1                &lt;- ufs_lookup              
+  1                -&gt; vn_rele                 
+  1                &lt;- vn_rele                 
+  1              &lt;- lookuppnvp                
+  1            &lt;- lookuppnat                  
+  1          &lt;- lookupnameat                  
+  1        &lt;- vn_openat                       
+  1        -&gt; setf                            
+  1          -&gt; fd_reserve                    
+  1            -&gt; mutex_owned                 
+  1            &lt;- mutex_owned                 
+  1            -&gt; mutex_owned                 
+  1            &lt;- mutex_owned                 
+  1          &lt;- fd_reserve                    
+  1          -&gt; cv_broadcast                  
+  1          &lt;- cv_broadcast                  
+  1        &lt;- setf                            
+  1        -&gt; unfalloc                        
+  1          -&gt; mutex_owned                   
+  1          &lt;- mutex_owned                   
+  1          -&gt; crfree                        
+  1          &lt;- crfree                        
+  1          -&gt; kmem_cache_free               
+  1            -&gt; kmem_cache_free_debug       
+  1              -&gt; kmem_log_enter            
+  1              &lt;- kmem_log_enter            
+  1              -&gt; tsc_gethrtime             
+  1              &lt;- tsc_gethrtime             
+  1              -&gt; getpcstack                
+  1              &lt;- getpcstack                
+  1              -&gt; kmem_log_enter            
+  1              &lt;- kmem_log_enter
+  1              -&gt; file_cache_destructor     
+  1                -&gt; mutex_destroy           
+  1                &lt;- mutex_destroy           
+  1              &lt;- file_cache_destructor     
+  1              -&gt; copy_pattern              
+  1              &lt;- copy_pattern              
+  1            &lt;- kmem_cache_free_debug       
+  1          &lt;- kmem_cache_free               
+  1        &lt;- unfalloc                        
+  1        -&gt; set_errno                       
+  1        &lt;- set_errno                       
+  1      &lt;- copen                             
+  1    &lt;- open                                
+  1  &lt;= open                                          2</screen>
+</sect1><sect1 id="chp-spec-7"><title>Speculation Options and Tuning</title><para><indexterm><primary>speculative drops</primary></indexterm><indexterm><primary>speculation</primary><secondary>options</secondary></indexterm><indexterm><primary>speculation</primary><secondary>tuning</secondary></indexterm>If
+a speculative buffer is full when a speculative tracing action is attempted,
+no data is stored in the buffer and a drop count is incremented. If this situation,
+a <command>dtrace</command> message similar to the following example is generated:</para><screen>dtrace: 38 speculative drops</screen><para>Speculative drops will <emphasis>not</emphasis> prevent the full speculative
+buffer from being copied into the principal buffer when the buffer is committed.
+Similarly, speculative drops can occur even if drops were experienced on a
+speculative buffer that was ultimately discarded. Speculative drops can be
+reduced by increasing the speculative buffer size, which is tuned using the <literal>specsize</literal> option. The <literal>specsize</literal> option may be specified
+with any size suffix. The resizing policy of this buffer is dictated by the <literal>bufresize</literal> option.</para><para>Speculative buffers might be unavailable when <function>speculation</function> is
+called. If buffers exist that have not yet been committed or discarded, a <command>dtrace</command> message similar to the following example is generated:</para><screen>dtrace: 1 failed speculation (no speculative buffer available)</screen><para>You can reduce the likelihood of failed speculations of this nature
+by increasing the number of speculative buffers with the <literal>nspec</literal> option.
+The value of <literal>nspec</literal> defaults to one.</para><para>Alternatively, <function>speculation</function> may fail because all
+speculative buffers are busy. In this case, a <command>dtrace</command> message
+similar to the following example is generated:</para><screen>dtrace: 1 failed speculation (available buffer(s) still busy)</screen><para>This message indicates that <function>speculation</function> was called
+after <function>commit</function> was called for a speculative buffer, but
+before that buffer was actually committed on all CPUs. You can reduce the
+likelihood of failed speculations of this nature by increasing the rate at
+which CPUs are cleaned with the <literal>cleanrate</literal> option. The value
+of <literal>cleanrate</literal> defaults to <literal>101hz</literal>.</para><note><para>You must specify values for the <literal>cleanrate</literal> option in number-per-second. Use the <literal>hz</literal> suffix.</para>
+</note>
+</sect1>
+</chapter><?Pub *0000021994 0?>

@@ -1,0 +1,206 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="devaccess-3"><title>Device Access: Programmed I/O</title><highlights><para>The Solaris OS provides driver developers with a comprehensive set of
+interfaces for accessing device memory.  These interfaces are designed to
+shield the driver from platform-specific dependencies by handling mismatches
+between processor and device endianness as well as enforcing any data order
+dependencies the device might have.  By using these interfaces, you can develop
+a single-source driver that runs on both the SPARC and x86 processor architectures
+as well as the various platforms from each respective processor family.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="devaccess-20" remap="internal">Managing Differences in Device
+and Host Endianness</olink></para>
+</listitem><listitem><para><olink targetptr="devaccess-21" remap="internal">Managing Data Ordering Requirements</olink></para>
+</listitem><listitem><para><olink targetptr="devaccess-5" remap="internal">ddi_device_acc_attr Structure</olink></para>
+</listitem><listitem><para><olink targetptr="devaccess-6" remap="internal">Mapping Device Memory</olink></para>
+</listitem><listitem><para><olink targetptr="devaccess-22" remap="internal">Mapping Setup Example</olink></para>
+</listitem><listitem><para><olink targetptr="devaccess-27" remap="internal">Alternate Device Access Interfaces</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="devaccess-4"><title>Device Memory</title><para>Devices that support programmed I/O are assigned one or more regions
+of bus address space that map to addressable regions of the device. These
+mappings are described as pairs of values in the <literal>reg</literal> property
+associated with the device. Each value pair describes a segment of a bus address.</para><para>Drivers identify a particular bus address mapping by specifying the
+register number, or <literal>regspec</literal>,  which is an index into the
+devices' <literal>reg</literal> property. The <literal>reg</literal> property
+identifies the <literal>busaddr</literal> and <literal>size</literal> for
+the device. Drivers pass the register number when making calls to DDI functions
+such as <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. Drivers can determine how many mappable regions have
+been assigned to the device by calling <olink targetdoc="group-refman" targetptr="ddi-dev-nregs-9f" remap="external"><citerefentry><refentrytitle>ddi_dev_nregs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><sect2 id="devaccess-20"><title>Managing Differences in Device and Host Endianness</title><para>The data format of the host can have different endian characteristics
+than the data format of the device.  In such a case, data transferred between
+the host and device would need to be byte-swapped to conform to the data format
+requirements of the destination location.  Devices with the same endian characteristics
+of the host require no byte-swapping of the data.</para><para>Drivers specify the endian characteristics of the device by setting
+the appropriate flag in the <olink targetdoc="group-refman" targetptr="ddi-device-acc-attr-9s" remap="external"><citerefentry><refentrytitle>ddi_device_acc_attr</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+that is passed to <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The DDI
+framework then performs any required byte-swapping when the driver calls a <literal>ddi_get</literal><emphasis>X</emphasis> routine like <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or a <literal>ddi_put</literal><emphasis>X</emphasis> routine like <olink targetdoc="group-refman" targetptr="ddi-put16-9f" remap="external"><citerefentry><refentrytitle>ddi_put16</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to read or write to device
+memory.</para>
+</sect2><sect2 id="devaccess-21"><title>Managing Data Ordering Requirements</title><para>Platforms can reorder loads and stores of data to optimize performance
+of the platform.  Because reordering might not be allowed by certain devices,
+the driver is required to specify the device's ordering requirements when
+setting up mappings to the device.</para>
+</sect2><sect2 id="devaccess-5"><title><structname>ddi_device_acc_attr</structname> Structure</title><para><indexterm><primary><function>ddi_regs_map_setup</function> function</primary></indexterm>This structure describes the endian and data order requirements
+of the device.  The driver is required to initialize and pass this structure
+as an argument to <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><programlisting>typedef struct ddi_device_acc_attr {
+    ushort_t    devacc_attr_version;
+    uchar_t     devacc_attr_endian_flags;
+    uchar_t     devacc_attr_dataorder;
+} ddi_device_acc_attr_t;</programlisting><variablelist><varlistentry><term><structfield>devacc_attr_version</structfield></term><listitem><para>Specifies <literal>DDI_DEVICE_ATTR_V0</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devacc_attr_endian_flags</structfield></term><listitem><para>Describes the endian characteristics of the device. Specified
+as a bit value whose possible values are:</para><itemizedlist><listitem><para><literal>DDI_NEVERSWAP_ACC</literal> &ndash; Never swap data</para>
+</listitem><listitem><para><literal>DDI_STRUCTURE_BE_ACC</literal> &ndash; The device
+data format is big-endian</para>
+</listitem><listitem><para><literal>DDI_STRUCTURE_LE_ACC</literal> &ndash; The device
+data format is little-endian</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term><structfield>devacc_attr_dataorder</structfield></term><listitem><para>Describes the order in which the CPU must reference data as
+required by the device. Specified as an enumerated value, where data access
+restrictions are ordered from most strict to least strict.</para><itemizedlist><listitem><para><structfield>DDI_STRICTORDER_ACC</structfield> &ndash; The
+host must issue the references in order, as specified by the programmer. This
+flag is the default behavior.</para>
+</listitem><listitem><para><structfield>DDI_UNORDERED_OK_ACC</structfield> &ndash; The
+host is allowed to reorder loads and stores to device memory.</para>
+</listitem><listitem><para><structfield>DDI_MERGING_OK_ACC</structfield> &ndash; The
+host is allowed to merge individual stores to consecutive locations.  This
+setting also implies reordering.</para>
+</listitem><listitem><para><structfield>DDI_LOADCACHING_OK_ACC</structfield> &ndash;
+The host is allowed to read data from the device until a store occurs.</para>
+</listitem><listitem><para><structfield>DDI_STORECACHING_OK_ACC</structfield> &ndash;
+The host is allowed to cache data written to the device. The host can then
+defer writing the data to the device until a future time.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry>
+</variablelist><note><para>The system can access data more strictly than the driver specifies
+in <structfield>devacc_attr_dataorder</structfield>.  The restriction to the
+host diminishes while moving from strict data ordering to cache storing in
+terms of data accesses by the driver.</para>
+</note>
+</sect2><sect2 id="devaccess-6"><title>Mapping Device Memory</title><para>Drivers typically map all regions of a device during <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.  The driver
+maps a region of device memory by calling <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, specifying
+the register number of the region to map, the device access attributes for
+the region, an offset, and size.  The DDI framework sets up the mappings for
+the device region and returns an opaque handle to the driver. This data access
+handle is passed as an argument to the <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="ddi-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> family of
+routines when reading data from or writing data to that region of the device.</para><para>The driver verifies that the shape of the device mappings match what
+the driver is expecting by checking the number of mappings exported by the
+device. The driver calls <olink targetdoc="group-refman" targetptr="ddi-dev-nregs-9f" remap="external"><citerefentry><refentrytitle>ddi_dev_nregs</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and then verifies the size
+of each mapping by calling <olink targetdoc="group-refman" targetptr="ddi-dev-regsize-9f" remap="external"><citerefentry><refentrytitle>ddi_dev_regsize</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="devaccess-22"><title>Mapping Setup Example</title><para>The following simple example demonstrates the DDI data access interfaces.
+ This driver is for a fictional little endian device that accepts one character
+at a time and generates an interrupt when ready for another character.  This
+device implements two register sets: the first is an 8-bit CSR register, and
+the second is an 8-bit data register.</para><example id="devaccess-ex-24"><title>Mapping Setup</title><programlisting>#define CSR_REG 0
+#define DATA_REG 1
+/*
+ * Initialize the device access attributes for the register
+ * mapping
+ */
+dev_acc_attr.devacc_attr_version = DDI_DEVICE_ATTR_V0;
+dev_acc_attr.devacc_attr_endian_flags = DDI_STRUCTURE_LE_ACC;
+dev_acc_attr.devacc_attr_dataorder = DDI_STRICTORDER_ACC;
+/*
+ * Map in the csr register (register 0)
+ */
+if (ddi_regs_map_setup(dip, CSR_REG, (caddr_t *)&amp;(pio_p-&gt;csr), 0,
+  sizeof (Pio_csr), &amp;dev_acc_attr, &amp;pio_p-&gt;csr_handle) != DDI_SUCCESS) {
+    mutex_destroy(&amp;pio_p-&gt;mutex);
+    ddi_soft_state_free(pio_softstate, instance);
+    return (DDI_FAILURE);
+}
+/*
+ * Map in the data register (register 1)
+ */
+if (ddi_regs_map_setup(dip, DATA_REG, (caddr_t *)&amp;(pio_p-&gt;data), 0,
+  sizeof (uchar_t), &amp;dev_acc_attr, &amp;pio_p-&gt;data_handle) \
+  != DDI_SUCCESS) {
+    mutex_destroy(&amp;pio_p-&gt;mutex);
+    ddi_regs_map_free(&amp;pio_p-&gt;csr_handle);
+    ddi_soft_state_free(pio_softstate, instance);
+    return (DDI_FAILURE);
+}</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="devaccess-23"><title>Device Access Functions</title><para>Drivers use the <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> family of
+routines in conjunction with the handle returned by <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to transfer data to and from a device.  The DDI framework
+automatically handles any byte-swapping that is required to meet the endian
+format for the host or device, and enforces any store-ordering constraints
+the device might have.</para><para>The DDI provides interfaces for transferring data in 8-bit, 16-bit,
+32-bit, and 64-bit quantities, as well as interfaces for transferring multiple
+values repeatedly.  See the man pages for the <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-rep-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_rep_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-rep-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_rep_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> families of routines for a complete listing and description
+of these interfaces.</para><para>The following example builds on <olink targetptr="devaccess-ex-24" remap="internal">Example&nbsp;7&ndash;1</olink> where the driver mapped the device's CSR and data registers.  Here,
+the driver's <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point, when called, writes a buffer of data to the device one byte at a time.</para><example id="devaccess-ex-26"><title>Mapping Setup: Buffer</title><programlisting>static  int
+pio_write(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+    int  retval;
+    int  error = OK;
+    Pio *pio_p = ddi_get_soft_state(pio_softstate, getminor(dev));
+
+    if (pio_p == NULL)
+        return (ENXIO);
+    mutex_enter(&amp;pio_p-&gt;mutex);
+    /*
+     * enable interrupts from the device by setting the Interrupt
+     * Enable bit in the devices CSR register
+     */
+    ddi_put8(pio_p-&gt;csr_handle, pio_p-&gt;csr,
+      (ddi_get8(pio_p-&gt;csr_handle, pio_p-&gt;csr) | PIO_INTR_ENABLE));
+
+    while (uiop-&gt;uio_resid &gt; 0) {
+    /*
+     * This device issues an IDLE interrupt when it is ready
+     * to accept a character; the interrupt can be cleared
+     * by setting PIO_INTR_CLEAR.  The interrupt is reasserted
+     * after the next character is written or the next time
+     * PIO_INTR_ENABLE is toggled on.
+     *
+     * wait for interrupt (see pio_intr)
+     */
+        cv_wait(&amp;pio_p-&gt;cv, &amp;pio_p-&gt;mutex);
+
+    /*
+     * get a character from the user's write request
+     * fail the write request if any errors are encountered
+     */
+        if ((retval = uwritec(uiop)) == -1) {
+            error = retval;
+            break;
+        }
+
+    /*
+     * pass the character to the device by writing it to
+     * the device's data register
+     */
+        ddi_put8(pio_p-&gt;data_handle, pio_p-&gt;data, (uchar_t)retval);
+    }
+
+    /*
+     * disable interrupts by clearing the Interrupt Enable bit
+     * in the CSR
+     */
+    ddi_put8(pio_p-&gt;csr_handle, pio_p-&gt;csr,
+      (ddi_get8(pio_p-&gt;csr_handle, pio_p-&gt;csr) &amp; ~PIO_INTR_ENABLE));
+
+    mutex_exit(&amp;pio_p-&gt;mutex);
+    return (error);
+}</programlisting>
+</example><sect2 id="devaccess-27"><title>Alternate Device Access Interfaces</title><para>In addition to implementing all device accesses through the <olink targetdoc="group-refman" targetptr="ddi-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> families
+of interfaces, the Solaris OS provides interfaces that are specific to particular
+bus implementations.  While these functions can be more efficient on some
+platforms, use of these routines can limit the ability of the driver to remain
+portable across different bus versions of the device.</para><sect3 id="devaccess-28"><title>Memory Space Access</title><para>With memory mapped access, device registers appear in memory address
+space.  The <literal>ddi_get</literal><emphasis>X</emphasis> family of routines
+and the <literal>ddi_put</literal><emphasis>X</emphasis> family are available
+for use by drivers as an alternative to the standard device access interfaces.</para>
+</sect3><sect3 id="devaccess-29"><title>I/O Space Access</title><para>With I/O space access, the device registers appear in I/O space, where
+each addressable element is called an I/O port.  The <olink targetdoc="group-refman" targetptr="ddi-io-get8-9f" remap="external"><citerefentry><refentrytitle>ddi_io_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-io-put8-9f" remap="external"><citerefentry><refentrytitle>ddi_io_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines are available for
+use by drivers as an alternative to the standard device access interfaces.</para>
+</sect3><sect3 id="devaccess-30"><title>PCI Configuration Space Access</title><para>To access PCI configuration space without using the normal device access
+interfaces, a driver is required to map PCI configuration space by calling <olink targetdoc="group-refman" targetptr="pci-config-setup-9f" remap="external"><citerefentry><refentrytitle>pci_config_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> in place of <olink targetdoc="group-refman" targetptr="ddi-regs-map-setup-9f" remap="external"><citerefentry><refentrytitle>ddi_regs_map_setup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  The driver
+can then call the <olink targetdoc="group-refman" targetptr="pci-config-get8-9f" remap="external"><citerefentry><refentrytitle>pci_config_get8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pci-config-put8-9f" remap="external"><citerefentry><refentrytitle>pci_config_put8</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> families of interfaces to
+access PCI configuration space.</para>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000018288 0?>

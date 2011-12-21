@@ -1,0 +1,717 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part()part(title()partintro()chapter()?><chapter id="block-34861"><title>Drivers for Block Devices</title><highlights><para>This chapter describes the structure of block device drivers. The kernel
+views a block device as a set of randomly accessible logical blocks. The file
+system uses a list of <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structures
+to buffer the data blocks between a block device and the user space. Only
+block devices can support a file system.</para><para>This chapter provides information on the following subjects:</para><itemizedlist><listitem><para><olink targetptr="block-1" remap="internal">Block Driver Structure Overview</olink></para>
+</listitem><listitem><para><olink targetptr="block-82249" remap="internal">File I/O</olink></para>
+</listitem><listitem><para><olink targetptr="block-5" remap="internal">Block Device Autoconfiguration</olink></para>
+</listitem><listitem><para><olink targetptr="block-6" remap="internal">Controlling Device Access</olink></para>
+</listitem><listitem><para><olink targetptr="block-78892" remap="internal">Synchronous Data Transfers
+(Block Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="block-54698" remap="internal">Asynchronous Data Transfers
+(Block Drivers)</olink></para>
+</listitem><listitem><para><olink targetptr="block-25" remap="internal">dump() and print() Entry Points</olink></para>
+</listitem><listitem><para><olink targetptr="advanced-7" remap="internal">Disk Device Drivers</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="block-1"><title>Block Driver Structure Overview</title><para><olink targetptr="block-fig-3" remap="internal">Figure&nbsp;16&ndash;1</olink> shows
+data structures and routines that define the structure of a block device driver.
+Device drivers typically include the following elements:</para><itemizedlist><listitem><para>Device-loadable driver section</para>
+</listitem><listitem><para>Device configuration section</para>
+</listitem><listitem><para>Device access section</para>
+</listitem>
+</itemizedlist><para>The shaded device access section in the following figure illustrates
+entry points for block drivers.</para><figure id="block-fig-3"><title id="block-36477">Block Driver Roadmap</title><mediaobject><imageobject><imagedata entityref="block.view.epsi"/>
+</imageobject><textobject><simpara>Diagram shows structures and entry points for block device
+drivers.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><indexterm id="block-ix419"><primary>entry points</primary><secondary sortas="block">for block drivers</secondary></indexterm><indexterm id="block-ix420"><primary>entry points</primary><secondary sortas="block">for block drivers</secondary></indexterm><indexterm id="block-ix421"><primary>block driver entry points</primary></indexterm>Associated with each device driver
+is a <olink targetdoc="group-refman" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure,
+which in turn refers to a <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+See <olink targetptr="autoconf-17" remap="internal">Chapter&nbsp;6, Driver Autoconfiguration</olink> for
+details on driver data structures.</para><para>Block device drivers provide these entry points:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="print-9e" remap="external"><citerefentry><refentrytitle>print</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><note><para>Some of the entry points can be replaced by <olink targetdoc="group-refman" targetptr="nodev-9f" remap="external"><citerefentry><refentrytitle>nodev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="nulldev-9f" remap="external"><citerefentry><refentrytitle>nulldev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> as appropriate.</para>
+</note>
+</sect1><sect1 id="block-82249"><title>File I/O</title><indexterm id="block-ix417"><primary>file system I/O</primary>
+</indexterm><indexterm id="block-ix418"><primary>I/O</primary><secondary>file system structure</secondary>
+</indexterm><para>A file system is a tree-structured hierarchy of directories and files.
+Some file systems, such as the UNIX File System (UFS), reside on block-oriented
+devices. File systems are created by <olink targetdoc="group-refman" targetptr="format-1m" remap="external"><citerefentry><refentrytitle>format</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="newfs-1m" remap="external"><citerefentry><refentrytitle>newfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><para>When an application issues a <olink targetdoc="group-refman" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call to an ordinary file on the UFS file system, the file system can call
+the device driver <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point for the block device on which the file system resides. The file system
+code can call <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> several
+times for a single <olink targetdoc="group-refman" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="write-2" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call.</para><para>The file system code determines the logical device address, or <emphasis>logical
+block number</emphasis>, for each ordinary file block. A block I/O request
+is then built in the form of a <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+directed at the block device. The driver <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point then interprets
+the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+and completes the request.</para>
+</sect1><sect1 id="block-5"><title>Block Device Autoconfiguration</title><indexterm id="block-ix422"><primary>autoconfiguration</primary><secondary sortas="block">of block devices</secondary>
+</indexterm><para><olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> should
+perform the common initialization tasks for each instance of a device:</para><itemizedlist><listitem><para>Allocating per-instance state structures</para>
+</listitem><listitem><para>Mapping the device's registers</para>
+</listitem><listitem><para>Registering device interrupts</para>
+</listitem><listitem><para>Initializing mutex and condition variables</para>
+</listitem><listitem><para>Creating power manageable components</para>
+</listitem><listitem><para>Creating minor nodes</para>
+</listitem>
+</itemizedlist><para>Block device drivers create minor nodes of type <literal>S_IFBLK</literal>.
+As a result,  a block special file that represents the node appears in the <filename>/devices</filename> hierarchy.</para><para><indexterm id="block-ix423"><primary>block driver</primary><secondary>autoconfiguration of</secondary></indexterm><indexterm id="block-ix424"><primary>block driver</primary><secondary>slice number</secondary></indexterm><indexterm id="block-ix425"><primary>slice number for block devices</primary></indexterm>Logical device
+names for block devices appear in the <filename>/dev/dsk</filename> directory,
+and consist of a controller number, bus-address number, disk number, and slice
+number. These names are created by the <olink targetdoc="group-refman" targetptr="devfsadm-1m" remap="external"><citerefentry><refentrytitle>devfsadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> program if the node type
+is set to <literal>DDI_NT_BLOCK</literal> or <literal>DDI_NT_BLOCK_CHAN</literal>. <literal>DDI_NT_BLOCK_CHAN</literal> should be specified if the device communicates
+on a channel, that is, a bus with an additional level of addressability. 
+SCSI disks are a good example. <literal>DDI_NT_BLOCK_CHAN</literal> causes
+a bus-address field (t<emphasis>N</emphasis>) to appear in the logical name. <literal>DDI_NT_BLOCK</literal> should be used for most other devices.</para><para><indexterm><primary><literal>nblocks</literal> property</primary><secondary>use in block device drivers</secondary></indexterm><indexterm><primary><literal>Nblocks</literal> property</primary><secondary>use in block device drivers</secondary></indexterm><indexterm><primary>properties</primary><secondary><literal>nblocks</literal> property</secondary></indexterm><indexterm><primary>properties</primary><secondary><literal>Nblocks</literal> property</secondary></indexterm>A minor device refers to a partition on the disk. For each minor
+device, the driver must create an <literal>nblocks</literal> or <literal>Nblocks</literal> property.
+This integer property gives the number of blocks supported by the minor device
+expressed in units of <literal>DEV_BSIZE</literal>, that is, 512 bytes. The
+file system uses the <literal>nblocks</literal> and <literal>Nblocks</literal> properties
+to determine device limits. <literal>Nblocks</literal> is the 64-bit version
+of <literal>nblocks</literal>. <literal>Nblocks</literal> should be used with
+storage devices that can hold over 1 Tbyte of storage per disk. See <olink targetptr="properties-8" remap="internal">Device Properties</olink> for more information.</para><para><olink targetptr="block-29600" remap="internal">Example&nbsp;16&ndash;1</olink> shows
+a typical <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point with emphasis on creating the device's minor node and the <literal>Nblocks</literal> property.
+Note that because this example uses <literal>Nblocks</literal> and not <literal>nblocks</literal>,  <olink targetdoc="group-refman" targetptr="ddi-prop-update-int64-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is called instead of <olink targetdoc="group-refman" targetptr="ddi-prop-update-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para><indexterm><primary><function>makedevice</function> function</primary></indexterm><indexterm><primary><function>ddi_driver_major</function> function</primary></indexterm><indexterm><primary><function>getmajor</function> function</primary></indexterm><indexterm><primary><function>ddi_driver_major</function> function</primary></indexterm><indexterm><primary>getting major numbers</primary><secondary>example of</secondary></indexterm><indexterm><primary>major numbers</primary><secondary>example of</secondary></indexterm>As a side note, this example shows the use of <olink targetdoc="group-refman" targetptr="makedevice-9f" remap="external"><citerefentry><refentrytitle>makedevice</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to create
+a device number for <function>ddi_prop_update_int64</function>. The <literal>makedevice</literal> function makes use of <olink targetdoc="group-refman" targetptr="ddi-driver-major-9f" remap="external"><citerefentry><refentrytitle>ddi_driver_major</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which generates a major
+number from a pointer to a <structname>dev_info_t</structname> structure.
+Using <function>ddi_driver_major</function> is similar to using <olink targetdoc="group-refman" targetptr="getmajor-9f" remap="external"><citerefentry><refentrytitle>getmajor</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, which gets
+a <structname>dev_t</structname> structure pointer.</para><example id="block-29600"><title>Block Driver <function>attach</function> Routine</title><programlisting>static int
+xxattach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    int instance = ddi_get_instance(dip);
+    switch (cmd) {
+      case DDI_ATTACH:
+      /*
+       * allocate a state structure and initialize it
+       * map the devices registers
+       * add the device driver's interrupt handler(s)
+       * initialize any mutexes and condition variables
+       * read label information if the device is a disk
+       * create power manageable components
+       *
+       * Create the device minor node. Note that the node_type
+       * argument is set to DDI_NT_BLOCK.
+       */
+      if (ddi_create_minor_node(dip, "<replaceable>minor_name</replaceable>", S_IFBLK,
+          instance, DDI_NT_BLOCK, 0) == DDI_FAILURE) {
+          /* free resources allocated so far */
+          /* Remove any previously allocated minor nodes */
+          ddi_remove_minor_node(dip, NULL);
+          return (DDI_FAILURE);
+      }
+      /*
+       * Create driver properties like "Nblocks". If the device
+       * is a disk, the Nblocks property is usually calculated from
+       * information in the disk label.  Use "Nblocks" instead of
+       * "nblocks" to ensure the property works for large disks.
+       */
+      xsp-&gt;Nblocks = <replaceable>size</replaceable>;
+      /* size is the size of the device in 512 byte blocks */
+      maj_number = ddi_driver_major(dip);
+      if (ddi_prop_update_int64(makedevice(maj_number, instance), dip, 
+          "Nblocks", xsp-&gt;Nblocks) != DDI_PROP_SUCCESS) {
+          cmn_err(CE_CONT, "%s: cannot create Nblocks property\n",
+              ddi_get_name(dip));
+          /* free resources allocated so far */
+          return (DDI_FAILURE);
+      }
+      xsp-&gt;open = 0;
+      xsp-&gt;nlayered = 0;
+      /* ... */
+      return (DDI_SUCCESS);
+
+      case DDI_RESUME:
+          /* For information, see Chapter 12, "Power Management," in this book. */
+      default:
+          return (DDI_FAILURE);
+    }
+}</programlisting>
+</example>
+</sect1><sect1 id="block-6"><title>Controlling Device Access</title><para>This section describes the entry points for <function>open</function> and <function>close</function> functions in block device drivers. See <olink targetptr="character-21002" remap="internal">Chapter&nbsp;15, Drivers for Character Devices</olink> for
+more information on <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para><sect2 id="block-7"><title><function>open</function> Entry Point (Block Drivers)</title><para><indexterm id="block-ix426"><primary>block driver entry points</primary><secondary><function>open</function> function</secondary></indexterm><indexterm id="block-ix427"><primary>device access functions</primary><secondary>block drivers</secondary></indexterm><indexterm id="block-ix428"><primary><function>open</function> entry point</primary><secondary>block drivers</secondary></indexterm><indexterm id="block-ix429"><primary><function>mount</function> function</primary><secondary>block drivers</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is used to gain
+access to a given device. The <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+of a block driver is called when a user thread issues an <olink targetdoc="group-refman" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="mount-2" remap="external"><citerefentry><refentrytitle>mount</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call on a block special
+file associated with the minor device, or when a layered driver calls  <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. See <olink targetptr="block-82249" remap="internal">File I/O</olink> for more information.</para><para>The <function>open</function> entry point should check for the following
+conditions:</para><itemizedlist><listitem><para>The device can be opened, that is, the device is online and
+ready.</para>
+</listitem><listitem><para>The device can be opened as requested. The device supports
+the operation. The device's current state does not conflict with the request.</para>
+</listitem><listitem><para>The caller has permission to open the device.</para>
+</listitem>
+</itemizedlist><para>The following example demonstrates a block driver <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point.</para><example id="block-40232"><title>Block Driver <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxopen(dev_t *devp, int flags, int otyp, cred_t *credp)
+{
+    minor_t         instance;
+    struct xxstate        *xsp;
+
+    instance = getminor(*devp);
+    xsp = ddi_get_soft_state(statep, instance);
+    if (xsp == NULL)
+        return (ENXIO);
+    mutex_enter(&amp;xsp-&gt;mu);
+    /*
+     * only honor FEXCL. If a regular open or a layered open
+     * is still outstanding on the device, the exclusive open
+     * must fail.
+     */
+    if ((flags &amp; FEXCL) &amp;&amp; (xsp-&gt;open || xsp-&gt;nlayered)) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (EAGAIN);
+    }
+    switch (otyp) {
+      case OTYP_LYR:
+          xsp-&gt;nlayered++;
+          break;
+      case OTYP_BLK:
+          xsp-&gt;open = 1;
+          break;
+      default:
+          mutex_exit(&amp;xsp-&gt;mu);
+          return (EINVAL);
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    return (0);
+}</programlisting>
+</example><para>The <literal>otyp</literal> argument is used to specify the type of
+open on the device. <literal>OTYP_BLK</literal> is the typical open type for
+a block device. A device can be opened several times with <literal>otyp</literal> set
+to <literal>OTYP_BLK</literal>.  <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is called only once when
+the final close of type <literal>OTYP_BLK</literal> has occurred for the device. <literal>otyp</literal> is set to <literal>OTYP_LYR</literal> if the device is being
+used as a layered device. For every open of type <literal>OTYP_LYR</literal>,
+the layering driver issues a corresponding close of type <literal>OTYP_LYR</literal>.
+The example keeps track of each type of open so the driver can determine when
+the device is not being used in <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="block-8"><title><function>close</function> Entry Point (Block Drivers)</title><para><indexterm id="block-ix430"><primary><function>close</function> entry point</primary><secondary>block drivers</secondary></indexterm><indexterm id="block-ix431"><primary>block driver entry points</primary><secondary><function>close</function> function</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point uses the same
+arguments as  <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> with
+one exception. <literal>dev</literal> is the device number rather than a pointer
+to the device number.</para><para>The <function>close</function> routine should verify <literal>otyp</literal> in
+the same way as was described for the <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. In the following example, <function>close</function> must determine when the device can really be closed. Closing
+is affected by the number of block opens and layered opens.</para><example id="block-15508"><title>Block Device <citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry> Routine</title><programlisting>static int
+xxclose(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+    minor_t instance;
+    struct xxstate *xsp;
+
+    instance = getminor(dev);
+    xsp = ddi_get_soft_state(statep, instance);
+    if (xsp == NULL)
+        return (ENXIO);
+    mutex_enter(&amp;xsp-&gt;mu);
+    switch (otyp) {
+      case OTYP_LYR:
+          xsp-&gt;nlayered--;
+          break;
+      case OTYP_BLK:
+          xsp-&gt;open = 0;
+          break;
+      default:
+          mutex_exit(&amp;xsp-&gt;mu);
+         return (EINVAL);
+    }
+
+    if (xsp-&gt;open || xsp-&gt;nlayered) {
+        /* not done yet */
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (0);
+    }
+    /* cleanup (rewind tape, free memory, etc.) */
+    /* wait for I/O to drain */
+    mutex_exit(&amp;xsp-&gt;mu);
+
+    return (0);
+}</programlisting>
+</example>
+</sect2><sect2 id="block-20"><title><function>strategy</function> Entry Point</title><para><indexterm><primary><function>strategy</function> entry point</primary><secondary>block drivers</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+is used to read and write data buffers to and from a block device. The name <emphasis>strategy</emphasis> refers to the fact that this entry point might implement
+some optimal strategy for ordering requests to the device.</para><para><indexterm><primary>block driver entry points</primary><secondary><function>strategy</function> function</secondary></indexterm><olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> can be written
+to process one request at a time, that is, a synchronous transfer. <function>strategy</function> can also be written to queue multiple requests to the device,
+as in an asynchronous transfer. When choosing a method, the abilities and
+limitations of the device should be taken into account.</para><para>The <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine
+is passed a pointer to a <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+This structure describes the transfer request, and contains status information
+on return. <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> are the focus
+of block device operations.</para>
+</sect2><sect2 id="block-3"><title><literal>buf</literal> Structure</title><para><indexterm><primary><structname>buf</structname> structure</primary><secondary>description of</secondary></indexterm><indexterm><primary>block driver</primary><secondary><structname>buf</structname> structure</secondary></indexterm>The following <structname>buf</structname> structure members are
+important to block drivers:</para><programlisting>int           b_flags;       /* Buffer Status */
+struct buf    *av_forw;      /* Driver work list link */
+struct buf    *av_back;      /* Driver work list link */
+size_t        b_bcount;      /* # of bytes to transfer */
+union {
+    caddr_t   b_addr;        /* Buffer's virtual address */
+} b_un;
+daddr_t       b_blkno;       /* Block number on device */
+diskaddr_t    b_lblkno;      /* Expanded block number on device */
+size_t        b_resid;       /* # of bytes not transferred after error */
+int           b_error;       /* Expanded error field */
+void          *b_private;    /* &ldquo;opaque&rdquo; driver private area */
+dev_t         b_edev;        /* expanded dev field */</programlisting><para>where:</para><variablelist><varlistentry><term><structfield>av_forw</structfield> and <structfield>av_back</structfield></term><listitem><para>Pointers that the driver can use to manage a list of buffers
+by the driver. See <olink targetptr="block-54698" remap="internal">Asynchronous Data Transfers
+(Block Drivers)</olink> for a discussion of the <structfield>av_forw</structfield> and <structfield>av_back</structfield> pointers.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_bcount</structfield></term><listitem><para>Specifies the number of bytes to be transferred by the device.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_un.b_addr</structfield></term><listitem><para>The kernel virtual address of the data buffer. Only valid
+after <olink targetdoc="group-refman" targetptr="bp-mapin-9f" remap="external"><citerefentry><refentrytitle>bp_mapin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> call.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_blkno</structfield></term><listitem><para>The starting 32-bit logical block number on the device for
+the data transfer, which is expressed in 512-byte <literal>DEV_BSIZE</literal> units.
+The driver should use either <structfield>b_blkno</structfield> or <structfield>b_lblkno</structfield> but not both.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_lblkno</structfield></term><listitem><para>The starting 64-bit logical block number on the device for
+the data transfer, which is expressed in 512-byte <literal>DEV_BSIZE</literal> units.
+The driver should use either <structfield>b_blkno</structfield> or <structfield>b_lblkno</structfield> but not both.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_resid</structfield></term><listitem><para>Set by the driver to indicate the number of bytes that were
+not transferred because of an error. See <olink targetptr="block-33565" remap="internal">Example&nbsp;16&ndash;7</olink> for an example of setting <structfield>b_resid</structfield>. The <structfield>b_resid</structfield> member is overloaded. <structfield>b_resid</structfield> is
+also used by <olink targetdoc="group-refman" targetptr="disksort-9f" remap="external"><citerefentry><refentrytitle>disksort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_error</structfield></term><listitem><para>Set to an error number by the driver when a transfer error
+occurs. <literal>b_error</literal> is set in conjunction with the <structfield>b_flags</structfield> <literal>B_ERROR</literal> bit. See the <olink targetdoc="group-refman" targetptr="intro-9e" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man page for details about
+error values. Drivers should use  <olink targetdoc="group-refman" targetptr="bioerror-9f" remap="external"><citerefentry><refentrytitle>bioerror</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> rather than setting <structfield>b_error</structfield> directly.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>b_flags</literal></term><listitem><para>Flags with status and transfer attributes of the <structname>buf</structname> structure.
+If <literal>B_READ</literal> is set, the <structname>buf</structname> structure
+indicates a transfer from the device to memory. Otherwise, this structure
+indicates a transfer from memory to the device. If the driver encounters an
+error during data transfer, the driver should set the <literal>B_ERROR</literal> field
+in the <structfield>b_flags</structfield> member. In addition, the driver
+should provide a more specific error value in <structfield>b_error</structfield>.
+Drivers should use  <olink targetdoc="group-refman" targetptr="bioerror-9f" remap="external"><citerefentry><refentrytitle>bioerror</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> rather
+than setting <literal>B_ERROR</literal>.</para><caution><para>Drivers should never clear <literal>b_flags</literal>.</para>
+</caution>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_private</structfield></term><listitem><para>For exclusive use by the driver to store driver-private data.</para>
+</listitem>
+</varlistentry><varlistentry><term><structfield>b_edev</structfield></term><listitem><para>Contains the device number of the device that  was used in
+the transfer.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect3 id="block-4"><title><structname>bp_mapin</structname> Structure</title><para>A <structname>buf</structname> structure pointer can be passed into
+the device driver's <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine.
+However, the data buffer referred to by <structfield>b_un.b_addr</structfield> is
+not necessarily mapped in the kernel's address space. Therefore, the driver
+cannot directly access the data. Most block-oriented devices have DMA capability
+and therefore do not need to access the data buffer directly. Instead, these
+devices use the DMA mapping routines to enable the device's DMA engine to
+do the data transfer. For details about using DMA, see <olink targetptr="dma-29901" remap="internal">Chapter&nbsp;9, Direct Memory Access (DMA)</olink>.</para><para>If a driver needs to access the data buffer directly, that driver must
+first map the buffer into the kernel's address space by using <olink targetdoc="group-refman" targetptr="bp-mapin-9f" remap="external"><citerefentry><refentrytitle>bp_mapin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  <olink targetdoc="group-refman" targetptr="bp-mapout-9f" remap="external"><citerefentry><refentrytitle>bp_mapout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> should be
+used when the driver no longer needs to access the data directly.</para><caution><para><olink targetdoc="group-refman" targetptr="bp-mapout-9f" remap="external"><citerefentry><refentrytitle>bp_mapout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> should
+only be called on buffers that have  been  allocated and are owned by the
+device driver. <function>bp_mapout</function> must not be called on buffers
+that are passed to the driver through the <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point, such as a file
+system. <olink targetdoc="group-refman" targetptr="bp-mapin-9f" remap="external"><citerefentry><refentrytitle>bp_mapin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> does
+not keep a reference count. <olink targetdoc="group-refman" targetptr="bp-mapout-9f" remap="external"><citerefentry><refentrytitle>bp_mapout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> removes any kernel  mapping
+ on which  a layer over the device driver might rely.</para>
+</caution>
+</sect3>
+</sect2>
+</sect1><sect1 id="block-78892"><title>Synchronous Data Transfers (Block Drivers)</title><para><indexterm id="block-ix437"><primary>I/O</primary><secondary>synchronous data transfers</secondary></indexterm><indexterm><primary>synchronous data transfers</primary><secondary>block drivers</secondary></indexterm>This section
+presents a simple method for performing synchronous I/O transfers. This method
+assumes that the hardware is a simple disk device that can transfer only one
+data buffer at a time by using DMA. Another assumption is that the disk can
+be spun up and spun down by software command. The device driver's  <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine waits
+for the current request to be completed before accepting a new request. The
+device interrupts when the transfer is complete. The device also interrupts
+if an error occurs.</para><para>The steps for performing a synchronous data transfer for a block driver
+are as follows:</para><orderedlist><listitem><para>Check for invalid <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> requests.</para><para>Check the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure that is passed
+to  <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> for
+validity. All drivers should check the following conditions:</para><itemizedlist><listitem><para>The request begins at a valid block. The driver converts the <structfield>b_blkno</structfield> field to the correct device offset and then determines
+whether the offset is valid for the device.</para>
+</listitem><listitem><para>The request does not go beyond the last block on the device.</para>
+</listitem><listitem><para>Device-specific requirements are met.</para>
+</listitem>
+</itemizedlist><para><indexterm id="block-ix438"><primary><function>biodone</function> function</primary></indexterm>If an error is encountered, the driver should indicate the appropriate
+error with  <olink targetdoc="group-refman" targetptr="bioerror-9f" remap="external"><citerefentry><refentrytitle>bioerror</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.
+The driver should then complete the request by calling <olink targetdoc="group-refman" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.  <function>biodone</function> notifies the caller of  <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> that the transfer is complete.
+In this case, the transfer has stopped because of an error.</para>
+</listitem><listitem><para>Check whether the device is busy.</para><para>Synchronous
+data transfers allow single-threaded access to the device. The device driver
+enforces this access in two ways:</para><itemizedlist><listitem><para>The driver maintains a busy flag that is guarded by a mutex.</para>
+</listitem><listitem><para>The driver waits on a condition variable with <olink targetdoc="group-refman" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, when the
+device is busy.</para>
+</listitem>
+</itemizedlist><para>If the device is busy, the thread waits until the interrupt handler
+indicates that the device is not longer busy. The available status can be
+indicated by either the <olink targetdoc="group-refman" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or the <olink targetdoc="group-refman" targetptr="cv-signal-9f" remap="external"><citerefentry><refentrytitle>cv_signal</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.
+ See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3, Multithreading</olink> for
+details on condition variables.</para><para>When the device is no longer busy, the <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> routine marks the device
+as available. <function>strategy</function> then prepares the buffer and the
+device for the transfer.</para>
+</listitem><listitem><para>Set up the buffer for DMA.</para><para>Prepare the data buffer
+for a DMA transfer by using <olink targetdoc="group-refman" targetptr="ddi-dma-alloc-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_alloc_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to allocate
+a DMA handle. Use <olink targetdoc="group-refman" targetptr="ddi-dma-buf-bind-handle-9f" remap="external"><citerefentry><refentrytitle>ddi_dma_buf_bind_handle</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to bind the
+data buffer to the handle. For information on setting up DMA resources and
+related data structures, see <olink targetptr="dma-29901" remap="internal">Chapter&nbsp;9,
+Direct Memory Access (DMA)</olink>.</para>
+</listitem><listitem><para>Begin the transfer.</para><para>At this point, a pointer to
+the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+is saved in the state structure of the device. The interrupt routine can then
+complete the transfer by calling <olink targetdoc="group-refman" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>The device driver then accesses device registers to initiate a data
+transfer. In most cases, the driver should protect the device registers from
+other threads by using mutexes. In this case, because <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> is single-threaded,
+guarding the device registers is not necessary. See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3,
+Multithreading</olink> for details about data locks.</para><para>When the executing thread has started the device's DMA engine, the driver
+can return execution control to the calling routine, as follows:</para><programlisting>static int
+xxstrategy(struct buf *bp)
+{
+    struct xxstate *xsp;
+    struct device_reg *regp;
+    minor_t instance;
+    ddi_dma_cookie_t cookie;
+    instance = getminor(bp-&gt;b_edev);
+    xsp = ddi_get_soft_state(statep, instance);
+    if (xsp == NULL) {
+        bioerror(bp, ENXIO);
+        biodone(bp);
+        return (0);
+    }
+    /* validate the transfer request */
+    if ((bp-&gt;b_blkno &gt;= xsp-&gt;Nblocks) || (bp-&gt;b_blkno &lt; 0)) {
+        bioerror(bp, EINVAL);    
+        biodone(bp);
+        return (0);
+    }
+    /*
+     * Hold off all threads until the device is not busy.
+     */
+    mutex_enter(&amp;xsp-&gt;mu);
+    while (xsp-&gt;busy) {
+        cv_wait(&amp;xsp-&gt;cv, &amp;xsp-&gt;mu);
+    }
+    xsp-&gt;busy = 1;
+    mutex_exit(&amp;xsp-&gt;mu);
+    /* 
+     * If the device has power manageable components, 
+     * mark the device busy with pm_busy_components(9F),
+     * and then ensure that the device 
+     * is powered up by calling pm_raise_power(9F).
+     *
+     * Set up DMA resources with ddi_dma_alloc_handle(9F) and
+     * ddi_dma_buf_bind_handle(9F).
+     */
+    xsp-&gt;bp = bp;
+    regp = xsp-&gt;regp;
+    ddi_put32(xsp-&gt;data_access_handle, &amp;regp-&gt;dma_addr,
+        cookie.dmac_address);
+    ddi_put32(xsp-&gt;data_access_handle, &amp;regp-&gt;dma_size,
+        (uint32_t)cookie.dmac_size);
+    ddi_put8(xsp-&gt;data_access_handle, &amp;regp-&gt;csr,
+        ENABLE_INTERRUPTS | START_TRANSFER);
+    return (0);
+}</programlisting>
+</listitem><listitem><para>Handle the interrupting device.</para><para>When the device
+finishes the data transfer, the driver generates an interrupt, which eventually
+results in the driver's interrupt routine being called. Most drivers specify
+the state structure of the device as the argument to the interrupt routine
+when registering interrupts. See the <olink targetdoc="group-refman" targetptr="ddi-add-intr-9f" remap="external"><citerefentry><refentrytitle>ddi_add_intr</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man page and <olink targetptr="interrupt-14" remap="internal">Registering Interrupts</olink>. The interrupt routine
+can then access the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+being transferred, plus any other information that is available from the state
+structure.</para><para>The interrupt handler should check the device's status register to determine
+whether the transfer completed without error. If an error occurred, the handler
+should indicate the appropriate error with  <olink targetdoc="group-refman" targetptr="bioerror-9f" remap="external"><citerefentry><refentrytitle>bioerror</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The handler should also
+clear the pending interrupt for the device and then complete the transfer
+by calling <olink targetdoc="group-refman" targetptr="biodone-9f" remap="external"><citerefentry><refentrytitle>biodone</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><para>As the final task, the handler clears the busy flag. The handler then
+calls <olink targetdoc="group-refman" targetptr="cv-signal-9f" remap="external"><citerefentry><refentrytitle>cv_signal</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> on the condition variable, signaling that the device
+is no longer busy. This notification enables other threads waiting for the
+device in <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> to
+proceed with the next data transfer.</para><para>The following example shows a synchronous interrupt routine.</para>
+</listitem>
+</orderedlist><example id="block-ex-19"><title>Synchronous Interrupt Routine for Block Drivers</title><programlisting>static u_int
+xxintr(caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    struct buf *bp;
+    uint8_t status;
+    mutex_enter(&amp;xsp-&gt;mu);
+    status = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+    if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_INTR_UNCLAIMED);
+    }
+    /* Get the buf responsible for this interrupt */
+    bp = xsp-&gt;bp;
+    xsp-&gt;bp = NULL;
+    /*
+     * This example is for a simple device which either
+     * succeeds or fails the data transfer, indicated in the
+     * command/status register.
+     */
+    if (status &amp; DEVICE_ERROR) {
+        /* failure */
+        bp-&gt;b_resid = bp-&gt;b_bcount;
+        bioerror(bp, EIO);
+    } else {
+        /* success */
+        bp-&gt;b_resid = 0;
+    }
+    ddi_put8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr,
+        CLEAR_INTERRUPT);
+    /* The transfer has finished, successfully or not */
+    biodone(bp);
+    /*
+     * If the device has power manageable components that were
+     * marked busy in strategy(9F), mark them idle now with
+     * pm_idle_component(9F)
+     * Release any resources used in the transfer, such as DMA
+     * resources ddi_dma_unbind_handle(9F) and
+     * ddi_dma_free_handle(9F).
+     *
+     * Let the next I/O thread have access to the device.
+     */
+    xsp-&gt;busy = 0;
+    cv_signal(&amp;xsp-&gt;cv);
+    mutex_exit(&amp;xsp-&gt;mu);
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example>
+</sect1><sect1 id="block-54698"><title>Asynchronous Data Transfers (Block Drivers)</title><para><indexterm id="block-ix439"><primary>I/O</primary><secondary>asynchronous data transfers</secondary></indexterm><indexterm><primary>asynchronous data transfers</primary><secondary>block drivers</secondary></indexterm>This section
+presents a method for performing asynchronous I/O transfers. The driver queues
+the I/O requests and then returns control to the caller. Again, the assumption
+is that the hardware is a simple disk device that allows one transfer at a
+time. The device interrupts when a data transfer has completed. An interrupt
+also takes place if an error occurs. The basic steps for performing asynchronous
+data transfers are:</para><orderedlist><listitem><para>Check for invalid <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> requests.</para>
+</listitem><listitem><para>Enqueue the request.</para>
+</listitem><listitem><para>Start the first transfer.</para>
+</listitem><listitem><para>Handle the interrupting device.</para>
+</listitem>
+</orderedlist><sect2 id="fblew"><title>Checking for Invalid <structname>buf</structname> Requests</title><para>As in the synchronous case, the device driver should check the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure passed to  <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> for validity.
+See <olink targetptr="block-78892" remap="internal">Synchronous Data Transfers (Block Drivers)</olink> for
+more details.</para>
+</sect2><sect2 id="fbleu"><title>Enqueuing the Request</title><para>Unlike synchronous data transfers, a driver does not wait for an asynchronous
+request to complete. Instead, the driver adds the request to a queue. The
+head of the queue can be the current transfer. The head of the queue can also
+be a separate field in the state structure for holding the active request,
+as in <olink targetptr="fblfb" remap="internal">Example&nbsp;16&ndash;5</olink>.</para><para>If the queue is initially empty, then the hardware is not busy and <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> starts the
+transfer before returning. Otherwise, if a transfer completes with a non-empty
+queue, the interrupt routine begins a new transfer.  <olink targetptr="fblfb" remap="internal">Example&nbsp;16&ndash;5</olink> places the decision of whether to start a new transfer into a separate
+routine for convenience.</para><para>The driver can use the <structfield>av_forw</structfield> and the <structfield>av_back</structfield> members of the <olink targetdoc="group-refman" targetptr="buf-9s" remap="external"><citerefentry><refentrytitle>buf</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure to manage a list of transfer requests. A
+single pointer can be used to manage a singly linked list, or both pointers
+can be used together to build a doubly linked list. The device hardware specification
+specifies which type of list management, such as insertion policies, is used
+to optimize the performance of the device. The transfer list is a per-device
+list, so the head and tail of the list are stored in the state structure.</para><para>The following example provides multiple threads with access to the driver
+shared data, such as the transfer list. You must identify the shared data
+and must protect the data with a mutex. See <olink targetptr="mt-17026" remap="internal">Chapter&nbsp;3,
+Multithreading</olink> for more details about mutex locks.</para><example id="fblfb"><title>Enqueuing Data Transfer Requests for Block Drivers</title><programlisting>static int
+xxstrategy(struct buf *bp)
+{
+    struct xxstate *xsp;
+    minor_t instance;
+    instance = getminor(bp-&gt;b_edev);
+    xsp = ddi_get_soft_state(statep, instance);
+    /* ... */
+    /* validate transfer request */
+    /* ... */
+    /*
+     * Add the request to the end of the queue. Depending on the device, a sorting
+     * algorithm, such as disksort(9F) can be used if it improves the
+     * performance of the device.
+     */
+    mutex_enter(&amp;xsp-&gt;mu);
+    bp-&gt;av_forw = NULL;
+    if (xsp-&gt;list_head) {
+        /* Non-empty transfer list */
+        xsp-&gt;list_tail-&gt;av_forw = bp;
+        xsp-&gt;list_tail = bp;
+    } else {
+        /* Empty Transfer list */
+        xsp-&gt;list_head = bp;
+        xsp-&gt;list_tail = bp;
+    }
+    mutex_exit(&amp;xsp-&gt;mu);
+    /* Start the transfer if possible */
+    (void) xxstart((caddr_t)xsp);
+    return (0);
+}</programlisting>
+</example>
+</sect2><sect2 id="fblev"><title>Starting the First Transfer</title><para>Device drivers that implement queuing usually have a <function>start</function> routine. <function>start</function> dequeues the next request and starts the data transfer to
+or from the device. In this example, <function>start</function> processes
+all requests regardless of the state of the device, whether busy or free.</para><note><para><function>start</function> must be written to be called from any
+context. <function>start</function> can be called by both the strategy routine
+in kernel context and the interrupt routine in interrupt context.</para>
+</note><para><function>start</function> is called by <olink targetdoc="group-refman" targetptr="strategy-9e" remap="external"><citerefentry><refentrytitle>strategy</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> every time <function>strategy</function> queues
+a request so that an idle device can be started. If the device is busy, <function>start</function> returns immediately.</para><para><function>start</function> is also called by the interrupt handler before
+the handler returns from a claimed interrupt so that a nonempty queue can
+be serviced. If the queue is empty, <function>start</function> returns immediately.</para><para>Because <function>start</function> is a private driver routine, <function>start</function> can take any arguments and can return any type. The following
+code sample is written to be used as a DMA callback, although that portion
+is not shown. Accordingly, the example must take a <literal>caddr_t</literal> as
+an argument and return an <literal>int</literal>. See <olink targetptr="dma-200" remap="internal">Handling Resource Allocation Failures</olink> for more information about DMA
+callback routines.</para><example id="fblfa"><title>Starting the First Data Request for a Block Driver</title><programlisting>static int
+xxstart(caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    struct buf *bp;
+
+    mutex_enter(&amp;xsp-&gt;mu);
+    /*
+     * If there is nothing more to do, or the device is
+     * busy, return.
+     */
+    if (xsp-&gt;list_head == NULL || xsp-&gt;busy) {
+       mutex_exit(&amp;xsp-&gt;mu);
+       return (0);
+    }
+    xsp-&gt;busy = 1;
+    /* Get the first buffer off the transfer list */
+    bp = xsp-&gt;list_head;
+    /* Update the head and tail pointer */
+    xsp-&gt;list_head = xsp-&gt;list_head-&gt;av_forw;
+    if (xsp-&gt;list_head == NULL)
+       xsp-&gt;list_tail = NULL;
+    bp-&gt;av_forw = NULL;
+    mutex_exit(&amp;xsp-&gt;mu);
+    /* 
+     * If the device has power manageable components, 
+     * mark the device busy with pm_busy_components(9F),
+     * and then ensure that the device 
+     * is powered up by calling pm_raise_power(9F).
+     *
+     * Set up DMA resources with ddi_dma_alloc_handle(9F) and
+     * ddi_dma_buf_bind_handle(9F).
+     */
+    xsp-&gt;bp = bp;
+    ddi_put32(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;dma_addr,
+        cookie.dmac_address);
+    ddi_put32(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;dma_size,
+        (uint32_t)cookie.dmac_size);
+    ddi_put8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr,
+        ENABLE_INTERRUPTS | START_TRANSFER);
+    return (0);
+}</programlisting>
+</example>
+</sect2><sect2 id="fbles"><title>Handling the Interrupting Device</title><para>The interrupt routine is similar to the asynchronous version, with the
+addition of the call to <function>start</function> and the removal of the
+call to <olink targetdoc="group-refman" targetptr="cv-signal-9f" remap="external"><citerefentry><refentrytitle>cv_signal</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>.</para><example id="block-33565"><title>Block Driver Routine for Asynchronous Interrupts</title><programlisting>static u_int
+xxintr(caddr_t arg)
+{
+    struct xxstate *xsp = (struct xxstate *)arg;
+    struct buf *bp;
+    uint8_t status;
+    mutex_enter(&amp;xsp-&gt;mu);
+    status = ddi_get8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr);
+    if (!(status &amp; INTERRUPTING)) {
+        mutex_exit(&amp;xsp-&gt;mu);
+        return (DDI_INTR_UNCLAIMED);
+    }
+    /* Get the buf responsible for this interrupt */
+    bp = xsp-&gt;bp;
+    xsp-&gt;bp = NULL;
+    /*
+     * This example is for a simple device which either
+     * succeeds or fails the data transfer, indicated in the
+     * command/status register.
+     */
+    if (status &amp; DEVICE_ERROR) {
+        /* failure */
+        bp-&gt;b_resid = bp-&gt;b_bcount;
+        bioerror(bp, EIO);
+    } else {
+        /* success */
+        bp-&gt;b_resid = 0;
+    }
+    ddi_put8(xsp-&gt;data_access_handle, &amp;xsp-&gt;regp-&gt;csr,
+        CLEAR_INTERRUPT);
+    /* The transfer has finished, successfully or not */
+    biodone(bp);
+    /*
+     * If the device has power manageable components that were
+     * marked busy in strategy(9F), mark them idle now with
+     * pm_idle_component(9F)
+     * Release any resources used in the transfer, such as DMA
+     * resources (ddi_dma_unbind_handle(9F) and
+     * ddi_dma_free_handle(9F)).
+     *
+     * Let the next I/O thread have access to the device.
+     */
+    xsp-&gt;busy = 0;
+    mutex_exit(&amp;xsp-&gt;mu);
+    (void) xxstart((caddr_t)xsp);
+    return (DDI_INTR_CLAIMED);
+}</programlisting>
+</example>
+</sect2>
+</sect1><sect1 id="block-25"><title><function>dump</function> and <function>print</function> Entry
+Points</title><para>This section discusses the <olink targetdoc="group-refman" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="print-9e" remap="external"><citerefentry><refentrytitle>print</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points.</para><sect2 id="block-26"><title><function>dump</function> Entry Point (Block Drivers)</title><para><indexterm id="block-ix440"><primary><function>dump</function> entry point</primary><secondary>block drivers</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is used to copy
+a portion of virtual address space directly to the specified device in the
+case of a system failure. <function>dump</function> is also used to copy the
+state of the kernel out to disk during a checkpoint operation. See the <olink targetdoc="group-refman" targetptr="cpr-7" remap="external"><citerefentry><refentrytitle>cpr</refentrytitle><manvolnum>7</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="dump-9e" remap="external"><citerefentry><refentrytitle>dump</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> man pages for more information.
+The entry point must be capable of performing this operation without the use
+of interrupts, because interrupts are disabled during  the checkpoint operation.</para><programlisting>int dump(dev_t <replaceable>dev</replaceable>, caddr_t <replaceable>addr</replaceable>, daddr_t <replaceable>blkno</replaceable>, int <replaceable>nblk</replaceable>)</programlisting><para>where:</para><variablelist><varlistentry><term><replaceable>dev</replaceable></term><listitem><para>Device number of the device to receive the dump.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>addr</replaceable></term><listitem><para>Base kernel virtual address at which to start the dump.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>blkno</replaceable></term><listitem><para>Block at which the dump is to start.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>nblk</replaceable></term><listitem><para>Number of blocks to dump.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The dump depends upon the existing driver working properly.</para>
+</sect2><sect2 id="block-27"><title><function>print</function> Entry Point (Block
+Drivers)</title><programlisting>int print(dev_t <replaceable>dev</replaceable>, char *<replaceable>str</replaceable>)</programlisting><para><indexterm id="block-ix441"><primary>error messages, printing</primary></indexterm><indexterm id="block-ix442"><primary><function>print</function> entry point</primary><secondary>block drivers</secondary></indexterm><indexterm id="block-ix443"><primary><function>cmn_err</function> function</primary><secondary>example of</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="print-9e" remap="external"><citerefentry><refentrytitle>print</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point is called by
+the system to display a message about an exception that has been detected. <olink targetdoc="group-refman" targetptr="print-9e" remap="external"><citerefentry><refentrytitle>print</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> should call <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to post the
+message to the console on behalf of the system. The following example demonstrates
+a typical <function>print</function> entry point.</para><programlisting>static int
+ xxprint(dev_t dev, char *str)
+ {
+     cmn_err(CE_CONT, &ldquo;xx: %s\n&rdquo;, str);
+     return (0);
+ }</programlisting>
+</sect2>
+</sect1><sect1 id="advanced-7"><title>Disk Device Drivers</title><para>Disk devices represent an important class of block device drivers.</para><sect2 id="advanced-8"><title>Disk <literal>ioctl</literal>s</title><para><indexterm id="fblgy"><primary>I/O</primary><secondary>disk controls</secondary></indexterm><indexterm id="fblgi"><primary>disk</primary><secondary>I/O controls</secondary></indexterm>Solaris disk drivers need to support a minimum set of <literal>ioctl</literal> commands
+specific to Solaris disk drivers. These I/O controls are specified in the <olink targetdoc="group-refman" targetptr="dkio-7i" remap="external"><citerefentry><refentrytitle>dkio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> manual page. Disk I/O controls
+transfer disk information to or from the device driver. A Solaris disk device
+is supported by disk utility commands such as <olink targetdoc="group-refman" targetptr="format-1m" remap="external"><citerefentry><refentrytitle>format</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="newfs-1m" remap="external"><citerefentry><refentrytitle>newfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. The mandatory Sun disk I/O
+controls are as follows:</para><variablelist><varlistentry><term><returnvalue>DKIOCINFO</returnvalue></term><listitem><para>Returns information that describes the disk controller</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCGAPART</returnvalue></term><listitem><para>Returns a disk's partition map</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCSAPART</returnvalue></term><listitem><para>Sets a disk's partition map</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCGGEOM</returnvalue></term><listitem><para>Returns a disk's geometry</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCSGEOM</returnvalue></term><listitem><para>Sets a disk's geometry</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCGVTOC</returnvalue></term><listitem><para>Returns a disk's Volume Table of Contents</para>
+</listitem>
+</varlistentry><varlistentry><term><returnvalue>DKIOCSVTOC</returnvalue></term><listitem><para>Sets a disk's Volume Table of Contents</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="advanced-9"><title>Disk Performance</title><para><indexterm id="advanced-ix685"><primary>DDI/DKI</primary><secondary sortas="disk">and disk performance</secondary></indexterm><indexterm id="advanced-ix686"><primary>disk</primary><secondary>performance</secondary></indexterm>The Solaris DDI/DKI provides facilities to optimize I/O transfers
+for improved file system performance. A mechanism manages the list of I/O
+requests so as to optimize disk access for a file system. See <olink targetptr="block-54698" remap="internal">Asynchronous Data Transfers (Block Drivers)</olink> for
+a description of enqueuing an I/O request.</para><para>The <structname>diskhd</structname> structure is used to manage a linked
+list of I/O requests.</para><programlisting>struct diskhd {
+    long     b_flags;         /* not used, needed for consistency*/
+    struct   buf *b_forw,     *b_back;     /* queue of unit queues */
+    struct   buf *av_forw,    *av_back;    /* queue of bufs for this unit */
+    long     b_bcount;        /* active flag */
+};</programlisting><para>The <structname>diskhd</structname> data structure has two <structfield>buf</structfield> pointers that the driver can manipulate. The <structfield>av_forw</structfield> pointer
+points to the first active I/O request. The second pointer, <structfield>av_back</structfield>,
+points to the last active request on the list.</para><para>A pointer to this structure is passed as an argument to <olink targetdoc="group-refman" targetptr="disksort-9f" remap="external"><citerefentry><refentrytitle>disksort</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, along with
+a pointer to the current <structname>buf</structname> structure being processed.
+The <function>disksort</function> routine sorts the <structname>buf</structname> requests
+to optimize disk seek. The routine then inserts the <structfield>buf</structfield> pointer
+into the <structfield>diskhd</structfield> list. The <function>disksort</function> program
+uses the value that is in <structfield>b_resid</structfield> of the <structname>buf</structname> structure as a sort key. The driver is responsible for setting
+this value. Most Sun disk drivers use the cylinder group as the sort key.
+This approach optimizes the file system read-ahead accesses.</para><para>When data has been added to the <literal>diskhd</literal> list, the
+device needs to transfer the data. If the device is not busy processing a
+request, the <function>xxstart</function> routine pulls the first <structname>buf</structname> structure off the <literal>diskhd</literal> list and starts
+a transfer.</para><para>If the device is busy, the driver should return from the <function>xxstrategy</function> entry point. When the hardware is done with the data transfer,
+an interrupt is generated. The driver's interrupt routine is then called to
+service the device. After servicing the interrupt, the driver can then call
+the <function>start</function> routine to process the next <structname>buf</structname> structure
+in the <literal>diskhd</literal> list.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000064312 0?>

@@ -1,0 +1,160 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-types"><title>Type and Constant Definitions</title><highlights><para>This chapter describes how to declare type aliases and named constants
+in D. This chapter also discusses D type and namespace management for program
+and operating system types and identifiers.</para>
+</highlights><sect1 id="chp-types-1"><title>Typedef</title><para><indexterm><primary>constant definitions</primary></indexterm><indexterm><primary>type definitions</primary></indexterm><indexterm><primary><literal>typedef</literal></primary></indexterm>The <literal>typedef</literal> keyword is
+used to declare an identifier as an alias for an existing type. Like all D
+type declarations, the <literal>typedef</literal> keyword is used outside
+probe clauses in a declaration of the form:</para><programlisting>typedef <replaceable>existing-type</replaceable> <replaceable>new-type</replaceable> ;</programlisting><para>where <replaceable>existing-type</replaceable> is any type declaration
+and <replaceable>new-type</replaceable> is an identifier to be used as the
+alias for this type. For example, the declaration:</para><programlisting>typedef unsigned char uint8_t;</programlisting><para>is used internally by the D compiler to create the <literal>uint8_t</literal> type
+alias. Type aliases can be used anywhere that a normal type can be used, such
+as the type of a variable or associative array value or tuple member. You
+can also combine <literal>typedef</literal> with more elaborate declarations
+such as the definition of a new <literal>struct</literal>:</para><programlisting>typedef struct foo {
+	int x;
+	int y;
+} foo_t;</programlisting><para>In this example, <literal>struct foo</literal> is defined as the same
+type as its alias, <literal>foo_t</literal>. Solaris C system headers often
+use the suffix <literal>_t</literal> to denote a <literal>typedef</literal> alias.</para>
+</sect1><sect1 id="chp-types-2"><title>Enumerations</title><para><indexterm><primary>enumeration</primary></indexterm><indexterm><primary>enumeration of symbolic names</primary></indexterm>Defining symbolic names for constants
+in a program eases readability and simplifies the process of maintaining the
+program in the future. One method is to define an <firstterm>enumeration</firstterm>,
+which associates a set of integers with a set of identifiers called enumerators
+that the compiler recognizes and replaces with the corresponding integer value.
+An enumeration is defined using a declaration such as:</para><programlisting>enum colors {
+	RED,
+	GREEN,
+	BLUE
+};</programlisting><para>The first enumerator in the enumeration, <literal>RED</literal>, is
+assigned the value zero and each subsequent identifier is assigned the next
+integer value. You can also specify an explicit integer value for any enumerator
+by suffixing it with an equal sign and an integer constant, as in the following
+example:</para><programlisting>enum colors {
+	RED = 7,
+	GREEN = 9,
+	BLUE
+};</programlisting><para>The enumerator <literal>BLUE</literal> is assigned the value 10 by the
+compiler because it has no value specified and the previous enumerator is
+set to 9. Once an enumeration is defined, the enumerators can be used anywhere
+in a D program that an integer constant can be used. In addition, the enumeration <literal>enum colors</literal> is also defined as a type that is equivalent to an <literal>int</literal>. The D compiler will allow a variable of <literal>enum</literal> type
+to be used anywhere an <literal>int</literal> can be used, and will allow
+any integer value to be assigned to a variable of <literal>enum</literal> type.
+You can also omit the <literal>enum</literal> name in the declaration if the
+type name is not needed.</para><para>Enumerators are visible in all subsequent clauses and declarations in
+your program, so you cannot define the same enumerator identifier in more
+than one enumeration. However, you may define more than one enumerator that
+has the same value in either the same or different enumerations. You may also
+assign integers that have no corresponding enumerator to a variable of the
+enumeration type.</para><para><indexterm><primary>enumeration</primary><secondary>syntax</secondary></indexterm>The D enumeration syntax is the same as the corresponding syntax
+in ANSI-C. D also provides access to enumerations defined in the operating
+system kernel and its loadable modules, but these enumerators are not globally
+visible in your D program. Kernel enumerators are only visible when used as
+an argument to one of the binary comparison operators when compared to an
+object of the corresponding enumeration type. For example, the function <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> has a parameter of type <literal>enum uio_rw</literal> defined as follows:</para><programlisting>enum uio_rw { UIO_READ, UIO_WRITE };</programlisting><para><indexterm><primary>enumeration</primary><secondary>UIO_WRITE visibility</secondary></indexterm><indexterm><primary>enumeration</primary><secondary>UIO_READ visibility</secondary></indexterm> <indexterm><primary>examples</primary><secondary>enumeration</secondary></indexterm>The enumerators <literal>UIO_READ</literal> and <literal>UIO_WRITE</literal> are not normally visible in your D program, but you can
+promote them to global visibility by comparing a value of type <literal>enum uio_rw</literal>, as shown in the following example clause:</para><programlisting>fbt::uiomove:entry
+/args[2] == UIO_WRITE/
+{
+	...
+}</programlisting><para>This example traces calls to the <olink targetdoc="refman9f" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function for write requests
+by comparing <literal>args[2]</literal>, a variable of type <literal>enum
+uio_rw</literal>, to the enumerator <literal>UIO_WRITE</literal>. Because
+the left-hand argument is an enumeration type, the D compiler searches the
+enumeration when attempting to resolve the right-hand identifier. This feature
+protects your D programs against inadvertent identifier name conflicts with
+the large collection of enumerations defined in the operating system kernel.</para>
+</sect1><sect1 id="chp-types-3"><title>Inlines</title><para><indexterm><primary>inline directives</primary></indexterm>D named constants
+can also be defined using <literal>inline</literal> directives, which provide
+a more general means of creating identifiers that are replaced by predefined
+values or expressions during compilation. Inline directives are a more powerful
+form of lexical replacement than the <literal>#define</literal> directive
+provided by the C preprocessor because the replacement is assigned an actual
+type and is performed using the compiled syntax tree and not simply a set
+of lexical tokens. An inline directive is specified using a declaration of
+the form:</para><programlisting>inline <replaceable>type</replaceable> <replaceable>name</replaceable> = <replaceable>expression</replaceable> ;</programlisting><para>where <replaceable>type</replaceable> is a type declaration of an existing
+type, <replaceable>name</replaceable> is any valid D identifier that is not
+previously defined as an inline or global variable, and <replaceable>expression</replaceable> is
+any valid D expression. Once the inline directive is processed, the D compiler
+substitutes the compiled form of <replaceable>expression</replaceable> for
+each subsequent instance of <replaceable>name</replaceable> in the program
+source. For example, the following D program would trace the string <literal>"hello"</literal> and integer value <literal>123</literal>:</para><programlisting>inline string hello = "hello";
+inline int number = 100 + 23;
+
+BEGIN
+{
+	trace(hello);
+	trace(number);
+}</programlisting><para>An inline name may be used anywhere a global variable of the corresponding
+type can be used. If the inline expression can be evaluated to an integer
+or string constant at compile time, then the inline name can also be used
+in contexts that require constant expressions, such as scalar array dimensions.</para><para>The inline expression is validated for syntax errors as part of evaluating
+the directive. The expression result type must be compatible with the type
+defined by the inline, according to the same rules used for the D assignment
+operator (<literal>=</literal>). An inline expression may not reference the
+inline identifier itself: recursive definitions are not permitted.</para><para>The DTrace software packages install a number of D source files in the
+system directory <filename>/usr/lib/dtrace</filename> that contain inline
+directives you can use in your D programs. For example, the <filename>signal.d</filename> library
+includes directives of the form:</para><programlisting>inline int SIGHUP = 1;
+inline int SIGINT = 2;
+inline int SIGQUIT = 3;
+...</programlisting><para>These inline definitions provide you access to the current set of Solaris
+signal names described in <olink targetdoc="refman3f" targetptr="signal-3head" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3HEAD</manvolnum></citerefentry></olink>.
+Similarly, the <filename>errno.d</filename> library contains inline directives
+for the C <literal>errno</literal> constants described in <olink targetdoc="refman2" targetptr="intro-2" remap="external"><citerefentry><refentrytitle>Intro</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>By default, the D compiler includes all of the provided D library files
+automatically so you can use these definitions in any D program.</para>
+</sect1><sect1 id="chp-types-4"><title>Type Namespaces</title><para><indexterm><primary>type namespaces</primary></indexterm>This section
+discusses D namespaces and namespace issues related to types. In traditional
+languages such as ANSI-C, type visibility is determined by whether a type
+is nested inside of a function or other declaration. Types declared at the
+outer scope of a C program are associated with a single global namespace and
+are visible throughout the entire program. Types defined in C header files
+are typically included in this outer scope. Unlike these languages, D provides
+access to types from multiple outer scopes.</para><para>D is a language that facilitates dynamic observability across multiple
+layers of a software stack, including the operating system kernel, an associated
+set of loadable kernel modules, and user processes running on the system.
+A single D program may instantiate probes to gather data from multiple kernel
+modules or other software entities that are compiled into independent binary
+objects. Therefore, more than one data type of the same name, perhaps with
+different definitions, might be present in the universe of types available
+to DTrace and the D compiler. To manage this situation, the D compiler associates
+each type with a namespace identified by the containing program object. Types
+from a particular program object can be accessed by specifying the object
+name and backquote (<literal>`</literal>) scoping operator in any type name.</para><para>For example, if a kernel module named <literal>foo</literal> contains
+the following C type declaration:</para><programlisting>typedef struct bar {
+	int x;
+} bar_t;</programlisting><para>then the types <literal>struct bar</literal> and <literal>bar_t</literal> could
+be accessed from D using the type names:</para><programlisting>struct foo`bar				foo`bar_t</programlisting><para>The backquote operator can be used in any context where a type name
+is appropriate, including when specifying the type for D variable declarations
+or cast expressions in D probe clauses.</para><para><indexterm><primary>type namespaces</primary><secondary>built in</secondary></indexterm>The D compiler also provides two special built-in type namespaces
+that use the names <literal>C</literal> and <literal>D</literal> respectively.
+The C type namespace is initially populated with the standard ANSI-C intrinsic
+types such as <literal>int</literal>. In addition, type definitions acquired
+using the C preprocessor <olink targetdoc="refman1" targetptr="cpp-1" remap="external"><citerefentry><refentrytitle>cpp</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> using
+the <command>dtrace</command> <option>C</option> option will be processed
+by and added to the C scope. As a result, you can include C header files containing
+type declarations which are already visible in another type namespace without
+causing a compilation error.</para><para>The D type namespace is initially populated with the D type intrinsics
+such as <literal>int</literal> and <literal>string</literal> as well as the
+built-in D type aliases such as <literal>uint32_t</literal>. Any new type
+declarations that appear in the D program source are automatically added to
+the D type namespace. If you create a complex type such as a <literal>struct</literal> in
+your D program consisting of member types from other namespaces, the member
+types will be copied into the D namespace by the declaration.</para><para>When the D compiler encounters a type declaration that does not specify
+an explicit namespace using the backquote operator, the compiler searches
+the set of active type namespaces to find a match using the specified type
+name. The C namespace is always searched first, followed by the D namespace.
+If the type name is not found in either the C or D namespace, the type namespaces
+of the active kernel modules are searched in ascending order by kernel module
+ID. This ordering guarantees that the binary objects that form the core kernel
+are searched before any loadable kernel modules, but does not guarantee any
+ordering properties among the loadable modules. You should use the scoping
+operator when accessing types defined in loadable kernel modules to avoid
+type name conflicts with other kernel modules.</para><para>The D compiler uses compressed ANSI-C debugging information provided
+with the core Solaris kernel modules in order to automatically access the
+types associated with the operating system source code without the need for
+accessing the corresponding C include files. This symbolic debugging information
+might not be available for all kernel modules on your system. The D compiler
+will report an error if you attempt to access a type within the namespace
+of a module that lacks compressed C debugging information intended for use
+with DTrace.</para>
+</sect1>
+</chapter><?Pub *0000014854 0?>

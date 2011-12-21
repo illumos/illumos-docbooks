@@ -1,0 +1,203 @@
+<?Pub UDT _bookmark _target?><?Pub EntList amp nbsp gt lt ndash hyphen?><?Pub CX solbook(book(title()bookinfo()part(title()partintro()chapter()?><chapter id="properties-1"><?Pub Tag atict:info tracking="off"
+ref="2"?><?Pub Tag atict:user user="jstearns" fullname="John Stearns"?><?Pub Tag atict:user user="ae149097" fullname="Alta Elstad"?><title>Properties</title><highlights><para>Properties are user-defined, name-value pair structures that are managed
+using the DDI/DKI interfaces. This chapter provides information on the following
+subjects:</para><itemizedlist><listitem><para><olink targetptr="properties-2" remap="internal">Device Property Names</olink></para>
+</listitem><listitem><para><olink targetptr="properties-18" remap="internal">Creating and Updating Properties</olink></para>
+</listitem><listitem><para><olink targetptr="properties-19" remap="internal">Looking Up Properties</olink></para>
+</listitem><listitem><para><olink targetptr="properties-20" remap="internal">prop_op() Entry Point</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="properties-8"><title>Device Properties</title><para>Device attribute information can be represented by a <emphasis>name-value</emphasis> pair
+notation called a <emphasis>property</emphasis>.</para><para>For example, device registers and onboard memory can be represented
+by the <property>reg</property> property. The <property>reg</property> property
+is a software abstraction that describes device hardware registers. The value
+of the <property>reg</property> property encodes the device register address
+location and size. Drivers use the <property>reg</property> property to access
+device registers.</para><para>Another example is the <property>interrupt</property> property. An <property>interrupt</property> property represents the device interrupt. The value of
+the <property>interrupt</property> property encodes the device-interrupt PIN.</para><para>Five types of values can be assigned to properties:</para><itemizedlist><listitem><para><emphasis role="strong">Byte array</emphasis> &ndash; Series
+of bytes of an arbitrary length</para>
+</listitem><listitem><para><emphasis role="strong">Integer property</emphasis> &ndash;
+An integer value</para>
+</listitem><listitem><para><emphasis role="strong">Integer array property</emphasis> &ndash;
+An array of integers</para>
+</listitem><listitem><para><emphasis role="strong">String property</emphasis> &ndash;
+A null-terminated string</para>
+</listitem><listitem><para><emphasis role="strong">String array property</emphasis> &ndash;
+A list of null-terminated strings</para>
+</listitem>
+</itemizedlist><para><indexterm><primary>properties</primary><secondary>overview</secondary></indexterm><indexterm><primary><property>reg</property> property</primary></indexterm><indexterm><primary>properties</primary><secondary>types of</secondary></indexterm>A property that has no value is considered to be a Boolean property.
+A Boolean property that exists is true. A Boolean value that does not exist
+is false.</para><sect2 id="properties-2"><title>Device Property Names</title><para>Strictly speaking, DDI/DKI software property names have no restrictions.
+Certain uses are recommended, however. The IEEE 1275-1994 Standard for Boot
+Firmware defines properties as follows:</para><blockquote><para>A property is a human readable text string consisting of
+from 1 to 31 printable characters. Property names cannot contain upper case
+characters or the characters &ldquo;/&rdquo;, &ldquo;\&rdquo;, &ldquo;:&rdquo;, &ldquo;[&ldquo;, &ldquo;]&rdquo;
+and &ldquo;@&rdquo;. Property names beginning with the character &ldquo;+&rdquo;
+are reserved for use by future revisions of IEEE 1275-1994.</para>
+</blockquote><para>By convention, underscores are not used in property names. Use a hyphen
+(-) instead. By convention, property names ending with the question mark character
+(<literal>?</literal>) contain values that are strings, typically TRUE or
+FALSE, for example <literal>auto-boot?</literal>.</para><para>Predefined property names are listed in publications of the IEEE 1275
+Working Group. See <ulink url="http://playground.sun.com/1275/" type="url"></ulink> for
+information about how to obtain these publications. For a discussion of adding
+properties in driver configuration files, see the <olink targetdoc="group-refman" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page. The <olink targetdoc="group-refman" targetptr="pm-9p" remap="external"><citerefentry><refentrytitle>pm</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="pm-components-9p" remap="external"><citerefentry><refentrytitle>pm-components</refentrytitle><manvolnum>9P</manvolnum></citerefentry></olink> man pages show how properties are used in power management.
+Read the <olink targetdoc="group-refman" targetptr="sd-7d" remap="external"><citerefentry><refentrytitle>sd</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> man
+page as an example of how properties should be documented in device driver
+man pages.</para>
+</sect2><sect2 id="properties-18"><title>Creating and Updating Properties</title><para>To create a property for a driver, or to update an existing property,
+use an interface from the DDI driver update interfaces such as <olink targetdoc="group-refman" targetptr="ddi-prop-update-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="ddi-prop-update-string-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_string</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> with the
+appropriate property type. See <olink targetptr="properties-tbl-3" remap="internal">Table&nbsp;4&ndash;1</olink> for a list of available property interfaces. These interfaces are
+typically called from the driver's <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point. In the following
+example, <function>ddi_prop_update_string</function>creates a string property
+called <literal>pm-hardware-state</literal> with a value of <literal>needs-suspend-resume</literal>.</para><programlisting>/* The following code is to tell cpr that this device
+ * needs to be suspended and resumed.
+ */
+(void) ddi_prop_update_string(device, dip,
+    "pm-hardware-state", "needs-suspend-resume");</programlisting><para>In most cases, using a <function>ddi_prop_update</function> routine
+is sufficient for updating a property. Sometimes, however, the overhead of
+updating a property value that is subject to frequent change can cause performance
+problems. See <olink targetptr="properties-20" remap="internal">prop_op() Entry Point</olink> for
+a description of using a local instance of a property value to avoid using <function>ddi_prop_update</function>.</para>
+</sect2><sect2 id="properties-19"><title>Looking Up Properties</title><para>A driver can request a property from its parent, which in turn can ask
+its parent. The driver can control whether the request can go higher than
+its parent.</para><para><indexterm><primary>properties</primary><secondary><literal>prtconf</literal></secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary><secondary>displaying properties</secondary></indexterm>For example, the <literal>esp</literal> driver in the following example maintains an integer property
+called <literal>targetx-sync-speed</literal> for each target. The <literal>x</literal> in <literal>targetx-sync-speed</literal> represents the target number. The <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command displays
+driver properties in verbose mode. The following example shows a partial listing
+for the <literal>esp</literal> driver.</para><screen>% <userinput>prtconf -v</userinput>
+...
+       esp, instance #0
+            Driver software properties:
+                name &lt;target2-sync-speed&gt; length &lt;4&gt;
+                    value &lt;0x00000fa0&gt;.
+...</screen><para><indexterm><primary><function>ddi_prop_lookup</function> function</primary></indexterm>The following table provides a summary of the property interfaces.</para><table frame="topbot" pgwide="1" id="properties-tbl-3"><title>Property Interface
+Uses</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="column1" colwidth="88.00*"/><colspec colname="column2" colwidth="164.00*"/><colspec colname="column3" colwidth="143.99*"/><thead><row rowsep="1"><entry><para>Family</para>
+</entry><entry><para>Property Interfaces</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>ddi_prop_lookup</literal></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-exists-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_exists</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up a property and returns successfully if the property exists.
+Fails if the property does not exist</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-get-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_get_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns an integer property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-get-int64-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_get_int64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns a 64-bit integer property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-lookup-int-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_int_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns an integer array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-lookup-int64-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_int64_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns a 64-bit integer array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-lookup-string-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_string</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns a string property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-lookup-string-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_string_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns a string array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-lookup-byte-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup_byte_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Looks up and returns a byte array property</para>
+</entry>
+</row><row><entry><para><literal>ddi_prop_update</literal></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates an integer property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-int64-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates a single 64-bit integer property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-int-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates an integer array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-string-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_string</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates a string property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-string-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_string_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates a string array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-int64-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int64_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates a 64-bit integer array property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-update-byte-array-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_byte_array</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates or creates a byte array property</para>
+</entry>
+</row><row><entry><para><literal>ddi_prop_remove</literal></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-remove-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Removes a property</para>
+</entry>
+</row><row><entry><para></para>
+</entry><entry><para><olink targetdoc="group-refman" targetptr="ddi-prop-remove-all-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_remove_all</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Removes all properties that are associated with a device</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Whenever possible, use 64-bit versions of <type>int</type> property
+interfaces such as <olink targetdoc="group-refman" targetptr="ddi-prop-update-int64-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int64</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> instead of
+32-bit versions such as <olink targetdoc="group-refman" targetptr="ddi-prop-update-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>).</para>
+</sect2><sect2 id="properties-20"><title><function>prop_op</function> Entry Point</title><para>The <olink targetdoc="group-refman" targetptr="prop-op-9e" remap="external"><citerefentry><refentrytitle>prop_op</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point is generally required for reporting device properties or driver properties
+to the system. If the driver does not need to create or manage its own properties,
+then the <olink targetdoc="group-refman" targetptr="ddi-prop-op-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_op</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function can be used for this entry point.</para><para><olink targetdoc="group-refman" targetptr="ddi-prop-op-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_op</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> can be used as the <olink targetdoc="group-refman" targetptr="prop-op-9e" remap="external"><citerefentry><refentrytitle>prop_op</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for a device
+driver when <function>ddi_prop_op</function> is defined in the driver's <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. <function>ddi_prop_op</function> enables a leaf device to search for and obtain property
+values from the device's property list.</para><para>If the driver has to maintain a property whose value changes frequently,
+you should define a driver-specific <function>prop_op</function> routine within
+the <structname>cb_ops</structname> structure instead of calling <function>ddi_prop_op</function>. This technique avoids the inefficiency of using <function>ddi_prop_update</function> repeatedly. The driver should then maintain a copy of the property
+value either within its soft-state structure or in a driver variable.</para><para><indexterm><primary>properties</primary><secondary>reporting device properties</secondary></indexterm><indexterm><primary><function>prop_op</function> entry point</primary><secondary>description of</secondary></indexterm><indexterm><primary>properties</primary><secondary><literal>ddi_prop_op</literal></secondary></indexterm><indexterm><primary><function>ddi_prop_op</function> function</primary></indexterm>The <olink targetdoc="group-refman" targetptr="prop-op-9e" remap="external"><citerefentry><refentrytitle>prop_op</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point reports the values of specific driver properties and device properties
+to the system. In many cases, the <olink targetdoc="group-refman" targetptr="ddi-prop-op-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_op</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine can be used as the
+driver's <function>prop_op</function> entry point in the <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure. <function>ddi_prop_op</function> performs all of the required processing. <function>ddi_prop_op</function> is sufficient for drivers that do not require special processing
+when handling device property requests.</para><para>However, sometimes the driver must provide a <function>prop_op</function> entry
+point. For example, if a driver maintains a property whose value changes frequently,
+updating the property with <olink targetdoc="group-refman" targetptr="ddi-prop-update-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_update</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for each change is not efficient.
+Instead, the driver should maintain a shadow copy of the property in the instance's
+soft state. The driver would then update the shadow copy when the value changes
+without using any of the <function>ddi_prop_update</function> routines. The <function>prop_op</function> entry point must intercept requests for this property and
+use one of the <function>ddi_prop_update</function> routines to update the
+value of the property before passing the request to <function>ddi_prop_op</function> to
+process the property request.</para><para>In the following example, <function>prop_op</function> intercepts requests
+for the <literal>temperature</literal> property. The driver updates a variable
+in the state structure whenever the property changes. However, the property
+is updated only when a request is made. The driver then uses <function>ddi_prop_op</function> to process the property request. If the property request is not
+specific to a device, the driver does not intercept the request. This situation
+is indicated when the value of the <literal>dev</literal> parameter is equal
+to <literal>DDI_DEV_T_ANY</literal>, the wildcard device number.</para><example id="properties-ex-5"><title><function>prop_op</function> Routine</title><programlisting>static int
+xx_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int flags, char *name, caddr_t valuep, int *lengthp)
+{
+        minor_t instance;
+        struct xxstate *xsp;
+        if (dev != DDI_DEV_T_ANY) {
+                return (ddi_prop_op(dev, dip, prop_op, flags, name,
+                    valuep, lengthp));
+        }
+
+        instance = getminor(dev);
+        xsp = ddi_get_soft_state(statep, instance);
+        if (xsp == NULL)
+                return (DDI_PROP_NOTFOUND);
+        if (strcmp(name, "temperature") == 0) {
+                ddi_prop_update_int(dev, dip, name, temperature);
+        }
+
+        /* other cases */    
+}</programlisting>
+</example>
+</sect2>
+</sect1>
+</chapter><?Pub *0000020991 0?>

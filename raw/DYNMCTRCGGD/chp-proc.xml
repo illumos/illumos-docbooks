@@ -1,0 +1,687 @@
+<?Pub EntList bull rArr sect?><chapter id="chp-proc"><title><literal>proc</literal> Provider</title><highlights><para>The <literal>proc</literal> provider makes available probes pertaining
+to the following activities: process creation and termination, LWP creation
+and termination, executing new program images, and sending and handling signals.</para>
+</highlights><sect1 id="gelrh"><title>Probes</title><para><indexterm><primary><literal>proc</literal> probe</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>proc</literal></secondary></indexterm>The <literal>proc</literal> probes are described in <olink targetptr="tbl-proc" remap="internal">Table&nbsp;25&ndash;1</olink>.</para><table frame="topbot" id="tbl-proc"><title><literal>proc</literal> Probes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><thead><row><entry colname="colspec0" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec1" rowsep="1" valign="top"><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0"><para><literal>create</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a process is created using <olink targetdoc="refman2" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="forkall-2" remap="external"><citerefentry><refentrytitle>forkall</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="fork1-2" remap="external"><citerefentry><refentrytitle>fork1</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, or <olink targetdoc="refman2" targetptr="vfork-2" remap="external"><citerefentry><refentrytitle>vfork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. The <literal>psinfo_t</literal> corresponding
+to the new child process is pointed to by <literal>args[0]</literal>. You
+can distinguish <literal>vfork</literal> from the other fork variants by checking
+for <literal>PR_VFORKP</literal> in the <literal>pr_flag</literal> member
+of the forking thread's <literal>lwpsinfo_t</literal>. You can distinguish <literal>fork1</literal> from <literal>forkall</literal> by examining the <literal>pr_nlwp</literal> members of both the parent process's <literal>psinfo_t</literal> (<literal>curpsinfo</literal>) and the child process's <literal>psinfo_t</literal> (<literal>args[0]</literal>). Because the <literal>create</literal> probe only fires
+after the process has been successfully created, and because LWP creation
+is part of creating a process, <literal>lwp-create</literal> will fire for
+any LWPs created at process creation time <emphasis>before</emphasis> the <literal>create</literal> probe fires for the new process.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>exec</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires whenever a process loads a new process image with a
+variant of the <olink targetdoc="refman2" targetptr="exec-2" remap="external"><citerefentry><refentrytitle>exec</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call: <olink targetdoc="refman2" targetptr="exec-2" remap="external"><citerefentry><refentrytitle>exec</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="execle-2" remap="external"><citerefentry><refentrytitle>execle</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="execlp-2" remap="external"><citerefentry><refentrytitle>execlp</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="execv-2" remap="external"><citerefentry><refentrytitle>execv</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="execve-2" remap="external"><citerefentry><refentrytitle>execve</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="execvp-2" remap="external"><citerefentry><refentrytitle>execvp</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. The <literal>exec</literal> probe
+fires <emphasis>before</emphasis> the process image is loaded. Process variables
+like <literal>execname</literal> and <literal>curpsinfo</literal> therefore
+contain the process state before the image is loaded. Some time after the <literal>exec</literal> probe fires, either the <literal>exec-failure</literal> probe
+or the <literal>exec-success</literal> probe will subsequently fire in the
+same thread. The path of the new process image is pointed to by <literal>args[0]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>exec-failure</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when an <olink targetdoc="refman2" targetptr="exec-2" remap="external"><citerefentry><refentrytitle>exec</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> variant
+has failed. The <literal>exec-failure</literal> probe fires only after the <literal>exec</literal> probe has fired in the same thread. The <olink targetdoc="refman3a" targetptr="errno-3c" remap="external"><citerefentry><refentrytitle>errno</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> value is provided in <literal>args[0]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>exec-success</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when an <olink targetdoc="refman2" targetptr="exec-2" remap="external"><citerefentry><refentrytitle>exec</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> variant
+has succeeded. Like the <literal>exec-failure</literal> probe, the <literal>exec-success</literal> probe fires only after the <literal>exec</literal> probe has fired
+in the same thread. By the time the <literal>exec-success</literal> probe
+fires, process variables like <literal>execname</literal> and <literal>curpsinfo</literal> contain
+the process state after the new process image has been loaded.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>exit</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when the current process is exiting. The reason for
+exit, which is expressed as one of the <literal>SIGCHLD</literal> <olink targetdoc="refman3f" targetptr="siginfo.h-3head" remap="external"><citerefentry><refentrytitle>siginfo.h</refentrytitle><manvolnum>3HEAD</manvolnum></citerefentry></olink> codes,
+is contained in <literal>args[0]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>fault</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a thread experiences a machine fault. The fault
+code (as defined in <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>)
+is in <literal>args[0]</literal>. The <literal>siginfo</literal> structure
+corresponding to the fault is pointed to by <literal>args[1]</literal>. Only
+those faults that induce a signal can trigger the <literal>fault</literal> probe.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>lwp-create</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when an LWP is created, typically as a result of <olink targetdoc="refman3a" targetptr="thr-create-3c" remap="external"><citerefentry><refentrytitle>thr_create</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>. The <literal>lwpsinfo_t</literal> corresponding to the new thread is pointed to by <literal>args[0]</literal>.
+The <literal>psinfo_t</literal> of the process containing the thread is pointed
+to by <literal>args[1]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>lwp-start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires within the context of a newly created LWP. The <literal>lwp-start</literal> probe will fire before any user-level instructions are executed.
+If the LWP is the first LWP in the process, the <literal>start</literal> probe
+will fire, followed by <literal>lwp-start</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>lwp-exit</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when an LWP is exiting, due either to a signal or to
+an explicit call to <olink targetdoc="refman3a" targetptr="thr-exit-3c" remap="external"><citerefentry><refentrytitle>thr_exit</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>signal-discard</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a signal is sent to a single-threaded process,
+and the signal is both unblocked and ignored by the process. Under these conditions,
+the signal is discarded on generation. The <literal>lwpsinfo_t</literal> and <literal>psinfo_t</literal> of the target process and thread are in <literal>args[0]</literal> and <literal>args[1]</literal>, respectively. The signal number is in <literal>args[2]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>signal-send</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires when a signal is sent to a thread or process. The <literal>signal-send</literal> probe fires in the context of the sending process and
+thread. The <literal>lwpsinfo_t</literal> and <literal>psinfo_t</literal> of
+the receiving process and thread are in <literal>args[0]</literal> and <literal>args[1]</literal>, respectively. The signal number is in <literal>args[2]</literal>. <literal>signal-send</literal> is always followed by <literal>signal-handle</literal> or <literal>signal-clear</literal> in the receiving process and thread.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>signal-handle</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires immediately before a thread handles a signal. The <literal>signal-handle</literal> probe fires in the context of the thread that will
+handle the signal. The signal number is in <literal>args[0]</literal>. A pointer
+to the <literal>siginfo_t</literal> structure that corresponds to the signal
+is in <literal>args[1]</literal>. The value of <literal>args[1]</literal> is
+NULL if there is no <literal>siginfo_t</literal> structure or
+if the signal handler does not have the <literal>SA_SIGINFO</literal> flag
+set. The address of the signal handler in the process is in <literal>args[2]</literal>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>signal-clear</literal></para>
+</entry><entry colname="colspec1"><para>Probes that fires when a pending signal is cleared because the target
+thread was waiting for the signal in <olink targetdoc="refman2" targetptr="sigwait-2" remap="external"><citerefentry><refentrytitle>sigwait</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman3d" targetptr="sigwaitinfo-3rt" remap="external"><citerefentry><refentrytitle>sigwaitinfo</refentrytitle><manvolnum>3RT</manvolnum></citerefentry></olink>, or <olink targetdoc="refman3d" targetptr="sigtimedwait-3rt" remap="external"><citerefentry><refentrytitle>sigtimedwait</refentrytitle><manvolnum>3RT</manvolnum></citerefentry></olink>. Under these conditions,
+the pending signal is cleared and the signal number is returned to the caller.
+The signal number is in <literal>args[0]</literal>. <literal>signal-clear</literal> fires
+in the context of the formerly waiting thread.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>start</literal></para>
+</entry><entry colname="colspec1"><para>Probe that fires in the context of a newly created process. The <literal>start</literal> probe will fire before any user-level instructions are executed
+in the process.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="gelse"><title>Arguments</title><para><indexterm><primary><literal>proc</literal> probe</primary><secondary>arguments</secondary></indexterm>The argument types for the <literal>proc</literal> probes
+are listed in <olink targetptr="tbl-proc-args" remap="internal">Table&nbsp;25&ndash;2</olink>. The
+arguments are described in <olink targetptr="tbl-proc" remap="internal">Table&nbsp;25&ndash;1</olink>.</para><table frame="topbot" id="tbl-proc-args"><title><literal>proc</literal> Probe
+Arguments</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec2" colwidth="1.20in" align="center"/><colspec colname="colspec4" colwidth="1.20in" align="center"/><colspec colname="colspec3" colwidth="1.20in" align="center"/><thead><row><entry colname="colspec0" colsep="1" rowsep="1" valign="top"><para>Probe</para>
+</entry><entry colname="colspec2" rowsep="1" valign="top"><para><literal>args[0]</literal></para>
+</entry><entry colname="colspec4" rowsep="1" valign="top"><para><literal>args[1]</literal></para>
+</entry><entry colname="colspec3" rowsep="1" valign="top"><para><literal>args[2]</literal></para>
+</entry>
+</row>
+</thead><tbody><row><entry colname="colspec0" colsep="1"><para><literal>create</literal></para>
+</entry><entry colname="colspec2"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>exec</literal></para>
+</entry><entry colname="colspec2"><para><literal>char *</literal></para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>exec-failure</literal></para>
+</entry><entry colname="colspec2"><para><literal>int</literal></para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>exit</literal></para>
+</entry><entry colname="colspec2"><para><literal>int</literal></para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>fault</literal></para>
+</entry><entry colname="colspec2"><para><literal>int</literal></para>
+</entry><entry colname="colspec4"><para><literal>siginfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>lwp-create</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>lwp-start</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>lwp-exit</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>signal-discard</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>int</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>signal-discard</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>int</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>signal-send</literal></para>
+</entry><entry colname="colspec2"><para><literal>lwpsinfo_t *</literal></para>
+</entry><entry colname="colspec4"><para><literal>psinfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>int</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>signal-handle</literal></para>
+</entry><entry colname="colspec2"><para><literal>int</literal></para>
+</entry><entry colname="colspec4"><para><literal>siginfo_t *</literal></para>
+</entry><entry colname="colspec3"><para><literal>void (*)(void)</literal></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>signal-clear</literal></para>
+</entry><entry colname="colspec2"><para><literal>int</literal></para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="1"><para><literal>start</literal></para>
+</entry><entry colname="colspec2"><para>&mdash;</para>
+</entry><entry colname="colspec4"><para>&mdash;</para>
+</entry><entry colname="colspec3"><para>&mdash;</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="chp-proc-lwpsinfo"><title><literal>lwpsinfo_t</literal></title><para><indexterm><primary><literal>lwpsinfo_t</literal></primary></indexterm>Several <literal>proc</literal> probes have arguments of type <literal>lwpsinfo_t</literal>,
+a structure that is documented in <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.
+The definition of the <literal>lwpsinfo_t</literal> structure as available
+to DTrace consumers is as follows:</para><programlisting>typedef struct lwpsinfo {
+	int pr_flag;              /* flags; see below */
+	id_t pr_lwpid;            /* LWP id */
+	uintptr_t pr_addr;        /* internal address of thread */
+	uintptr_t pr_wchan;       /* wait addr for sleeping thread */
+	char pr_stype;            /* synchronization event type */
+	char pr_state;            /* numeric thread state */
+	char pr_sname;            /* printable character for pr_state */
+	char pr_nice;             /* nice for cpu usage */
+	short pr_syscall;         /* system call number (if in syscall) */
+	int pr_pri;               /* priority, high value = high priority */
+	char pr_clname[PRCLSZ];   /* scheduling class name */
+	processorid_t pr_onpro;   /* processor which last ran this thread */
+	processorid_t pr_bindpro; /* processor to which thread is bound */
+	psetid_t pr_bindpset;     /* processor set to which thread is bound */
+} lwpsinfo_t;</programlisting><para>The <literal>pr_flag</literal> field is a bit-mask holding flags describing
+the process. These flags and their meanings are described in <olink targetptr="tbl-sched-flags" remap="internal">Table&nbsp;25&ndash;3</olink>.</para><table frame="topbot" id="tbl-sched-flags"><title><literal>pr_flag</literal> Values</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><tbody><row><entry colname="colspec0"><para><literal>PR_ISSYS</literal></para>
+</entry><entry colname="colspec1"><para>The process is a system process.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_VFORKP</literal></para>
+</entry><entry colname="colspec1"><para>The process is the parent of a <olink targetdoc="refman2" targetptr="vfork-2" remap="external"><citerefentry><refentrytitle>vfork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>'d child.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_FORK</literal></para>
+</entry><entry colname="colspec1"><para>The process has its inherit-on-fork mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_RLC</literal></para>
+</entry><entry colname="colspec1"><para>The process has its run-on-last-close mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_KLC</literal></para>
+</entry><entry colname="colspec1"><para>The process has its kill-on-last-close mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_ASYNC</literal></para>
+</entry><entry colname="colspec1"><para>The process has its asynchronous-stop mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_MSACCT</literal></para>
+</entry><entry colname="colspec1"><para>The process has microstate accounting enabled.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_MSFORK</literal></para>
+</entry><entry colname="colspec1"><para>The process microstate accounting is inherited on fork.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_BPTADJ</literal></para>
+</entry><entry colname="colspec1"><para>The process has its breakpoint adjustment mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_PTRACE</literal></para>
+</entry><entry colname="colspec1"><para>The process has its <olink targetdoc="refman3a" targetptr="ptrace-3c" remap="external"><citerefentry><refentrytitle>ptrace</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>-compatibility
+mode set.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_STOPPED</literal></para>
+</entry><entry colname="colspec1"><para>The thread is an LWP that is stopped.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_ISTOP</literal></para>
+</entry><entry colname="colspec1"><para>The thread is an LWP stopped on an event of interest.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_DSTOP</literal></para>
+</entry><entry colname="colspec1"><para>The thread is an LWP that has a stop directive in effect.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_STEP</literal></para>
+</entry><entry colname="colspec1"><para>The thread is an LWP that has a single-step directive in effect.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_ASLEEP</literal></para>
+</entry><entry colname="colspec1"><para>The thread is an LWP in an interruptible sleep within a system call.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_DETACH</literal></para>
+</entry><entry colname="colspec1"><para>The thread is a detached LWP. See <olink targetdoc="refman3a" targetptr="pthread-create-3c" remap="external"><citerefentry><refentrytitle>pthread_create</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> and <olink targetdoc="refman3a" targetptr="pthread-join-3c" remap="external"><citerefentry><refentrytitle>pthread_join</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_DAEMON</literal></para>
+</entry><entry colname="colspec1"><para>The thread is a daemon LWP. See <olink targetdoc="refman3a" targetptr="pthread-create-3c" remap="external"><citerefentry><refentrytitle>pthread_create</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_AGENT</literal></para>
+</entry><entry colname="colspec1"><para>The thread is the agent LWP for the process.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>PR_IDLE</literal></para>
+</entry><entry colname="colspec1"><para>The thread is the idle thread for a CPU. Idle threads only run on a
+CPU when the run queues for the CPU are empty.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <literal>pr_addr</literal> field is the address of a private, in-kernel
+data structure representing the thread. While the data structure is private,
+the <literal>pr_addr</literal> field may be used as a token unique to a thread
+for the thread's lifetime.</para><para>The <literal>pr_wchan</literal> field is set when the thread is sleeping
+on a synchronization object. The meaning of the <literal>pr_wchan</literal> field
+is private to the kernel implementation, but the field may be used as a token
+unique to the synchronization object.</para><para>The <literal>pr_stype</literal> field is set when the thread is sleeping
+on a synchronization object. The possible values for the <literal>pr_stype</literal> field
+are in <olink targetptr="tbl-sched-sobj" remap="internal">Table&nbsp;25&ndash;4</olink>.</para><table frame="topbot" id="tbl-sched-sobj"><title><literal>pr_stype</literal> Values</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="1.33in"/><colspec colname="colspec1" colwidth="3.67in"/><tbody><row><entry colname="colspec0"><para><literal>SOBJ_MUTEX</literal></para>
+</entry><entry colname="colspec1"><para>Kernel mutex synchronization object. Used to serialize access to shared
+data regions in the kernel. See <olink targetptr="chp-lockstat" remap="internal">Chapter&nbsp;18,
+lockstat Provider</olink> and <olink targetdoc="refman9f" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for details on kernel mutex
+synchronization objects.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_RWLOCK</literal></para>
+</entry><entry colname="colspec1"><para>Kernel readers/writer synchronization object. Used to synchronize access
+to shared objects in the kernel that can allow multiple concurrent readers
+or a single writer. See <olink targetptr="chp-lockstat" remap="internal">Chapter&nbsp;18, lockstat
+Provider</olink> and <olink targetdoc="refman9f" targetptr="rwlock-9f" remap="external"><citerefentry><refentrytitle>rwlock</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for
+details on kernel readers/writer synchronization objects.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_CV</literal></para>
+</entry><entry colname="colspec1"><para>Condition variable synchronization object. A condition variable is designed
+to wait indefinitely until some condition becomes true. Condition variables
+are typically used to synchronize for reasons other than access to a shared
+data region, and are the mechanism generally used when a process performs
+a program-directed indefinite wait. For example, blocking in <olink targetdoc="refman2" targetptr="poll-2" remap="external"><citerefentry><refentrytitle>poll</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="pause-2" remap="external"><citerefentry><refentrytitle>pause</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="wait-3c" remap="external"><citerefentry><refentrytitle>wait</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, and the like.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_SEMA</literal></para>
+</entry><entry colname="colspec1"><para>Semaphore synchronization object. A general-purpose synchronization
+object that &ndash; like condition variable objects &ndash; does not track
+a notion of ownership. Because ownership is required to implement priority
+inheritance in the Solaris kernel, the lack of ownership inherent in semaphore
+objects inhibits their widespread use. See <olink targetdoc="refman9f" targetptr="semaphore-9f" remap="external"><citerefentry><refentrytitle>semaphore</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> for details.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_USER</literal></para>
+</entry><entry colname="colspec1"><para>A user-level synchronization object. All blocking on user-level synchronization
+objects is handled with <literal>SOBJ_USER</literal> synchronization objects.
+User-level synchronization objects include those created with <olink targetdoc="refman3a" targetptr="mutex-init-3c" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="sema-init-3c" remap="external"><citerefentry><refentrytitle>sema_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="rwlock-init-3c" remap="external"><citerefentry><refentrytitle>rwlock_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="cond-init-3c" remap="external"><citerefentry><refentrytitle>cond_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> and their
+POSIX equivalents.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_USER_PI</literal></para>
+</entry><entry colname="colspec1"><para>A user-level synchronization object that implements priority inheritance.
+Some user-level synchronization objects that track ownership additionally
+allow for priority inheritance. For example, mutex objects created with <olink targetdoc="refman3a" targetptr="pthread-mutex-init-3c" remap="external"><citerefentry><refentrytitle>pthread_mutex_init</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> may be made to inherit priority using <olink targetdoc="refman3a" targetptr="pthread-mutexattr-setprotocol-3c" remap="external"><citerefentry><refentrytitle>pthread_mutexattr_setprotocol</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>.</para>
+</entry>
+</row><row><entry colname="colspec0"><para><literal>SOBJ_SHUTTLE</literal></para>
+</entry><entry colname="colspec1"><para>A shuttle synchronization object. Shuttle objects are used to implement
+doors. See door_create(3DOOR) for more information.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <literal>pr_state</literal> field is set to one of the values in <olink targetptr="tbl-sched-state" remap="internal">Table&nbsp;25&ndash;5</olink>. The <literal>pr_sname</literal> field
+is set to a corresponding character shown in parentheses in the same table.</para><table frame="topbot" id="tbl-sched-state"><title><literal>pr_state</literal> Values</title><tgroup cols="2"><colspec colname="col1" colwidth="1.33in"/><colspec colname="col2" colwidth="3.67in"/><tbody><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SSLEEP</literal> (<literal>S</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is sleeping. The <literal>sched:::sleep</literal> probe will
+fire immediately before a thread's state is transitioned to <literal>SSLEEP</literal>.</para>
+</entry>
+</row><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SRUN</literal> (<literal>R</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is runnable, but is not currently running. The <literal>sched:::enqueue</literal> probe will fire immediately before a thread's state is transitioned
+to <literal>SRUN</literal>.</para>
+</entry>
+</row><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SZOMB</literal> (<literal>Z</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is a zombie LWP.</para>
+</entry>
+</row><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SSTOP</literal> (<literal>T</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is stopped, either due to an explicit <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> directive or some other stopping mechanism.</para>
+</entry>
+</row><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SIDL</literal> (<literal>I</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is an intermediate state during process creation.</para>
+</entry>
+</row><row><entry colname="col1" colsep="0" rowsep="0"><para><literal>SONPROC</literal> (<literal>O</literal>)</para>
+</entry><entry colname="col2" colsep="0" rowsep="0"><para>The thread is running on a CPU. The <literal>sched:::on-cpu</literal> probe
+will fire in the context of the <literal>SONPROC</literal> thread a short
+time after the thread's state is transitioned to <literal>SONPROC</literal>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="chp-proc-psinfo"><title><literal>psinfo_t</literal></title><para><indexterm><primary><literal>psinfo_t</literal></primary></indexterm>Several <literal>proc</literal> probes have an argument of type <literal>psinfo_t</literal>,
+a structure that is documented in <olink targetdoc="refman4" targetptr="proc-4" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.
+The definition of the <literal>psinfo_t</literal> structure as available to
+DTrace consumers is as follows:</para><programlisting>typedef struct psinfo {
+	int     pr_nlwp;            /* number of active lwps in the process */
+	pid_t   pr_pid;             /* unique process id */
+	pid_t   pr_ppid;            /* process id of parent */
+	pid_t   pr_pgid;            /* pid of process group leader */
+	pid_t   pr_sid;             /* session id */
+	uid_t   pr_uid;             /* real user id */
+	uid_t   pr_euid;            /* effective user id */
+	gid_t   pr_gid;             /* real group id */
+	gid_t   pr_egid;            /* effective group id */
+	uintptr_t pr_addr;          /* address of process */
+	dev_t   pr_ttydev;          /* controlling tty device (or PRNODEV) */
+	timestruc_t pr_start;       /* process start time, from the epoch */
+	char    pr_fname[PRFNSZ];   /* name of execed file */
+	char    pr_psargs[PRARGSZ]; /* initial characters of arg list */
+	int     pr_argc;            /* initial argument count */
+	uintptr_t pr_argv;          /* address of initial argument vector */
+	uintptr_t pr_envp;          /* address of initial environment vector */
+	char    pr_dmodel;          /* data model of the process */
+	taskid_t pr_taskid;         /* task id */
+	projid_t pr_projid;         /* project id */
+	poolid_t pr_poolid;         /* pool id */
+	zoneid_t pr_zoneid;         /* zone id */
+} psinfo_t;</programlisting><para>The <literal>pr_dmodel</literal> field is set to either <literal>PR_MODEL_ILP32</literal>, denoting a 32&ndash;bit process, or <literal>PR_MODEL_LP64</literal>,
+denoting a 64&ndash;bit process.</para>
+</sect2>
+</sect1><sect1 id="gelrt"><title>Examples</title><sect2 id="chp-proc-1"><title><literal>exec</literal></title><para><indexterm><primary>examples</primary><secondary><literal>exec</literal> probe</secondary></indexterm><indexterm><primary><literal>exec</literal> probes</primary></indexterm><indexterm><primary>probes</primary><secondary><literal>exec</literal></secondary></indexterm>You can use the <literal>exec</literal> probe to easily determine
+which programs are being executed, and by whom, as shown in the following
+example:</para><programlisting>#pragma D option quiet
+
+proc:::exec
+{
+        self-&gt;parent = execname;
+}
+
+proc:::exec-success
+/self-&gt;parent != NULL/
+{
+	@[self-&gt;parent, execname] = count();
+	self-&gt;parent = NULL;
+}
+
+proc:::exec-failure
+/self-&gt;parent != NULL/
+{
+	self-&gt;parent = NULL;
+}
+
+END
+{
+	printf("%-20s %-20s %s\n", "WHO", "WHAT", "COUNT");
+	printa("%-20s %-20s %@d\n", @);
+}</programlisting><para>Running the example script for a short period of time on a build machine
+results in output similar to the following example:</para><screen><userinput># dtrace -s ./whoexec.d</userinput>
+<userinput>^C</userinput>
+WHO                  WHAT                 COUNT
+make.bin             yacc                 1
+tcsh                 make                 1
+make.bin             spec2map             1
+sh                   grep                 1
+lint                 lint2                1
+sh                   lint                 1
+sh                   ln                   1
+cc                   ld                   1
+make.bin             cc                   1
+lint                 lint1                1
+sh                   lex                  1
+make.bin             mv                   2
+sh                   sh                   3
+sh                   make                 3
+sh                   sed                  4
+sh                   tr                   4
+make                 make.bin             4
+sh                   install.bin          5
+sh                   rm                   6
+cc                   ir2hf                33
+cc                   ube                  33
+sh                   date                 34
+sh                   mcs                  34
+cc                   acomp                34
+sh                   cc                   34
+sh                   basename             34
+basename             expr                 34
+make.bin             sh                   87</screen>
+</sect2><sect2 id="chp-proc-2"><title><literal>start</literal> and <literal>exit</literal></title><para><indexterm><primary>probes</primary><secondary><literal>exit</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>start</literal></secondary></indexterm><indexterm><primary><literal>start</literal> probe</primary></indexterm><indexterm><primary><literal>exit</literal> probe</primary></indexterm>If you want to know how long programs are running from creation
+to termination, you can enable the <literal>start</literal> and <literal>exit</literal> probes,
+as shown in the following example:</para><programlisting>proc:::start
+{
+	self-&gt;start = timestamp;
+}
+
+proc:::exit
+/self-&gt;start/
+{
+	@[execname] = quantize(timestamp - self-&gt;start);
+	self-&gt;start = 0;
+}</programlisting><para>Running the example script on the build server for several seconds results
+in output similar to the following example:</para><screen><userinput># dtrace -s ./progtime.d</userinput>
+dtrace: script './progtime.d' matched 2 probes
+<userinput>^C</userinput>
+
+  ir2hf                                             
+           value  ------------- Distribution ------------- count
+         4194304 |                                         0        
+         8388608 |@                                        1        
+        16777216 |@@@@@@@@@@@@@@@@                         14       
+        33554432 |@@@@@@@@@@                               9        
+        67108864 |@@@                                      3        
+       134217728 |@                                        1        
+       268435456 |@@@@                                     4        
+       536870912 |@                                        1        
+      1073741824 |                                         0        
+
+  ube                                               
+           value  ------------- Distribution ------------- count
+        16777216 |                                         0        
+        33554432 |@@@@@@@                                  6        
+        67108864 |@@@                                      3        
+       134217728 |@@                                       2        
+       268435456 |@@@@                                     4        
+       536870912 |@@@@@@@@@@@@                             10       
+      1073741824 |@@@@@@@                                  6        
+      2147483648 |@@                                       2        
+      4294967296 |                                         0        
+
+  acomp                                             
+           value  ------------- Distribution ------------- count
+         8388608 |                                         0        
+        16777216 |@@                                       2        
+        33554432 |                                         0        
+        67108864 |@                                        1        
+       134217728 |@@@                                      3        
+       268435456 |                                         0        
+       536870912 |@@@@@                                    5        
+      1073741824 |@@@@@@@@@@@@@@@@@@@@@@@@@                22       
+      2147483648 |@                                        1        
+      4294967296 |                                         0        
+
+  cc                                                
+           value  ------------- Distribution ------------- count
+        33554432 |                                         0        
+        67108864 |@@@                                      3        
+       134217728 |@                                        1        
+       268435456 |                                         0        
+       536870912 |@@@@                                     4        
+      1073741824 |@@@@@@@@@@@@@@                           13       
+      2147483648 |@@@@@@@@@@@@                             11       
+      4294967296 |@@@                                      3        
+      8589934592 |                                         0        
+
+  sh                                                
+           value  ------------- Distribution ------------- count
+          262144 |                                         0        
+          524288 |@                                        5        
+         1048576 |@@@@@@@                                  29       
+         2097152 |                                         0        
+         4194304 |                                         0        
+         8388608 |@@@                                      12       
+        16777216 |@@                                       9        
+        33554432 |@@                                       9        
+        67108864 |@@                                       8        
+       134217728 |@                                        7        
+       268435456 |@@@@@                                    20       
+       536870912 |@@@@@@                                   26       
+      1073741824 |@@@                                      14       
+      2147483648 |@@                                       11       
+      4294967296 |                                         3        
+      8589934592 |                                         1        
+     17179869184 |                                         0        
+
+  make.bin                                          
+           value  ------------- Distribution ------------- count
+        16777216 |                                         0        
+        33554432 |@                                        1        
+        67108864 |@                                        1        
+       134217728 |@@                                       2        
+       268435456 |                                         0        
+       536870912 |@@                                       2        
+      1073741824 |@@@@@@@@@                                9        
+      2147483648 |@@@@@@@@@@@@@@@                          14       
+      4294967296 |@@@@@@                                   6        
+      8589934592 |@@                                       2        
+     17179869184 |                                         0</screen>
+</sect2><sect2 id="chp-proc-3"><title><literal>lwp-start</literal> and <literal>lwp-exit</literal></title><para><indexterm><primary>probes</primary><secondary><literal>lwp-exit</literal></secondary></indexterm><indexterm><primary>probes</primary><secondary><literal>lwp-start</literal></secondary></indexterm><indexterm><primary><literal>lwp-start</literal> probe</primary></indexterm><indexterm><primary><literal>lwp-exit</literal> probe</primary></indexterm>Instead of knowing the amount of time that a particular process
+takes to run, you might want to know how long individual threads take to run.
+The following example shows how to use the <literal>lwp-start</literal> and <literal>lwp-exit</literal> probes for this purpose:</para><programlisting>proc:::lwp-start
+/tid != 1/
+{
+	self-&gt;start = timestamp;
+}
+
+proc:::lwp-exit
+/self-&gt;start/
+{
+	@[execname] = quantize(timestamp - self-&gt;start);
+	self-&gt;start = 0;
+}</programlisting><para>Running the example script on an NFS and calendar server results in
+output similar to the following example:</para><screen><userinput># dtrace -s ./lwptime.d</userinput>
+dtrace: script './lwptime.d' matched 3 probes
+<userinput>^C</userinput>
+
+  nscd                                              
+           value  ------------- Distribution ------------- count
+          131072 |                                         0        
+          262144 |@                                        18       
+          524288 |@@                                       24       
+         1048576 |@@@@@@@                                  75       
+         2097152 |@@@@@@@@@@@@@@@@@@@@@@@                  245      
+         4194304 |@@                                       22       
+         8388608 |@@                                       24       
+        16777216 |                                         6        
+        33554432 |                                         3        
+        67108864 |                                         1        
+       134217728 |                                         1        
+       268435456 |                                         0        
+
+  mountd                                            
+           value  ------------- Distribution ------------- count
+          524288 |                                         0        
+         1048576 |@                                        15       
+         2097152 |@                                        24       
+         4194304 |@@@                                      51       
+         8388608 |@                                        17       
+        16777216 |@                                        24       
+        33554432 |@                                        15       
+        67108864 |@@@@                                     57       
+       134217728 |@                                        28       
+       268435456 |@                                        26       
+       536870912 |@@                                       39       
+      1073741824 |@@@                                      45       
+      2147483648 |@@@@@                                    72       
+      4294967296 |@@@@@                                    77       
+      8589934592 |@@@                                      55       
+     17179869184 |                                         14       
+     34359738368 |                                         2        
+     68719476736 |                                         0        
+
+  automountd                                        
+           value  ------------- Distribution ------------- count
+         1048576 |                                         0        
+         2097152 |                                         3        
+         4194304 |@@@@                                     146      
+         8388608 |                                         6        
+        16777216 |                                         6        
+        33554432 |                                         9        
+        67108864 |@@@@@                                    203      
+       134217728 |@@                                       87       
+       268435456 |@@@@@@@@@@@@@@@                          534      
+       536870912 |@@@@@@                                   223      
+      1073741824 |@                                        45       
+      2147483648 |                                         20       
+      4294967296 |                                         26       
+      8589934592 |                                         20       
+     17179869184 |                                         19       
+     34359738368 |                                         7        
+     68719476736 |                                         2        
+    137438953472 |                                         0        
+
+  iCald
+           value  ------------- Distribution ------------- count
+         8388608 |                                         0        
+        16777216 |@@@@@@@                                  20       
+        33554432 |@@@                                      9        
+        67108864 |@@                                       8        
+       134217728 |@@@@@                                    16       
+       268435456 |@@@@                                     11       
+       536870912 |@@@@                                     11       
+      1073741824 |@                                        4        
+      2147483648 |                                         2        
+      4294967296 |                                         0        
+      8589934592 |@@                                       8        
+     17179869184 |@                                        5        
+     34359738368 |@                                        4        
+     68719476736 |@@                                       6        
+    137438953472 |@                                        4        
+    274877906944 |                                         2        
+    549755813888 |                                         0</screen>
+</sect2><sect2 id="chp-proc-4"><title><literal>signal-send</literal></title><para><indexterm><primary>probes</primary><secondary><literal>signal-send</literal></secondary></indexterm><indexterm><primary><literal>signal-send</literal> probe</primary></indexterm>You can use the <literal>signal-send</literal> probe to determine
+the sending and receiving process associated with any signal, as shown in
+the following example:</para><programlisting>#pragma D option quiet
+
+proc:::signal-send
+{
+	@[execname, stringof(args[1]-&gt;pr_fname), args[2]] = count();
+}
+
+END
+{
+	printf("%20s %20s %12s %s\n",
+	    "SENDER", "RECIPIENT", "SIG", "COUNT");
+	printa("%20s %20s %12d %@d\n", @);
+}</programlisting><para>Running this script results in output similar to the following example:</para><screen><userinput># dtrace -s ./sig.d</userinput>
+<userinput>^C</userinput>
+              SENDER            RECIPIENT          SIG COUNT
+               xterm               dtrace            2 1
+               xterm          soffice.bin            2 1
+                  tr                 init           18 1
+               sched                 test           18 1
+               sched                fvwm2           18 1
+                bash                 bash           20 1
+                 sed                 init           18 2
+               sched                  ksh           18 15
+               sched                 Xsun           22 471</screen>
+</sect2>
+</sect1><sect1 id="chp-proc-stability"><title>Stability</title><para><indexterm><primary><literal>proc</literal> probe</primary><secondary>stability</secondary></indexterm><indexterm><primary>stability</primary><secondary><literal>proc</literal></secondary></indexterm>The <literal>proc</literal> provider
+uses DTrace's stability mechanism to describe its stabilities, as shown in
+the following table. For more information about the stability mechanism, see <olink targetptr="chp-stab" remap="internal">Chapter&nbsp;39, Stability</olink>.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry colsep="1"><para>Element</para>
+</entry><entry><para>Name stability</para>
+</entry><entry><para>Data stability</para>
+</entry><entry><para>Dependency class</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="1"><para>Provider</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Module</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Function</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Private</para>
+</entry><entry><para>Unknown</para>
+</entry>
+</row><row><entry colsep="1"><para>Name</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row><row><entry colsep="1"><para>Arguments</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para>Evolving</para>
+</entry><entry><para><acronym>ISA</acronym></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter><?Pub *0000052441 0?>
