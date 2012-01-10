@@ -19,6 +19,23 @@
     <xsl:template match="//remark">
         <p><xsl:apply-templates /></p>
     </xsl:template>
+
+    <!-- 
+
+	 For some reason we have absolutely no xslt rules for the indexterm
+	 sections. Without these rules we have two problems
+
+	 1) The keywords we've inserted aren't going to be stripped out and
+	    instead are going to end up in the actual text.
+
+	 2) The index isn't going to contain anything.
+
+	 The following piece of XSLT solves problem 1, but not problem 2.
+	 Problem 2 is much harder problem than the other, but it's all software,
+	 so it can be fixed.
+
+    -->
+    <xsl:template match='//indexterm'></xsl:template>
     
     <!-- Variable List and kids -->
     <xsl:template match="//variablelist">
