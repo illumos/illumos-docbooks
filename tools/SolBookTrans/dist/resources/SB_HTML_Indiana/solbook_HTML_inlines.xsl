@@ -36,6 +36,9 @@
 
     -->
     <xsl:template match='//indexterm'></xsl:template>
+
+    <!-- TODO In the future this should go to the online man pages -->
+    <xsl:template match='manvolnum'>(<xsl:apply-templates />)</xsl:template>
     
     <!-- Variable List and kids -->
     <xsl:template match="//variablelist">
