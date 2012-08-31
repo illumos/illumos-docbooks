@@ -103,9 +103,8 @@ public class Main {
             System.out.println("Preparing to run transform " + transType.getTransName() + " on file " + srcFile.getPath());
             solbookTransform.runTransform();
         } catch (Exception e) {
-            System.out.println(e.getMessage());
-            System.out.println("TRANSFORMATION FAILURE");
-            return;
+            System.err.println(e.getMessage());
+	    System.exit(1);
         }
     }
     
