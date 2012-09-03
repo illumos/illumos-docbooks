@@ -377,6 +377,95 @@ services required of the kernel. To better understand these phases, you might
 want to understand which system calls are being called when. If so, you could
 change the D script to aggregate on the variable <literal>probefunc</literal> instead
 of a constant string.</para>
+
+<para> 
+For some operations, visibility into microsecond resolution is critical, while
+for other (longer) operations, millisecond resolution is sufficient – and some
+classes of operations may take hundreds or thousands of milliseconds to
+complete. If one makes the wrong choice as the resolution of aggregation, one
+either ends up clogging the system with unnecessarily fine-grained data, or
+discarding valuable information in overly coarse-grained data. One might think
+that one could infer the interesting latency range from the nature of the
+operation, but this is unfortunately not the case: I/O operations (a
+typically-millisecond resolution operation) can take but microseconds, and CPU
+scheduling operations (a typically-microsecond resolution operation) can take
+hundreds of milliseconds. Indeed, the problem is that one often does not know
+what order of magnitude of resolution is interesting for a particular operation
+until one has a feel for the data for the specific operation — one needs to
+instrument the system to best know how to instrument the system! To understand
+this case use the <function>llquantize</function> aggregating function.
+</para>
+
+<para>Here is a simple example of how the aggregation is both logarithmic and
+linear:</para>
+<programlisting>
+tick-1ms
+{
+	/*
+	 * A log-linear quantization with factor of 10 ranging from magnitude
+	 * 0 to magnitude 6 (inclusive) with twenty steps per magnitude
+	 */
+	@ = llquantize(i++, 10, 0, 6, 20);
+}
+
+tick-1ms
+/i == 1500/
+{
+	exit(0);
+}
+</programlisting>
+<para>This example outputs:</para><screen>
+
+           value  ------------- Distribution ------------- count
+             &lt; 1 |                                         1
+               1 |                                         1
+               2 |                                         1
+               3 |                                         1
+               4 |                                         1
+               5 |                                         1
+               6 |                                         1
+               7 |                                         1
+               8 |                                         1
+               9 |                                         1
+              10 |                                         5
+              15 |                                         5
+              20 |                                         5
+              25 |                                         5
+              30 |                                         5
+              35 |                                         5
+              40 |                                         5
+              45 |                                         5
+              50 |                                         5
+              55 |                                         5
+              60 |                                         5
+              65 |                                         5
+              70 |                                         5
+              75 |                                         5
+              80 |                                         5
+              85 |                                         5
+              90 |                                         5
+              95 |                                         5
+             100 |@                                        50
+             150 |@                                        50
+             200 |@                                        50
+             250 |@                                        50
+             300 |@                                        50
+             350 |@                                        50
+             400 |@                                        50
+             450 |@                                        50
+             500 |@                                        50
+             550 |@                                        50
+             600 |@                                        50
+             650 |@                                        50
+             700 |@                                        50
+             750 |@                                        50
+             800 |@                                        50
+             850 |@                                        50
+             900 |@                                        50
+             950 |@                                        50
+            1000 |@@@@@@@@@@@@@                            500
+            1500 |                                         0
+</screen>
 </sect1><sect1 id="chp-aggs-7"><title>Printing Aggregations</title><para><indexterm><primary>aggregator</primary><secondary>output</secondary></indexterm>By default, multiple aggregations are displayed in the order they
 are introduced in the D program. You can override this behavior using the <function>printa</function> function to print the aggregations. The <function>printa</function> function
 also enables you to precisely format the aggregation data using a format string,

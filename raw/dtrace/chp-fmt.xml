@@ -1,7 +1,8 @@
 <?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="chp-fmt"><title>Output Formatting</title><highlights><para>DTrace provides built-in formatting functions <function>printf</function> and <function>printa</function> that you can use from your D programs to format output.
 The D compiler provides features not found in the <olink targetdoc="refman3a" targetptr="printf-3c" remap="external"><citerefentry><refentrytitle>printf</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> library routine, so you should
 read this chapter even if you are already familiar with <function>printf</function>.
-This chapter also discusses the formatting behavior of the <function>trace</function> function
+This chapter also discusses the formatting behavior of the
+<function>trace</function> and <function>print</function> functions
 and the default output format used by <olink targetdoc="refman1m" targetptr="dtrace-1m" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to display aggregations.</para>
 </highlights><sect1 id="chp-fmt-1"><title><function>printf</function></title><para><indexterm><primary><literal>printf</literal></primary></indexterm>The <function>printf</function> function combines the ability to trace data, as if by the <function>trace</function> function, with the ability to output the data and other text
 in a specific format that you describe. The <function>printf</function> function
@@ -339,4 +340,117 @@ of bytes, it will be printed as an ASCII string. If the data is any other
 size and is not a sequence of printable characters, it will be printed as
 a series of byte values formatted as hexadecimal integers.</para>
 </sect1>
+<sect1 id="chp-fmt-print"><title><function>print()</function></title>
+<para><indexterm><primary><literal>print</literal></primary></indexterm>
+The <function>print</function> action formats output based on the type
+information that DTrace knows about. The output data is formatted based
+on the type. The following rules cover the output format:</para>
+<itemizedlist>
+<listitem><para>The type always preceeds the data.</para></listitem>
+<listitem><para>All integers and pointers are printed in hex.</para></listitem>
+<listitem><para>Floats and doubles are printed as though the
+<function>printf</function> string "%.7e"
+were applied.</para></listitem>
+<listitem><para>Long doubles are printed as though the
+<function>printf</function> string
+"%.16LE" were applied"</para></listitem>
+<listitem><para>Every entry in an array is printed.</para></listitem>
+<listitem><para>Every member in a structure is printed out. This is applied
+recursively.</para></listitem>
+</itemizedlist>
+
+<para>The following examples demonstrate using the <function>print</function>
+action and some of its formatting characteristics. The first example
+shows the difference between using trace and print for a builtin
+variable.</para>
+<screen><userinput># dtrace -qn 'BEGIN{ trace(timestamp); }'</userinput>
+1809563006895229
+<userinput># dtrace -qn 'BEGIN{ print(timestamp); }'</userinput>
+uint64_t 0x66d997f0b030a</screen>
+
+<para>This example shows how a structure is printed with type
+information. p0 is the global address of the first process in the
+illumos operating system.</para>
+
+<screen><userinput># dtrace -qn 'BEGIN{ trace(`p0'); }'</userinput>
+proc_t {
+    struct vnode *p_exec = 0
+    struct as *p_as = 0xfffffffffbc30ac0
+    struct plock *p_lockp = 0xfffffffffbc6d3c8
+    kmutex_t p_crlock = {
+        void *[1] _opaque = [ 0 ]
+    }
+    struct cred *p_cred = 0xffffff0d29fd9db0
+    int p_swapcnt = 0
+    char p_stat = '\002'
+    char p_wcode = '\0'
+...
+</screen>
+
+<para>This final example shows how you might use this information with other
+providers.</para>
+
+<screen><userinput># dtrace -n 'fbt::zio_done:entry{ print(*args[0]); }'</userinput>
+dtrace: description 'fbt::zio_done:entry' matched 1 probe
+CPU     ID                    FUNCTION:NAME
+ 10  53680                   zio_done:entry zio_t {
+    zbookmark_t io_bookmark = {
+        uint64_t zb_objset = 0
+        uint64_t zb_object = 0
+        int64_t zb_level = 0
+        uint64_t zb_blkid = 0x14
+    }
+    zio_prop_t io_prop = {
+        enum zio_checksum zp_checksum = ZIO_CHECKSUM_INHERIT
+        enum zio_compress zp_compress = ZIO_COMPRESS_INHERIT
+        dmu_object_type_t zp_type = DMU_OT_NONE
+        uint8_t zp_level = 0
+        uint8_t zp_copies = 0
+        uint8_t zp_dedup = 0
+        uint8_t zp_dedup_verify = 0
+    }
+    zio_type_t io_type = ZIO_TYPE_NULL
+    enum zio_child io_child_type = ZIO_CHILD_VDEV
+    int io_cmd = 0
+    uint8_t io_priority = 0x4
+    uint8_t io_reexecute = 0
+    uint8_t [2] io_state = [ 0x1, 0 ]
+    uint64_t io_txg = 0x8dfb3a
+    spa_t *io_spa = 0xffffff0d37f3a500
+    blkptr_t *io_bp = 0xffffff0d39581a00
+    blkptr_t *io_bp_override = 0
+    blkptr_t io_bp_copy = {
+        dva_t [3] blk_dva = [ 
+            dva_t {
+                uint64_t [2] dva_word = [ 0x5, 0x394c7972 ]
+            }, 
+...
+</screen>
+
+<sect2 id="chp-fmt-4-sources"><title><function>print</function> Type Information
+Sources</title><para><indexterm><primary><literal>print</literal></primary><secondary>type
+sources</secondary></indexterm>DTrace has three primary sources for type
+information for the type information used when formatting data for
+<function>print</function> action.</para>
+
+<para>The D language defines fundamental types for integer and
+floating-point constants. These are enumerated in <olink
+targetptr="chp-typeopexpr" remap="internal">Chapter&nbsp;2,
+Buffers and Buffering</olink>. Builtin actions, variables, and
+subroutines are defined in terms of these types. These types will match
+those that are being used by a user program or Operating System kernel.</para>
+
+<para>Next, DTrace uses the types that are defined in a D script. These
+can be brought in by using the C Pre-processor or by declaring them
+directly. These can be used the same as any built in type.</para>
+
+<para>Finally, DTrace uses the C Compact Type Information (CTF) that is
+embedded in the operating system kernel and its modules. (DTrace does
+not currently use CTF data in user binaries or modules.) The system's
+CTF data provides most of the types that DTrace uses via functionality
+such as <function>print</function>.</para>
+
+</sect2>
+</sect1>
+
 </chapter><?Pub *0000032060 0?>

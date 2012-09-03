@@ -49,7 +49,7 @@
     <html>
         <head>
             <title><xsl:value-of select="title" /></title>
-            <meta http-equiv="refresh" content="0;url=bookinfo.html"/>
+            <meta http-equiv="refresh" content="0;url=preface.html"/>
         </head>
         <body><p> </p></body>
     </html>

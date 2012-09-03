@@ -18,7 +18,7 @@
        <xsl:variable name="titleParent" select=".." />
        <xsl:choose>
            <xsl:when test="local-name($titleParent) = 'chapter'">
-                <h3><xsl:value-of select="." /></h3>
+                <h3><xsl:apply-templates /></h3>
            </xsl:when>
            <xsl:when test="local-name($titleParent) = 'sect1'">
                 <h3><xsl:value-of select="." /></h3>

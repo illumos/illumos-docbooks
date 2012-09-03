@@ -15,7 +15,7 @@
     <xsl:template match="//para">
         <p><xsl:apply-templates /></p>
     </xsl:template>
-    
+
     <xsl:template match="//remark">
         <p><xsl:apply-templates /></p>
     </xsl:template>
@@ -39,6 +39,41 @@
 
     <!-- TODO In the future this should go to the online man pages -->
     <xsl:template match='manvolnum'>(<xsl:apply-templates />)</xsl:template>
+    <xsl:template match='refentrytitle'>
+	<tt><xsl:apply-templates /></tt>
+    </xsl:template>
+
+    <!--
+
+	The command synopsis has special formatting that the other
+	pieces don't have. For example, it's command needs to both be
+	<tt> and <b> (TODO This should be handled by CSS).
+
+	Next, we have groups of arguments which need to be put together
+	in []s. We also need to be able to handle all this recursively.
+	blah.
+
+    -->
+    <xsl:template match='cmdsynopsis'>
+	<p><xsl:apply-templates /></p>
+    </xsl:template>
+
+    <xsl:template match='cmdsynopsis/command'>
+        <tt><b><xsl:apply-templates /></b></tt>
+    </xsl:template>
+
+    <xsl:template match='group'>
+	<xsl:text> [</xsl:text>
+	<xsl:for-each select="*">
+		<xsl:apply-templates select="." />
+		<xsl:if test="(local-name() = 'arg') and (position() !=
+last())">
+			<xsl:text> |</xsl:text>
+		</xsl:if>
+		<xsl:text>&#32;</xsl:text>
+	</xsl:for-each>
+	<xsl:text>]</xsl:text>
+    </xsl:template>
     
     <!-- Variable List and kids -->
     <xsl:template match="//variablelist">
@@ -102,8 +137,14 @@
     <xsl:template match="//emphasis">
         <b><xsl:apply-templates /></b>
     </xsl:template>
-    
+   
+<!-- 
     <xsl:template match="//command">
+        <tt><xsl:apply-templates /></tt>
+    </xsl:template>
+-->
+   <!-- XXX Use CSS -->
+   <xsl:template match="command">
         <tt><xsl:apply-templates /></tt>
     </xsl:template>
     
@@ -220,7 +261,7 @@
     </xsl:template>
     
     <xsl:template match="//option">
-        <tt><xsl:apply-templates /></tt>
+        <tt><xsl:text>-</xsl:text><xsl:apply-templates /></tt>
     </xsl:template>
     
     <xsl:template match="//filename">
@@ -238,7 +279,7 @@
     <xsl:template match="//literal">
         <tt><xsl:apply-templates /></tt>
     </xsl:template>
-    
+
     <xsl:template match="//varname">
         <tt><xsl:apply-templates /></tt>
     </xsl:template>

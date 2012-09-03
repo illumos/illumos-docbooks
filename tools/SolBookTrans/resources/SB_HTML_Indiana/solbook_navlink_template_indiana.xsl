@@ -30,6 +30,10 @@
             <xsl:text><xsl:value-of select="local-name()" /></xsl:text>
             <xsl:text>.html</xsl:text>
         </xsl:when>
+	<xsl:when test="local-name() = 'preface'">
+            <xsl:text><xsl:value-of select="local-name()" /></xsl:text>
+            <xsl:text>.html</xsl:text>
+	</xsl:when>
         <xsl:otherwise>
             <xsl:text><xsl:value-of select="local-name()" /></xsl:text>
             <xsl:text><xsl:value-of select="$elementNum" /></xsl:text>

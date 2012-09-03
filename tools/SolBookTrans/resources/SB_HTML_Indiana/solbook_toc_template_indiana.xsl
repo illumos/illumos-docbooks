@@ -12,7 +12,8 @@
                 version="1.0">
                     
 <xsl:include href="solbook_navlink_template_indiana.xsl" />
-           
+<xsl:include href="solbook_HTML_inlines.xsl" />
+
 <!-- generates a file name for the given context node, which should be a child of the book node -->
 <xsl:template name="generatePageToc">
     <xsl:variable name="currPageName" select="local-name()" />
@@ -36,7 +37,7 @@
                         <xsl:when test="local-name() = 'chapter'">
                             <xsl:number count="chapter" level="any" />
                             <xsl:text>.&#32;&#32;</xsl:text>
-                            <xsl:value-of select="title" />
+                            <xsl:apply-templates select="title" />
                         </xsl:when>
                         <xsl:when test="local-name() = 'partintro'">
                             <xsl:text>Part </xsl:text>
