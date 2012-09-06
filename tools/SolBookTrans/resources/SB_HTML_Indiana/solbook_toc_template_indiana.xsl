@@ -68,6 +68,7 @@
                                 <xsl:with-param name="wordName">appendix</xsl:with-param>
                                 <xsl:with-param name="languageCode" select="$langCode" />
                             </xsl:call-template>
+                            <xsl:text> </xsl:text>
                             <xsl:number count="appendix" />
                             <xsl:text>: </xsl:text>
                             <xsl:value-of select="title" />
