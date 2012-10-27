@@ -24,6 +24,11 @@
             <xsl:when test="string($linkDocFile) and @remap = 'internal'">
                 <a href="{$linkDocFile}#{@targetptr}"><xsl:apply-templates /></a>
             </xsl:when>
+	    <xsl:when test="contains(@targetdoc,'refman') and @remap = 'external'">
+	    	<xsl:variable name="volume" select="./citerefentry/manvolnum" />
+	    	<xsl:variable name="page" select="./citerefentry/refentrytitle" />
+		<a href="http://illumos.org/man/{$volume}/{$page}"><xsl:apply-templates /></a>	
+	    </xsl:when>
             <!-- if its not internal or no ID could be found, then just remove link because there is no way to know where other docs will be -->
             <xsl:otherwise>
                 <xsl:apply-templates />
