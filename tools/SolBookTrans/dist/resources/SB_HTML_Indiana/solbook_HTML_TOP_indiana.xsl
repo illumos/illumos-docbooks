@@ -29,16 +29,39 @@
 <xsl:template match="/book">    
    <!-- book kids: title | bookinfo | preface | glossary | reference | chapter | appendix | bibliography | index -->
    <!-- book/part kids: part/partintro | part/chapter | part/reference | part/glossary | part/appendix | part/bibliography -->
-   <xsl:for-each select="part/* | *">
+   <!-- <xsl:for-each select="part/* | *">-->
+   <!--
+	It is just our luck that for some reason the previous select statement
+	which was part/* | * would not end up evaluating the first part
+	correctly. To work around that we only look explicitly at * and manually
+	recurse as appropriate into the part/ itself.
+   -->
+   <xsl:for-each select="*">
        <xsl:choose>
            <xsl:when test="local-name() = 'subtitle'">
                <!-- do nothing -->
            </xsl:when>
            <xsl:when test="local-name() = 'part'">
+	       <xsl:for-each select="./*">
+		       <xsl:choose>
+			    <xsl:when test="local-name() = 'title'">
+			       <!-- do nothing -->
+			   </xsl:when>
+		   <xsl:when test="local-name() = 'partintro'">
+		       <xsl:call-template name="processPageElement" />
+		   </xsl:when>
+		    <xsl:otherwise>
+		       <xsl:call-template name="processPageElement" />
+		   </xsl:otherwise>
+		   </xsl:choose>
+	       </xsl:for-each>
                <!-- do nothing -->
            </xsl:when>
            <xsl:when test="local-name() = 'title'">
                <!-- do nothing -->
+           </xsl:when>
+           <xsl:when test="local-name() = 'partintro'">
+               <xsl:call-template name="processPageElement" />
            </xsl:when>
            <xsl:otherwise>
                <xsl:call-template name="processPageElement" />

@@ -17,13 +17,40 @@
 <!-- generates a file name for the given context node, which should be a child of the book node -->
 <xsl:template name="generatePageToc">
     <xsl:variable name="currPageName" select="local-name()" />
+    <!--
+
+	Traditionally the position() function was used to try and determine
+	whether or not we were in the same section. Unfortunately that is not
+	actually a valid way to determine this information because it is
+	relative to the context node. That means that as we iterate over each
+	part, it will be seen as the same value which ultimately just breaks us.
+	Instead, we rely on a variant of the id. Most sections have an id, aside
+	from the partintro. Therefore because there is only one partintro, we
+	simply grab the id of the part itself.
+
+     -->
+    <xsl:variable name="currPageId" >
+    	<xsl:choose>
+		<xsl:when test="local-name() = 'partintro'">
+			<xsl:value-of select="ancestor::part/@id" />
+		</xsl:when>
+		<xsl:otherwise>
+			<xsl:value-of select="@id" />
+		</xsl:otherwise>
+	</xsl:choose>
+    </xsl:variable>
     <xsl:variable name="currPagePosition" select="position()" />
     <!-- book kids: title | bookinfo | preface | glossary | reference | chapter | appendix | bibliography | index -->
     <!-- book/part kids: part/partintro | part/chapter | part/reference | part/glossary | part/appendix | part/bibliography -->
-    <xsl:for-each select="/book/part/* | /book/*">
+    <xsl:for-each select="/book/* | /book/part/*">
         <xsl:choose>
             <xsl:when test="local-name() = 'part'">
                 <!-- do nothing -->
+		<xsl:for-each select="./*">
+		<!-- XXX -->
+		<!-- XXX -->
+
+		</xsl:for-each>
             </xsl:when>
             <xsl:when test="local-name() = 'title'">
                 <!-- do nothing -->
@@ -106,12 +133,22 @@
                         </xsl:otherwise>
                     </xsl:choose>
                 </xsl:variable>
-                <!-- build single line for this chapter (or equivalent) file in toc -->
-                <xsl:if test="$currPagePosition != position()">
+		   <xsl:variable name="loopid" >
+			<xsl:choose>
+				<xsl:when test="local-name() = 'partintro'">
+					<xsl:value-of select="ancestor::part/@id" />
+				</xsl:when>
+				<xsl:otherwise>
+					<xsl:value-of select="@id" />
+				</xsl:otherwise>
+			</xsl:choose>
+		    </xsl:variable>
+
+                <xsl:if test="$currPageId != $loopid">
                     <p class="toc level1 tocsp"><a href="{$currFileName}"><xsl:value-of select="$currTitle" /></a></p>
                 </xsl:if>
                 <!-- if this current iteration is for the current calling page, then also populate sub-menu -->
-                <xsl:if test="$currPagePosition = position()">
+                <xsl:if test="$currPageId = $loopid">
                     <div class="onpage">
                         <p class="toc level1 tocsp"><a href="{$currFileName}"><xsl:value-of select="$currTitle" /></a></p>
                     <xsl:for-each select="sect1">
@@ -139,13 +176,4 @@
     </xsl:for-each><!-- foreach book/child or /book/part/child -->
 </xsl:template>    
 
-
-
-
-
-    
 </xsl:stylesheet> 
-    
-    
-    
-    

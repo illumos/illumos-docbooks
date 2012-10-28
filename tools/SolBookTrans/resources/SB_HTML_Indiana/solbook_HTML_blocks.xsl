@@ -148,7 +148,7 @@
         <xsl:if test="@id">
             <a name="{@id}"></a>
         </xsl:if>
-        <p><b><xsl:value-of select="title" /></b></p>
+        <!-- <p><b><xsl:value-of select="title" /></b></p> -->
         <xsl:apply-templates />
     </xsl:template>
     <xsl:template match="//substeps">

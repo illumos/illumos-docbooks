@@ -31,7 +31,7 @@ bld_argo=
 bld_arga=
 bld_argd=
 bld_booklist=
-
+bld_verb=
 
 function fail
 {
@@ -50,6 +50,7 @@ Usage: $bld_arg0 [-o output] [-a | -d book ...]
 	-o specify output directory
 	-a generate all docbooks
 	-d generate specified docbook
+	-v verbose output
 	-h show this message
 USAGE
 	exit 2
@@ -91,14 +92,19 @@ function build_book
 	mkdir $bld_argo/$bdir || fail "failed to make book-specific output" \
 	    "directory: $bld_argo/$bdir"
 	cd $bld_jar_path
-	$bld_cmd_base -s $cdir/$bfile -o $cdir/$bld_argo/$bdir > /dev/null
+	if [[ -z "$bld_verb" ]]; then
+		$bld_cmd_base -s $cdir/$bfile -o $cdir/$bld_argo/$bdir > \
+		    /dev/null
+	else
+		$bld_cmd_base -s $cdir/$bfile -o $cdir/$bld_argo/$bdir
+	fi
 	[[ $? -eq 0 ]] || fail "failed to build $bdir"
 	cd $cdir
 	echo "done"
 	echo ""
 }
 
-while getopts ":o:d:ah" c $@; do
+while getopts ":o:d:avh" c $@; do
 	case "$c" in
 	a)
 		bld_arga=1
@@ -115,6 +121,9 @@ while getopts ":o:d:ah" c $@; do
 		;;
 	h)
 		usage
+		;;
+	v)
+		bld_verb="yes"
 		;;
 	:)
 		usage "option requires an argument: $OPTARG"

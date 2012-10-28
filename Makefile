@@ -19,3 +19,4 @@ DTD=tools/SolBookTrans/resources
 check:
 	$(LINT) --valid --noout --path $(DTD) raw/dtrace/DYNMCTRCGGD.book	
 	$(LINT) --valid --noout --path $(DTD) raw/mdb/MODDEBUG.book	
+	$(LINT) --valid --noout --path $(DTD) raw/wdd/DRIVER.book
