@@ -1,0 +1,231 @@
+<chapter id="eoqra"><title>Solaris Volume Manager for Sun Cluster (Overview)</title><highlights><para>This chapter provides an overview of Solaris Volume Manager for Sun
+Cluster.</para><para>This chapter includes the following information:</para><itemizedlist><listitem><para><olink targetptr="eoqrd" remap="internal">Introduction to Solaris Volume Manager
+for Sun Cluster</olink></para>
+</listitem><listitem><para><olink targetptr="eqqcx" remap="internal">Multi-Owner Disk Set Concepts</olink></para>
+</listitem><listitem><para><olink targetptr="eoqsi" remap="internal">Solaris Volume Manager for Sun Cluster
+Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="eqqcy" remap="internal">RAID&ndash;1 (Mirror) Volumes in
+Multi-Owner Disk Sets</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="eoqrd"><title>Introduction to Solaris Volume Manager for Sun Cluster</title><para>Starting with the Solaris 9 9/04 release, Solaris Volume Manager can manage storage
+in a Sun Cluster environment using multi-owner disk sets. <firstterm>Multi-owner
+disk sets</firstterm> allow multiple nodes to share ownership of a disk set
+and to simultaneously write to the shared disks. Previously, shared disk sets
+were visible from all participating hosts in the disk set, but only one host
+could access it at a time. Multi-owner disk sets work with Sun Cluster  and
+with applications such as Oracle Real Application Clusters.</para><para>Multi-owner disk sets and Solaris Volume Manager shared disk sets can coexist
+on the same node. However, moving disk sets between the two configurations
+is not supported.</para><note><para>Solaris Volume Manager for Sun Cluster device id support for multi-owner disk sets is not available.
+Therefore, importing multi-owner disk sets from one system to another is not
+supported at this time.</para>
+</note><para>Solaris Volume Manager for Sun Cluster creates the same components that you can create with Solaris Volume Manager,
+including stripes, concatenations, mirrors, soft partitions, and hot spares. Solaris Volume Manager for Sun Cluster does
+not support RAID-5 volumes and transactional volumes.</para><para>The following figure shows the association between the software and
+the shared storage in a typical cluster configuration.</para><figure id="eupvi"><title>Sample Cluster Configuration</title><mediaobject><imageobject><imagedata entityref="newoverview"/>
+</imageobject><textobject><simpara>The diagram titled Sample Cluster Configuration shows
+the association between the software and the shared storage in a typical cluster
+configuration.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>Each node has local storage as well as at least one path to shared storage.
+The multi-owner disk sets in the cluster are managed by Solaris Volume Manager for Sun Cluster, which is part
+of the Solaris Operating System (Solaris OS).</para><sect2 id="exlvs"><title>Prerequisite: Required Software Components for Multi-Owner
+Disk Set Functionality</title><para>To use Solaris Volume Manager for Sun Cluster, the following software must be installed in addition
+to the Solaris OS:</para><itemizedlist><listitem><para>Sun Cluster initial cluster framework</para>
+</listitem><listitem><para>Sun Cluster Support for Oracle Real Application Clusters software</para>
+</listitem><listitem><para>Oracle Real Application Clusters software</para>
+</listitem>
+</itemizedlist><note><para>For information on setting up Sun Cluster and Oracle Real Application
+Clusters software, see <olink targetdoc="clustinstall" remap="external"><citetitle remap="book">Sun
+Cluster Software Installation Guide for Solaris OS</citetitle></olink> and <olink targetdoc="sc31ds403opsrac" remap="external"><citetitle remap="book">Sun Cluster Data Service
+for Oracle Real Application Clusters Guide for Solaris OS</citetitle></olink>.</para>
+</note>
+</sect2>
+</sect1><sect1 id="eqqcx"><title>Multi-Owner Disk Set Concepts</title><para>The storage managed by Solaris Volume Manager for Sun Cluster is grouped into multi-owner disk sets. Multi-owner
+disk sets allow multiple nodes to share ownership of a disk set and to simultaneously
+write to the shared disks. An instance of an application such as Oracle Real
+Application Clusters runs on each node in the cluster, so multi-owner disk sets provide
+scalability. Since each instance of the application directly accesses the
+shared storage, multi-owner disk sets also enhance the performance of the
+application.</para><note><para>Multi-owner disk set functionality is enabled only in a Sun Cluster
+environment. <firstterm>Nodes</firstterm> are the physical machines that are
+part of a Sun Cluster system.</para>
+</note><para>Each multi-owner disk set is associated with a list of nodes. These nodes
+share ownership of the disk set. The following <command>metaset</command> <option>s</option> <replaceable>disk-set</replaceable> command shows the output for
+a multi-owner disk set.</para><screen># <userinput>metaset -s blue</userinput>
+
+Multi-owner Set name = blue, Set number = 1, Master = nodeone
+
+Host                Owner          Member
+  nodeone           multi-owner   Yes 
+  nodetwo           multi-owner   Yes 
+
+Drive    Dbase
+
+d9       Yes  
+
+d13      Yes  </screen><para>This output shows <computeroutput>nodeone</computeroutput> and<computeroutput> nodetwo</computeroutput> in the list of nodes that share ownership of the
+disk set. Additionally, <computeroutput>nodeone</computeroutput> is designated
+as the <firstterm>master node</firstterm>.</para><para>Each multi-owner disk set has a master node. After a disk set is created,
+the node that adds the first disk to the disk set becomes the master node
+of the disk set. The master node creates, deletes, and updates the state database
+replicas in the disk set.</para><note><para>For more information on state database replicas, see <olink targetptr="about-state-db-replicas-1" remap="internal">Chapter&nbsp;6, State Database (Overview)</olink>.</para>
+</note><para>Solaris Volume Manager for Sun Cluster can support disk sets with different, yet overlapping, node lists.
+Because each disk set has a master node, multiple masters can exist simultaneously
+on the same cluster.</para><para>The following output from the <command>metaset</command> command shows
+that <computeroutput>nodeone</computeroutput> becomes the master node when
+the first disk is added to the disk set.</para><screen>nodeone# <userinput>metaset -s red</userinput>
+Multi-owner Set name = red, Set number = 1, Master = 
+
+Host                Owner          Member
+  nodeone                           Yes 
+  nodetwo                           Yes 
+nodeone# <userinput>metaset -s red -a /dev/did/dsk/d9</userinput>
+nodeone# <userinput>metaset -s red</userinput>
+
+Multi-owner Set name = red, Set number = 1, Master = nodeone 
+
+Host                Owner          Member
+  nodeone           multi-owner     Yes 
+  nodetwo           multi-owner     Yes 
+
+Drive     Dbase
+
+d9        Yes  </screen><para>Solaris Volume Manager for Sun Cluster can support disk sets with different, yet overlapping, node lists.
+Because each disk set has a master node, multiple masters can exist simultaneously
+on the same cluster.</para><sect2 id="exlvt"><title>Tasks Associated With Multi-Owner Disk Sets</title><caution><para>Before configuring multi-owner disk sets, you must have the following
+software installed, in addition to the Solaris OS:</para><itemizedlist><listitem><para>Sun Cluster initial cluster framework</para>
+</listitem><listitem><para>Sun Cluster Support for Oracle Real Application Clusters software</para>
+</listitem><listitem><para>Oracle Real Application Clusters software</para>
+</listitem>
+</itemizedlist><para>For information on setting up Sun Cluster and Oracle Real Application
+Clusters software, see <olink targetdoc="clustinstall" remap="external"><citetitle remap="book">Sun
+Cluster Software Installation Guide for Solaris OS</citetitle></olink> and <olink targetdoc="sc31ds403opsrac" remap="external"><citetitle remap="book">Sun Cluster Data Service
+for Oracle Real Application Clusters Guide for Solaris OS</citetitle></olink>.</para>
+</caution><para>Solaris Volume Manager for Sun Cluster generally uses the same set of Solaris Volume Manager commands to perform
+tasks associated with disk sets. Some command options unique to multi-owner disk sets have
+been added to the <command>metaset</command> command. For example, the task
+to create a multi-owner disk set requires the <option>M</option> to the <command>metaset</command> command. The following output shows you how to create a multi-owner disk set using
+the <command>metaset</command> <option>s</option> <replaceable>diskset-name</replaceable> <option>a</option> <option>M</option> <option>h</option> <replaceable>hostname</replaceable> command.</para><screen># <userinput>metaset -s red -a -M -h nodeone</userinput>
+# <userinput>metaset</userinput>
+Multi-owner Set name = red, Set number = 1, Master = 
+
+Host                Owner          Member
+  nodeone                          Yes </screen><para>In addition, some of the <command>metaset</command> command options,
+such as the commands to take and release disk sets, are not used with multi-owner disk sets.
+For more information, see the <olink targetdoc="refman1m" targetptr="metaset-1m" remap="external"><citerefentry><refentrytitle>metaset</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><para>Another example of how tasks differ in a Sun Cluster environment occurs
+when working with disks. Sun Cluster assigns each disk a unique device ID
+(DID) number. Rather than using the c<replaceable>n</replaceable>t<replaceable>n</replaceable>d<replaceable>n</replaceable> format to identify a disk, use the Sun Cluster DID path name, <filename>/dev/did/dsk/d<replaceable>N</replaceable></filename>. The variable <replaceable>N</replaceable> is the device number assigned by Sun Cluster.</para><para>The following output shows you how to add a disk to a multi-owner disk
+set using the <command>metaset</command> <option>s</option> <replaceable>diskset-name</replaceable> <option>a</option> <replaceable>disk-name</replaceable> command
+and the Sun Cluster DID path name to identify the disk.</para><screen>nodeone# <userinput>metaset -s red</userinput>
+Multi-owner Set name = red
+Multi-owner Set name = red, Set number = 1, Master = 
+
+Host                Owner          Member
+  nodeone                           Yes 
+  nodetwo                           Yes 
+nodeone# <userinput>metaset -s red -a /dev/did/dsk/d13</userinput>
+nodeone# <userinput>metaset -s red</userinput>
+Multi-owner Set name = red, Set number = 1, Master = nodeone
+
+Host                Owner          Member
+  nodeone            multi-owner   Yes
+
+Drive Dbase
+
+d13   Yes</screen><para>For information on creating multi-owner disk sets for the Oracle Real Application
+Clusters, see <olink targetdoc="sc31ds403opsrac" targetptr="opsrac-installation-29" remap="external"><citetitle remap="section">Creating a Multi-Owner
+Disk Set in Solaris Volume Manager for Sun Cluster for the Oracle Real Application
+Clusters Database</citetitle> in <citetitle remap="book">Sun Cluster Data
+Service for Oracle Real Application Clusters Guide for Solaris OS</citetitle></olink>.</para><para>For tasks that are associated with disk sets, see <olink targetptr="tasks-disksets-1" remap="internal">Chapter&nbsp;19, Disk Sets (Tasks)</olink>.</para>
+</sect2>
+</sect1><sect1 id="eoqsi"><title>Solaris Volume Manager for Sun Cluster Configuration</title><para>Solaris Volume Manager for Sun Cluster supports the following configuration:</para><itemizedlist><listitem><para>Solaris Volume Manager for Sun Cluster supports up to 32 disk sets. These disk sets can include
+any combination of multi-owner disk sets, shared disk sets, and the local disk
+set.</para><note><para>For more information on different types of disk sets, see <olink targetptr="eqqda" remap="internal">Types of Disk Sets</olink>.</para>
+</note>
+</listitem><listitem><para>Each multi-owner disk set supports a maximum of 8192 volumes
+per disk set.</para>
+</listitem><listitem><para>The default size for a state database replica is 16 Mbytes.
+The minimum size is 16 Mbytes. The maximum size is 256 Mbytes.</para>
+</listitem>
+</itemizedlist><para>Many of the extension properties for Sun Cluster Support for Oracle
+Real Application Clusters specify timeouts for steps in reconfiguration processes.
+For further information about setting timeouts, refer to <olink targetdoc="sc31ds403opsrac" targetptr="ch8_ops-8" remap="external"><citetitle remap="section">Tuning
+Sun Cluster Support for Oracle Real Application Clusters</citetitle> in <citetitle remap="book">Sun Cluster Data Service for Oracle Real Application Clusters
+Guide for Solaris OS</citetitle></olink>.</para>
+</sect1><sect1 id="eqqcy"><title>RAID&ndash;1 (Mirror) Volumes in Multi-Owner Disk
+Sets</title><para>A RAID&ndash;1 volume, or mirror, created in a multi-owner disk set functions
+identically to a RAID-1 volume in a Solaris Volume Manager shared disk set. However,
+RAID-1 volumes in multi-owner disk sets have some additional features.</para><sect2 id="eqqcm"><title>Mirror Ownership With Multi-Owner Disk Sets</title><para>The concept of mirror ownership is unique to multi-owner disk sets. Unlike
+a RAID-1 volume in a Solaris Volume Manager shared disk set, a RAID-1 volume in a multi-owner disk set usually
+has an owner associated with it. The ownership of the mirror volume is chosen
+by the volume manager. The owner of the volume is one of the nodes designated
+in the node list for the disk set. Only the owner of the RAID-1 volume can
+write to the volume. If a non-owner node wants to write to the volume, the
+ownership switches to the node doing the write operation. The following output
+from the <command>metastat</command> <option>s</option> <replaceable>diskset-name</replaceable> command shows <computeroutput>nodeone</computeroutput> as the
+owner of the RAID-1 volume, <computeroutput>d24</computeroutput>.</para><screen># <userinput>metastat -s red</userinput>
+red/d24: Mirror
+    Submirror 0: red/d20
+      State: Okay
+    Submirror 1: red/d21
+      State: Okay
+    Pass: 1
+    Read option: roundrobin (default)
+    Write option: parallel (default)
+    Resync option: optimizedresync
+    Owner: nodeone
+    Size: 825930 blocks (403 MB)</screen>
+</sect2><sect2 id="eqqct"><title>Data Management and Recovery Processes</title><para>As with RAID-1 volumes in Solaris Volume Manager, RAID-1 volumes in Solaris Volume Manager for Sun Cluster perform
+operations to ensure consistent data. Solaris Volume Manager for Sun Cluster provides RAID-1 volumes with
+two options for data management and recovery.</para><sect3 id="eqqcu"><title>Optimized Resynchronization for Solaris Volume Manager for Sun Cluster</title><para>Optimized resynchronization in Solaris Volume Manager for Sun Cluster functions identically to optimized
+resynchronization in Solaris Volume Manager. However, in a multi-owner disk set, a RAID-1
+volume with the resynchronization option set to optimized resynchronization
+always has a mirror owner. The following output from the <command>metastat</command> <option>s</option> <replaceable>diskset-name</replaceable> command shows the resynchronization
+option set to <computeroutput>optimizedresync</computeroutput> (for optimized
+resynchronization).</para><screen># <userinput>metastat -s red</userinput>
+red/d24: Mirror
+    Submirror 0: red/d20
+      State: Okay
+    Submirror 1: red/d21
+      State: Okay
+    Pass: 1
+    Read option: roundrobin (default)
+    Write option: parallel (default)
+    Resync option: optimizedresync
+    Owner: nodeone
+    Size: 825930 blocks (403 MB)</screen><para>For more information on optimized resynchronization, see <olink targetptr="about-metadevices-15" remap="internal">Optimized Resynchronization</olink>.</para>
+</sect3><sect3 id="eqqcv"><title>Application-Based Recovery and Directed Mirror Reads</title><para>To optimize data recovery in Solaris Volume Manager for Sun Cluster, applications such as Oracle Real
+Application Clusters require the ability to manage and control the recovery
+of data. Enabling an application to control the recovery improves the performance
+of the recovery. The ioctls <literal>DKIOGETVOLCAP</literal>, <literal>DKIOSETVOLCAP</literal>, and <literal>DKIODMR</literal> provide support for an application's
+data management recovery in a cluster environment. These ioctls provide an
+application with the following capabilities:</para><itemizedlist><listitem><para>Application Based Recovery (ABR)&mdash;Allows the application
+to control the recovery of data on mirrored volumes</para>
+</listitem><listitem><para>Directed Mirror Reads&mdash;Allows the application to direct
+reads to specific submirrors and to determine the state of the data</para>
+</listitem>
+</itemizedlist><para>For more information on the ioctls used with application-based data
+management recovery, see the <olink targetdoc="refman7" targetptr="dkio-7i" remap="external"><citerefentry><refentrytitle>dkio</refentrytitle><manvolnum>7I</manvolnum></citerefentry></olink> man
+page.</para><para>A RAID-1 volume with the resynchronization option set to application-based
+recovery only has a mirror owner during the application-based recovery process.
+The following output from the <command>metastat</command> <option>s</option> <replaceable>diskset-name</replaceable> command shows a RAID-1 volume in a normal state.
+The resynchronization option is set to application-based recovery. There is
+no mirror owner.</para><screen># <userinput>metastat -s red</userinput>
+red/d24: Mirror
+    Submirror 0: red/d20
+      State: Okay
+    Submirror 1: red/d21
+      State: Okay
+    Pass: 1
+    Read option: roundrobin (default)
+    Write option: parallel (default)
+    Resync option: application based
+    Owner: None
+    Size: 825930 blocks (403 MB)</screen>
+</sect3>
+</sect2>
+</sect1>
+</chapter>

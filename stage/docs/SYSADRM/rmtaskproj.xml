@@ -1,0 +1,260 @@
+<chapter id="rmtaskproj-1"><title>Projects and Tasks (Overview)</title><highlights><para>This chapter discusses the <emphasis>project</emphasis> and <emphasis>task</emphasis> facilities
+of Solaris resource management. Projects and tasks are used to label workloads
+and separate them from one another.</para><para>The following topics are covered in this chapter:</para><itemizedlist><listitem><para><olink targetptr="rmtaskproj-2" remap="internal">Project and Task Facilities</olink></para>
+</listitem><listitem><para><olink targetptr="rmtaskproj-6" remap="internal">Project Identifiers</olink></para>
+</listitem><listitem><para><olink targetptr="rmtaskproj-7" remap="internal">Task Identifiers</olink></para>
+</listitem><listitem><para><olink targetptr="rmtaskproj-14" remap="internal">Commands Used With Projects
+and Tasks</olink></para>
+</listitem>
+</itemizedlist><para>To use the projects and tasks facilities, see <olink targetptr="rmtaskproj.task-37" remap="internal">Chapter&nbsp;3, Administering Projects and
+Tasks</olink>.</para>
+</highlights><sect1 id="rmtaskproj-2"><title>Project and Task Facilities</title><para>To optimize workload response, you must first be able to identify the
+workloads that are running on the system you are analyzing. This information
+can be difficult to obtain by using either a purely process-oriented or a
+user-oriented method alone. In the Solaris system, you have two additional
+facilities that can be used to separate and identify workloads: the project
+and the task. The <emphasis>project</emphasis> provides a network-wide administrative
+identifier for related work. The  <emphasis>task</emphasis> collects a group
+of processes into a manageable entity that represents a workload component.</para><para>The controls specified in the <filename>project</filename> name service
+database are set on the process, task, and project.  Since process and task
+controls are inherited across <command>fork</command> and <command>settaskid</command> system
+calls, all processes and tasks that are created within the project inherit
+these controls. For information on these system calls, see the <olink targetdoc="group-refman" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="settaskid-2" remap="external"><citerefentry><refentrytitle>settaskid</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> man pages.</para><para>Based on their project or task membership, running processes can be
+manipulated with standard Solaris commands. The extended accounting facility
+can report on both process usage and task usage, and tag each record with
+the governing project identifier. This process enables offline workload analysis
+to be correlated with online monitoring. The project identifier can be shared
+across multiple machines through the <filename>project</filename> name service
+database. Thus, the resource consumption of related workloads that run on
+(or span) multiple machines can ultimately be analyzed across all of the machines.</para>
+</sect1><sect1 id="rmtaskproj-6"><title>Project Identifiers</title><para>The project identifier is an administrative identifier that is
+used to identify related work. The project identifier can be thought of as
+a workload tag equivalent to the user and group identifiers. A user or group
+can belong to one or more projects. These projects can be used to represent
+the workloads in which the user (or group of users) is allowed to participate.
+This membership can then be the basis of chargeback that is based on, for
+example, usage or initial resource allocations. Although a user must be assigned
+to a default project, the processes that the user launches can be associated
+with any of the projects of which that user is a member.</para><sect2 id="rmtaskproj-3"><title>Determining a User's Default Project</title><para>To log in to
+the system, a user must be assigned a default project. A user is automatically
+a member of that default project, even if the user is not in the user or group
+list specified in that project.</para><para>Because each process on the system possesses project membership, an
+algorithm to assign a default project to the login or other initial process
+is necessary. The algorithm is documented in the man page <citerefentry><refentrytitle>getprojent</refentrytitle><manvolnum>3C</manvolnum></citerefentry>. The system follows ordered steps to determine the default
+project. If no default project is found, the user's login, or request to start
+a process, is denied.</para><para>The system sequentially follows these steps to determine a user's default
+project:</para><orderedlist><listitem><para>If the user has an entry with a <literal>project</literal> attribute
+defined in the <filename>/etc/user_attr</filename> extended user attributes
+database, then the value of the <literal>project</literal> attribute is the
+default project. See the <olink targetdoc="group-refman" targetptr="user-attr-4" remap="external"><citerefentry><refentrytitle>user_attr</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem><listitem><para>If a project with the name <literal>user.</literal><replaceable>user-id</replaceable> is present in the <literal>project</literal> database, then
+that project is the default project. See the <olink targetdoc="group-refman" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page for more information.</para>
+</listitem><listitem><para>If a project with the name <literal>group.</literal><replaceable>group-name</replaceable> is present in the <filename>project</filename> database,
+where <replaceable>group-name</replaceable> is the name of the default group
+for the user, as specified in the <command>passwd</command> file, then that
+project is the default project. For information on the <command>passwd</command> file,
+see the <olink targetdoc="group-refman" targetptr="passwd-4" remap="external"><citerefentry><refentrytitle>passwd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem><listitem><para>If the special project <literal>default</literal> is present
+in the <filename>project</filename> database, then that project is the default
+project.</para>
+</listitem>
+</orderedlist><para>This logic is provided by the <function>getdefaultproj</function> library
+function. See the <olink targetdoc="group-refman" targetptr="getprojent-3project" remap="external"><citerefentry><refentrytitle>getprojent</refentrytitle><manvolnum>3PROJECT</manvolnum></citerefentry></olink> man page for more information.</para>
+</sect2><sect2 id="rmtaskproj-15"><title>Setting User Attributes With the <command>useradd</command>, <command>usermod</command>, and <command>passmgmt</command> Commands</title><para>You can use the following commands with the <option>K</option> option
+and a <replaceable>key</replaceable><literal>=</literal><replaceable>value</replaceable> pair
+to set user attributes in local files :</para><variablelist><varlistentry><term><command>passmgmt</command></term><listitem><para>Modify user information</para>
+</listitem>
+</varlistentry><varlistentry><term><command>useradd</command></term><listitem><para>Set default project for user</para>
+</listitem>
+</varlistentry><varlistentry><term><command>usermod</command></term><listitem><para>Modify user information</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Local files can include the following:</para><itemizedlist><listitem><para><filename>/etc/group</filename></para>
+</listitem><listitem><para><filename>/etc/passwd</filename></para>
+</listitem><listitem><para><filename>/etc/project</filename></para>
+</listitem><listitem><para><filename>/etc/shadow</filename></para>
+</listitem><listitem><para><filename>/etc/user_attr</filename></para>
+</listitem>
+</itemizedlist><para>If a network naming service such as NIS is being used to supplement
+the local file with additional entries, these commands cannot change information
+supplied by the network name service. However, the commands do verify the
+following against the external <emphasis>naming service database</emphasis>:</para><itemizedlist><listitem><para>Uniqueness of the user name (or role)</para>
+</listitem><listitem><para>Uniqueness of the user ID</para>
+</listitem><listitem><para>Existence of any group names specified</para>
+</listitem>
+</itemizedlist><para>For more information, see the <olink targetdoc="group-refman" targetptr="passmgmt-1m" remap="external"><citerefentry><refentrytitle>passmgmt</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="useradd-1m" remap="external"><citerefentry><refentrytitle>useradd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="usermod-1m" remap="external"><citerefentry><refentrytitle>usermod</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="user-attr-4" remap="external"><citerefentry><refentrytitle>user_attr</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man pages.</para>
+</sect2><sect2 id="rmtaskproj-9"><title><filename>project</filename> Database</title><para>You can store project data in a local
+file, in the Domain Name System (DNS), in a Network Information Service (NIS)
+project map, or in a Lightweight Directory Access Protocol (LDAP) directory
+service. The <filename>/etc/project</filename> file or naming service is used
+at login and by all requests for account management by the pluggable authentication
+module (PAM) to bind a user to a default project.</para><note><para>Updates to entries in the project database, whether to the <filename>/etc/project</filename> file or to a representation of the database in a network
+naming service, are not applied to currently active projects. The updates
+are applied to new tasks that join the project when either the <command>login</command> or
+the <command>newtask</command> command is used. For more information, see
+the <olink targetdoc="group-refman" targetptr="login-1" remap="external"><citerefentry><refentrytitle>login</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="newtask-1" remap="external"><citerefentry><refentrytitle>newtask</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man pages.</para>
+</note>
+</sect2><sect2 id="rmtaskproj-10"><title>PAM Subsystem</title><para>Operations that change
+or set identity include logging in to the system, invoking an <command>rcp</command> or <command>rsh</command> command, using <command>ftp</command>, or using <command>su</command>.
+When an operation involves changing or setting an identity, a set of configurable
+modules is used to provide authentication, account management, credentials
+management, and session management.</para><para>For an overview of PAM, see <olink targetdoc="sysadv6" targetptr="pam-1" remap="external">Chapter 17, <citetitle remap="chapter">Using PAM,</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</sect2><sect2 id="rmtaskproj-11"><title>Naming Services Configuration</title><para>Resource management supports naming service <filename>project</filename> databases.
+The location where the <filename>project</filename> database is stored is
+defined in the <filename>/etc/nsswitch.conf</filename> file. By default, <literal>files</literal> is listed first, but the sources can be listed in any order.</para><screen>project: files [nis] [ldap]</screen><para>If more than one source for project information is listed, the <filename>nsswitch.conf</filename> file directs the routine to start searching for the information
+in the first source listed, and then search subsequent sources.</para><para>For more information about the <filename>/etc/nsswitch.conf</filename> file,
+see <olink targetdoc="sysadv5" targetptr="a12swit-86415" remap="external">Chapter 2, <citetitle remap="chapter">The Name Service Switch (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink> and <olink targetdoc="group-refman" targetptr="nsswitch.conf-4" remap="external"><citerefentry><refentrytitle>nsswitch.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="rmtaskproj-12"><title>Local <filename>/etc/project</filename> File
+Format</title><para>If you
+select <literal>files</literal> as your <filename>project</filename> database
+source in the <filename>nsswitch.conf</filename> file, the login process searches
+the <filename>/etc/project</filename> file for project information. See the <olink targetdoc="group-refman" targetptr="projects-1" remap="external"><citerefentry><refentrytitle>projects</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man pages
+for more information.</para><para>The <filename>project</filename> file contains a one-line entry of the
+following form for each project recognized by the system:</para><screen>projname:projid:comment:user-list:group-list:attributes</screen><para>The fields are defined as follows:</para><variablelist><varlistentry><term><replaceable>projname</replaceable></term><listitem><para>The name of the project. The name must be a string that consists
+of alphanumeric characters, underline (_) characters, hyphens (-), and periods
+(.).  The period, which is reserved for projects with special meaning to the
+operating system, can only be used in the names of default projects for users. <replaceable>projname</replaceable> cannot contain colons (:) or newline characters.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>projid</replaceable></term><listitem><para>The project's unique numerical ID (PROJID) within the system.
+The maximum value of the <replaceable>projid</replaceable> field is <literal>UID_MAX</literal> (<literal>2147483647</literal>).</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>comment</replaceable></term><listitem><para>A description of the project.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>user-list</replaceable></term><listitem><para>A comma-separated list of users who are allowed in the project.</para><para>Wildcards can be used in this field. An asterisk (*) allows all users
+to join the project. An exclamation point followed by an asterisk (!*) excludes
+all users from the project. An exclamation mark (!) followed by a user name
+excludes the specified user from the project.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>group-list</replaceable></term><listitem><para>A comma-separated list of groups of users who are allowed
+in the project.</para><para>Wildcards can be used in this field. An asterisk (*) allows all groups
+to join the project. An exclamation point followed by an asterisk (!*) excludes
+all groups from the project. An exclamation mark (!) followed by a group name
+excludes the specified group from the project.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>attributes</replaceable></term><listitem><para>A semicolon-separated list of name-value pairs, such as resource
+controls (see <olink targetptr="rmctrls-1" remap="internal">Chapter&nbsp;6, Resource Controls
+(Overview)</olink>). <replaceable>name</replaceable> is an arbitrary string
+that specifies the object-related attribute, and <replaceable>value</replaceable> is
+the optional value for that attribute.</para><screen>name[=<replaceable>value</replaceable>]</screen><para>In the name-value pair, names are restricted to letters, digits, underscores,
+and periods. A period is conventionally used as a separator between the categories
+and subcategories of the resource control (rctl). The first character of an
+attribute name must be a letter. The name is case sensitive.</para><para>Values can be structured by using commas and parentheses to establish
+precedence.</para><para>A semicolon is used to separate name-value pairs. A semicolon cannot
+be used in a value definition. A colon is used to separate project fields.
+A colon cannot be used in a value definition.</para>
+</listitem>
+</varlistentry>
+</variablelist><note><para>Routines that read this file halt if they encounter a malformed
+entry. Any projects that are specified after the incorrect entry are not assigned.</para>
+</note><para>This example shows the default <filename>/etc/project</filename> file:</para><screen>system:0:System:::
+user.root:1:Super-User:::
+noproject:2:No Project:::
+default:3::::
+group.staff:10::::</screen><para>This example shows the default <filename>/etc/project</filename> file
+with project entries added at the end:</para><screen>system:0:System:::
+user.root:1:Super-User:::
+noproject:2:No Project:::
+default:3::::
+group.staff:10::::
+user.ml:2424:Lyle Personal:::
+booksite:4113:Book Auction Project:ml,mp,jtd,kjh::</screen><para>You can also add resource controls and attributes to the <filename>/etc/project</filename> file:</para><itemizedlist><listitem><para>To add resource controls for a project, see <olink targetptr="rmctrls.task-2" remap="internal">Setting Resource Controls</olink>.</para>
+</listitem><listitem><para>To define a physical memory resource cap for a project using
+the resource capping daemon described in <olink targetdoc="group-refman" targetptr="rcapd-1m" remap="external"><citerefentry><refentrytitle>rcapd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, see <olink targetptr="rm.rcapd-4" remap="internal">Attribute to Limit Physical Memory Usage</olink>.</para>
+</listitem><listitem><para>To add a <literal>project.pool</literal> attribute to a project's
+entry, see <olink targetptr="rmconfig-4" remap="internal">Creating the Configuration</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="rmtaskproj-4"><title>Project Configuration for NIS</title><para>If you are using NIS, you can specify in the <filename>/etc/nsswitch.conf</filename> file
+to search the NIS project maps for projects:</para><screen>project: nis files </screen><para>The NIS maps, either <literal>project.byname</literal> or <literal>project.bynumber</literal>, have the same form as the <filename>/etc/project</filename> file:</para><screen>projname:projid:comment:user-list:group-list:attributes</screen><para>For more information, see <olink targetdoc="sysadv5" targetptr="anis1-25461" remap="external">Chapter 4, <citetitle remap="chapter">Network Information Service (NIS) (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>.</para>
+</sect2><sect2 id="rmtaskproj-5"><title>Project Configuration for LDAP</title><para>If you are using LDAP, you can specify in the <filename>/etc/nsswitch.conf</filename> file
+to search the LDAP <literal>project</literal> database for projects:</para><screen>project: ldap files</screen><para>For more information about LDAP, see <olink targetdoc="sysadv5" targetptr="overview-1" remap="external">Chapter 8, <citetitle remap="chapter">Introduction to LDAP Naming Services (Overview/Reference),</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>. For more information about the schema
+for project entries in an LDAP database, see <olink targetdoc="sysadv5" targetptr="appendixa-5" remap="external"><citetitle remap="section">Solaris Schemas</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>.</para>
+</sect2>
+</sect1><sect1 id="rmtaskproj-7"><title>Task Identifiers</title><para>Each successful login into a project creates a new <emphasis>task</emphasis> that
+contains the login process. The task is a process collective that represents
+a set of work over time. A task can also be viewed as a <emphasis>workload
+component</emphasis>. Each task is automatically assigned a task ID.</para><para>Each process is a member of one task, and each task is associated
+with one project.</para><figure id="rmtaskproj-fig-50"><title>Project and Task Tree</title><mediaobject><imageobject><imagedata entityref="rmtasktree"/>
+</imageobject><textobject><simpara>Diagram shows one project with three tasks under it,
+and two to four processes under each task.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>All operations on process groups, such as signal delivery, are also
+supported on tasks. You can also bind a task to a <emphasis>processor set</emphasis> and
+set a scheduling priority and class for a task, which modifies all current
+and subsequent processes in the task.</para><para>A task is created whenever a project is joined. The following actions,
+commands, and functions create tasks:</para><itemizedlist><listitem><para>login</para>
+</listitem><listitem><para><command>cron</command></para>
+</listitem><listitem><para><command>newtask</command></para>
+</listitem><listitem><para><command>setproject</command></para>
+</listitem><listitem><para><command>su</command></para>
+</listitem>
+</itemizedlist><para>You can create a finalized task by using one of the following methods.
+All further attempts to create new tasks will fail.</para><itemizedlist><listitem><para>You can use the <command>newtask</command> command with the <option>F</option> option.</para>
+</listitem><listitem><para>You can set the <literal>task.final</literal> attribute on
+a project in the <filename>project</filename> naming service database. All
+tasks created in that project by <command>setproject</command> have the <literal>TASK_FINAL</literal> flag.</para>
+</listitem>
+</itemizedlist><para>For more information, see the <olink targetdoc="group-refman" targetptr="login-1" remap="external"><citerefentry><refentrytitle>login</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="newtask-1" remap="external"><citerefentry><refentrytitle>newtask</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="cron-1m" remap="external"><citerefentry><refentrytitle>cron</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="su-1m" remap="external"><citerefentry><refentrytitle>su</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="setproject-3project" remap="external"><citerefentry><refentrytitle>setproject</refentrytitle><manvolnum>3PROJECT</manvolnum></citerefentry></olink> man
+pages.</para><para>The extended accounting facility can provide accounting data for processes.
+The data is aggregated at the task level.</para>
+</sect1><sect1 id="rmtaskproj-14"><title>Commands Used With Projects and Tasks</title><para>The commands that are shown in the following table provide the
+primary administrative interface to the project and task facilities.</para><informaltable frame="all"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="30*"/><colspec colwidth="70*"/><thead><row><entry><para>Man Page Reference</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="projects-1" remap="external"><citerefentry><refentrytitle>projects</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Displays project memberships for users. Lists projects from <command>project</command> database. Prints information on given projects. If no project names
+are supplied, information is displayed for all projects. Use the <command>projects</command> command with the <option>l</option> option to print verbose output.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="newtask-1" remap="external"><citerefentry><refentrytitle>newtask</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Executes the user's default shell or specified command, placing the
+execution command in a new task that is owned by the specified project. <command>newtask</command> can also be used to change the task and the project binding
+for a running process. Use with the <option>F</option> option to create a
+finalized task.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="passmgmt-1m" remap="external"><citerefentry><refentrytitle>passmgmt</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Updates information in the password files. Use with the <option>K</option> <replaceable>key</replaceable><literal>=</literal><replaceable>value</replaceable> option
+to add to user attributes or replace user attributes in local files.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="projadd-1m" remap="external"><citerefentry><refentrytitle>projadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Adds a new project entry to the <filename>/etc/project</filename> file.
+The <command>projadd</command> command creates a project entry only on the
+local system. <command>projadd</command> cannot change information that is
+supplied by the network naming service.</para><para>Can be used to edit project files other than the default file, <filename>/etc/project</filename>. Provides syntax checking for <filename>project</filename> file.
+Validates and edits project attributes. Supports scaled values.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="projmod-1m" remap="external"><citerefentry><refentrytitle>projmod</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Modifies information for a project on the local system. <command>projmod</command> cannot
+change information that is supplied by the network naming service. However,
+the command does verify the uniqueness of the project name and project ID
+against the external naming service.</para><para>Can be used to edit project files other than the default file, <filename>/etc/project</filename>. Provides syntax checking for <filename>project</filename> file.
+Validates and edits project attributes. Can be used to add a new attribute,
+add values to an attribute, or remove an attribute. Supports scaled values.</para><para>Can be used with the <option>A</option> option to apply the resource
+control values found in the project database to the active project. Existing
+values that do not match the values defined in the <command>project</command> file
+are removed.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="projdel-1m" remap="external"><citerefentry><refentrytitle>projdel</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Deletes a project from the local system. <command>projdel</command> cannot
+change information that is supplied by the network naming service.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="useradd-1m" remap="external"><citerefentry><refentrytitle>useradd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Adds default project definitions to the local files. Use with the <option>K</option> <replaceable>key</replaceable><literal>=</literal><replaceable>value</replaceable> option
+to add or replace user attributes.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="userdel-1m" remap="external"><citerefentry><refentrytitle>userdel</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Deletes a user's account from the local file.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="usermod-1m" remap="external"><citerefentry><refentrytitle>usermod</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Modifies a user's login information on the system. Use with the <option>K</option> <replaceable>key</replaceable><literal>=</literal><replaceable>value</replaceable> option
+to add or replace user attributes.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

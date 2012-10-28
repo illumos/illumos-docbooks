@@ -1,0 +1,286 @@
+<chapter id="gevrx"><title>MPO Observability Tools</title><highlights><para>This chapter describes the tools that are available to use the MPO functionality
+that is available in the Solaris operating system.</para><para>This chapter discusses the following topics:</para><itemizedlist><listitem><para><olink targetptr="gevsz" remap="internal">The pmadvise utility</olink> describes
+the tool that applies rules that define the memory use of a process.</para>
+</listitem><listitem><para><olink targetptr="gevog" remap="internal">The plgrp tool</olink> describes
+the tool that can display and set a thread's affinity for a locality group.</para>
+</listitem><listitem><para><olink targetptr="gesuq" remap="internal">The lgrpinfo Tool</olink> prints
+information about the lgroup hierarchy, contents, and characteristics.</para>
+</listitem><listitem><para><olink targetptr="gesvi" remap="internal">The Solaris::lgrp Module</olink> describes
+a Perl interface to the locality group API that is described in <olink targetptr="lgroups-1" remap="internal">Chapter&nbsp;1, Locality Group APIs</olink>.</para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gevsz"><title>The <literal>pmadvise</literal> utility</title><para>The <literal>pmadvise</literal> utility applies rules to a process that
+define how that process uses memory. The <literal>pmadvise</literal> utility
+applies the rules, called <emphasis>advice</emphasis>, to the process with
+the <olink targetdoc="group-refman" targetptr="madvise-3c" remap="external"><citerefentry><refentrytitle>madvise</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> tool.
+This tool can apply advice to a specific subrange of locations in memory at
+a specific time. By contrast, the <olink targetdoc="group-refman" targetptr="madv.so.1-1" remap="external"><citerefentry><refentrytitle>madv.so.1</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> tool applies the advice throughout
+the execution of the target program to all segments of a specified type.</para><para>The <literal>pmadvise</literal> utility has the following options:</para><variablelist><varlistentry><term><option>f</option></term><listitem><para>This option takes control of the target process. This option
+overrides the control of any other process. See the <olink targetdoc="group-refman" targetptr="proc-1" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> manual page.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>o</option></term><listitem><para>This option specifies the advice to apply to the target process.
+Specify the advice in this format:</para><programlisting>private=<emphasis>advice</emphasis>
+shared=<emphasis>advice</emphasis>
+heap=<emphasis>advice</emphasis>
+stack=<emphasis>advice</emphasis>
+<emphasis>address</emphasis>:<emphasis>length</emphasis>=<emphasis>advice</emphasis></programlisting><para>The value of the <replaceable>advice</replaceable> term can be one of
+the following:</para><programlisting>normal
+random
+sequential
+willneed
+dontneed
+free
+access_lwp
+access_many
+access_default</programlisting><para>You can specify an address and length to specify the subrange where
+the advice applies. Specify the address in hexadecimal notation and the length
+in bytes.</para><para>If you do not specify the length and the starting address refers to
+the start of a segment, the <literal>pmadvise</literal> utility applies the
+advice to that segment. You can qualify the length by adding the letters K,
+M, G, T, P, or E to specify kilobytes, megabytes, gigabytes, terabytes, or
+exabytes, respectively.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>v</option></term><listitem><para>This option prints verbose output in the style of the <olink targetdoc="group-refman" targetptr="pmap-1" remap="external"><citerefentry><refentrytitle>pmap</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> tool that shows the value
+and locations of the advice rules currently in force.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The <literal>pmadvise</literal> tool attempts to process all legal options.
+When the pmadvise tool attempts to process an option that specifies an illegal
+address range, the tool prints an error message and skips that option. When
+the <literal>pmadvise</literal> tool finds a syntax error, it quits without
+processing any options and prints a usage message.</para><para>When the advice for a specific region conflicts with the advice for
+a more general region, the advice for the more specific region takes precedence.
+Advice that specifies a particular address range has precedence over advice
+for the heap and stack regions, and advice for the heap and stack regions
+has precedence over advice for private and shared memory.</para><para>The advice rules in each of the following groups are mutually exclusive
+from other advice rules within the same group:</para><programlisting>MADV_NORMAL, MADV_RANDOM, MADV_SEQUENTIAL
+MADV_WILLNEED, MADV_DONTNEED, MADV_FREE   
+MADV_ACCESS_DEFAULT, MADV_ACCESS_LWP, MADV_ACCESS_MANY</programlisting>
+</sect1><sect1 id="gevog"><title>The <literal>plgrp</literal> tool</title><para>The <literal>plgrp</literal> utility can display or set the home lgroup
+and lgroup affinities for one or more processes, threads, or lightweight processes
+(LWPs). The system assigns a home lgroup to each thread on creation. When
+the system allocates a CPU or memory resource to a thread, it searches the
+lgroup hierarchy from the thread's home lgroup for the nearest available resources
+to the thread's home.</para><para>The system chooses a home lgroup for each thread. The thread's affinity
+for its home lgroup is initially set to none, or no affinity. When a thread
+sets an affinity for an lgroup in its processor set that is higher than the
+thread's affinity for its home lgroup, the system moves the thread to that
+lgroup. The system does not move threads that are bound to a CPU. The system
+rehomes a thread to the lgroup in its processor set that has the highest affinity
+when the thread's affinity for its home lgroup is removed (set to none).</para><para>For a full description of the different levels of lgroup affinity and
+their semantics, see the <olink targetdoc="group-refman" targetptr="lgrp-affinity-set-3lgrp" remap="external"><citerefentry><refentrytitle>lgrp_affinity_set</refentrytitle><manvolnum>3LGRP</manvolnum></citerefentry></olink> manual
+page.</para><para>The <literal>plgrp</literal> tool supports the following options:</para><variablelist><varlistentry><term><option>a</option> <replaceable>lgroup list</replaceable></term><listitem><para>This option displays the affinities of the processes or threads
+that you specify for the lgroups in the list.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>A</option><replaceable>lgroup list</replaceable>/<literal>none|weak|strong[,...]</literal></term><listitem><para>This option sets the affinity of the processes or threads
+that you specify for the lgroups in the list. You can use a comma separated
+list of <replaceable>lgroup</replaceable>/<replaceable>affinity</replaceable> assignments
+to set several affinities at once.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>F</option></term><listitem><para>This option takes control of the target process. This option
+overrides the control of any other process. See the <olink targetdoc="group-refman" targetptr="proc-1" remap="external"><citerefentry><refentrytitle>proc</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> manual page.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>h</option></term><listitem><para>This option returns the home lgroup of the processes or threads
+that you specify. This is the default behavior of the <literal>plgrp</literal> tool
+when you do not specify any options.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>H</option> <replaceable>lgroup list</replaceable></term><listitem><para>This option sets the home lgroup of the processes or threads
+that you specify. This option sets a strong affinity for the listed lgroup.
+If you specify more than one lgroup, the <literal>plgrp</literal> utility
+will attempt to home the threads to the lgroups in a round robin fashion.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect2 id="gevte"><title>Specifying Lgroups</title><para id="gevnr">The value of the <replaceable>lgroup list</replaceable> variable
+is a comma separated list of one or more of the following attributes:</para><itemizedlist><listitem><para>lgroup ID</para>
+</listitem><listitem><para>Range of lgroup IDs, specified as <replaceable>start lgroup
+ID</replaceable>-<replaceable>end lgroup ID</replaceable></para>
+</listitem><listitem><para><literal>all</literal></para>
+</listitem><listitem><para><literal>root</literal></para>
+</listitem><listitem><para><literal>leaves</literal></para>
+</listitem>
+</itemizedlist><para>The <literal>all</literal> keyword represents all of the lgroup IDs
+in the system. The <literal>root</literal> keyword represents the ID of the
+root lgroup. The <literal>leaves</literal> keyword represents the IDs of all
+of the leaf lgroups. A leaf lgroup is an lgroup that does not have any children.</para>
+</sect2><sect2 id="gevtg"><title>Specifying Process and Thread Arguments</title><para>The <literal>plgrp</literal> utility takes one or more space-separated
+processes or threads as arguments. You can specify processes and threads in
+a the same syntax that the <literal>proc(1)</literal> tools use. You can specify
+a process ID as an integer, with the syntax <replaceable>pid</replaceable> or <literal>/proc/</literal><replaceable>pid</replaceable>. You can use shell expansions
+with the <literal>/proc/</literal><replaceable>pid</replaceable> syntax. When
+you give a process ID alone, the arguments to the <literal>plgrp</literal> utility
+include all of the threads of that process.</para><para>You can specify a thread explicitly by specifying the process ID and
+thread ID with the syntax <replaceable>pid</replaceable>/<replaceable>lwpid</replaceable>.
+You can specify multiple threads of a process by defining ranges with can
+be selected at once by using the <literal>-</literal> character to define
+a range, or with a comma-separated list. To specify threads 1, 2, 7, 8, and
+9 of a process whose process ID is <replaceable>pid</replaceable>, use the
+syntax <replaceable>pid</replaceable>/<literal>1,2,7-9</literal>.</para>
+</sect2>
+</sect1><sect1 id="gesuq"><title>The <literal>lgrpinfo</literal> Tool</title><para>The <literal>lgrpinfo</literal> tool prints information about the lgroup
+hierarchy, contents, and characteristics. The <literal>lgrpinfo</literal> tool
+is a Perl script that requires the <literal>Solaris::Lgrp</literal> module.
+This tool uses the <olink targetdoc="group-refman" targetptr="liblgrp-3lib" remap="external"><citerefentry><refentrytitle>liblgrp</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> API
+to get the information from the system and displays it in the human-readable
+form.</para><para>The <literal>lgrpinfo</literal> tool prints general information about
+all of the lgroups in the system when you call it without any arguments. When
+you pass lgroup IDs to the <literal>lgrpinfo</literal> tool at the command
+line, the tool returns information about the lgroups that you specify. You
+can specify lgroups with their lgroup IDs or with one of the following keywords:</para><variablelist><varlistentry><term><literal>all</literal></term><listitem><para>This keyword specifies all lgroups and is the default behavior.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>root</literal></term><listitem><para>This keyword specifies the root lgroup.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>leaves</literal></term><listitem><para>This keyword specifies all of the leaf lgroups. A leaf lgroup
+is an lgroup that has no children in the lgroup hierarchy.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>intermediate</literal></term><listitem><para>This keyword specifies all of the intermediate lgroups. An
+intermediate lgroup is an lgroup that has a parent and children.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>When the <literal>lgrpinfo</literal> tool receives an invalid lgroup
+ID, the tool prints a message with the invalid ID and continues processing
+any other lgroups that are passed in the command line. When the <literal>lgrpinfo</literal> tool finds no valid lgroups in the arguments, it exits with a status
+of <literal>2</literal>.</para><sect2 id="gevto"><title>Options for the <literal>lgrpinfo</literal> Tool</title><para>When you call the <literal>lgrpinfo</literal> tool without any arguments,
+the tool's behavior is equivalent to using the options <option>celmrt all</option>.
+The valid options for the <literal>lgrpinfo</literal> tool are:</para><variablelist><varlistentry><term><option>a</option></term><listitem><para>This option prints the topology, CPU, memory, load and latency
+information for the specified lgroup IDs. This option combines the behaviors
+of the <option>tcemrlL</option> options, unless you also specify the <option>T</option> option.
+When you specify the <option>T</option> option, the behavior of the <option>a</option> option
+does not include the behavior of the <option>t</option> option.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>c</option></term><listitem><para>This option prints the CPU information.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>C</option></term><listitem><para>This option replaces each lgroup in the list with its children.
+You cannot combine this option with the <option>P</option> or <option>T</option> options.
+When you do not specify any arguments, the tool applies this option to all
+lgroups.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>e</option></term><listitem><para>This option prints lgroup load averages for leaf lgroups.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>G</option></term><listitem><para>This option prints the OS view of the lgroup hierarchy. The
+tool's default behavior displays the caller's view of the lgroup hierarchy.
+The caller's view only includes the resources that the caller can use. See
+the <olink targetdoc="group-refman" targetptr="lgrp-init-3lgrp" remap="external"><citerefentry><refentrytitle>lgrp_init</refentrytitle><manvolnum>3LGRP</manvolnum></citerefentry></olink> manual page for more details on the OS and caller's
+view.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>h</option></term><listitem><para>This option prints the help message for the tool.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>I</option></term><listitem><para>This option prints only IDs that match the IDs you specify.
+You can combine this option with the <option>c</option>, <option>G</option>, <option>C</option>, or <option>P</option> options. When you specify the <option>c</option> option,
+the tool prints the list of CPUs that are in all of the matching lgroups.
+When you do not specify the <option>c</option> option, the tool displays the
+IDs for the matching lgroups. When you do not specify any arguments, the tool
+applies this option to all lgroups.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>l</option></term><listitem><para>This option prints information about lgroup latencies. The
+latency value given for each lgroup is defined by the operating system and
+is platform-specific. It can only be used for relative comparison of lgroups
+on the running system. It does not necessarily represent the actual latency
+between hardware devices and may not be applicable across platforms.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>L</option></term><listitem><para>This option prints the lgroup latency table. This table shows
+the relative latency from each lgroup to each of the other lgroups.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>m</option></term><listitem><para>This option prints memory information. The tool reports memory
+sizes in the units that give a size result in the integer range from 0 to
+1023. You can override this behavior by using the <option>u</option> option.
+The tool will only display fractional results for values smaller than 10.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>P</option></term><listitem><para>This option replaces each lgroup in the list with its parent
+or parents. You cannot combine this option with the <option>C</option> or <option>T</option> options. When you do not specify any arguments, the tool applies
+this option to all lgroups.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>r</option></term><listitem><para>This option prints information about lgroup resources. When
+you specify the <option>T</option> option, the tool displays information about
+the resources of the intermediate lgroups only.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>t</option></term><listitem><para>This option prints information about lgroup topology.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>T</option></term><listitem><para>This option prints the lgroup topology of a system graphically,
+as a tree. You can only use this option with the <option>a</option>, <option>c</option>, <option>e</option>, <option>G</option>, <option>l</option>, <option>L</option>, <option>m</option>, <option>r</option>, and <option>u</option> options. To restrict
+the output to intermediate lgroups, use the <option>r</option> option. Omit
+the <option>t</option> option when you combine the <option>T</option> option
+with the <option>a</option> option. This option does not print information
+for the root lgroup unless it is the only lgroup.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>u</option><replaceable>units</replaceable></term><listitem><para>This option specifies memory units. The value of the <replaceable>units</replaceable> argument can be <literal>b</literal>, <literal>k</literal>, <literal>m</literal>, <literal>g</literal>, <literal>t</literal>, <literal>p</literal>,
+or <literal>e</literal> for bytes, kilobytes, megabytes, gigabytes, terabytes,
+petabytes, or exabytes, respectively.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="gesvi"><title>The <literal>Solaris::lgrp</literal> Module</title><para>This Perl module provides a Perl interface to the lgroup APIs that are
+in <literal>liblgrp</literal>. This interface provides a way to traverse the
+lgroup hierarchy, discover its contents and characteristics, and set a thread's
+affinity for an lgroup. The module gives access to various constants and functions
+defined in the <literal>lgrp_user.h</literal> header file. The module provides
+the procedural interface and the object interface to the library.</para><para>The default behavior of this module does not export anything. You can
+use the following tags to selectively import the constants and functions that
+are defined in this module:</para><variablelist><varlistentry><term><literal>:LGRP_CONSTANTS</literal></term><listitem><para><literal>LGRP_AFF_NONE</literal>, <literal>LGRP_AFF_STRONG</literal>, <literal>LGRP_AFF_WEAK</literal>, <literal>LGRP_CONTENT_DIRECT</literal>, <literal>LGRP_CONTENT_HIERARCHY</literal>, <literal>LGRP_MEM_SZ_FREE</literal>, <literal>LGRP_MEM_SZ_INSTALLED</literal>, <literal>LGRP_VER_CURRENT</literal>, <literal>LGRP_VER_NONE</literal>, <literal>LGRP_VIEW_CALLER</literal>, <literal>LGRP_VIEW_OS</literal>, <literal>LGRP_NONE</literal>, <literal>LGRP_RSRC_CPU</literal>, <literal>LGRP_RSRC_MEM</literal>, <literal>LGRP_CONTENT_ALL</literal>, <literal>LGRP_LAT_CPU_TO_MEM</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>:PROC_CONSTANTS</literal></term><listitem><para><literal>P_PID</literal>, <literal>P_LWPID</literal>, <literal>P_MYID</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>:CONSTANTS</literal></term><listitem><para><literal>:LGRP_CONSTANTS</literal>, <literal>:PROC_CONSTANTS</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>:FUNCTIONS</literal></term><listitem><para><function>lgrp_affinity_get</function>, <function>lgrp_affinity_set</function>, <function>lgrp_children</function>, <function>lgrp_cookie_stale</function>, <function>lgrp_cpus</function>, <function>lgrp_fini</function>, <function>lgrp_home</function>, <function>lgrp_init</function>, <function>lgrp_latency</function>, <function>lgrp_latency_cookie</function>, <function>lgrp_mem_size</function>, <function>lgrp_nlgrps</function>, <function>lgrp_parents</function>, <function>lgrp_root</function>, <function>lgrp_version</function>, <function>lgrp_view</function>, <function>lgrp_resources</function>, <function>lgrp_lgrps</function>, <function>lgrp_leaves</function>, <function>lgrp_isleaf</function>, <function>lgrp_lgrps</function>, <function>lgrp_leaves</function>.</para>
+</listitem>
+</varlistentry><varlistentry><term><function>:ALL</function></term><listitem><para><function>:CONSTANTS</function>, <function>:FUNCTIONS</function></para>
+</listitem>
+</varlistentry>
+</variablelist><para>The Perl module has the following methods:</para><itemizedlist><listitem><para><function>new</function></para>
+</listitem><listitem><para><function>cookie</function></para>
+</listitem><listitem><para><function>stale</function></para>
+</listitem><listitem><para><function>view</function></para>
+</listitem><listitem><para><function>root</function></para>
+</listitem><listitem><para><function>children</function></para>
+</listitem><listitem><para><function>parents</function></para>
+</listitem><listitem><para><function>nlgrps</function></para>
+</listitem><listitem><para><function>mem_size</function></para>
+</listitem><listitem><para><function>cpus</function></para>
+</listitem><listitem><para><function>isleaf</function></para>
+</listitem><listitem><para><function>resources</function></para>
+</listitem><listitem><para><function>version</function></para>
+</listitem><listitem><para><function>home</function></para>
+</listitem><listitem><para><function>affinity_get</function></para>
+</listitem><listitem><para><function>affinity_set</function></para>
+</listitem><listitem><para><function>lgrps</function></para>
+</listitem><listitem><para><function>leaves</function></para>
+</listitem><listitem><para><function>latency</function></para>
+</listitem>
+</itemizedlist><para>You can export constants with the <literal>:CONSTANTS</literal> or <literal>:ALL</literal> tags. You can use any of the constants in the following list
+in Perl programs.</para><itemizedlist><listitem><para><literal>LGRP_NONE</literal></para>
+</listitem><listitem><para><literal>LGRP_VER_CURRENT</literal></para>
+</listitem><listitem><para><literal>LGRP_VER_NONE</literal></para>
+</listitem><listitem><para><literal>LGRP_VIEW_CALLER</literal></para>
+</listitem><listitem><para><literal>LGRP_VIEW_OS</literal></para>
+</listitem><listitem><para><literal>LGRP_AFF_NONE</literal></para>
+</listitem><listitem><para><literal>LGRP_AFF_STRONG</literal></para>
+</listitem><listitem><para><literal>LGRP_AFF_WEAK</literal></para>
+</listitem><listitem><para><literal>LGRP_CONTENT_DIRECT</literal></para>
+</listitem><listitem><para><literal>LGRP_CONTENT_HIERARCHY</literal></para>
+</listitem><listitem><para><literal>LGRP_MEM_SZ_FREE</literal></para>
+</listitem><listitem><para><literal>LGRP_MEM_SZ_INSTALLED</literal></para>
+</listitem><listitem><para><literal>LGRP_RSRC_CPU</literal></para>
+</listitem><listitem><para><literal>LGRP_RSRC_MEM</literal></para>
+</listitem><listitem><para><literal>LGRP_CONTENT_ALL</literal></para>
+</listitem><listitem><para><literal>LGRP_LAT_CPU_TO_MEM</literal></para>
+</listitem><listitem><para><literal>P_PID</literal></para>
+</listitem><listitem><para><literal>P_LWPID</literal></para>
+</listitem><listitem><para><literal>P_MYID</literal></para>
+</listitem>
+</itemizedlist><para>When an underlying library function fails, the functions in this module
+return either <literal>undef</literal> or an empty list. The module can use
+the following error codes:</para><variablelist><varlistentry><term><literal>EINVAL</literal></term><listitem><para>The value supplied is not valid.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ENOMEM</literal></term><listitem><para>There was not enough system memory to complete an operation.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ESRCH</literal></term><listitem><para>The specified process or thread was not found.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>EPERM</literal></term><listitem><para>The effective user of the calling process does not have the
+appropriate privileges, and its real or effective user ID does not match the
+real or effective user ID of one of the threads.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1>
+</chapter>

@@ -1,0 +1,400 @@
+<?Pub UDT _bookmark _target?><?Pub CX solbook(?><chapter id="clientsetup-1"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag
+atict:user user="sharonr" fullname="Sharon Veach"?><?Pub Tag atict:user
+user="ee194360" fullname="ERIC ERICKSON"?><?Pub Tag atict:user user="mseif"
+fullname=""?><title>Setting Up LDAP Clients (Tasks)</title><highlights><para>This chapter describes how to set up a Solaris LDAP naming services
+client.</para><para>This chapter covers the following topics.</para><itemizedlist><listitem><para><olink targetptr="clientsetup-48" remap="internal">Prerequisites to LDAP Client
+Setup</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-49" remap="internal">Initializing an LDAP Client</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-50" remap="internal">Using Profiles to Initialize
+a Client</olink></para>
+</listitem><listitem><para><olink targetptr="gdzpf" remap="internal">Using Per-User Credentials</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-90" remap="internal">Using Proxy Credentials</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-51" remap="internal">Initializing a Client Manually</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-78" remap="internal">Modifying a Manual Client
+Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-71" remap="internal">Uninitializing a Client</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-57" remap="internal">Setting Up TLS Security</olink></para>
+</listitem><listitem><para><olink targetptr="clientsetup-89" remap="internal">Configuring PAM</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="clientsetup-48"><title>Prerequisites to LDAP Client Setup</title><para>In order for a Solaris client to use LDAP as a naming service the following
+needs to be in place.</para><itemizedlist><listitem><para>The client's domain name must be served by the LDAP server</para>
+</listitem><listitem><para>The <filename>nsswitch.conf</filename> file needs to point
+to LDAP for the required services</para>
+</listitem><listitem><para>The client needs to be configured with all the given parameters
+that define its behavior</para>
+</listitem><listitem><para><literal>ldap_cachemgr</literal> needs to be running on the
+client</para>
+</listitem><listitem><para>At least one server for which a client is configured must
+be up and running</para>
+</listitem>
+</itemizedlist><para>The <command>ldapclient</command> utility is the key to setting up an
+LDAP client, as it performs all of the above steps, except for starting the
+server.  The rest of this chapter will show examples of how to use the <command>ldapclient</command> utility to set up an LDAP client and use the various other LDAP
+utilities to get information about, and check the status of, an LDAP client.</para>
+</sect1><sect1 id="clientsetup-95"><title>LDAP and the Service Management Facility</title><indexterm><primary>New Features</primary><secondary>Service Management Facility with LDAP</secondary>
+</indexterm><indexterm><primary>Service Management Facility</primary><secondary>and LDAP</secondary>
+</indexterm><indexterm><primary>LDAP</primary><secondary>Service Management Facility</secondary>
+</indexterm><para>The LDAP client service is managed by using the Service Management Facility.
+For an overview of SMF, refer to <olink targetdoc="sysadv1" targetptr="hbrunlevels-25516" remap="external">Chapter 16, <citetitle remap="chapter">Managing Services (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>. Also refer to the <olink targetdoc="refman1m" targetptr="svcadm-1m" remap="external"><citerefentry><refentrytitle>svcadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="refman1" targetptr="svcs-1" remap="external"><citerefentry><refentrytitle>svcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man pages for more details.</para><itemizedlist><listitem><para>Administrative actions on this service, such as enabling,
+disabling, or restarting, can be performed by using the <command>svcadm</command> command.</para><tip><para><indexterm><primary>FMRI</primary><secondary>LDAP</secondary></indexterm>Temporarily disabling a service by using the <option>t</option> option
+provides some protection for the service configuration. If the service is
+disabled with the <option>t</option> option, the original settings would be
+restored for the service after a reboot. If the service is disabled without <option>t</option>, the service will remain disabled after reboot.</para>
+</tip>
+</listitem><listitem><para>The Fault Managed Resource Identifier (FMRI) for the LDAP
+client service is <literal>svc:/network/ldap/client:</literal><replaceable>&lt;instance&gt;</replaceable><literal></literal>.</para>
+</listitem><listitem><para>You can query the status of the LDAP client and <command>ldap_cachemgr</command> by using the <command>svcs</command> command.</para><itemizedlist><listitem><para>Example of <command>svcs</command> command and output.</para><screen># <userinput>svcs \*ldap\*</userinput>
+STATE         STIME     FMRI
+online        15:43:46  svc:/network/ldap/client:default</screen>
+</listitem><listitem><para>Example of <command>svcs</command> <option>l</option> command
+and output. To get the output shown below, you must use the instance name
+in the FMRI.</para><screen># <userinput>svcs</userinput> <option>l</option> <userinput>network/ldap/client:default</userinput>
+fmri         svc:/network/ldap/client:default
+enabled      true
+state        online
+next_state   none
+restarter    svc:/system/svc/restarter:default
+contract_id  1598 
+dependency   require_all/none file://localhost/var/ldap/ldap_client_file (-)
+dependency   require_all/none svc:/network/initial (online)
+dependency   require_all/none svc:/system/filesystem/minimal (online)</screen>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>You can check a daemon's presence by using the <command>ps</command> command.</para><screen># <userinput>ps</userinput> <option>e</option> <userinput>| grep slapd</userinput>
+  root 23320     1   0   Aug 27 ?       16:30 ./ns-slapd -D \
+  /usr/iplanet/ds5/slapd-lastrev -i /usr/iplanet/ds5/slapd-lastrev/
+  root 25367 25353   0 15:35:19 pts/1     0:00 grep slapd</screen><note><para>Do not use the <option>f</option> option with <command>ps</command> because
+this option attempts to translate user IDs to names, which causes more naming
+service lookups that might not succeed.</para>
+</note>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="clientsetup-49"><title>Initializing an LDAP Client</title><para><olink targetdoc="refman1m" targetptr="ldapclient-1m" remap="external"><citerefentry><refentrytitle>ldapclient</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> is a utility used to set up LDAP clients in the Solaris
+system. <command>ldapclient</command> assumes the server has already been
+configured with the appropriate client profiles. You must install and configure
+the server with the appropriate profiles before you can set up clients.</para><note><para>The Solaris operating system does not support a configuration
+in which a NIS client and a Native LDAP client co-exist on the same client
+machine.</para>
+</note><para>There are two main ways to set up a client by using <command>ldapclient</command>.</para><itemizedlist><listitem><para><emphasis>Profile</emphasis></para><para>At a minimum, you
+need to specify the server address containing the profile and domain you want
+to use. If no profile is specified, then the &ldquo;default&rdquo; profile
+is assumed. The server will provide the rest of the required information,
+except for proxy and certificate database information. If a client's credential
+level is <literal>proxy</literal> or <literal>proxy anonymous</literal>, you
+must supply the proxy bind DN and password. See <olink targetptr="ldapsecure-74" remap="internal">Assigning Client Credential Levels</olink> for more information.</para>
+</listitem><listitem><para><emphasis>Manual</emphasis></para><para>You configure the
+profile on the client itself, which means defining all parameters from the
+command line. Thus, the profile information is stored in cache files and is
+never refreshed by the server.</para>
+</listitem>
+</itemizedlist><note><para>Though you can manually configure clients, it is not recommended.
+Using the configuration profiles decreases the complexity and cost of managing
+clients.</para>
+</note><sect2 id="clientsetup-50"><title>Using Profiles to Initialize a
+Client</title><task id="clientsetup-proc-52"><title>How to Initialize a Client Using Profiles</title><procedure><step id="clientsetup-step-79"><para>Become superuser or assume an equivalent
+role.</para><para>Roles contain authorizations and privileged commands. For
+more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="clientsetup-step-53"><para>Run <command>ldapclient</command> with <literal>init</literal>.</para><screen># <userinput>ldapclient init \</userinput>
+<userinput></userinput><option>a</option> <userinput>profileName=new \</userinput>
+<userinput></userinput><option>a</option> <userinput>domainName=west.example.com 192.168.0.1</userinput>
+System successfully configured</screen>
+</step>
+</procedure>
+</task>
+</sect2><sect2 id="gdzpf"><title>Using Per-User Credentials</title><note><para>Do not edit either of the client configuration files directly.
+Use <literal>ldapclient</literal> to create or modify the content of these
+files.</para>
+</note><task id="gdzpl"><title>How to Initialize a Client Using Per-User Credentials</title><taskprerequisites><para>Before you set up a client with per-user credentials the following items
+must already be configured:</para><itemizedlist><listitem><para>One or more Kerberos KDC servers must be configured and running.</para>
+</listitem><listitem><para>DNS, client access to a DNS server, and at least one DNS server,
+must be configured and running.</para>
+</listitem><listitem><para>Kerberos on the client machine must be configured and enabled.</para>
+</listitem><listitem><para>A Kerberos client installation profile must exist. Such a
+profile might be:</para><screen># cat /usr/tmp/krb5.profile
+REALM SPARKS.COM
+KDC kdc.example.com
+ADMIN super/admin
+FILEPATH /usr/tmp/krb5.conf
+NFS 1
+DNSLOOKUP none</screen>
+</listitem><listitem><para>The LDAP server must be installed and configured to support
+the <literal>sasl/GSSAPI</literal>.  </para>
+</listitem><listitem><para>Appropriate identity mapping configurations must exist.</para>
+</listitem><listitem><para>Kerberos host principals for the directory server and the
+KDC must be set up in the KDC.</para>
+</listitem><listitem><para><literal>idsconfig</literal> must have been run on the directory
+server DIT to be used.</para>
+</listitem><listitem><para>An appropriate per-user profile gssapi profile (such as <filename>gssapi_EXAMPLE.COM</filename>) must have been created.</para><para>An illustration
+of a per-user profile in idsconfig is shown in the following partial example:</para><screen># /usr/lib/ldap/idsconfig
+Do you wish to continue with server setup (y/n/h)? [n] y
+Enter the iPlanet Directory Server's (iDS) hostname to setup: kdc.example.com
+Enter the port number for iDS (h=help): [389] &lt;Enter your port&gt;
+Enter the directory manager DN: [cn=Directory Manager] &lt;Enter your DN&gt;
+Enter passwd for cn=Directory Manager : &lt;Enter your password&gt;
+Enter the domainname to be served (h=help): [example.com] &lt;Enter your domain&gt;
+Enter LDAP Base DN (h=help): [dc=example,dc=com] &lt;Enter your DN&gt;
+GSSAPI is supported. Do you want to set up gssapi:(y/n) [n] y
+Enter Kerberos Realm: [EXAMPLE.COM] EXAMPLE.COM
+You can create a sasl/GSSAPI enabled profile with default values now.
+Do you want to create a sasl/GSSAPI default profile ? [n] y
+Enter. the profile name (h=help): [gssapi_EXAMPLE.COM] &lt;Enter&gt;
+GSSAPI setup is done. ...</screen>
+</listitem><listitem><para>The necessary user principals must exist in the Key Distribution
+Center (KDC).</para>
+</listitem><listitem><para>On the client machine, Kerberos must be initialized using
+the client profile with a command such as:</para><para><userinput># /usr/sbin/kclient
+-p /usr/tmp/krb5.profile</userinput></para>
+</listitem><listitem><para><literal>/etc/nsswitch.ldap</literal> must be configured to
+use dns for hosts and ipnodes like this:</para><para>host: files dns</para><para>ipnodes: files dns</para><para>(Modify this file with an editor as necessary)</para>
+</listitem><listitem><para><literal>/etc/resolv.conf</literal> must be configured and
+the dns service must be running 	(See the DNS chapters in this document for
+details)</para>
+</listitem><listitem><para>The directory server DIT must be pre-loaded with (at a minimum)
+the users of this client machine, the client host and necessary auto_home
+LDAP entries. See other sections of this manual for details on how to add
+entries using <command>ldapaddent</command>.</para>
+</listitem>
+</itemizedlist>
+</taskprerequisites><procedure><step><para>Run<userinput> ldapclient init</userinput> to initialize the client
+using the gssapi profile</para><para><userinput># /usr/sbin/ldapclient init
+-a profilename=gssapi_SPARKS.COM -a \</userinput></para><para><userinput>domainname=example.com 9.9.9.50</userinput></para>
+</step><step><para>Try to log in as a user:</para><para>Run <userinput>kinit -p user</userinput>.</para><para>Run <userinput>ldaplist -l passwd</userinput> user in user's login session
+and you should see &ldquo;userpassword.&rdquo;</para><para>But <userinput>ldaplist -l passwd bar</userinput> can get the entry
+without <userinput>userpassword</userinput>. By default root can still see <literal>userpassword</literal> of everybody.</para>
+</step>
+</procedure><taskrelated-custom><title>Notes About Using Per-User Credentials</title><itemizedlist><listitem><para>If the syslog has messages: <literal>libsldap: Status: 7 Mesg:
+openConnection: GSSAPI bind failed - 82 Local error</literal>, it is likely
+that Kerberos is not initialized or its ticket is expired. Run <userinput>klist</userinput> to
+browse it. Run <userinput>kinit -p foo</userinput> or <userinput>kinit -R
+-p foo</userinput> and try again.</para>
+</listitem><listitem><para>If you want to, you can add <userinput>pam_krb5.so.1</userinput> to <literal>/etc/pam.conf</literal> so it will automatically <literal>kinit</literal> when
+you log in.</para>
+</listitem><listitem><para>For example:</para><screen><userinput>login   auth optional pam_krb5.so.1 </userinput></screen><screen><userinput>rlogin  auth optional pam_krb5.so.1</userinput></screen><screen><userinput>other   auth optional pam_krb5.so.1</userinput></screen>
+</listitem><listitem><para>If a user is <literal>kinited</literal> and the syslog message
+indicates <literal>Invalid credential</literal>, then the problem could be
+the host entry (root) or user entry is not in LDAP directory or mapping rules
+are not correct.</para>
+</listitem><listitem><para>When <literal>ldapclient init</literal> is executed, it makes
+some checks if the LDAP profile contains self/ sasl/GSSAPI configuration.
+If it fails at <literal>/etc/nsswitch.ldap</literal> check, then the usual
+reason is that dns was not added to <literal>host:</literal> and <literal>ipnodes:</literal>.</para>
+</listitem><listitem><para>If it fails because the DNS client not enabled, run <userinput>svcs
+-l dns/client</userinput> to see if <literal>/etc/resolv.conf</literal> is
+missing or it is just disabled. Run <userinput>svcadm enable dns/client</userinput> to
+enable it.</para>
+</listitem><listitem><para>If the check fails because of sasl/GSSAPI bind, check syslog
+to find out what went wrong.</para>
+</listitem>
+</itemizedlist><para>See other references in this guide and in the <olink targetdoc="sysadv6" remap="external"><citetitle remap="book">System Administration Guide: Security Services</citetitle></olink> for
+details.</para>
+</taskrelated-custom>
+</task>
+</sect2><sect2 id="clientsetup-90"><title>Using Proxy Credentials</title><task id="clientsetup-proc-54"><title>How to Initialize a Client Using Proxy
+Credentials</title><tasksummary><note><para><emphasis>Do not</emphasis> edit either of the client configuration
+files directly.  Use <command>ldapclient</command> to create or modify the
+content of these files.</para>
+</note>
+</tasksummary><procedure><step id="clientsetup-step-80"><para>Become superuser or assume an equivalent
+role.</para><para>Roles contain authorizations and privileged commands. For
+more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="clientsetup-step-55"><para>Run <command>ldapclient</command> (defining
+proxy values).</para><screen># <userinput>ldapclient init \</userinput>
+<userinput></userinput><option>a</option> <userinput>proxyDN=cn=proxyagent,ou=profile,dc=west,dc=example,dc=com \</userinput>
+<userinput></userinput><option>a</option> <userinput>domainName=west.example.com \</userinput>
+<userinput></userinput><option>a</option> <userinput>profileName=pit1 \</userinput>
+<userinput></userinput><option>a</option> <userinput>proxyPassword=test1234 192.168.0.1</userinput>
+System successfully configured</screen><para>The <option>a</option> proxyDN and <option>a</option> proxyPassword
+are <emphasis>required</emphasis> if the profile to be used is set up for <literal>proxy</literal>.  As the credentials are not stored in the profile saved on
+the server, you must supply the information when you initialize the client.
+ This method is more secure than the older method of storing the proxy credentials
+on the server.</para><para>The proxy information is used to create <literal>/var/ldap/ldap_client_cred</literal>. The rest of the information is put in <literal>/var/ldap/ldap_client_file</literal>.</para>
+</step>
+</procedure>
+</task>
+</sect2><sect2 id="clientsetup-51"><title>Initializing a Client Manually</title><para>Superusers. or administrators with an equivalent role, can perform manual
+client configurations. However, many of the checks are bypassed during the
+process, so it is relatively easy to misconfigure your system.  In addition,
+you must change settings <emphasis>on every machine</emphasis>, instead of
+in one central place, as is done when using profiles.</para><task id="clientsetup-proc-75"><title>How to Initialize a Client Manually</title><procedure><step id="clientsetup-step-81"><para>Become superuser or assume an equivalent
+role.</para><para>Roles contain authorizations and privileged commands. For
+more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="clientsetup-step-76"><para>Use <command>ldapclient manual</command> to
+initialize the client.</para><screen># <userinput>ldapclient manual \</userinput>
+<userinput></userinput><option>a</option> <userinput>domainName=dc=west.example.com \</userinput>
+<userinput></userinput><option>a</option> <userinput>credentialLevel=proxy \</userinput>
+<userinput></userinput><option>a</option> <userinput>defaultSearchBase=dc=west,dc=example,dc=com \</userinput> 
+<userinput></userinput><option>a</option> <userinput>proxyDN=cn=proxyagent,ou=profile,dc=west,dc=example,dc=com \</userinput> 
+<userinput></userinput><option>a</option> <userinput>proxyPassword=testtest 192.168.0.1</userinput></screen>
+</step><step id="clientsetup-step-77"><para>Use <literal>ldapclient list</literal> to
+verify.</para><screen>NS_LDAP_FILE_VERSION= 2.0
+NS_LDAP_BINDDN= cn=proxyagent,ou=profile,dc=west,dc=example,dc=com
+NS_LDAP_BINDPASSWD= {NS1}4a3788e8c053424f
+NS_LDAP_SERVERS= 192.168.0.1
+NS_LDAP_SEARCH_BASEDN= dc=west,dc=example,dc=com
+NS_LDAP_CREDENTIAL_LEVEL= proxy</screen>
+</step>
+</procedure>
+</task>
+</sect2><sect2 id="clientsetup-78"><title>Modifying a Manual Client Configuration</title><task id="clientsetup-proc-84"><title>How to Modify a Manual Configuration</title><procedure><step id="clientsetup-step-87"><para>Become superuser or assume an equivalent
+role.</para><para>Roles contain authorizations and privileged commands. For
+more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="clientsetup-step-85"><para>Use the <command>ldapclient mod</command> command
+to change the authentication method to <literal>simple</literal>.</para><screen># <userinput>ldapclient mod</userinput> <option>a</option> <userinput>authenticationMethod=simple</userinput></screen>
+</step><step id="clientsetup-step-86"><para>Use <command>ldapclient list</command> to
+verify the change was made.</para><screen># <userinput>ldapclient list</userinput>
+NS_LDAP_FILE_VERSION= 2.0
+NS_LDAP_BINDDN= cn=proxyagent,ou=profile,dc=west,dc=example,dc=com
+NS_LDAP_BINDPASSWD= {NS1}4a3788e8c053424f
+NS_LDAP_SERVERS= 192.168.0.1
+NS_LDAP_SEARCH_BASEDN= dc=west,dc=example,dc=com
+NS_LDAP_AUTH= simple
+NS_LDAP_CREDENTIAL_LEVEL= proxy</screen>
+</step>
+</procedure><taskrelated role="troubleshooting"><para>You cannot change some attributes of an LDAP client configuration by
+using the <literal>mod</literal> subcommand. For example, you cannot change
+the <literal>profileName</literal> and <literal>profileTTL</literal> attributes.
+To change these attributes, create a new profile by using the <command>ldapclient
+init</command> command, as described in <olink targetptr="clientsetup-50" remap="internal">Using
+Profiles to Initialize a Client</olink>. Or, run the <command>ldapclient manual</command> command,
+as described in <olink targetptr="clientsetup-51" remap="internal">Initializing a Client Manually</olink>.</para>
+</taskrelated>
+</task>
+</sect2><sect2 id="clientsetup-71"><title>Uninitializing a Client</title><para><command>ldapclient uninit</command> restores the client name service
+to what it was prior to the most recent <literal>init</literal>, <literal>modify</literal>,
+or <literal>manual</literal> operation. In other words, it performs an &ldquo;undo&rdquo;
+on the last step taken. For example, if the client was configured to use <literal>profile1</literal> and was then changed to use <literal>profile2</literal>,
+using <command>ldapclient uninit</command> would revert the client back to
+using  <literal>profile1</literal>.</para><task id="clientsetup-proc-72"><title>How to Uninitialize a Client</title><procedure><step id="clientsetup-step-82"><para>Become superuser or assume an equivalent
+role.</para><para>Roles contain authorizations and privileged commands. For
+more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="clientsetup-step-83"><para>Use <literal>ldapclient uninit</literal>.</para><screen># <userinput>ldapclient uninit</userinput>
+System successfully recovered</screen>
+</step>
+</procedure>
+</task>
+</sect2><sect2 id="clientsetup-57"><title>Setting Up TLS Security</title><note><para>The security database files must be readable by everyone. Do not
+include any private keys in the <filename>key3.db</filename>.</para>
+</note><para>If using TLS, the necessary security databases must be installed. In
+particular, the certificate and key database files  are needed. For example,
+if you adopt an older database format from Netscape Communicator, two files, <filename>cert7.db</filename> and <filename>key3.db</filename>, are required. Or if
+you use a new database format from Mozilla, three files, <filename>cert8.db</filename>, <filename>key3.db</filename> and <filename>secmod.db</filename> are needed. The <filename>cert7.db</filename> or <filename>cert8.db</filename> file contains trusted certificates.
+The <filename>key3.db</filename> file contains the client's keys. Even if
+the LDAP naming service client does not use client keys, this file must be
+present. The <filename>secmod.db</filename> file contains the security modules
+such as <filename>PKCS#11</filename> module. This file is not required if
+the older format is used.</para><note><para>Before running <command>ldapclient</command>, you should set up
+and install the needed security database files described in this section.</para>
+</note><para>See the section about configuring LDAP clients to use SSL in the &ldquo;Managing
+SSL&rdquo; chapter of the Administrator's Guide for the version of Sun Java System Directory Server you
+are using. For information on how to create and manage these files. Once configured,
+these files must be stored in the location expected by the LDAP naming services
+client. The attribute <literal>certificatePath</literal> is used to determine
+this location.  This is by default <filename>/var/ldap</filename>.</para><para>For example, after setting up the necessary <literal>cert7.db</literal> and <literal>key3.db</literal> files using <trademark>Netscape Communicator</trademark>,
+copy the files to the default location.</para><screen># <userinput>cp $HOME/.netscape/cert7.db /var/ldap</userinput>
+# <userinput>cp $HOME/.netscape/key3.db /var/ldap</userinput></screen><para>Next, give everyone read access.</para><screen># <userinput>chmod 444 /var/ldap/cert7.db</userinput>
+# <userinput>chmod 444 /var/ldap/key3.db</userinput></screen><note><para>While Netscape manages the <filename>cert7.db</filename> and <filename>key3.db</filename> files in the <literal>$HOME/.netscape</literal> directory,
+Mozilla has its <filename>cert8.db</filename>, <filename>key3.db</filename> and <filename>secmod.db</filename> files managed in a sub-directory under <literal>$HOME/.mozilla</literal>. Copies of these security databases must be stored on a local file
+system if you are using them for an LDAP naming services client.</para>
+</note>
+</sect2><sect2 id="clientsetup-89"><title>Configuring PAM</title><para><literal>pam_ldap</literal> is one authentication and account management
+PAM module option for LDAP. See the <olink targetdoc="refman5" targetptr="pam-ldap-5" remap="external"><citerefentry><refentrytitle>pam_ldap</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink> man page and <olink targetptr="whatsnew-1" remap="internal">Appendix&nbsp;A, Solaris 10 Software Updates to DNS,
+NIS, and LDAP</olink> for more information about the features currently supported
+with <literal>pam_ldap</literal>.</para><para>If you have selected both the per-user mode and the self credentials
+option, then you must also enable the PAM Kerberos pam_krb5(5) pam modules.
+ See <olink targetdoc="group-refman" targetptr="pam-krb5-5" remap="external"><citerefentry><refentrytitle>pam_krb5</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink> and
+the <olink targetdoc="sysadv6" remap="external"><citetitle remap="book">System Administration Guide: Security Services</citetitle></olink> documentation for further details.</para><sect3 id="clientsetup-91"><title>Configuring PAM to Use UNIX <literal>policy</literal></title><para>To configure PAM to use UNIX <literal>policy</literal>, follow the sample
+in <olink targetptr="schemas-111" remap="internal">Example pam.conf File for pam_ldap</olink>.
+Add the lines that contain <literal>pam_ldap.so.1</literal> to the client's <literal>/etc/pam.conf</literal> file. For details, see the <olink targetdoc="refman" targetptr="pam.conf-4" remap="external"><citerefentry><refentrytitle>pam.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page.</para>
+</sect3><sect3 id="clientsetup-92"><title>Configuring PAM to Use LDAP <literal>server_policy</literal></title><para>To configure PAM to use LDAP <literal>server_policy</literal>, follow
+the sample in <olink targetptr="schemas-250" remap="internal">Example pam_conf file for pam_ldap
+Configured for Account Management</olink>. Add the lines that contain <literal>pam_ldap.so.1</literal> to the client's <filename>/etc/pam.conf</filename> file. In addition,
+if any PAM module in the sample <filename>pam.conf</filename> file specifies
+the <literal>binding</literal> flag and  the <literal>server_policy</literal> option,
+use the same flag and option for the corresponding module in the client's
+ <filename>/etc/pam.conf</filename> file.   Also, add the <literal>server_policy</literal> option
+to the line that contains the service module <literal>pam_authtok_store.so.1</literal>.</para>&pamldapnote;<itemizedlist><listitem><para>The <literal>binding</literal> control flag</para><para>Using
+the <literal>binding</literal> control flag allows a local password  override
+of a remote (LDAP) password. For example, if a user account  is found on both
+the local files and the LDAP namespace,  the password associated with the
+local account takes precedence over the remote password. Thus, if the local
+password expires, authentication fails even if the remote LDAP password is
+still valid.</para>
+</listitem><listitem><para>The <literal>server_policy</literal> option</para><para>The <literal>server_policy</literal> option instructs <command>pam_unix_auth</command>, <command>pam_unix_account</command>, and <command>pam_passwd_auth</command> to ignore
+a user found in the LDAP namespace and to allow <literal>pam_ldap</literal> to
+perform authentication or account validation. In the case of <command>pam_authtok_store</command>, a new password is passed to the LDAP server without encryption.
+The password is thereby stored in the directory according to the password
+encryption scheme configured on the server. For more information, see <olink targetdoc="refman" targetptr="pam.conf-4" remap="external"><citerefentry><refentrytitle>pam.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> and   <olink targetdoc="refman5" targetptr="pam-ldap-5" remap="external"><citerefentry><refentrytitle>pam_ldap</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist>
+</sect3>
+</sect2>
+</sect1><sect1 id="clientsetup-59"><title>Retrieving LDAP Naming Services Information</title><para>You can retrieve information about LDAP naming services by using the <literal>ldaplist</literal> utility. This LDAP utility lists the naming information
+from the LDAP servers in LDIF format. It can be useful for troubleshooting.
+ See <olink targetdoc="refman1" targetptr="ldaplist-1" remap="external"><citerefentry><refentrytitle>ldaplist</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> for
+further information.</para><sect2 id="clientsetup-61"><title>Listing All LDAP Containers</title><para><literal>ldaplist</literal> displays its output with a blank line separating
+records, which is helpful for big multiline records.</para><note><para>The output of <command>ldaplist</command> depends upon the client
+configuration. For example, if the value of <literal>ns_ldap_search</literal> is <literal>sub</literal> rather than <literal>one</literal>, <command>ldaplist</command> lists
+all the entries under the current search <literal>baseDN</literal>.</para>
+</note><para>The following is an example of <command>ldaplist</command> output.</para><screen># <userinput>ldaplist</userinput>
+dn: ou=people,dc=west,dc=example,dc=com
+
+dn: ou=group,dc=west,dc=example,dc=com
+
+dn: ou=rpc,dc=west,dc=example,dc=com
+
+dn: ou=protocols,dc=west,dc=example,dc=com
+
+dn: ou=networks,dc=west,dc=example,dc=com
+
+dn: ou=netgroup,dc=west,dc=example,dc=com
+
+dn: ou=aliases,dc=west,dc=example,dc=com
+
+dn: ou=hosts,dc=west,dc=example,dc=com
+
+dn: ou=services,dc=west,dc=example,dc=com
+
+dn: ou=ethers,dc=west,dc=example,dc=com
+
+dn: ou=profile,dc=west,dc=example,dc=com
+
+dn: automountmap=auto_home,dc=west,dc=example,dc=com
+
+dn: automountmap=auto_direct,dc=west,dc=example,dc=com
+
+dn: automountmap=auto_master,dc=west,dc=example,dc=com
+
+dn: automountmap=auto_shared,dc=west,dc=example,dc=com</screen>
+</sect2><sect2 id="clientsetup-62"><title>Listing All User Entry Attributes</title><para>To list specific information such as a user's <literal>passwd</literal> entry,
+use <command>getent</command> as follows:</para><screen># <userinput>getent passwd user1</userinput>
+user1::30641:10:Joe Q. User:/home/user1:/bin/csh</screen><para>If you want to list all attributes, use <command>ldaplist</command> with
+the <literal>-l</literal> option.</para><screen># <userinput>ldaplist</userinput> <option>l</option> <userinput>passwd user1</userinput>dn: uid=user1,ou=People,dc=west,dc=example,dc=com
+        uid: user1
+        cn: user1
+        uidNumber: 30641
+        gidNumber: 10
+        gecos: Joe Q. User
+        homeDirectory: /home/user1
+        loginShell: /bin/csh
+        objectClass: top
+        objectClass: shadowAccount
+        objectClass: account
+        objectClass: posixAccount
+        shadowLastChange: 6445</screen>
+</sect2>
+</sect1><sect1 id="clientsetup-63"><title>Customizing the LDAP Client Environment</title><para>The following sections describe how you can customize the client environment.</para><para>You can change any of the services, but be careful, because if the data
+is not populated on the server for the service specified, things will stop
+working. Also, in some cases files may not be set up by default.</para><sect2 id="clientsetup-65"><title>Modifying the <filename>nsswitch.conf</filename> File
+for LDAP</title><para>You can modify your <filename>/etc/nsswitch.conf</filename> file to
+customize where each service gets its information.  The default settings are
+stored in <filename>/etc/nsswitch.ldap</filename> and <command>ldapclient</command> uses
+this file to create your <filename>/etc/nsswitch.conf</filename> file when
+the client is initialized.</para>
+</sect2><sect2 id="clientsetup-2"><title>Enabling DNS With LDAP</title><para>If you want to enable DNS by setting up a <literal>/etc/resolv.conf</literal> file,
+add DNS to your hosts lines as shown below.</para><screen>hosts:      ldap dns [NOTFOUND=return] files</screen><para>The recommended configuration is:</para><para><literal>hosts: files dns</literal></para><para><literal>ipnodes: files dns</literal></para><para>If per-user authentication is used, the sasl/GSSAPI and Kerberos mechanisms
+expect the dns naming service to be configured and enabled.  See the chapters
+on DNS in this administration guide for further details.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000035151 0?>

@@ -1,0 +1,77 @@
+<!-- 
+The contents of this Documentation are subject to the Public Documentation
+License Version 1.01 (the "License"); you may only use this Documentation if
+you comply with the terms of this License. A copy of the License is
+available at http://www.opensolaris.org/os/community/documentation/license.
+-->
+
+<chapter id="repo_mirror"><title>Mirroring Repositories</title><highlights><para>The image packaging system client, <citerefentry><refentrytitle>pkg</refentrytitle><manvolnum>1</manvolnum></citerefentry>, can retrieve content from mirror
+servers. A mirror provides a complete copy of a repository's catalog of packages.
+Using a nearby mirror can speed up system updates, distribution construction,
+zone creation, and other packaging-intensive operations.</para>
+</highlights><sect1><title>Setting Up a Mirror Repository</title><para>The following figure gives an overview of the IPS repository mirroring
+and the IPS certificate servers.</para><figure id="ghqhv"><title>IPS Repository and Mirrors</title><mediaobject><imageobject><imagedata entityref="ips_tif"/>
+</imageobject><textobject><simpara></simpara>
+</textobject>
+</mediaobject>
+</figure><task id="ghnok"><title>How to Set Up a Mirror</title><taskprerequisites><itemizedlist><listitem><para>Ensure that you are running the OpenSolaris 2009.06 operating
+system.</para>
+</listitem><listitem><para>Read the section on the depot server, <olink type="auto-generated" targetptr="depot_server" remap="internal"></olink> and become familiar
+with the <command>pkg.depotd(1M)</command> command.</para>
+</listitem><listitem><para>Ensure that you have sufficient bandwidth and disk space on
+the system that will mirror the master repository.</para>
+</listitem>
+</itemizedlist>
+</taskprerequisites><procedure><step><para>Become root.</para>
+</step><step><para>Import the SMF service manifest.</para><para><command># svccfg
+import /var/svc/manifest/application/pkg-server.xml</command></para>
+</step><step><para>Prepare a location for your mirror server, by briefly running
+a packaging depot server in normal mode.</para><para>The depot server will
+create the appropriate directory structures. In this example, <command>/export/pkg</command> is such a location.</para><screen># mkdir /export/pkg 
+ # /usr/lib/pkg.depotd -d /export/pkg -p 8009
+ [wait for startup messages to conclude]</screen>
+</step><step><para>Deploy a second instance of the packaging server to run as a read-only
+mirror. Set <command>pkg/port</command> to a different value if you do not
+want your mirror to run on port 80.</para><screen># svccfg -s pkg/server 
+svc:/application/pkg/server&gt; add mirror
+svc:/application/pkg/server&gt; select mirror
+svc:/application/pkg/server&gt;	addpg pkg application
+svc:/application/pkg/server&gt;	addpg start method
+svc:/application/pkg/server&gt;	setprop start/exec= astring: "/usr/lib/pkg.depotd
+--mirror -p %{pkg/port} -d %{pkg/inst_root} -t	%{pkg/socket_timeout} -s
+% {pkg/threads} --proxy-base=%{pkg/proxy_base} 
+--log-access=%{pkg/log_access} --log-errors=%{pkg/log_errors}" 
+svc:/application/pkg/server&gt;	setprop pkg/inst_root = astring: "/export/pkg"
+svc:/application/pkg/server&gt;	setprop pkg/threads = count: 50
+svc:/application/pkg/server&gt;	setprop
+exit</screen>
+</step><step><para>Refresh the mirror.</para><screen># svcadm refresh pkg/server:mirror</screen>
+</step><step><para>Enable the mirror.</para><screen># svcadm enable pkg/server:mirror</screen>
+</step><step><para>For system performance, mount the file system that contains your
+repository with <filename>noatime</filename> so that file accesses do not
+cause directory metadata updates. The following command uses ZFS.</para><screen># zfs set atime=off <replaceable>filesystem_name</replaceable></screen>
+</step><step><para>Add a mirror to the configuration of the <ulink url="http://opensolaris.org" type="url"></ulink> repository on your local
+packaging clients.</para><screen># pkg set-publisher -m http://my.hostname.sun.com opensolaris.org</screen>
+</step>
+</procedure>
+</task><task id="ghuor"><title>How to Add a Mirror</title><taskprerequisites><para>Ensure that you have set up a mirror. For instructions on setting up
+a mirror, see <olink type="auto-generated" targetptr="ghnok" remap="internal"></olink></para>
+</taskprerequisites><procedure remap="single-step"><step><para>Use the following command to add a mirror.</para><para><command>$
+pfexec pkg set-publisher -m <replaceable>name_of_mirror_to_add</replaceable> <replaceable>publisher</replaceable></command></para>
+</step>
+</procedure><example id="ghydp"><title>Add a Mirror</title><para>This example creates an image, adds a mirror within the image, and installs
+a package.</para><screen>$ pfexec pkg image-create -a os=http://ipkg.sun.com /tmp/io
+$ cd /tmp/io
+$ pfexec pkg set-publisher -m http://ipkg.mirror os
+$ pfexec pkg install SUNWzsh</screen>
+</example>
+</task><task id="ghuoy"><title>How to Remove a Mirror</title><taskprerequisites><para>Ensure that you have set up a mirror and added the mirror to the current
+publisher associated with your image. For instructions on setting up a mirror,
+see <olink type="auto-generated" targetptr="ghnok" remap="internal"></olink>.</para>
+</taskprerequisites><procedure remap="single-step"><step><para>Use the following command to remove a mirror.</para><para><command>$
+pfexec pkg set-publisher -M <replaceable>name_of_mirror_to_remove</replaceable> <replaceable>publisher</replaceable></command></para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

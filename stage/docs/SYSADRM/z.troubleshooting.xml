@@ -1,0 +1,119 @@
+<chapter id="gclkx"><title>Troubleshooting Miscellaneous Solaris Zones
+Problems</title><highlights><para>This chapter contains zones troubleshooting information.</para>
+</highlights><sect1 id="geoin"><title>Exclusive-IP Zone Is Using Device, so <command>dladm</command> <literal>reset-linkprop</literal> Fails</title><para>If the following error message is displayed:</para><screen>dladm: warning: cannot reset link property 'zone' on 'bge0': operation failed</screen><para>Referring to <olink targetptr="geofj" remap="internal">How to Use dladm reset-linkprop</olink>,
+the attempt to use <command>dladm</command> <literal>reset-linkprop</literal> failed.
+The running zone <literal>excl</literal> is using the device, which was assigned
+by executing <command>ifconfig</command> <literal>bge0</literal> <literal>plumb</literal> inside
+the zone.</para><para>To reset the value, use the procedure <command>ifconfig</command> <literal>bge0</literal> <literal>unplumb</literal> inside the zone and rerun the <command>dladm</command> command.</para>
+</sect1><sect1 id="gcokc"><title>Incorrect Privilege Set Specified in Zone Configuration</title><para>If the zone's privilege set contains a disallowed privilege, is missing
+a required privilege, or includes an unknown privilege name, an attempt to
+verify, ready, or boot the zone will fail with an error message such as the
+following:</para><screen>zonecfg:zone5> <userinput>set limitpriv="basic"</userinput>
+.
+.
+.
+global# <userinput>zoneadm -z zone5 boot</userinput>
+ 	required privilege "sys_mount" is missing from the zone's privilege set
+ 	zoneadm: zone zone5 failed to verify</screen>
+</sect1><sect1><title>Zone Administrator Mounting Over File Systems Populated by the
+Global Zone</title><para>The presence of files within a file system hierarchy when a non-global
+zone is first booted indicates that the file system data is managed by the
+global zone. When the non-global zone was installed, a number of the packaging
+files in the global zone were duplicated inside the zone. These files must
+reside under the <literal>zonepath</literal> directly. If the files reside
+under a file system created by a zone administrator on disk devices or ZFS
+datasets added to the zone, packaging and patching problems could occur.</para><para>The issue with storing any of the file system data that is managed by
+the global zone in a zone-local file system can be described by using ZFS
+as an example. If a ZFS dataset has been delegated to a non-global zone, the
+zone administrator should not use that dataset to store any of the file system
+data that is managed by the global zone. The configuration could not be patched
+or upgraded correctly.</para><para>For example, a ZFS delegated dataset should not be used as a <literal>/var</literal> file
+system. The Solaris operating system delivers core packages that install components
+into <literal>/var</literal>.  These packages have to access <literal>/var</literal> when
+they are upgraded or patched, which is not possible if <literal>/var</literal> is
+mounted on a delegated ZFS dataset.</para><para>File system mounts under parts of the hierarchy controlled by the global
+zone are supported. For example, if an empty <literal>/usr/local</literal> directory
+exists in the global zone, the zone administrator can mount other contents
+under that directory.</para><para>You can use a delegated ZFS dataset for file systems that do not need
+to be accessed during patching or upgrade, such as <literal>/export</literal> in
+the non-global zone. </para>
+</sect1><sect1 id="gdepn"><title><command>netmasks</command> Warning Displayed When
+Booting Zone</title><para>If you see the following message when you boot the zone as described
+in <olink targetptr="z.inst.task-13" remap="internal">How to Boot a Zone</olink>:</para><screen># <userinput>zoneadm -z my-zone boot</userinput>
+zoneadm: zone 'my-zone': WARNING: hme0:1: no matching subnet
+	found in netmasks(4) for 192.168.0.1; using default of
+	255.255.255.0.</screen><para>The message is only a warning, and the command has succeeded. The message
+indicates that the system was unable to find the <literal>netmask</literal> to
+be used for the IP address specified in the zone's configuration.</para><para>To stop the warning from displaying on subsequent reboots, ensure that
+the correct <command>netmasks</command> databases are listed in the <filename>/etc/nsswitch.conf</filename> file in the global zone and that at least one of these databases
+contains the subnet and <literal>netmasks</literal> to be used for the zone <literal>my-zone</literal>.</para><para>For example, if the <filename>/etc/inet/netmasks</filename> file and
+the local NIS database are used for resolving <literal>netmasks</literal> in
+the global zone, the appropriate entry in <filename>/etc/nsswitch.conf</filename> is
+as follows:</para><para><literal>netmasks: files nis</literal></para><para>The subnet and corresponding netmask information for the zone <literal>my-zone</literal> can then be added to <filename>/etc/inet/netmasks</filename> for
+subsequent use.</para><para>For more information about the <command>netmasks</command> command,
+see the <olink targetdoc="group-refman" targetptr="netmasks-4" remap="external"><citerefentry><refentrytitle>netmasks</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page.</para>
+</sect1><sect1 id="gcrsr"><title>Zone Does Not Halt</title><para>In the event that the system state associated with the zone cannot be
+destroyed, the halt operation will fail halfway. This leaves the zone in an
+intermediate state, somewhere between running and installed. In this state
+there are no active user processes or kernel threads, and none can be created.
+When the halt operation fails, you must manually intervene to complete the
+process.</para><para>The most common cause of a failure is the inability of the system to
+unmount all file systems. Unlike a traditional Solaris system shutdown, which
+destroys the system state, zones must ensure that no mounts performed while
+booting the zone or during zone operation remain once the zone has been halted.
+Even though <command>zoneadm</command> makes sure that there are no processes
+executing in the zone, the unmount operation can fail if processes in the
+global zone have open files in the zone. Use the tools described in the <citerefentry><refentrytitle>proc</refentrytitle><manvolnum>1</manvolnum></citerefentry> (see <command>pfiles</command>) and <citerefentry><refentrytitle>fuser</refentrytitle><manvolnum>1M</manvolnum></citerefentry> man pages to find these processes
+and take appropriate action. After these processes have been dealt with, reinvoking <command>zoneadm</command> <command>halt</command> will completely halt the zone.</para>
+</sect1><sect1 id="gchbp"><title>Resolving Problems With a <command>zoneadm</command> <literal>attach</literal> Operation</title><task id="gcgme"><title>Patches and Packages Are Out of Sync</title><tasksummary><para>The target system must be running the same or later versions of the
+following required operating system packages and patches as those installed
+on the original host.</para><itemizedlist><listitem><para>Packages that deliver files under an <literal>inherit-pkg-dir</literal> resource </para>
+</listitem><listitem><para>Packages where <literal>SUNW_PKG_ALLZONES=true</literal></para>
+</listitem>
+</itemizedlist>
+</tasksummary><procedure><step><para>If packages and patches are different between the original host
+and the new host, you might see a display similar to the following:</para><screen>host2# <userinput>zoneadm -z my-zone attach</userinput>
+	These packages installed on the source system are inconsistent with this system:
+            SUNWgnome-libs (2.6.0,REV=101.0.3.2005.12.06.20.27) version mismatch
+                    (2.6.0,REV=101.0.3.2005.12.19.21.22)
+            SUNWudaplr (11.11,REV=2005.12.13.01.06) version mismatch
+                    (11.11,REV=2006.01.03.00.45)
+            SUNWradpu320 (11.10.0,REV=2005.01.21.16.34) is not installed
+            SUNWaudf (11.11,REV=2005.12.13.01.06) version mismatch
+                    (11.11,REV=2006.01.03.00.45)
+            NCRos86r (11.10.0,REV=2005.01.17.23.31) is not installed
+	These packages installed on this system were not installed on the source system:
+            SUNWukspfw (11.11,REV=2006.01.03.00.45) was not installed
+            SUNWsmcmd (1.0,REV=2005.12.14.01.53) was not installed
+	These patches installed on the source system are inconsistent with this system:
+            120081 is not installed
+            118844 is not installed
+            118344 is not installed
+	These patches installed on this system were not installed on the source system:
+            118669 was not installed
+            118668 was not installed
+            116299 was not installed</screen>
+</step><step><para>To migrate the zone successfully, use one of the following methods:.</para><stepalternatives><step><para>Update the new host with the correct packages and patches so that
+this content is the same on both systems. For more information, see <olink targetptr="z.pkginst.ov-1" remap="internal">Chapter&nbsp;24, About Packages and Patches on
+a Solaris System With Zones Installed (Overview)</olink> and <olink targetptr="z.pkginst.task-1" remap="internal">Chapter&nbsp;25, Adding and Removing Packages
+and Patches on a Solaris System With Zones Installed (Tasks)</olink></para>
+</step><step><para>If the new host has later versions of the zone-dependent packages
+or their associated patches, use <command>zoneadm</command> <literal>attach</literal> with
+the <option>u</option> option to update those packages within the zone to
+match the new host. See <olink targetptr="gcxgj" remap="internal">About Migrating a Zone</olink>.</para>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="gchcg"><title>Operating System Releases or Machine Architectures
+Do Not Match</title><tasksummary><para>To migrate the zone successfully, install the same Solaris release that
+is running on the original host on a system with the same architecture.</para>
+</tasksummary><procedure><step><para>Verify the Solaris release running on the original system and
+the system architecture.</para><screen>host1# <userinput>uname -a</userinput></screen>
+</step><step><para>Install the same release on the new host with the same architecture. </para><para>Refer to the Solaris installation documentation on <literal>docs.sun.com</literal>.</para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

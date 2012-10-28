@@ -1,0 +1,507 @@
+<chapter id="resource-ctrls-8"><title>Resource Controls</title><highlights><para>This chapter describes resource controls and their properties.</para><itemizedlist><listitem><para><olink targetptr="resource-ctrls-9" remap="internal">Overview of Resource Controls</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-1" remap="internal">Resource Controls Flags
+and Actions</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-13" remap="internal">Resource Controls API
+Functions</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-12" remap="internal">Resource Control Code
+Examples</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-19" remap="internal">Programming Issues Associated
+With Resource Controls</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="resource-ctrls-9"><title>Overview of Resource Controls</title><para>Use the extended accounting facility to determine the resource consumption
+of workloads on your system. After the resource consumption has been determined,
+use the resource control facility to place bounds on resource usage. Bounds
+that are placed on resources prevent workloads from over-consuming resources.</para><para>For an overview of resource controls and example commands for administering
+resource controls, see <olink targetdoc="sysadrm" targetptr="rmctrls-1" remap="external">Chapter
+6, <citetitle remap="chapter">Resource Controls (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management
+and Solaris Zones</citetitle></olink> and <olink targetdoc="sysadrm" targetptr="rmctrls.task-1" remap="external">Chapter 7, <citetitle remap="chapter">Administering
+Resource Controls (Tasks),</citetitle> in <citetitle remap="book">System Administration
+Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><para>The resource control facility adds the following benefits.</para><itemizedlist><listitem><para><userinput>Dynamically set</userinput></para><para>Resource
+controls can be adjusted while the system is running.</para>
+</listitem><listitem><para><userinput>Containment level granularity</userinput></para><para>Resource controls are arranged in a containment level of zone, project,
+task, or process. The containment level simplifies the configuration and aligns
+the collected values closer to the particular zone, project, task, or process.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="resource-ctrls-1"><title>Resource Controls Flags and Actions</title><para>This section describes flags, actions, and signals associated with resource
+controls.</para><sect2 id="faayq"><title><literal>rlimit</literal>, Resource Limit</title><para><literal>rlimit</literal> is process-based. <literal>rlimit</literal> establishes
+a restricting boundary on the consumption of a variety of system resources
+by a process. Each process that the process creates inherits from the original
+process. A resource limit is defined by a pair of values. The values specify
+the current (soft) limit and the maximum (hard) limit. </para><para>A process might irreversibly lower its hard limit to any value that
+is greater than or equal to the soft limit. Only a process with superuser
+ID can raise the hard limit. See <function>setrlimit</function> and <function>getrlimit</function>.</para><para>The <structname>rlimit</structname> structure contains two members that
+define the soft limit and hard limit.</para><programlisting>rlim_t     rlim_cur;       /* current (soft) limit */
+rlim_t     rlim_max        /* hard limit */</programlisting>
+</sect2><sect2 id="resource-ctrls-6"><title><literal>rctl</literal>, Resource Control</title><para><literal>rctl</literal> extends the process-based limits of <literal>rlimit</literal> by controlling resource consumption by processes, tasks, and projects
+defined in the project database.</para><note><para>The <literal>rctl</literal> mechanism is preferred to the use
+of <literal>rlimit</literal> to set resource limits. The only reason to use
+the <literal>rlimit</literal> facility is when portability is required across
+UNIX platforms.</para>
+</note><para>Applications fall into the following broad categories depending on how
+an application deals with resource controls. Based on the action that is taken,
+resource controls can be further classified. Most report an error and terminate
+operation. Other resource controls allow applications to resume operation
+and adapt to the reduced resource usage. A progressive chain of actions at
+increasing values can be specified for each resource control.</para><para>The list of attributes for a resource control consists of a privilege
+level, a threshold value, and an action that is taken when the threshold is
+exceeded.</para>
+</sect2><sect2 id="resource-ctrls-4"><title>Resource Control Values and Privilege
+Levels</title><para>Each threshold value on a resource control must
+be associated with one of the following privilege levels:</para><variablelist termlength="wholeline"><varlistentry><term>RCPRIV_BASIC</term><listitem><para>Privilege level can be modified by the owner of the calling
+process. RCPRIV_BASIC is associated with a resource's soft limit.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCPRIV_PRIVILEGED</term><listitem><para>Privilege level can be modified only by privileged (superuser)
+callers. RCPRIV_PRIVILEGED is associated with a resource's hard limit.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCPRIV_SYSTEM</term><listitem><para>Privilege level remains fixed for the duration of the operating
+system instance.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><olink targetptr="resource-ctrls-fig-25" remap="internal">Figure 5&ndash;2</olink> shows
+the timeline for setting privilege levels for signals that are defined by
+the <filename>/etc/project</filename> file <literal>process.max-cpu-time</literal> resource
+control.</para>
+</sect2><sect2 id="resource-ctrls-2"><title>Local Actions and Local Flags</title><para>The local action and local flags are applied to
+the current resource control value represented by this resource control block.
+Local actions and local flags are value-specific. For each threshold value
+that is placed on a resource control, the following local actions and local
+flags are available:</para><variablelist termlength="wholeline"><varlistentry><term>RCTL_LOCAL_NOACTION</term><listitem><para>No local action is taken when this resource control value
+is exceeded.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_LOCAL_SIGNAL</term><listitem><para>The specified signal, set by <function>rctlblk_set_local_action</function>,
+is sent to the process that placed this resource control  value in the value
+sequence.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_LOCAL_DENY</term><listitem><para>When this resource control value is encountered, the request
+for the resource is denied. Set on all values if RCTL_GLOBAL_DENY_ALWAYS is
+set for this control. Cleared on all values if RCTL_GLOBAL_DENY_NEVER is set
+for this control.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_LOCAL_MAXIMAL</term><listitem><para>This resource control value represents a request for the maximum
+amount of resource for this control. If RCTL_GLOBAL_INFINITE is set for this
+resource control, RCTL_LOCAL_MAXIMAL indicates an unlimited resource control
+value that is never exceeded.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="resource-ctrls-3"><title>Global Actions and Global Flags</title><para>Global flags apply to all current resource control
+values represented by this resource control block. Global actions and global
+flags are set by <literal>rctladm</literal>(1M). Global actions and global
+flags cannot be set with <function>setrctl</function>. Global flags apply
+to all resource controls. For each threshold value that is placed on a resource
+control, the following global actions and global flags are available:</para><variablelist termlength="wholeline"><varlistentry><term>RCTL_GLOBAL_NOACTION</term><listitem><para>No global action is taken when a resource control value is
+exceeded on this control.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_SYSLOG</term><listitem><para>A standard message is logged by the <function>syslog</function> facility
+when any resource control value on a sequence associated with this control
+is exceeded.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_SECONDS</term><listitem><para>Defines the unit string of the limit value as seconds.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_COUNT</term><listitem><para>Defines the unit string of the limit value as count.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_BYTES</term><listitem><para>Defines the unit string of the limit value as bytes.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_SYSLOG_NEVER</term><listitem><para>Flag means that RCTL_GLOBAL_SYSLOG cannot be set for this
+resource control through <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_NOBASIC</term><listitem><para>No values with the RCPRIV_BASIC privilege are permitted on
+this control.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_LOWERABLE</term><listitem><para>Non-privileged callers are able to lower the value of privileged
+resource control values on this control.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_DENY_ALWAYS</term><listitem><para>The action that is taken when a control value is exceeded
+on this control always includes denial of the resource.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_DENY_NEVER</term><listitem><para>The action that is taken when a control value is exceeded
+on this control always excludes denial of the resource. The resource is always
+granted, although other actions can also be taken.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_FILE_SIZE</term><listitem><para>The valid signals for local actions include the SIGXFSZ signal.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_CPU_TIME</term><listitem><para>The valid signals for local actions include the SIGXCPU signal.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_SIGNAL_NEVER</term><listitem><para>No local actions are permitted on this control. The resource
+is always granted.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_INFINITE</term><listitem><para>This resource control supports the concept of an unlimited
+value. Generally, an unlimited value applies only to accumulation-oriented
+resources, such as CPU time.</para>
+</listitem>
+</varlistentry><varlistentry><term>RCTL_GLOBAL_UNOBSERVABLE</term><listitem><para>Generally, a task or project related resource control does
+not support observational control values. An RCPRIV_BASIC privileged control
+value placed  on a task or process generates an action only if the value is
+exceeded by the process that placed the value.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="resource-ctrls-28"><title>Resource Control Sets Associated With
+a Project, Processes, and Tasks</title><para>The following figure shows the resource control sets associated with
+tasks, processes and a project.</para><figure id="fblfq"><title>Resource Control Sets for Task, Project, and Process</title><mediaobject><imageobject><imagedata entityref="res-ctrls.rctls" width="100"/>
+</imageobject><textobject><simpara>represents resource control sets for a task, project,
+and processes.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>More than one resource control can exist on a resource, each resource
+control at a containment level in the process model. Resource controls can
+be active on the same resource for both a process and collective task or collective
+project. In this case, the action for the process takes precedence. For example,
+action is taken on <literal>process.max-cpu-time</literal> before <literal>task.max-cpu-time</literal> if both controls are encountered simultaneously.</para><sect3 id="resource-ctrls-30"><title>Resource Controls Associated With a Project</title><para>Resource controls associated with a project include the following:</para><variablelist termlength="wholeline"><varlistentry><term><literal>project.cpu-cap</literal></term><listitem><para>Absolute limit on the amount of CPU resources that can be
+consumed by a project. A value of <literal>100</literal> means 100 percent
+of one CPU as the <literal>project.cpu-cap</literal> setting. A value of <literal>125</literal> is 125 percent, because 100 percent corresponds to one full
+CPU on the system when using CPU caps.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.cpu-shares</literal></term><listitem><para>The number of CPU shares that are granted to this project
+for use with the fair share scheduler, <literal>FSS</literal>(7).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-crypto-memory</literal></term><listitem><para>Total amount of kernel memory that can be used by <literal>libpkcs11</literal> for hardware crypto acceleration. Allocations for kernel buffers
+and session-related structures are charged against this resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-locked-memory</literal></term><listitem><para>Total amount of physical locked memory allowed.</para><para>Note that this resource control replaced <literal>project.max-device-locked-memory</literal>, which has been removed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-msg-ids</literal></term><listitem><para>Maximum number of System V message queues allowed for a project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-port-ids</literal></term><listitem><para>Maximum allowable number of event ports.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-sem-ids</literal></term><listitem><para>Maximum number of semaphore IDs allowed for a project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-shm-ids</literal></term><listitem><para>Maximum number of shared memory IDs allowed for this project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-msg-ids</literal></term><listitem><para>Maximum number of message queue IDs allowed for this project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-shm-memory</literal></term><listitem><para>Total amount of System V shared memory allowed for this project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-lwps</literal></term><listitem><para>Maximum number of LWPs simultaneously available to this project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-tasks</literal></term><listitem><para>Maximum number of tasks allowable in this project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>project.max-contracts</literal></term><listitem><para>Maximum number of contracts allowed in this project.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="resource-ctrls-32"><title>Resource Controls Associated With Tasks</title><para>Resource controls associated with tasks include the following:</para><variablelist termlength="wholeline"><varlistentry><term><literal>task.max-cpu-time</literal></term><listitem><para>Maximum CPU time (seconds) available to this task's processes. </para>
+</listitem>
+</varlistentry><varlistentry><term><literal>task.max-lwps</literal></term><listitem><para>Maximum number of LWPs simultaneously available to this task's
+processes.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="resource-ctrls-31"><title>Resource Controls Associated With Processes</title><para>Resource controls associated with processes include the following:</para><variablelist termlength="wholeline"><varlistentry><term><literal>process.max-address-space</literal></term><listitem><para>Maximum amount of address space (bytes), as summed over segment
+sizes, available to this process.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-core-size</literal></term><listitem><para>Maximum size (bytes) of a core file that is created by this
+process.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-cpu-time</literal></term><listitem><para>Maximum CPU time (seconds) available to this process.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-file-descriptor</literal></term><listitem><para>Maximum file descriptor index that is available to this process.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-file-size</literal></term><listitem><para>Maximum file offset (bytes) available for writing by this
+process.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-msg-messages</literal></term><listitem><para>Maximum number of messages on a message queue. This value
+is copied from the resource control at <function>msgget</function> time.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-msg-qbytes</literal></term><listitem><para>Maximum number (bytes) of messages on a message queue. This
+value is copied from the resource control at <function>msgget</function> time.When
+you set a new <literal>project.max-msg-qbytes</literal> value, initialization
+occurs only on the subsequently created values. The new <literal>project.max-msg-qbytes</literal> value does not effect existing values.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-sem-nsems</literal></term><listitem><para>Maximum number of semaphores allowed for a semaphore set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-sem-ops</literal></term><listitem><para>Maximum number of semaphore operations that are allowed for
+a <function>semop</function> call. This value is copied from the resource
+control at <function>msgget</function> time.A new <literal>project.max-sem-ops</literal> value only affects the initialization of subsequently
+created values and has no effect on existing values.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>process.max-port-events</literal></term><listitem><para>Maximum number of events that are allowed per event port.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="geaas"><title>Zone-Wide Resource Controls</title><para>Zone-wide resource controls are available on a system with zones
+installed. Zone-wide resource controls limit the total resource usage of all
+process entities within a zone.</para><variablelist><varlistentry><term><literal>zone.cpu-cap</literal></term><listitem><para>Absolute limit on the amount of CPU resources that can be
+consumed by a non-global zone. A value of <literal>100</literal> means 100
+percent of one CPU as the <literal>project.cpu-cap</literal> setting. A value
+of <literal>125</literal> is 125 percent, because 100 percent corresponds
+to one full CPU on the system when using CPU caps.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.cpu-shares</literal></term><listitem><para>Limit on the number of fair share scheduler (FSS) CPU shares
+for a zone. The scheduling class must be FSS. CPU shares are first allocated
+to the zone, and then further subdivided among projects within the zone as
+specified in the <literal>project.cpu-shares</literal> entries. A zone with
+a higher number of <literal>zone.cpu-shares</literal> is allowed to use more
+CPU than a zone with a low number of shares.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-locked-memory</literal></term><listitem><para>Total amount of physical locked memory available to a zone.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-lwps</literal></term><listitem><para>Maximum number of LWPs simultaneously available to this zone</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-msg-ids</literal></term><listitem><para>Maximum number of message queue IDs allowed for this zone</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-sem-ids</literal></term><listitem><para>Maximum number of semaphore IDs allowed for this zone</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-shm-ids</literal></term><listitem><para>Maximum number of shared memory IDs allowed for this zone</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-shm-memory</literal></term><listitem><para>Total amount of shared memory allowed for this zone</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>zone.max-swap</literal></term><listitem><para>Total amount of swap that can be consumed by user process
+address space mappings and <literal>tmpfs</literal> mounts for this zone.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For information on configuring zone-wide resource controls, see <olink targetdoc="sysadrm" targetptr="z.config.ov-1" remap="external">Chapter 17, <citetitle remap="chapter">Non-Global Zone Configuration (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management
+and Solaris Zones</citetitle></olink> and <olink targetdoc="sysadrm" targetptr="z.conf.start-1" remap="external">Chapter 18, <citetitle remap="chapter">Planning
+and Configuring Non-Global Zones (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris
+Zones</citetitle></olink>. Note that it is possible to use the <command>zonecfg</command> command
+to apply a zone-wide resource control to the global zone on a system with
+non-global zones installed.</para>
+</sect3>
+</sect2><sect2 id="resource-ctrls-5"><title>Signals Used With Resource Controls</title><para>For each threshold value that is placed on a resource control,
+the following restricted set of signals is available:</para><variablelist termlength="wholeline"><varlistentry><term>SIGBART</term><listitem><para>Terminate the process. </para>
+</listitem>
+</varlistentry><varlistentry><term>SIGXRES</term><listitem><para>Signal generated by resource control facility when the resource
+control limit is exceeded.</para>
+</listitem>
+</varlistentry><varlistentry><term>SIGHUP</term><listitem><para>When carrier drops on an open line, the process group that
+controls the terminal is sent a hangup signal, SIGHUP.</para>
+</listitem>
+</varlistentry><varlistentry><term>SIGSTOP</term><listitem><para>Job control signal. Stop the process. Stop signal not from
+terminal.</para>
+</listitem>
+</varlistentry><varlistentry><term>SIGTERM</term><listitem><para>Terminate the process. Termination signal sent by software.</para>
+</listitem>
+</varlistentry><varlistentry><term>SIGKILL</term><listitem><para>Terminate the process. Kill the program.</para>
+</listitem>
+</varlistentry><varlistentry><term>SIGXFSX</term><listitem><para>Terminate the process. File size limit exceeded. Available
+only to resource controls with the RCTL_GLOBAL_FILE_SIZE property. </para>
+</listitem>
+</varlistentry><varlistentry><term>SIGXCPU</term><listitem><para>Terminate the process. CPU time limit exceeded. Available
+only to resource controls with the RCTL_GLOBAL_CPUTIME property.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Other signals might be permitted due to  global properties of a specific
+control.</para><note><para>Calls to <function>setrctl</function> with illegal signals fail.</para>
+</note><figure id="resource-ctrls-fig-25"><title>Setting Privilege Levels for Signals</title><mediaobject><imageobject><imagedata entityref="value-action" width="100"/>
+</imageobject><textobject><simpara>setting privilege levels for signals</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2>
+</sect1><sect1 id="resource-ctrls-13"><title>Resource Controls API Functions</title><para>The resource controls API contains functions that: </para><itemizedlist><listitem><para><olink targetptr="resource-ctrls-14" remap="internal">Operate on Action-Value
+Pairs of a Resource Control</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-15" remap="internal">Operate on Local Modifiable
+Values</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-16" remap="internal">Retrieve Local Read-Only
+Values</olink></para>
+</listitem><listitem><para><olink targetptr="resource-ctrls-17" remap="internal">Retrieve Global Read-Only
+Actions</olink></para>
+</listitem>
+</itemizedlist><sect2 id="resource-ctrls-14"><title>Operate on Action-Value Pairs of a Resource
+Control</title><para>The following list contains the functions that set or get the resource
+control block.</para><simplelist><member><olink targetdoc="refman2" targetptr="setrctl-2" remap="external"><citerefentry><refentrytitle>setrctl</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman2" targetptr="getrctl-2" remap="external"><citerefentry><refentrytitle>getrctl</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member>
+</simplelist>
+</sect2><sect2 id="resource-ctrls-15"><title>Operate on Local Modifiable Values</title><para>The following list contains the functions associated with the local,
+modifiable resource control block.</para><simplelist><member><olink targetdoc="refman3a" targetptr="rctlblk-set-privilege-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_privilege</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-privilege-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_privilege</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-set-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_value</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_value</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-set-local-action-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_local_action</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-local-action-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_local_action</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-set-local-flags-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_local_flags</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-local-flags-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_local_flags</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member>
+</simplelist>
+</sect2><sect2 id="resource-ctrls-16"><title>Retrieve Local Read-Only Values</title><para>The following list contains the functions associated with the local,
+read-only resource control block.</para><simplelist><member><olink targetdoc="refman3a" targetptr="rctlblk-get-recipient-pid-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_recipient_pid</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-firing-time-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_firing_time</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-enforced-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_enforced_value</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member>
+</simplelist>
+</sect2><sect2 id="resource-ctrls-17"><title>Retrieve Global Read-Only
+Actions</title><para>The following list contains the functions associated with the global,
+read-only resource control block.</para><simplelist><member><olink targetdoc="refman3a" targetptr="rctlblk-get-global-action-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_global_action</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3a" targetptr="rctlblk-get-global-flags-3c" remap="external"><citerefentry><refentrytitle>rctlblk_get_global_flags</refentrytitle><manvolnum>3C</manvolnum>
+</citerefentry></olink></member>
+</simplelist>
+</sect2>
+</sect1><sect1 id="resource-ctrls-12"><title>Resource Control Code Examples</title><sect2 id="resource-ctrls-20"><title>Master Observing Process for Resource
+Controls</title><para>The following example is the master observer
+process. <olink targetptr="resource-ctrls-fig-26" remap="internal">Figure 5&ndash;3</olink> shows
+the resource controls for the master observing process.</para><note><para>The line break is not valid in an <filename>/etc/project</filename> file.
+The line break is shown here only to allow the example to display on a printed
+or displayed page. Each entry in the <filename>/etc/project</filename> file
+must be on a separate line.</para>
+</note><figure id="resource-ctrls-fig-26"><title>Master Observing Process</title><mediaobject><imageobject><imagedata entityref="master-proc" width="100"/>
+</imageobject><textobject><simpara>diagram showing resource controls for the master observing
+process</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The key points for the example include the following:</para><itemizedlist><listitem><para>Because the task's limit is privileged, the application cannot
+change the limit, or specify an action, such as a signal. A master process
+solves this problem by establishing the same resource control as a basic resource
+control on the task. The master process uses the same value or a little less
+on the resource, but with a different action, signal = XRES. The master process
+creates a thread to wait for this signal.</para>
+</listitem><listitem><para>The <structname>rctlblk</structname> is opaque. The struct
+needs to be dynamically allocated.</para>
+</listitem><listitem><para>Note the blocking of all signals before creating the thread,
+as required by sigwait(2). </para>
+</listitem><listitem><para>The thread calls <literal>sigwait</literal>(2) to block for
+the signal. If <function>sigwait</function> returns the SIGXRES signal, the
+thread notifies the master process' children, which adapts to reduce the number
+of LWPs being used. Each child should also be modelled similarly, with a thread
+in each child, waiting for this signal, and adapting its process' LWP usage
+appropriately.</para>
+</listitem>
+</itemizedlist><programlisting>rctlblk_t *mlwprcb;
+sigset_t smask;
+
+/* Omit return value checking/error processing to keep code sample short */
+/* First, install a RCPRIV_BASIC, v=1000, signal=SIGXRES rctl */
+mlwprcb = calloc(1, rctlblk_size());	 /* rctl blocks are opaque: */
+       rctlblk_set_value(mlwprcb, 1000);
+       rctlblk_set_privilege(mlwprcb, RCPRIV_BASIC);
+       rctlblk_set_local_action(mlwprcb, RCTL_LOCAL_SIGNAL, SIGXRES);
+       if (setrctl("task.max-lwps", NULL, mlwprcb, RCTL_INSERT) == -1) {
+           perror("setrctl");
+           exit (1);
+       }
+
+/* Now, create the thread which waits for the signal */
+        sigemptyset(&amp;smask);
+        sigaddset(&amp;smask, SIGXRES);
+        thr_sigsetmask(SIG_BLOCK, &amp;smask, NULL);
+thr_create(NULL, 0, sigthread, (void *)SIGXRES, THR_DETACHED, NULL));
+
+/* Omit return value checking/error processing to keep code sample short */
+
+void *sigthread(void *a)
+{
+        int sig = (int)a;
+        int rsig;
+        sigset_t sset;
+
+        sigemptyset(&amp;sset);
+        sigaddset(&amp;sset, sig);
+
+        while (1) {
+                 rsig = sigwait(&amp;sset);
+          if (rsig == SIGXRES) {
+              notify_all_children();
+              /* e.g. sigsend(P_PID, child_pid, SIGXRES); */
+		     }
+        }
+}</programlisting>
+</sect2><sect2 id="resource-ctrls-21"><title>List all the Value-Action Pairs for a
+Specific Resource Control</title><para>The following example lists all the value-action
+pairs for a specific resource control, <literal>task.max-lwps</literal>. The
+key point for the example is that <literal>getrctl</literal>(2) takes two
+resource control blocks, and returns the resource control block  for the RCTL_NEXT
+flag. To iterate through all resource control blocks, repeatedly swap the
+resource control block values, as shown here using the <literal>rcb_tmp</literal> <literal>rctl</literal> block.</para><programlisting>rctlblk_t *rcb1, *rcb2, *rcb_tmp;
+	...
+/* Omit return value checking/error processing to keep code sample short */
+rcb1 = calloc(1, rctlblk_size()); /* rctl blocks are opaque: */
+                               /* "rctlblk_t rcb" does not work */
+rcb2 = calloc(1, rctlblk_size());
+getrctl("task.max-lwps", NULL, rcb1, RCTL_FIRST);
+while (1) {
+     print_rctl(rcb1);
+     rcb_tmp = rcb2;
+     rcb2 = rcb1;
+     rcb1 = rcb_tmp;        /* swap rcb1 with rcb2 */
+     if (getrctl("task.max-lwps", rcb2,  rcb1, RCTL_NEXT) == -1) {
+          if (errno == ENOENT) {
+               break;
+     } else {
+          perror("getrctl");
+          exit (1);
+     }
+     }
+}</programlisting>
+</sect2><sect2 id="resource-pools-44"><title>Set <literal>project.cpu-shares</literal> and
+Add a New Value</title><para>The key points of the example
+include the following:</para><itemizedlist><listitem><para>This example is similar to the example shown in <olink targetptr="resource-pools-33" remap="internal">Set pool.comment Property and Add New Property</olink>.</para>
+</listitem><listitem><para>Use <function>bcopy</function>, rather than buffer swapping
+as in <olink targetptr="resource-ctrls-21" remap="internal">List all the Value-Action Pairs
+for a Specific Resource Control</olink>.</para>
+</listitem><listitem><para>To change the resource control value, call <function>setrctl</function> with
+the RCTL_REPLACE flag. The new resource control block is identical to the
+old resource control block except for the new control value.</para><programlisting>rctlblk_set_value(blk1, nshares);
+if (setrctl("project.cpu-shares", blk2, blk1, RCTL_REPLACE) != 0)</programlisting>
+</listitem>
+</itemizedlist><para>The example gets the project's CPU share allocation, <literal>project.cpu-shares</literal>,  and changes its value to <replaceable>nshares</replaceable>.</para><programlisting>/* Omit return value checking/error processing to keep code sample short */
+blk1 = malloc(rctlblk_size());
+getrctl("project.cpu-shares", NULL, blk1, RCTL_FIRST);
+my_shares = rctlblk_get_value(blk1);
+printout_my_shares(my_shares);
+/* if privileged, do the following to */
+/* change project.cpu-shares to "nshares" */
+blk1 = malloc(rctlblk_size());
+blk2 = malloc(rctlblk_size());
+if (getrctl("project.cpu-shares", NULL, blk1, RCTL_FIRST) != 0) {
+     perror("getrctl failed");
+     exit(1);
+}
+bcopy(blk1, blk2, rctlblk_size());
+rctlblk_set_value(blk1, nshares);
+if (setrctl("project.cpu-shares", blk2, blk1, RCTL_REPLACE) != 0) {
+     perror("setrctl failed");
+     exit(1);
+}		     </programlisting>
+</sect2><sect2 id="resource-ctrls-29"><title>Set LWP Limit Using Resource Control
+Blocks</title><para>In the following example, an application has set a privileged limit
+of 3000 LWPs that may not be exceeded.  In addition, the application has set
+a basic limit of 2000 LWPs.  When this limit is exceeded, a SIGXRES is sent
+to the application. Upon receiving a SIGXRES, the application might send notification
+to its child processes that might in turn reduce the number of LWPs the processes
+use or need. </para><programlisting>/* Omit return value and error checking */
+
+#include &lt;rctl.h>
+
+rctlblk_t *rcb1, *rcb2;
+
+/*
+         * Resource control blocks are opaque
+         * and must be explicitly allocated.
+         */
+rcb1 = calloc(rctlblk_size());	
+
+rcb2 = calloc(rctlblk_size());	
+
+
+/* Install an RCPRIV_PRIVILEGED, v=3000: do not allow more than 3000 LWPs */
+rctlblk_set_value(rcb1, 3000);
+rctlblk_set_privilege(rcb1, RCPRIV_PRIVILEGED);
+rctlblk_set_local_action(rcb1, RCTL_LOCAL_DENY);
+setrctl("task.max-lwps", NULL, rcb1, RCTL_INSERT);
+
+
+/* Install an RCPRIV_BASIC, v=2000 to send SIGXRES when LWPs exceeds 2000 */
+rctlblk_set_value(rcb2, 2000);
+rctlblk_set_privilege(rcb2, RCPRIV_BASIC);
+rctlblk_set_local_action(rcb2, RCTL_LOCAL_SIGNAL, SIGXRES);
+setrctl("task.max-lwps", NULL, rcb2, RCTL_INSERT);</programlisting>
+</sect2>
+</sect1><sect1 id="resource-ctrls-19"><title>Programming Issues Associated With Resource
+Controls</title><para>Consider the following issues when writing your application:</para><itemizedlist><listitem><para>The resource control block is opaque.  The control block needs
+to be dynamically allocated.</para>
+</listitem><listitem><para>If a basic resource control is established on a task or project,
+the process that establishes this resource control becomes an observer.  The
+action for this resource control block is applied to the observer. However,
+some resources cannot be observed in this manner.</para>
+</listitem><listitem><para>If a privileged resource control is set on a task or project,
+no observer process exists. However, any process that violates the limit becomes
+the subject of the resource control action.</para>
+</listitem><listitem><para>Only one action is permitted for each type: global and local.</para>
+</listitem><listitem><para>Only one basic <literal>rctl</literal> is allowed per process
+per resource control.</para>
+</listitem>
+</itemizedlist>
+</sect1>
+</chapter>

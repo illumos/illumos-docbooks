@@ -1,0 +1,436 @@
+<chapter id="idmappingtasks"><title>Identity Mapping Administration (Tasks)</title><highlights><para>This chapter describes the identity mapping service that maps Windows security identifiers (SIDs) to Solaris user identifiers (UIDs) and group identifiers (GIDs). The chapter also includes instructions on how to manage name-based mappings.</para><itemizedlist><para>This chapter covers the following topics:</para><listitem><para><olink targetptr="mapusergroupidentities" remap="internal">Mapping User and Group Identities</olink></para>
+</listitem><listitem><para><olink targetptr="createidmappingstrategy" remap="internal">Creating Your Identity Mapping Strategy</olink></para>
+</listitem><listitem><para><olink targetptr="managedirbasedusergroupmapstm" remap="internal">Managing Directory-Based Identity Mapping for Users and Groups (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="manageusergroupmapstm" remap="internal">Managing Rule-Based Identity Mapping for Users and Groups (Task Map)</olink></para>
+</listitem>
+</itemizedlist><para>The <command>idmapd</command> service can run in the global zone or in non-global zones. However, if Solaris Trusted Extensions software is enabled, the <command>idmapd</command> service <emphasis>must</emphasis> run in the global zone.</para><note><para>CIFS is an enhanced version of the SMB protocol, which allows CIFS clients to access files and resources on CIFS servers. The terms SMB and CIFS can be considered interchangeable.</para>
+</note>
+</highlights><sect1 id="mapusergroupidentities"><title>Mapping User and Group Identities</title><para>The Solaris CIFS service is designed to reside in a multiprotocol environment and provide an integrated model for sharing data between Windows and Solaris systems. Although files can be accessed simultaneously from both Windows and Solaris systems, no industry-standard mechanism is used to define a user in both Windows and Solaris environments. Objects can be created in either environment, but traditionally the access control semantics for each environment are vastly different. The Solaris OS is adopting the Windows model of access control lists (ACLs) by introducing ACLs in NFSv4 and ZFS, and by providing the <command>idmapd</command> identity mapping service.</para><para>The Solaris CIFS service uses identity mapping to establish an equivalence relationship between a Solaris user or group and a Windows user or group in which both the Solaris and Windows identities are deemed to have equivalent rights on the system.</para><para>The Solaris CIFS service determines the Windows user's Solaris credentials by using the <command>idmapd</command> service to map the SIDs in the user's Windows access token to UIDs and GIDs, as appropriate. The service checks the mappings and if a match for the Windows domain name and Windows entity name is found, the Solaris UID or GID is taken from the matching entry. If no match is found, an ephemeral UID or GID is dynamically allocated. An <olink type="custom-text" targetptr="glossaryephemeralid" remap="internal"><emphasis>ephemeral ID</emphasis></olink> is a dynamic UID or GID mapping for an SID that is not already mapped by name. An ephemeral ID does not persist across Solaris system reboots. Ephemeral mappings enable the Solaris CIFS service to work in a Windows environment without having to configure any name-based mappings.</para><itemizedlist><para>The <command>idmapd</command> service supports the following types of mappings between Windows security identifiers (SIDs) and Solaris user IDs and group IDs (UIDs and GIDs):</para><listitem><para><emphasis role="strong">Name-based mapping.</emphasis> Maps Windows and Solaris users and groups by name in the following ways:</para><itemizedlist><listitem><para><emphasis role="strong">Directory-based mapping.</emphasis> If configured, <command>idmapd</command> first tries to use name mapping information that is stored in user or group objects in the Active Directory (AD), in the native LDAP directory service, or in both. For instance, an AD object for a particular Windows user or group can be augmented to include the corresponding Solaris user or group name. Similarly, the native LDAP object for a particular Solaris user or group can be augmented to include the corresponding Windows user or group name.</para><para>You can configure <command>idmapd</command> to use AD and/or native LDAP directory-based name mappings by setting the <command>idmap</command> service properties in SMF. See Service Properties in the <olink targetdoc="refman1m" targetptr="idmap-1m" remap="external"><citerefentry><refentrytitle>idmap</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para><para>If directory-based name mapping is not configured or if it is configured but not found, <command>idmapd</command> will process locally stored rule-based mappings.</para>
+</listitem><listitem><para><emphasis role="strong">Rule-based mapping.</emphasis> An administrator maps Windows and Solaris users and groups by name.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><emphasis role="strong">Ephemeral ID mapping.</emphasis> A UID or GID is dynamically allocated for every SID that is not mapped by name.</para>
+</listitem><listitem><para><emphasis role="strong">Local SID mapping.</emphasis> A non-ephemeral UID or GID is mapped to an algorithmically generated local SID if it is not mapped by name.</para>
+</listitem>
+</itemizedlist><para>You can use the <command>idmap</command> command to create and manage the rule-based mappings.</para><itemizedlist><para>When you specify rule-based mappings, you must specify the direction in which the mapping occurs, as follows:</para><listitem><para><emphasis role="strong">Bidirectional mapping.</emphasis> Map the specified Windows name to the specified Solaris name, and map the specified Solaris name to the specified Windows name. By default, rule-based mappings that you create are bidirectional.</para><para>The following example shows a bidirectional mapping of the Windows user <literal>dana@example.com</literal> to <literal>danas</literal>, the Solaris user. Note that <literal>dana@example.com</literal> maps to <literal>danas</literal>, and <literal>danas</literal> maps to <literal>dana@example.com</literal>.</para><screen>dana@example.com == danas</screen>
+</listitem><listitem><para><emphasis role="strong">Unidirectional mapping.</emphasis> Map the names only in the specified direction.</para><para>The following example combines unidirectional and bidirectional mappings to map between Windows users <literal>dana@example.com</literal> and <literal>danasan@example.com</literal> and Solaris user <literal>danas</literal>. The bidirectional rule maps between Windows user <literal>dana@example.com</literal> and Solaris user <literal>danas</literal>. The unidirectional rule maps Windows user <literal>danasan@example.com</literal> to the Solaris user <literal>danas</literal>. When Solaris user <literal>danas</literal> needs to map to the appropriate Windows user, it maps to <literal>dana@example.com</literal>.</para><screen>dana@example.com == danas
+danasan@example.com => danas</screen>
+</listitem>
+</itemizedlist><para>On Windows and Solaris systems, files have an owner attribute and a group attribute. A Solaris file owner attribute must be a UID, and the group attribute must be a GID. Unlike the Solaris OS, Windows has no such restrictions. Windows permits either a user SID or a group SID to be a file owner or a file group. In fact, Windows uses the Administrator Group as a file owner in many instances, and any Windows application can set the file owner and group attributes to any SID.</para><itemizedlist><para>The Solaris system cannot interchange UIDs and GIDs like Windows can. Therefore, the Solaris system must be able to perform the following types of mappings:</para><listitem><para>Map a group SID to a UID when the group SID occurs in an owner field</para>
+</listitem><listitem><para>Map a user SID to a GID when the user SID occurs in group field</para>
+</listitem>
+</itemizedlist><para>These are called <olink type="custom-text" targetptr="glossarydiagonalmapping" remap="internal"><emphasis>diagonal mappings</emphasis></olink>, which use naming rules to set up the mappings.</para><sect2 id="unixusergroup"><title>Solaris Users and Groups</title><para>Solaris users and groups can be defined in local files (<filename>/etc/passwd</filename> and <filename>/etc/group</filename>) or in a naming or directory service, such as NIS and LDAP. The naming services you configure are listed in the Solaris naming services switch file <filename>/etc/nsswitch.conf</filename>. For more information, see <olink targetdoc="sysadv5" targetptr="a12swit-86415" remap="external">Chapter 2, <citetitle remap="chapter">The Name Service Switch (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>.</para><para>The Solaris CIFS service can be configured as a client of the various distributed naming services, such as NIS and LDAP. For information about configuring the Solaris CIFS service as a client for these naming services, see <olink targetdoc="sysadv5" remap="external"><citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>.</para><para>Each user and group is assigned a 32-bit identifier known, respectively, as a <olink type="custom-text" targetptr="glossaryuid" remap="internal"><emphasis>user ID (UID)</emphasis></olink> and a <olink type="custom-text" targetptr="glossarygid" remap="internal"><emphasis>group ID (GID)</emphasis></olink>. The Solaris OS has extended the <literal>uid_t</literal> and <literal>gid_t</literal> types from signed to unsigned 32-bit integers. Now that the <literal>uid_t</literal> and <literal>gid_t</literal> types are unsigned, the upper half of these namespaces is available for ephemeral dynamic ID mapping. This mapping process enable IDs to be assigned dynamically and ephemerally on demand. An <emphasis>ephemeral mapping</emphasis> is one that does not survive a Solaris system reboot. Typically, the UID or GID uniquely identifies a user or group within a single Solaris domain. However, these values are not unique across domains.</para><para>Traditionally, UID 0 or GID 0 is assigned to the <literal>root</literal> user or group. The <literal>root</literal> user is granted almost unlimited access to system objects in order to perform administration tasks.</para>
+</sect2><sect2 id="windowsusergroup"><title>Windows Users and Groups</title><para>Windows users and groups are defined in a <olink type="custom-text" targetptr="glossarysam" remap="internal"><emphasis>Security Account Manager (SAM) database</emphasis></olink>, which is managed on a <olink type="custom-text" targetptr="glossarywindowsdomaincontroller" remap="internal"><emphasis>Windows domain controller</emphasis></olink>. Each user and group is identified by a security identifier (SID). An <olink type="custom-text" targetptr="glossarysid" remap="internal"><emphasis>SID</emphasis></olink> is a variable-length structure that uniquely identifies a user or group both within a host and a local domain, and across all possible Windows domains.</para><para>The text form of an SID is represented as follows:</para><screen>S-<replaceable>R</replaceable>-<replaceable>I</replaceable>-<replaceable>SA</replaceable>-<replaceable>SA</replaceable>-..-<replaceable>SA</replaceable></screen><itemizedlist><para>The following describes the fields in the SID text string:</para><listitem><para><literal>S</literal> <emphasis role="strong">&ndash;</emphasis> Identifies the string as an SID.</para>
+</listitem><listitem><para><replaceable>R</replaceable> <emphasis role="strong">&ndash;</emphasis> Identifies the revision number, which is currently 1.</para>
+</listitem><listitem><para><replaceable>I</replaceable> <emphasis role="strong">&ndash;</emphasis> Identifies the 48-bit identifier authority value, which is the agent or namespace that issued the SID.</para>
+</listitem><listitem><para><replaceable>SA</replaceable> <emphasis role="strong">&ndash;</emphasis> Is one or more subauthorities, such as a <olink type="custom-text" targetptr="glossaryrid" remap="internal"><emphasis>relative identifier (RID)</emphasis></olink>.</para>
+</listitem>
+</itemizedlist><para>In a domain SID, the RIDs identify the domain. In a user or group SID, except for the last RID, the RIDs identify the machine or the domain that issues the SID. The last RID identifies the user or group.</para><para>For example, the <literal>S-1-5-32-500</literal> SID contains a version number of 1. The identifier authority value is 5, and it contains the 32 and 500 subauthorities. The value 500 is the RID.</para><para>The <command>idmapd</command> service generates a unique SID for the host on which it runs. This SID is used to represent both users and groups that cannot be mapped by name to SIDs. This SID is stored in the equivalent of a local SAM database. The Solaris computer SID is generated randomly.</para><para>The <command>idmap</command> service generates a unique SID, <replaceable>machine-SID</replaceable>, for the host on which it runs. This SID is used to generate local SIDs as follows:</para><screen>local SID for user = <replaceable>machine-SID</replaceable> - 1000 + <replaceable>user's-UID</replaceable>
+local SID for group = <replaceable>machine-SID</replaceable> - 2^31 + <replaceable>group's-GID</replaceable></screen><para>For instance, the local SID for a user with a UID of <literal>182048</literal> and a machine SID of <literal>S-1-5-21-726303253-4128413635</literal> is <literal>S-1-5-21-726303253-4128413635-183048</literal>.</para><para>Local SIDs are used to represent Solaris users or groups that have non-ephemeral UIDs or GIDs and that cannot be mapped by name.</para>
+</sect2>
+</sect1><sect1 id="createidmappingstrategy"><title>Creating Your Identity Mapping Strategy</title><para>Windows SID to Solaris UID and GID mapping is required when the Solaris CIFS service is deployed to a Windows environment. The <olink type="custom-text" targetptr="glossaryidmapping" remap="internal"><emphasis>identity mapping</emphasis></olink> enables Windows clients to transparently access CIFS shares and remote services from the Solaris CIFS service.</para><itemizedlist><para>Your Solaris CIFS service can use name-based mapping, ephemeral ID mapping, or both. By default, the server uses ephemeral ID mapping, which dynamically assigns an ephemeral ID as a UID or a GID for a particular Windows SID. The identity mapping strategy you choose depends on the type of Windows environment you have.</para><listitem><para><emphasis role="strong">Using name-based mapping.</emphasis> If your Windows environment includes a parallel Solaris naming service infrastructure, such as NIS, you might want to use <olink type="custom-text" targetptr="glossarynamebasedmapping" remap="internal"><emphasis>name-based mappings</emphasis></olink> to associate Windows users with Solaris users, and Windows groups with Solaris groups.</para><para>Name-based mappings include directory-based mappings and rule-based mappings. A <olink type="custom-text" targetptr="glossarydirbasedmapping" remap="internal"><emphasis>directory-based mapping</emphasis></olink> uses name mapping information that is stored in user or group objects in the Active Directory (AD), in the native LDAP directory service, or both to map users and groups. A <olink type="custom-text" targetptr="glossaryrulebasedmapping" remap="internal"><emphasis>rule-based mapping</emphasis></olink> uses rules to associate Windows users and groups with equivalent Solaris users and groups by name rather than by identifier.</para><para>To use name-based mapping, do the following:</para><orderedlist><listitem><para>Choose a Windows domain that is the most natural counterpart to the Solaris naming service domain.</para>
+</listitem><listitem><para>Determine whether to use directory-based or rule-based mappings.</para><itemizedlist><para>These name-based mapping types have the following strengths and weaknesses:</para><listitem><para><emphasis role="strong">Directory-based mappings.</emphasis> Are stored globally and each mapping is configured individually. However, the setup is rather difficult and time-consuming. This method is more suitable if many CIFS servers are being used in your environment.</para><itemizedlist><para>If you decide to use directory-based mappings, use one of the following guidelines to determine which naming services to employ:</para><listitem><para>If you have already deployed AD or native LDAP, use that naming service.</para>
+</listitem><listitem><para>If you want one-to-one mappings, choose either AD-only or native LDAP-only modes as follows:</para><itemizedlist><listitem><para>If you have few native LDAP domains and do most of your administration in AD, choose AD-only mode</para>
+</listitem><listitem><para>Otherwise, choose native LDAP-only mode</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>If you need more flexibility than one-to-one mappings offer, choose mixed mode.</para><para>For example, to map Windows entities to one native LDAP user, group, or both, use mixed mode. Similarly, use mixed mode to map multiple native LDAP users or groups to one Windows entity.</para><para>Alternatively, you can employ directory-based mapping <emphasis>and</emphasis> name-based rules.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><emphasis role="strong">Rule-based mappings.</emphasis> Are easy to configure and can be configured with a single wildcard rule. However, the mapping rules are only stored on a particular computer rather than being global. This method is more suitable if only one CIFS server is being used in your environment.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</orderedlist><itemizedlist><listitem><para><emphasis role="strong">Using directory-based mapping.</emphasis></para><orderedlist><listitem><para>Extend the AD schema, the native LDAP schema, or both with new attributes to represent a UNIX user name, a UNIX group name, or a Windows name. Also, populate the AD or native LDAP user and group objects, or both types of objects, with the appropriate attribute and value. See <olink targetptr="modifyaddirbasedmapping" remap="internal">How to Extend the Active Directory Schema, and User and Group Entries</olink> and <olink targetptr="modifynldapdirbasedmapping" remap="internal">How to Extend the Native LDAP Schema, and User and Group Entries</olink>.</para><note><para>If you do not want to modify the schema and suitable attributes already exist in either AD or native LDAP, use those attributes.</para>
+</note>
+</listitem><listitem><para>Use the <command>svccfg</command> command to enable directory-based mapping on the Solaris system. Also, inform the <command>idmap</command> service about the new AD attributes, the native LDAP attributes, or both types of attributes that are used by the user and group objects. See <olink targetptr="configuredirbasedmapping" remap="internal">How to Configure Directory-Based Mapping</olink>.</para>
+</listitem>
+</orderedlist>
+</listitem><listitem><para><emphasis role="strong">Using rule-based mapping.</emphasis></para><orderedlist><listitem><para>Create a bidirectional rule-based mapping to map all users in the Windows domain to users of the same name in the Solaris domain.</para><screen># <userinput>idmap add 'winuser:*@example.com' 'unixuser:*'</userinput>
+# <userinput>idmap add 'wingroup:*@example.com' 'unixgroup:*'</userinput></screen><para>The previous commands map not only user names, but group names. For instance, the first command would map the Windows user called <literal>pat@example.com</literal> to the Solaris user <literal>pat</literal>. The second command would map the Windows group called <literal>staff@example.com</literal> to the Solaris group <literal>staff</literal>.</para><note><para>You can only have one bidirectional rule-based mapping to map all users in a single Windows domain to all Solaris users in the local Solaris domain.</para>
+</note>
+</listitem><listitem><para>Create bidirectional rule-based mappings for users and groups whose Windows names do not exactly match the Solaris names.</para><screen># <userinput>idmap add winuser:terry@example.com unixuser:terrym</userinput></screen><para>The previous command would map a Windows user called <literal>terry@example.com</literal> to the Solaris user <literal>terrym</literal>.</para>
+</listitem>
+</orderedlist><caution><para>Rule-based identity mappings can be used to map Windows users and groups to, for example, the <literal>nobody</literal> Solaris user and group. In some circumstances, such a mapping can lock a user out of the CIFS service.</para><para>The mapping works on both a per-user and a per-group basis and for entire Windows domains. Successfully using this type of mapping to lock out users depends on the rule-based mappings being in sync with the actual names in the naming service, such as AD. As a result, this type of mapping might not be a reliable way to lock users out of the CIFS service, and should not be used for that purpose.</para><para>This scheme <emphasis>could</emphasis> be used to lock out a user if the administrator who maintains the user and group namespace is the <emphasis>same</emphasis> administrator who maintains the identity mappings. If not, however, you could get into a situation where one administrator creates the rule to lock the user out and another administrator grants a request to change the user name. In that case, the rule created to lock the user out only applies to his old user name, not to the new name. Thus, the user is no longer locked out of the CIFS service as intended.</para><para>To ensure that a user is correctly locked out, lock out the user in the naming services.</para><para>For example, creating a bidirectional mapping between the <literal>dana@example.com</literal> and <literal>nobody</literal> users does not prevent user <literal>dana@example.com</literal> from bypassing this attempt to deny him access to the CIFS service. He can simply have his user name changed to something else so that the rule will no longer apply.</para>
+</caution>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><emphasis role="strong">Using ephemeral ID mapping.</emphasis> If your Windows environment does not already include a parallel Solaris naming service infrastructure, such as NIS, you do not need to create rule-based identity mappings. Instead, the default identity mapping configuration uses ephemeral IDs to map between Windows SIDs and Solaris UIDs and GIDs.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="managedirbasedusergroupmapstm"><title>Managing Directory-Based Identity Mapping for Users and Groups (Task Map)</title><para>The following table points to the tasks that you can use to manage directory-based identity mapping for the Solaris CIFS service in a Windows environment.</para><para>These tasks use the <olink targetdoc="refman1m" targetptr="idmap-1m" remap="external"><citerefentry><refentrytitle>idmap</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to manage identity mapping.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Extend the Active Directory (AD) schema with user and group name attributes.</para>
+</entry><entry><para>This procedure describes how to extend the AD schema and populate the user and group objects with UNIX user and group name information.</para>
+</entry><entry><para><olink targetptr="modifyaddirbasedmapping" remap="internal">How to Extend the Active Directory Schema, and User and Group Entries</olink></para>
+</entry>
+</row><row><entry><para>Extend the native LDAP schema with user and group name attributes.</para>
+</entry><entry><para>This procedure describes how to extend the native LDAP schema and populate the user and group objects with Windows user and group name information.</para>
+</entry><entry><para><olink targetptr="modifynldapdirbasedmapping" remap="internal">How to Extend the Native LDAP Schema, and User and Group Entries</olink></para>
+</entry>
+</row><row><entry><para>Configure directory-based name mapping.</para>
+</entry><entry><para>Use this procedure to enable directory-based mapping. This procedure also informs the <command>idmap</command> service about the new AD schema attributes that are used by the user and group objects.</para>
+</entry><entry><para><olink targetptr="configuredirbasedmapping" remap="internal">How to Configure Directory-Based Mapping</olink></para>
+</entry>
+</row><row><entry><para>Add a directory-based name mapping to a user object.</para>
+</entry><entry><para>Use this procedure to add a directory-based name mapping to a user object in AD or native LDAP.</para>
+</entry><entry><para><olink targetptr="adddirmappingusertask" remap="internal">How to Add a Directory-Based Name Mapping to a User Object</olink></para>
+</entry>
+</row><row><entry><para>Add a directory-based name mapping to a group object.</para>
+</entry><entry><para>Use this procedure to add a directory-based name mapping to a group object in AD or native LDAP.</para>
+</entry><entry><para><olink targetptr="adddirmappinggrouptask" remap="internal">How to Add a Directory-Based Name Mapping to a Group Object</olink></para>
+</entry>
+</row><row><entry><para>Remove a directory-based name mapping from a user object.</para>
+</entry><entry><para>Use this procedure to remove a directory-based name mapping from a user object in AD or native LDAP.</para>
+</entry><entry><para><olink targetptr="removedirmappingusertask" remap="internal">How to Remove a Directory-Based Name Mapping From a User Object</olink></para>
+</entry>
+</row><row><entry><para>Remove a directory-based name mapping from a group object.</para>
+</entry><entry><para>Use this procedure to remove a directory-based name mapping from a group object in AD or native LDAP.</para>
+</entry><entry><para><olink targetptr="removedirmappinggrouptask" remap="internal">How to Remove a Directory-Based Name Mapping From a Group Object</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>For more information about user and group identities, see <olink targetptr="mapusergroupidentities" remap="internal">Mapping User and Group Identities</olink>.</para><note><para>In a cluster configuration, changes made to user maps and to group maps on one server are immediately propagated to the other server.</para>
+</note><task id="modifyaddirbasedmapping"><title>How to Extend the Active Directory Schema, and User and Group Entries</title><tasksummary><para>This procedure shows how to extend the AD schema and populate the user and group objects with the associated Solaris names.</para><note><para>Perform this task before enabling directory-based mapping on your Solaris system.</para>
+</note>
+</tasksummary><procedure><step><para>(Optional) Extend the AD schema to add the new UNIX user and group attributes.</para><note><para>If you do not want to extend the AD schema, you can use an existing AD schema attribute to store UNIX user and group name information. For instance, if you already have schema that is comparable to what is described in <olink targetptr="modifyadschemaex" remap="internal">Example&nbsp;2&ndash;1</olink>, you can use your attributes instead of creating new ones.</para>
+</note><substeps><step><para>Create an LDAP Data Interchange Format (LDIF) file to describe the AD schema changes.</para><para>For sample LDIF file contents, see <olink targetptr="modifyadschemaex" remap="internal">Example&nbsp;2&ndash;1</olink>. Also see <citetitle>Extending Your Active Directory Schema in Windows Server 2003 R2</citetitle> and <citetitle>Step-by-Step Guide to Using Active Directory Schema and Display Specifiers</citetitle> on the <ulink url="http://technet.microsoft.com/" type="text_url">Microsoft technet web site</ulink>.</para>
+</step><step><para>Use the <command>ldifde</command> tool to load the schema changes into AD from the Windows server.</para><screen>C:\> <userinput>ldifde -v -i -f <replaceable>input-file</replaceable></userinput></screen>
+</step>
+</substeps>
+</step><step><para>Use the <command>ldapmodify</command> command to populate the AD user and group objects with the new attributes and their values.</para><para>You can use the <command>idmap set-namemap</command> command to populate user and group objects. See <olink targetptr="adddirmappingusertask" remap="internal">How to Add a Directory-Based Name Mapping to a User Object</olink> and <olink targetptr="adddirmappinggrouptask" remap="internal">How to Add a Directory-Based Name Mapping to a Group Object</olink>.</para><para>You can also use any of the Windows AD utilities to populate these objects.</para><substeps><step><para>Create an LDIF file to record the updates to the AD user and group objects.</para><para>See a sample LDIF file in <olink targetptr="populateadusergroupobjectsex" remap="internal">Example&nbsp;2&ndash;2</olink>. For more information about the LDIF file format, see <ulink url="http://www.faqs.org/rfcs/rfc2849.html" type="text_url">RFC 2849</ulink>.</para>
+</step><step><para>Use the <command>kinit</command> command to obtain a Kerberos ticket-granting ticket (TGT) for a privileged AD principal.</para><para>This principal will be used by the <command>ldapmodify</command> command to update the AD objects described in the file you created in the previous substep.</para><para>For example:</para><screen>$ <userinput>kinit Administrator</userinput>
+Password for Administrator@EXAMPLE.COM: </screen>
+</step><step><para>Use the <command>ldapmodify</command> command to update the user objects on the AD server.</para><screen>$ <userinput>ldapmodify -h <replaceable>AD-server-name</replaceable> -o mech=gssapi -o authzid='' -f <replaceable>input-file</replaceable></userinput></screen>
+</step>
+</substeps>
+</step>
+</procedure><example id="modifyadschemaex"><title>Extending the AD Schema</title><para>The following LDIF example file, <filename>ad_namemap_schema.ldif</filename>, describes the AD schema changes:</para><screen>dn: CN=unixUserName, CN=Schema, CN=Configuration, DC=example, DC=com
+changetype: add
+attributeID: 1.3.6.1.4.1.42.2.27.5.1.60
+attributeSyntax: 2.5.5.3
+isSingleValued: TRUE
+searchFlags: 1
+lDAPDisplayName: unixUserName
+adminDescription: This attribute contains the object's UNIX username
+objectClass: attributeSchema
+oMSyntax: 27
+
+dn: CN=unixGroupName, CN=Schema, CN=Configuration, DC=example, DC=com
+changetype: add
+attributeID: 1.3.6.1.4.1.42.2.27.5.1.61
+attributeSyntax: 2.5.5.3
+isSingleValued: TRUE
+searchFlags: 1
+lDAPDisplayName: unixGroupName
+adminDescription: This attribute contains the object's UNIX groupname
+objectClass: attributeSchema
+oMSyntax: 27
+
+dn:
+changetype: modify
+add: schemaUpdateNow
+schemaUpdateNow: 1
+-
+
+dn: CN=unixNameInfo, CN=Schema, CN=Configuration, DC=example, DC=com
+changetype: add
+governsID: 1.3.6.1.4.1.42.2.27.5.2.15
+lDAPDisplayName: unixNameInfo
+adminDescription: Auxiliary class to store UNIX name info in AD
+mayContain: unixUserName
+mayContain: unixGroupName
+objectClass: classSchema
+objectClassCategory: 3
+subClassOf: top</screen><para>Use the <command>ldifde</command> tool to load the schema changes into AD from the Windows server:</para><screen>C:\> <userinput>ldifde -v -i -f ad_namemap_schema.ldif</userinput></screen>
+</example><example id="populateadusergroupobjectsex"><title>Populating AD User and Group Objects</title><para>The following example has Windows users <literal>terry</literal>, <literal>cal</literal>, and <literal>dana</literal> stored in Active Directory. These Windows users are associated with the Solaris users <literal>tmw</literal>, <literal>crj</literal>, and <literal>dab</literal>, respectively.</para><para>This example shows how to add the Solaris user names to the appropriate user objects in AD by using the <command>ldapmodify</command> command.</para><para>First, create an input file, <filename>updateUsers</filename>, that associates the Windows names with the Solaris names:</para><screen>$ <userinput>cat updateUsers</userinput>
+dn: CN=Terry Walters,CN=Users,DC=example,DC=com
+changetype: modify
+add: unixUserName
+unixUserName: tmw
+
+dn: CN=Cal Jamieson,CN=Users,DC=example,DC=com
+changetype: modify
+add: unixUserName
+unixUserName: crj
+
+dn: CN=Dana Bloom,CN=Users,DC=example,DC=com
+changetype: modify
+add: unixUserName
+unixUserName: dab
+$</screen><para>Next, use the <command>kinit</command> command to obtain a TGT for a privileged principal:</para><screen>$ <userinput>kinit Administrator</userinput>
+Password for Administrator@EXAMPLE.COM: </screen><para>Finally, run the <command>ldapmodify</command> command to update the user objects on the AD server, <literal>saturn</literal>:</para><screen>$ <userinput>ldapmodify -h saturn -o mech=gssapi -o authzid='' -f updateUsers</userinput></screen>
+</example>
+</task><task id="modifynldapdirbasedmapping"><title>How to Extend the Native LDAP Schema, and User and Group Entries</title><tasksummary><para>This procedure shows how to extend the native LDAP schema and populate the user and group objects with the associated Windows names.</para><note><para>Perform this task before enabling directory-based mapping on your Solaris system.</para>
+</note>
+</tasksummary><procedure><step><para>(Optional) Extend the native LDAP schema to add the new Windows user and group attributes.</para><note><para>If you do not want to extend the native LDAP schema, you can use an existing native LDAP schema attribute to store Windows user and group name information. For instance, if you already have schema that is comparable to what is described in <olink targetptr="modifynldapschemaex" remap="internal">Example&nbsp;2&ndash;3</olink>, you can use your attributes instead of creating new ones.</para>
+</note><substeps><step><para>Create an LDAP Data Interchange Format (LDIF) file to describe the native LDAP schema changes.</para><para>For sample LDIF file contents, see <olink targetptr="modifynldapschemaex" remap="internal">Example&nbsp;2&ndash;3</olink>.</para>
+</step><step><para>Use the <command>ldapmodify</command> tool to load the schema changes into native LDAP.</para><screen>$ <userinput>ldapmodify -D cn=admin -w p -f <replaceable>input-file</replaceable></userinput></screen>
+</step>
+</substeps>
+</step><step><para>Use the <command>ldapmodify</command> command to populate the native LDAP user and group objects with the new attributes and their values.</para><para>You can use the <command>idmap set-namemap</command> command to populate user and group objects. See <olink targetptr="adddirmappingusertask" remap="internal">How to Add a Directory-Based Name Mapping to a User Object</olink> and <olink targetptr="adddirmappinggrouptask" remap="internal">How to Add a Directory-Based Name Mapping to a Group Object</olink>.</para><substeps><step><para>Create an LDIF file to record the updates to the native LDAP user and group objects.</para><para>See a sample LDIF file in <olink targetptr="populatenldapusergroupobjectsex" remap="internal">Example&nbsp;2&ndash;4</olink>. For more information about the LDIF file format, see <ulink url="http://www.faqs.org/rfcs/rfc2849.html" type="text_url">RFC 2849</ulink>.</para>
+</step><step><para>Use the <command>ldapmodify</command> command to update the user objects on the native LDAP server.</para><screen>$ <userinput>ldapmodify -h <replaceable>LDAP-server-name</replaceable> -o mech=gssapi -o authzid='' -f <replaceable>input-file</replaceable></userinput></screen>
+</step>
+</substeps>
+</step>
+</procedure><example id="modifynldapschemaex"><title>Extending the Native LDAP Schema</title><para>The following LDIF example file, <filename>nldap_namemap_schema.ldif</filename>, describes the native LDAP schema changes:</para><screen>dn: cn=schema
+changetype: modify
+add: attributeTypes
+attributeTypes: ( 1.3.6.1.4.1.42.2.27.5.1.62
+   NAME 'winAccountName'
+   DESC 'Windows user or group name corresponding to a Unix user or group'
+   EQUALITY caseIgnoreMatch
+   SUBSTRINGS caseIgnoreSubstringsMatch
+   ORDERING caseIgnoreOrderingMatch
+   SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+-
+add: objectClasses
+objectClasses: ( 1.3.6.1.4.1.42.2.27.5.2.16
+   NAME 'winAccount'
+   DESC 'Auxiliary class to store Windows name mappings in Unix user/group objects'
+   SUP top
+   AUXILIARY
+   MAY winAccountName )</screen><para>Use the <command>ldapmodify</command> tool to load the schema changes into native LDAP:</para><screen>$ <userinput>ldapmodify -D cn=admin -w - -f f nldap_namemap_schema.ldif</userinput>
+Enter bind password:
+modifying entry cn=schema</screen>
+</example><example id="populatenldapusergroupobjectsex"><title>Populating Native LDAP User and Group Objects</title><para>The following example has Solaris users <literal>tmw</literal>, <literal>crj</literal>, and <literal>dab</literal> stored in native LDAP. These Solaris users are associated with the Windows users <literal>terry</literal>, <literal>cal</literal>, and <literal>dana</literal>, respectively.</para><para>This example shows how to add the Windows user names to the appropriate user objects in native LDAP by using the <command>ldapmodify</command> command.</para><para>First, create an input file, <filename>updateUsers</filename>, that associates the Solaris names with the Windows names:</para><screen>$ <userinput>cat updateUsers</userinput>
+dn: uid=tmw,ou=passwd,dc=example,dc=com
+changetype: modify
+add: winAccountName
+winAccountName: terry@example.com
+
+dn: uid=crj,ou=passwd,dc=example,dc=com
+changetype: modify
+add: winAccountame
+winAccountame: cal@example.com
+
+dn: uid=dab,ou=passwd,dc=example,dc=com
+changetype: modify
+add: winAccountame
+winAccountame: dana@example.com
+$</screen><para>Then, run the <command>ldapmodify</command> command to update the user objects on the native LDAP server, <literal>neptune</literal>:</para><screen>$ <userinput>ldapmodify -h neptune -o mech=gssapi -o authzid='' -f updateUsers</userinput></screen>
+</example>
+</task><task id="configuredirbasedmapping"><title>How to Configure Directory-Based Mapping</title><taskprerequisites><para>Before you can enable directory-based mapping on your Solaris system, you must extend the AD schema, the native LDAP schema, or both, and populate the user and group objects with the associated Solaris names. See <olink targetptr="modifyaddirbasedmapping" remap="internal">How to Extend the Active Directory Schema, and User and Group Entries</olink> and <olink targetptr="modifynldapdirbasedmapping" remap="internal">How to Extend the Native LDAP Schema, and User and Group Entries</olink>.</para>
+</taskprerequisites><procedure><step><para>Enable directory-based mapping.</para><screen># <userinput>svccfg -s svc:/system/idmap setprop config/ds_name_mapping_enabled=boolean: true</userinput></screen>
+</step><step><para>Inform the <command>idmap</command> service about the new user and group attributes.</para><note><para>To fully enable directory-based mapping, you <emphasis>must</emphasis> specify values for the following properties depending on the directory service or services you plan to use:</para><itemizedlist><listitem><para><literal>config/ad_unixuser_attr</literal></para>
+</listitem><listitem><para><literal>config/ad_unixgroup_attr</literal></para>
+</listitem><listitem><para><literal>config/nldap_winname_attr</literal></para>
+</listitem>
+</itemizedlist><para>These properties do not have default values. If the properties are not set, directory-based mapping is effectively disabled for the corresponding naming service.</para>
+</note><para>In an environment that stores user and group name information in both Active Directory and native LDAP, perform the steps for each naming service.</para><stepalternatives><step><para>For Active Directory, inform the <command>idmap</command> service about the new Active Directory UNIX user and group attributes.</para><screen># <userinput>svccfg -s svc:/system/idmap setprop \
+config/ad_unixuser_attr=astring: <replaceable>attribute-name</replaceable></userinput>
+# <userinput>svccfg -s svc:/system/idmap setprop \
+config/ad_unixgroup_attr=astring: <replaceable>attribute-name</replaceable></userinput></screen><para><replaceable>attribute-name</replaceable> is the attribute name you choose for the UNIX user or group name to be stored in AD.</para><para>For example, the following specifies the <literal>unixGroupName</literal> and <literal>unixUserName</literal> attribute names for the UNIX group and user names, respectively:</para><screen># <userinput>svccfg -s svc:/system/idmap setprop \
+config/ad_unixgroup_attr=astring: unixGroupName</userinput>
+# <userinput>svccfg -s svc:/system/idmap setprop \
+config/ad_unixuser_attr=astring: unixUserName</userinput></screen>
+</step><step><para>For native LDAP, inform the <command>idmap</command> service about the new native LDAP Windows name attribute.</para><screen># <userinput>svccfg -s svc:/system/idmap setprop \
+config/nldap_winname_attr=astring: <replaceable>attribute-name</replaceable></userinput></screen><para><replaceable>attribute-name</replaceable> is the attribute name you choose for the Windows name to be stored in native LDAP.</para><para>For example, the following specifies the <literal>winAccountName</literal> attribute name for the Windows name:</para><screen># <userinput>svccfg -s svc:/system/idmap setprop \
+config/nldap_winname_attr=astring: winAccountName</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="adddirmappingusertask"><title>How to Add a Directory-Based Name Mapping to a User Object</title><tasksummary><itemizedlist><para>This procedure shows how to perform the following directory-based name mapping:</para><listitem><para>Map a Windows user to a Solaris user by adding the Solaris user name to the AD object for the specified Windows user.</para>
+</listitem><listitem><para>Map a Solaris user to a Windows user by adding the Windows user name to the native LDAP object for the specified Solaris user.</para>
+</listitem>
+</itemizedlist><para>For more information about the <command>idmap set-namemap</command> command and its options, see the <olink targetdoc="refman1m" targetptr="idmap-1m" remap="external"><citerefentry><refentrytitle>idmap</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</tasksummary><procedure>&rolestepidmap;<step><para>Determine whether to augment a user object in AD or in the native LDAP service.</para><stepalternatives><step><para>To augment the Windows user object in AD, type:</para><screen># <userinput>idmap set-namemap winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable> unixuser:<replaceable>username</replaceable></userinput></screen><para>For example, the following command maps Windows user <literal>danab@example.com</literal> to Solaris user <literal>dana</literal> by adding the Solaris name to the AD object for <literal>danab@example.com</literal>:</para><screen># <userinput>idmap set-namemap winuser:danab@example.com unixuser:dana</userinput></screen>
+</step><step><para>To augment the Solaris user object in native LDAP, type:</para><screen># <userinput>idmap set-namemap unixuser:<replaceable>username</replaceable> winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable></userinput></screen><para>For example, the following command maps Solaris user <literal>dana</literal> to Windows user <literal>danab@example.com</literal> by adding the Windows name to the native LDAP object for <literal>dana</literal>:</para><screen># <userinput>idmap set-namemap unixuser:dana winuser:danab@example.com</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="adddirmappinggrouptask"><title>How to Add a Directory-Based Name Mapping to a Group Object</title><tasksummary><itemizedlist><para>This procedure shows how to perform the following directory-based name mapping:</para><listitem><para>Map a Windows group to a Solaris group by adding the Solaris group name to the AD object for the specified Windows group.</para>
+</listitem><listitem><para>Map a Solaris group to a Windows group by adding the Windows group name to the native LDAP object for the specified Solaris group.</para>
+</listitem>
+</itemizedlist>
+</tasksummary><procedure>&rolestepidmap;<step><para>Determine whether to augment a group object in AD or in the native LDAP service.</para><stepalternatives><step><para>To augment the Windows group object in AD, type:</para><screen># <userinput>idmap set-namemap wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable> unixgroup:<replaceable>group-name</replaceable></userinput></screen><para>For example, the following command maps Windows group <literal>salesgrp@example.com</literal> to Solaris group <literal>sales</literal> by adding the Solaris name to the AD object for <literal>salesgrp@example.com</literal>:</para><screen># <userinput>idmap set-namemap wingroup:salesgrp@example.com unixgroup:sales</userinput></screen>
+</step><step><para>To augment the Solaris group object in native LDAP, type:</para><screen># <userinput>idmap set-namemap unixgroup:<replaceable>group-name</replaceable> wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable></userinput></screen><para>For example, the following command maps Solaris group <literal>sales</literal> to Windows group <literal>salesgrp@example.com</literal> by adding the Windows name to the native LDAP object for <literal>sales</literal>:</para><screen># <userinput>idmap set-namemap unixgroup:sales wingroup:salesgrp@example.com</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="removedirmappingusertask"><title>How to Remove a Directory-Based Name Mapping From a User Object</title><procedure>&rolestepidmap;<step><para>View the directory-based name mapping information for the specified user.</para><screen># <userinput>idmap get-namemap <replaceable>username</replaceable></userinput></screen>
+</step><step><para>Remove the user name stored in the user object of AD or native LDAP.</para><stepalternatives><step><para>Remove the Solaris name from the AD object for the specified user.</para><screen># <userinput>idmap unset-namemap winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable></userinput></screen><para>For example, the following command removes the Solaris name from the AD object for Windows user <literal>danab@example.com</literal>:</para><screen># <userinput>idmap unset-namemap winuser:danab@example.com</userinput></screen>
+</step><step><para>Remove the Windows name from the native LDAP object for the specified user.</para><screen># <userinput>idmap unset-namemap unixuser:<replaceable>username</replaceable></userinput></screen><para>For example, the following command removes the Windows name from the native LDAP object for Solaris user <literal>dana</literal>:</para><screen># <userinput>idmap unset-namemap unixuser:dana</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="removedirmappinggrouptask"><title>How to Remove a Directory-Based Name Mapping From a Group Object</title><procedure>&rolestepidmap;<step><para>View the directory-based name mapping information for the specified group.</para><screen># <userinput>idmap get-namemap <replaceable>group-name</replaceable></userinput></screen>
+</step><step><para>Remove the group name stored in the group object of AD or native LDAP.</para><stepalternatives><step><para>Remove the Solaris name from the AD object for the specified group.</para><screen># <userinput>idmap unset-namemap wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable></userinput></screen><para>For example, the following command removes the Solaris name from the AD object for Windows group <literal>salesgrp@example.com</literal>:</para><screen># <userinput>idmap unset-namemap wingroup:salesgrp@example.com</userinput></screen>
+</step><step><para>Remove the Windows name from the native LDAP object for the specified group.</para><screen># <userinput>idmap unset-namemap unixgroup:<replaceable>group-name</replaceable></userinput></screen><para>For example, the following command removes the Windows name from the native LDAP object for Solaris group <literal>sales</literal>:</para><screen># <userinput>idmap unset-namemap unixgroup:sales</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="manageusergroupmapstm"><title>Managing Rule-Based Identity Mapping for Users and Groups (Task Map)</title><para>Windows systems and Solaris systems use different identity schemes to determine who is permitted to access systems and system objects. When the Solaris CIFS service is integrated into an existing Windows domain, the Solaris user IDs and group IDs must find equivalent Windows SIDs to use for authorization and file access. The Solaris CIFS service uses identity mapping software to perform these tasks.</para><para>By default, no rule-based mappings are configured. In this case, non-ephemeral Solaris UIDs and GIDs are mapped to local SIDs. Local SIDs are composed of the server's SID and an RID that is derived algorithmically from the UID or GID. Similarly, domain user and group SIDs are mapped to ephemerally, dynamically allocated UIDs and GIDs. A system administrator can also create a set of rule-based mappings to map users and groups by name. Such rule-based mapping requires that Windows uses Active Directory and that the specified users and groups must already exist.</para><para>The following table points to the tasks that you can use to manage rule-based identity mapping for the Solaris CIFS service in a Windows environment. These tasks use the <olink targetdoc="refman1m" targetptr="idmap-1m" remap="external"><citerefentry><refentrytitle>idmap</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to manage identity mapping.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Add a user mapping rule.</para>
+</entry><entry><para>Use rules to create identity equivalents for Windows users and Solaris users based on the names in the naming services.</para>
+</entry><entry><para><olink targetptr="addusermaptask" remap="internal">How to Add a User Mapping Rule</olink></para>
+</entry>
+</row><row><entry><para>Add a group mapping rule.</para>
+</entry><entry><para>Use rules to create identity equivalents for Windows groups and Solaris groups based on the names in the naming services.</para>
+</entry><entry><para><olink targetptr="addgroupmaptask" remap="internal">How to Add a Group Mapping Rule</olink></para>
+</entry>
+</row><row><entry><para>Import rule-based user mappings from the <filename>usermap.cfg</filename> file.</para>
+</entry><entry><para>Use this procedure to add one or more user mappings from a <filename>usermap.cfg</filename> file that specifies rule-based mappings.</para>
+</entry><entry><para><olink targetptr="importmappingstask" remap="internal">How to Import User Mappings From a Rule-Mapping File</olink></para>
+</entry>
+</row><row><entry><para>List all of the mappings.</para>
+</entry><entry><para>Use this procedure to review all mappings or to find particular mappings for users and groups.</para>
+</entry><entry><para><olink targetptr="listmappingtask" remap="internal">How to Show Mappings</olink></para>
+</entry>
+</row><row><entry><para>Show the mapping for a particular identity.</para>
+</entry><entry><para>Use this procedure to view how a particular name or ID is mapped.</para>
+</entry><entry><para><olink targetptr="showmappingtask" remap="internal">How to Show a Mapping for a Particular Identity</olink></para>
+</entry>
+</row><row><entry><para>Show all the established mappings.</para>
+</entry><entry><para>Use this procedure to view the mappings stored in the cache.</para>
+</entry><entry><para><olink targetptr="dumpmappingtask" remap="internal">How to Show All Established Mappings</olink></para>
+</entry>
+</row><row><entry><para>Remove a user mapping rule.</para>
+</entry><entry><para>Use this procedure to remove a rule-based mapping when a user is no longer part of the naming service in your Windows domain.</para>
+</entry><entry><para><olink targetptr="removeusermaptask" remap="internal">How to Remove a User Mapping Rule</olink></para>
+</entry>
+</row><row><entry><para>Remove a group mapping rule.</para>
+</entry><entry><para>Use this procedure to remove a rule-based mapping when a group is no longer part of the naming service in your Windows domain.</para>
+</entry><entry><para><olink targetptr="removegroupmaptask" remap="internal">How to Remove a Group Mapping Rule</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>For more information about user and group identities, see <olink targetptr="mapusergroupidentities" remap="internal">Mapping User and Group Identities</olink>.</para><note><para>In a cluster configuration, changes made to user maps and to group maps on one server are immediately propagated to the other server.</para>
+</note><task id="addusermaptask"><title>How to Add a User Mapping Rule</title><tasksummary><para>The <command>idmap</command> command enables you to create rule-based mappings between Windows users and Solaris users. By default, the Solaris CIFS service uses ephemeral identity mapping.</para><para>Shell special characters, such as the double quote character (<literal>"</literal>), the asterisk character (<literal>*</literal>), and the backslash character (<literal>\</literal>), must be quoted when used as user names and domain names.</para>
+</tasksummary><procedure>&rolestepidmap;<step><para>Determine the user names that you want to map.</para><substeps><step><para>Determine the domain and name of the Windows user that you want to map to a Solaris user.</para><itemizedlist><para>The Windows user name must be specified by using one of the following formats:</para><listitem><para><literal>winuser:</literal><replaceable>username</replaceable><literal>@</literal><replaceable>domain-name</replaceable></para>
+</listitem><listitem><para><literal>winuser:'</literal><replaceable>domain-name</replaceable><literal>\</literal><replaceable>username</replaceable><literal>'</literal></para>
+</listitem>
+</itemizedlist>
+</step><step><para>Determine the name of the Solaris user that you want to map to the Windows user.</para><para>The Solaris user name must be specified by using the format <literal>unixuser:</literal><replaceable>username</replaceable>.</para>
+</step>
+</substeps><para>If <replaceable>username</replaceable> is the empty string (<literal>""</literal>), mapping is inhibited. Only directional mappings can have an empty string as their target identity. No mapping is created by the identity mapping service, and the <literal>nobody</literal> ID is used for access control. Note that a user name of <literal>""</literal> should not be used to preclude logins by unmapped Windows users.</para><para>If <replaceable>username</replaceable> uses the wildcard (<literal>*</literal>), it matches all user names that are not matched by other mappings. Similarly, if <replaceable>username</replaceable> is the wildcard Windows name (<literal>*@*</literal>), it matches all user names in all domains that are not matched by other mappings.</para>
+</step><step><para>Create the user mapping.</para><para>By default, identity mappings are bidirectional, which means that the Windows name is mapped to the Solaris name and the Solaris name is mapped to the Windows name. If you want the mapping to be unidirectional, specify the <option>d</option> option.</para><para>If <replaceable>username</replaceable> uses the wildcard on both sides of the mapping, the user name is the same for both Windows and Solaris users. For example, if the rule is <literal>'*@example.com' == '*'</literal>, the <literal>jp@example.com</literal> Windows user name would match this rule and map to the <literal>jp</literal> Solaris user name.</para><caution><para>Be careful when creating rule-based mappings that use wildcards for the user names. Windows user names are case insensitive, while Solaris user names are case sensitive. Note that the case of Windows names that appear in <command>idmap</command> name rules and in <command>idmap show</command> commands is irrelevant.</para><itemizedlist><para>Solaris environments typically use lowercase characters for user names, but uppercase characters are permitted. Therefore, using a wildcard to map Windows names to Solaris user names might not produce the expected results. Rule-based mapping rules that use the <literal>unixuser:*</literal> target map to the Solaris user name as follows:</para><listitem><para>Map the canonical Windows name, which uses the found in the directory entry, to the matching Solaris user name.</para>
+</listitem><listitem><para>If no such Solaris user name exists, fold the case of the canonical Windows name to lower case and use it as the Solaris CIFS user name.</para>
+</listitem>
+</itemizedlist><para>As a result of this differing treatment of case, user names that appear to be alike might not be recognized as matches. You must create rules to handle such pairings of strings that differ only in case. For example, to map Solaris user <literal>Kerry</literal> to Windows user <literal>kerry@example.com</literal>, you must create the following rule:</para><screen># <userinput>idmap add winuser:'*@example.com' unixuser:'*'</userinput>
+# <userinput>idmap add winuser:kerry@example.com unixuser:Kerry</userinput></screen>
+</caution><stepalternatives><step><para>Create a bidirectional mapping between a Windows user name and a Solaris user name.</para><screen># <userinput>idmap add winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable> unixuser:<replaceable>username</replaceable></userinput></screen>
+</step><step><para>Create a unidirectional mapping between a Windows user name and a Solaris user name.</para><screen># <userinput>idmap add -d winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable> unixuser:<replaceable>username</replaceable></userinput></screen>
+</step><step><para>Create a unidirectional mapping between a Solaris user name and a Windows user name.</para><screen># <userinput>idmap add -d unixuser:<replaceable>username</replaceable> winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable></userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="addgroupmaptask"><title>How to Add a Group Mapping Rule</title><tasksummary><para>The <command>idmap</command> command enables you to create rule-based mappings between Windows groups and Solaris groups. By default, the Solaris CIFS service uses ephemeral identity mapping.</para><para>You can also create diagonal mappings to maps between a Windows group and a Solaris user and between a Solaris group and a Windows user. These mappings are needed when Windows uses a group identity as a file owner or a user identity as a file group.</para><para>Shell special characters, such as the double quote character (<literal>"</literal>), the asterisk character (<literal>*</literal>), and the backslash character (<literal>\</literal>), must be quoted when used as group names and domain names.</para>
+</tasksummary><procedure>&rolestepidmap;<step><para>Determine the group names that you want to map.</para><substeps><step><para>Determine the domain and name of the Windows group that you want to map to a Solaris group.</para><itemizedlist><para>The Windows group name must be specified by using one of the following formats:</para><listitem><para><literal>wingroup:</literal><replaceable>group-name</replaceable><literal>@</literal><replaceable>domain-name</replaceable></para>
+</listitem><listitem><para><literal>wingroup:'</literal><replaceable>domain-name</replaceable><literal>\</literal><replaceable>group-name</replaceable><literal>'</literal></para>
+</listitem>
+</itemizedlist>
+</step><step><para>Determine the name of the Solaris user or group that you want to map to the Windows group.</para><para>The Solaris group name must be specified by using the format <literal>unixgroup:</literal><replaceable>group-name</replaceable>. The Solaris user name must be specified by using the format <literal>unixuser:</literal><replaceable>username</replaceable>.</para>
+</step>
+</substeps><para>If <replaceable>group-name</replaceable> is the empty string (<literal>""</literal>), mapping is inhibited.</para><para>If <replaceable>group-name</replaceable> uses the wildcard (<literal>*</literal>), it matches all group names that are not matched by other mappings. Similarly, if <replaceable>group-name</replaceable> is the wildcard Windows name (<literal>*@*</literal>), it matches all group names in all domains that are not matched by other mappings.</para>
+</step><step><para>Create the group mapping.</para><para>By default, identity mappings are bidirectional, which means that the Windows group name is mapped to the Solaris group name, and the Solaris group name is mapped to the Windows group name. If you want the mapping to be unidirectional, specify the <option>d</option> option.</para><para>If <replaceable>group-name</replaceable> uses the wildcard on both sides of the mapping, the group name is the same for both Windows groups and Solaris groups. For example, if the rule is <literal>"*@example.com" == "*"</literal>, the <literal>staff@example.com</literal> Windows group name would match this rule and map to the <literal>staff</literal> Solaris group name.</para><caution><para>Be careful when creating rule-based mappings that use wildcards for the group names. Windows group names are case insensitive, while Solaris group names are case sensitive. Note that the case of Windows names that appear in <command>idmap</command> name rules and in <command>idmap show</command> commands is irrelevant.</para><itemizedlist><para>Solaris environments typically use lowercase characters for group names, but uppercase characters are permitted. Therefore, using a wildcard to map Windows names to Solaris group names might not produce the expected results. Rule-based mapping rules that use the <literal>unixgroup:*</literal> target map to the Solaris group name as follows:</para><listitem><para>Map the canonical Windows name, which uses the found in the directory entry, to the matching Solaris group name.</para>
+</listitem><listitem><para>If no such Solaris group name exists, fold the case of the canonical Windows name to lower case and use it as the Solaris CIFS group name.</para>
+</listitem>
+</itemizedlist><para>As a result of this differing treatment of case, group names that appear to be alike might not be recognized as matches. You must create rules to handle such pairings of strings that differ only in case. For example, to map Solaris group <literal>Sales</literal> to Windows group <literal>sales@example.com</literal>, you must create the following rule:</para><screen># <userinput>idmap add wingroup:'*@example.com' unixgroup:'*'</userinput>
+# <userinput>idmap add wingroup:sales@example.com unixgroup:Sales</userinput></screen>
+</caution><stepalternatives><step><para>Create a bidirectional mapping between a Windows group name and a Solaris group name.</para><screen># <userinput>idmap add wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable> unixgroup:<replaceable>group-name</replaceable></userinput></screen>
+</step><step><para>Create a unidirectional mapping between a Windows group name and a Solaris group name.</para><screen># <userinput>idmap add -d wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable> unixgroup:<replaceable>group-name</replaceable></userinput></screen>
+</step><step><para>Create a unidirectional mapping between a Solaris group name and a Windows group name.</para><screen># <userinput>idmap add -d unixgroup:<replaceable>group-name</replaceable> wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable></userinput></screen>
+</step><step><para>Create a diagonal mapping between a Windows group name and a Solaris user name.</para><screen># <userinput>idmap add -d wingroup:<replaceable>group-name</replaceable>@<replaceable>domain-name</replaceable> unixuser:<replaceable>username</replaceable></userinput></screen>
+</step><step><para>Create a diagonal mapping between a Solaris group name and a Windows user name.</para><screen># <userinput>idmap add -d unixgroup:<replaceable>group-name</replaceable> winuser:<replaceable>username</replaceable>@<replaceable>domain-name</replaceable></userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="importmappingstask"><title>How to Import User Mappings From a Rule-Mapping File</title><tasksummary><para>The <command>idmap import</command> command enables you to import a set of rule-based user mappings that are stored in a file.</para><itemizedlist><para>The <command>idmap</command> supports these file formats:</para><listitem><para>The NetApp <filename>usermap.cfg</filename> rule-mapping format is as follows:</para><screen><replaceable>windows-username</replaceable> [<replaceable>direction</replaceable>] <replaceable>unix-username</replaceable></screen><para><replaceable>windows-username</replaceable> is a Windows user name in either the <replaceable>domain-name</replaceable>\<replaceable>username</replaceable> or <replaceable>username</replaceable><literal>@</literal><replaceable>domain-name</replaceable> format.</para><para><replaceable>unix-username</replaceable> is a Solaris user name.</para><itemizedlist><para><replaceable>direction</replaceable> is one of the following:</para><listitem><para><literal>==</literal> means a bidirectional mapping, which is the default.</para>
+</listitem><listitem><para><literal>=></literal> or <literal>&lt;=</literal> means a unidirectional mapping.</para>
+</listitem>
+</itemizedlist><para>The IP qualifier is not supported.</para>
+</listitem><listitem><para>The Samba <filename>smbusers</filename> rule-mapping format is as follows:</para><screen><replaceable>unixname</replaceable> = <replaceable>winname1</replaceable> <replaceable>winname2</replaceable> ...</screen><para>The mappings are imported as unidirectional mappings from one or more Windows names to a Solaris name.</para><para>The format is based on the &ldquo;username map&rdquo; entry of the <filename>smb.conf</filename> man page, which is available on the <literal>samba.org</literal> web site. The use of an asterisk (<literal>*</literal>) for <replaceable>winname</replaceable> is supported. However, the <literal>@group</literal> directive and the chaining of mappings are not supported.</para><para>By default, if no mapping entries are in the <filename>smbusers</filename> file, Samba maps a <replaceable>winname</replaceable> to the equivalent <replaceable>unixname</replaceable>, if any. The following <command>idmap</command> command shows this mapping:</para><screen>idmap add -d winuser:"*@*" unixuser:"*"</screen>
+</listitem>
+</itemizedlist>
+</tasksummary><procedure>&rolestepidmap;<step><para>Import the user mappings from standard input or from a file.</para><screen># <userinput>idmap import [-F] [-f <replaceable>file</replaceable>] <replaceable>format</replaceable></userinput></screen><para>For example, suppose that you have a file called <filename>myusermaps</filename> that uses the <literal>usermap.cfg</literal> format to specify the following user name mappings:</para><screen># <userinput>cat myusermaps</userinput>
+dana@example.com == dana
+danab@example.com => dana</screen><itemizedlist><para>Use one of the following commands to add these mappings to the database:</para><listitem><para><literal>#</literal> <userinput>cat myusermaps | idmap import usermap.cfg</userinput></para>
+</listitem><listitem><para><literal>#</literal> <userinput>idmap import -f myusermaps usermap.cfg</userinput></para>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task><task id="listmappingtask"><title>How to Show Mappings</title><tasksummary><para>The <command>idmap list</command> command enables you to view all of the rule-based identity mappings that you created for users and groups. You can also find particular mappings for users and groups.</para>
+</tasksummary><procedure remap="single-step"><step><para>List all of the mappings.</para><screen>$ <userinput>idmap list</userinput>
+add winuser:terry@example.com unixuser:terrym
+add wingroup:members unixgroup:staff</screen><itemizedlist><listitem><para>To optionally list only the user mappings, type:</para><screen>$ <userinput>idmap list | grep user</userinput>
+add winuser:terry@example.com unixuser:terrym</screen>
+</listitem><listitem><para>To optionally list only the group mappings, type:</para><screen>$ <userinput>idmap list | grep group</userinput>
+add wingroup:members unixgroup:staff</screen>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task><task id="showmappingtask"><title>How to Show a Mapping for a Particular Identity</title><tasksummary><para>The <command>idmap show</command> command enables you to view the particular name or ID for a name or ID that you specify.</para>
+</tasksummary><procedure remap="single-step"><step><para>Show the equivalent identity for a particular name or ID.</para><screen>$ <userinput>idmap show [-c] [-v] <replaceable>identity</replaceable> [<replaceable>target-type</replaceable>]</userinput></screen><para>By default, the <command>idmap show</command> command only shows mappings that have already been established.</para><para>For example, to view the SID that is mapped to UID 50000, type:</para><screen>$ <userinput>idmap show uid:50000 sid</userinput>
+S-1-5-21-726303253-4128413635-1168184439</screen><para>To view the Solaris user name for the Windows user name <literal>terry@example.com</literal>, type:</para><screen>$ <userinput>idmap show terry@example.com</userinput>
+terrym</screen><para>If you specify the <option>c</option> option, <command>idmap show</command> forces the evaluation of rule-based mapping configurations or the dynamic allocation of IDs. This command also shows mapping information when an error occurs to help diagnose mapping problems.</para><para>The <option>v</option> option includes additional information about how the identity mapping was generated, which can help with troubleshooting. The following example shows that the mapping is ephemeral and was retrieved from the cache:</para><screen># <userinput>idmap show -v sid:S-1-5-21-2949573101-2750415176-3223191819-884217</userinput>
+sid:S-1-5-21-2949573101-2750415176-3223191819-884217 -> uid:2175201213
+Source: Cache
+Method: Ephemeral</screen><para>For name-based mappings, the <command>idmap show -v</command> command shows either the mapping rule or the directory distinguished name with the attribute and value that created the mapping.</para>
+</step>
+</procedure>
+</task><task id="dumpmappingtask"><title>How to Show All Established Mappings</title><tasksummary><para>The <command>idmap dump</command> command enables you to view all of the  SID-to-UID and SID-to-GID mappings that are stored in the cache.</para>
+</tasksummary><procedure remap="single-step"><step><para>List all of the mappings in the cache.</para><para>By default, the <command>idmap dump</command> command only lists the mappings themselves. The <option>v</option> option includes additional information about how the identity mapping was generated, which can help with troubleshooting.</para><screen>$ <userinput>idmap dump</userinput>
+sid:S-1-5-21-2949573101-2750415176-3223191800-2000    ==     uid:50000
+sid:S-1-5-21-2949573101-2750415176-3223191800-2001    ==     uid:50001
+sid:S-1-5-21-2949573101-2750415176-3223191800-2006    ==     uid:50010
+sid:S-1-5-21-2949573101-2750415176-3223191900-3000    ==     uid:2147491840
+sid:S-1-5-21-2949573101-2750415176-3223191900-3001    ==     gid:2147491342
+sid:S-1-5-21-2949573101-2750415176-3223191700-4000    =>     uid:60001
+sid:S-1-5-21-2949573101-2750415176-3223191700-4001    =>     gid:60001
+sid:S-1-5-21-2949573101-2750415176-3223191800-5000    ==     gid:50000
+sid:S-1-5-21-2949573101-2750415176-3223191800-5001    ==     gid:50001</screen><itemizedlist><listitem><para>To optionally list only the user mappings, type:</para><screen>$ <userinput>idmap dump | grep uid</userinput>
+sid:S-1-5-21-2949573101-2750415176-3223191800-2000    ==     uid:50000
+sid:S-1-5-21-2949573101-2750415176-3223191800-2001    ==     uid:50001
+sid:S-1-5-21-2949573101-2750415176-3223191800-2006    ==     uid:50010
+sid:S-1-5-21-2949573101-2750415176-3223191900-3000    ==     uid:2147491840
+sid:S-1-5-21-2949573101-2750415176-3223191700-4000    =>     uid:60001</screen>
+</listitem><listitem><para>To optionally list only the group mappings, type:</para><screen>$ <userinput>idmap dump | grep gid</userinput>
+sid:S-1-5-21-2949573101-2750415176-3223191900-3001    ==     gid:2147491342
+sid:S-1-5-21-2949573101-2750415176-3223191700-4001    =>     gid:60001
+sid:S-1-5-21-2949573101-2750415176-3223191800-5000    ==     gid:50000
+sid:S-1-5-21-2949573101-2750415176-3223191800-5001    ==     gid:50001</screen>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task><task id="removeusermaptask"><title>How to Remove a User Mapping Rule</title><tasksummary><para>The <command>idmap</command> command enables you to remove a rule-based mapping that you created.</para>
+</tasksummary><procedure>&rolestepidmap;<step><para>Find the user mapping that you want to remove.</para><screen># <userinput>idmap list</userinput></screen><para>For example, to find all user mappings that map to the Solaris user <literal>pat</literal>, type:</para><screen># <userinput>idmap list | grep pat</userinput></screen>
+</step><step><para>Remove one or more user mappings.</para><stepalternatives><step><para>Remove any rule-based mapping that involves the specified user name, <replaceable>username</replaceable>.</para><screen># <userinput>idmap remove <replaceable>username</replaceable></userinput></screen>
+</step><step><para>Remove rule-based mappings between <replaceable>username1</replaceable> and <replaceable>username2</replaceable>.</para><screen># <userinput>idmap remove <replaceable>username1</replaceable> <replaceable>username2</replaceable></userinput></screen>
+</step><step><para>Remove all rule-based mappings.</para><screen># <userinput>idmap remove -a</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="removegroupmaptask"><title>How to Remove a Group Mapping Rule</title><tasksummary><para>The <command>idmap</command> command enables you to remove a rule-based mapping that you created.</para>
+</tasksummary><procedure>&rolestepidmap;<step><para>Find the group mapping that you want to remove.</para><screen># <userinput>idmap list</userinput></screen><para>For example, to find all unidirectional group mappings that map to the Solaris group <literal>staff</literal>, type:</para><screen># <userinput>idmap list | grep staff</userinput></screen>
+</step><step><para>Remove one or more group mappings.</para><stepalternatives><step><para>Remove any rule-based mapping that involves the specified group name, <replaceable>group-name</replaceable>.</para><screen># <userinput>idmap remove <replaceable>group-name</replaceable></userinput></screen>
+</step><step><para>Remove rule-based mappings between <replaceable>group-name1</replaceable> and <replaceable>group-name2</replaceable>.</para><screen># <userinput>idmap remove <replaceable>group-name1</replaceable> <replaceable>group-name2</replaceable></userinput></screen>
+</step><step><para>Remove all rule-based mappings.</para><screen># <userinput>idmap remove -a</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

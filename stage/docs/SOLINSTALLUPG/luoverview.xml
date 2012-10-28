@@ -1,0 +1,407 @@
+<chapter id="luoverview-1"><title>Solaris Live Upgrade (Overview)</title><highlights><para>This chapter describes the Solaris Live Upgrade process.</para><note><para>This book uses the term <emphasis>slice</emphasis>, but some Solaris
+documentation and programs might refer to a slice as a partition. </para>
+</note>
+</highlights><sect1 id="chapter-5"><title>Solaris Live Upgrade Introduction</title><para>Solaris Live Upgrade
+provides a method of upgrading a system while the system continues to operate.
+While your current boot environment is running, you can duplicate the boot
+environment, then upgrade the duplicate. Or, rather than upgrading, you can
+install a Solaris Flash archive on a boot environment. The original system
+configuration remains fully functional and unaffected by the upgrade or installation
+of an archive. When you are ready, you can activate the new boot environment
+by rebooting the system. If a failure occurs, you can quickly revert to the
+original boot environment with a simple reboot. This switch eliminates the
+normal downtime of the test and evaluation process.  </para><para>Solaris Live Upgrade enables you to duplicate a boot environment without
+affecting the currently running system. You can then do the following:</para><itemizedlist><listitem><para>Upgrade a system.</para>
+</listitem><listitem><para>Change the current boot environment's disk configuration to
+different file system types, sizes, and layouts on the new boot environment.</para>
+</listitem><listitem><para>Maintain numerous boot environments with different images.
+For example, you can create one boot environment that contains current patches
+and create another boot environment that contains an Update release.</para>
+</listitem>
+</itemizedlist><para>Some understanding of basic system administration is necessary before
+using Solaris Live Upgrade. For background information about system administration
+tasks such as managing file systems, mounting, booting, and managing swap,
+see the <olink targetdoc="sagdfs" remap="external"><citetitle remap="book">System Administration Guide: Devices and File Systems</citetitle></olink>.</para>
+</sect1><sect1 id="luoverview-100"><title>Solaris Live Upgrade Process</title><para>The following overview describes the tasks necessary to create
+a copy of the current boot environment, upgrade the copy, and switch the upgraded
+copy to become the active boot environment. The fallback process of switching
+back to the original boot environment is also described. <olink targetptr="luoverview-fig-1" remap="internal">Figure 2&ndash;1</olink> describes this complete
+Solaris Live Upgrade process.</para><figure id="luoverview-fig-1"><title>Solaris Live Upgrade Process</title><mediaobject><imageobject><imagedata entityref="lu-process" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The following sections describe the Solaris Live Upgrade process.</para><orderedlist><listitem><para>A new boot environment can be created on a physical slice
+or a logical volume:</para><itemizedlist><listitem><para><olink targetptr="overview-3" remap="internal">Creating a Boot Environment</olink></para>
+</listitem><listitem><para><olink targetptr="luoverview-7" remap="internal">Creating a Boot Environment
+With RAID-1 Volume File Systems</olink></para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><olink targetptr="luoverview-2" remap="internal">Upgrading a Boot Environment</olink></para>
+</listitem><listitem><para><olink targetptr="luoverview-3" remap="internal">Activating a Boot Environment</olink></para>
+</listitem><listitem><para><olink targetptr="luoverview-4" remap="internal">Falling Back to the Original
+Boot Environment</olink></para>
+</listitem>
+</orderedlist><sect2 id="overview-3"><title>Creating a Boot Environment</title><para>The process of creating a boot environment
+provides a method of copying critical file systems from an active boot environment
+to a new boot environment. The disk is reorganized if necessary, file systems
+are customized, and the critical file systems are copied to the new boot environment. </para><sect3 id="luoverview-13"><title>File System Types</title><para>Solaris Live Upgrade distinguishes between two file system types:
+critical file systems and shareable. The following table describes these file
+system types.</para><informaltable frame="topbot" pgwide="100"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="16.75*"/><colspec colwidth="49.18*"/><colspec colwidth="33.08*"/><thead><row rowsep="1"><entry><para>File System Type</para>
+</entry><entry><para>Description </para>
+</entry><entry><para>Examples and More Information</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Critical file systems</para>
+</entry><entry><para>Critical file systems are required by the Solaris OS. These file systems
+  are separate mount points in the <filename>vfstab</filename> of the active
+and inactive boot environments. These file systems are always copied from
+the source to the inactive boot environment. Critical file systems are sometimes
+referred to as <emphasis>nonshareable</emphasis>. </para>
+</entry><entry><para>Examples are root (<filename>/</filename>), <filename>/usr</filename>, <filename>/var</filename>, or <filename>/opt</filename>. </para>
+</entry>
+</row><row><entry><para>Shareable file systems</para>
+</entry><entry><para>Shareable file systems are user-defined files such as <filename>/export</filename> that
+contain the same mount point in the <filename>vfstab</filename> in both the
+active and inactive boot environments. Therefore, updating shared files in
+the active boot environment also updates data in the inactive boot environment.
+When you create a new boot environment, shareable file systems are shared
+by default. But you can specify a destination slice and then the file systems
+are copied. </para>
+</entry><entry><para><filename>/export</filename> is an example of a file system that can
+be shared.</para><para>For more detailed information about shareable file systems, see <olink targetptr="luplanning-16" remap="internal">Guidelines for Selecting Slices for Shareable File
+Systems</olink>.</para>
+</entry>
+</row><row><entry><para>Swap</para>
+</entry><entry><para>Swap is a special shareable file system. Like a shareable file system,
+all swap slices are shared by default. But, if you specify a destination directory
+for swap, the swap slice is copied.</para>
+</entry><entry><para> For procedures about reconfiguring swap, see <olink targetptr="lucreate-13" remap="internal">To Create a Boot Environment and Reconfiguring Swap</olink>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><sect4 id="esqbv"><title>Creating RAID-1 Volumes on File Systems</title><para>Solaris Live Upgrade can create a boot environment with RAID-1 volumes
+(mirrors) on file systems. For an overview, see <olink targetptr="luoverview-7" remap="internal">Creating
+a Boot Environment With RAID-1 Volume File Systems</olink>.</para>
+</sect4>
+</sect3><sect3 id="espyv"><title>Copying File Systems</title><para>The process of creating a new boot environment begins by identifying
+an unused slice where a critical file system can be copied. If a slice is
+not available or a slice does not meet the minimum requirements, you need
+to format a new slice. </para><para>After the slice is defined, you can reconfigure the file systems on
+the new boot environment before the file systems are copied into the directories.
+You reconfigure file systems by splitting and merging them, which provides
+a simple way of editing the <filename>vfstab</filename> to connect and disconnect
+file system directories. You can merge file systems into their parent directories
+by specifying the same mount point. You can also split file systems from their
+parent directories by specifying different mount points. </para><para>After file systems are configured on the inactive boot environment,
+you begin the automatic copy. Critical file systems are copied to the designated
+directories. Shareable file systems are not copied, but are shared. The exception
+is that you can  designate some shareable file systems to be copied.  When
+the file systems are copied from the active to the inactive boot environment,
+the files are directed to the new directories. The active boot environment
+is not changed in any way. </para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><tbody><row><entry><para>For procedures to split or merging file systems</para>
+</entry><entry><itemizedlist><listitem><para><olink targetptr="lucreate-15" remap="internal">To Create a Boot Environment
+and Merge File Systems </olink></para>
+</listitem><listitem><para><olink targetptr="lucreate-14" remap="internal">To Create a Boot Environment
+and Split File Systems</olink></para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para>For an overview of creating a boot environment with RAID&ndash;1 volume
+file systems</para>
+</entry><entry><para><olink targetptr="luoverview-7" remap="internal">Creating a Boot Environment With RAID-1
+Volume File Systems</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><sect4 id="esqcg"><title>Examples of Creating a New Boot Environment</title><para>The following figures illustrate various ways of creating new boot environments.</para><para><olink targetptr="luoverview-fig-25" remap="internal">Figure 2&ndash;2</olink> shows
+that critical file system root (<filename>/</filename>) has been copied to
+another slice on a disk to create a new boot environment. The  active boot
+environment contains the root (<filename>/</filename>) file system on one
+slice. The new boot environment is an exact duplicate with the root (<filename>/</filename>)
+file system on a new slice. The file systems <filename>/swap</filename> and <filename>/export/home</filename> are shared by the active and inactive boot environments.</para><figure id="luoverview-fig-25"><title>Creating an Inactive Boot Environment &ndash;
+Copying the root (<filename>/</filename>) File System</title><mediaobject><imageobject><imagedata entityref="lu-create-root" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><olink targetptr="luoverview-fig-3" remap="internal">Figure 2&ndash;3</olink> shows critical
+file systems that have been split and have been copied to slices on a disk
+to create a new boot environment. The  active boot environment contains the
+root (<filename>/</filename>) file system on one slice. On that slice, the
+root (<filename>/</filename>) file system contains the <filename>/usr</filename>, <filename>/var</filename>, and <filename>/opt</filename> directories. In the new boot
+environment, the root (<filename>/</filename>) file system is split and <filename>/usr</filename> and <filename>/opt</filename> are put on separate slices.
+The file systems <filename>/swap</filename> and <filename>/export/home</filename> are
+shared by both boot environments.</para><figure id="luoverview-fig-3"><title>Creating an Inactive Boot Environment &ndash;
+Splitting File Systems</title><mediaobject><imageobject><imagedata entityref="lu-create-split" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><olink targetptr="luoverview-fig-26" remap="internal">Figure 2&ndash;4</olink> shows
+critical file systems that have been merged and have been copied to slices
+on a disk to create a new boot environment. The  active boot environment contains
+the root (<filename>/</filename>) file system, <filename>/usr</filename>, <filename>/var</filename>, and <filename>/opt</filename> with each file system on their
+own slice. In the new boot environment, /usr and <filename>/opt</filename> are
+merged into the root (<filename>/</filename>) file system on one slice. The
+file systems <filename>/swap</filename> and <filename>/export/home</filename> are
+shared by both boot environments.</para><figure id="luoverview-fig-26"><title>Creating an Inactive Boot Environment &ndash;
+Merging File Systems</title><mediaobject><imageobject><imagedata entityref="lu-create-merge" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect4>
+</sect3>
+</sect2><sect2 id="luoverview-7"><title>Creating a Boot Environment With RAID-1 Volume
+File Systems</title><para>Solaris Live Upgrade uses Solaris Volume Manager technology
+to create a boot environment that can contain file systems encapsulated in
+RAID-1 volumes. Solaris Volume Manager provides a powerful way to reliably
+manage your disks and data by using volumes. Solaris Volume Manager enables
+concatenations, stripes, and other complex configurations. Solaris Live Upgrade
+enables a subset of these tasks, such as creating a RAID-1 volume for the
+root (<filename>/</filename>) file system. </para><para>A volume can group disk slices across several disks to transparently
+appear as a single disk to the OS. Solaris Live Upgrade is limited to creating
+a boot environment for the root (<filename>/</filename>) file system that
+contains single-slice concatenations inside a RAID-1 volume (mirror). This
+limitation is because the boot PROM is restricted to choosing one slice from
+which to boot. </para><sect3 id="esqcc"><title>How to Manage Volumes With Solaris Live Upgrade</title><para>When creating a boot environment, you can use Solaris Live Upgrade to
+manage the following tasks.</para><itemizedlist><listitem><para>Detach a single-slice concatenation (submirror) from a RAID-1
+volume (mirror). The contents can be preserved to become the content of the
+new boot environment if necessary. Because the contents are not copied, the
+new boot environment can be quickly created. After the submirror is detached
+from  the original mirror, the submirror  is no longer part of the mirror.
+Reads and writes on the submirror are no longer performed through the mirror.</para>
+</listitem><listitem><para>Create a boot environment that contains a mirror.</para>
+</listitem><listitem><para>Attach a maximum of three single-slice concatenations to the
+newly created mirror.</para>
+</listitem>
+</itemizedlist><para>You use the <command>lucreate</command> command with the <option>m</option> option
+to create a mirror, detach submirrors, and attach submirrors for the new boot
+environment. </para><note><para>If VxVM volumes are configured on your current system, the <command>lucreate</command> command can create a new boot environment.  When the data is copied
+to the new boot environment, the Veritas file system configuration is lost
+and a UFS file system is created on the new boot environment.</para>
+</note><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><tbody><row><entry><para>For step-by-step procedures</para>
+</entry><entry><para><olink targetptr="lucreate-1000" remap="internal">To Create a Boot Environment With RAID-1
+Volumes (Mirrors)</olink></para>
+</entry>
+</row><row><entry><para>For an overview of creating RAID-1 volumes when installing</para>
+</entry><entry><para><olink targetdoc="solinstallpbiu" targetptr="mirroroverview-1" remap="external">Chapter 8, <citetitle remap="chapter">Creating RAID-1 Volumes (Mirrors) During Installation (Overview),</citetitle> in <citetitle remap="book">Solaris Express Installation Guide: Planning for Installation and Upgrade</citetitle></olink></para>
+</entry>
+</row><row><entry><para>For in-depth information about other complex Solaris Volume Manager
+configurations that are not supported if you are using Solaris Live Upgrade</para>
+</entry><entry><para><olink targetdoc="logvolmgradmin" targetptr="storage-overview-1" remap="external">Chapter 2, <citetitle remap="chapter">Storage Management Concepts,</citetitle> in <citetitle remap="book">Solaris Volume Manager Administration Guide</citetitle></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3><sect3 id="esqce"><title>Mapping Solaris Volume Manager Tasks to Solaris Live
+Upgrade</title><para>Solaris Live Upgrade manages a subset of Solaris Volume Manager tasks. <olink targetptr="luoverview-tbl-900" remap="internal">Table 2&ndash;1</olink> shows the Solaris Volume
+Manager components that Solaris Live Upgrade can manage.</para><table frame="topbot" id="luoverview-tbl-900"><title>Classes of Volumes</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="22.94*"/><colspec colname="colspec1" colwidth="77.06*"/><thead><row rowsep="1"><entry><para>Term</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>concatenation</para>
+</entry><entry><para>A RAID-0 volume. If slices are concatenated, the data is written to
+the first available slice until that slice is full. When that slice is full,
+the data is written to the next slice, serially. A concatenation provides
+no data redundancy unless it is contained in a mirror.</para>
+</entry>
+</row><row><entry><para>mirror</para>
+</entry><entry><para>A RAID-1 volume. See RAID-1 volume.</para>
+</entry>
+</row><row><entry><para>RAID-1 volume</para>
+</entry><entry><para>A class of volume that replicates data by maintaining multiple copies.
+A RAID-1 volume is sometimes called a mirror. A RAID-1 volume is composed
+of one or more RAID-0 volumes that  are called submirrors. </para>
+</entry>
+</row><row><entry><para>RAID-0
+volume</para>
+</entry><entry><para>A class of volume that can be a stripe or a concatenation. These components
+are also called submirrors. A stripe or concatenation is the basic building
+block for mirrors. </para>
+</entry>
+</row><row><entry><para>state database</para>
+</entry><entry><para>A state database stores information about disk about the state of your
+Solaris Volume Manager configuration. The state database is a collection of
+multiple, replicated database copies. Each copy is referred to as a state
+database replica. The state database tracks the location and status of all
+known state database replicas.</para>
+</entry>
+</row><row><entry><para>state database replica</para>
+</entry><entry><para>A copy of a state database. The replica ensures that the data in the
+database is valid.</para>
+</entry>
+</row><row><entry><para>submirror</para>
+</entry><entry><para>See RAID-0 volume.</para>
+</entry>
+</row><row><entry><para>volume</para>
+</entry><entry><para>A group of physical slices or other volumes that appear to the system
+as a single logical device. A volume is functionally identical to a physical
+disk in the view of an application or file system.  In some command-line utilities,
+a volume is called a metadevice.  </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3><sect3 id="esqby"><title>Examples of Using Solaris Live Upgrade to Create
+RAID-1 Volumes</title><para>The following examples present command syntax for creating RAID-1 volumes
+for a new boot environment.</para><sect4 id="esqcd"><title>Create RAID-1 Volume on Two Physical Disks</title><para><olink targetptr="luoverview-fig-10" remap="internal">Figure 2&ndash;5</olink> shows
+a new boot environment with a RAID-1 volume (mirror) that is created on two
+physical disks. The following command created the new boot environment and
+the mirror.</para><screen># <userinput>lucreate -n second_disk -m /:/dev/md/dsk/d30:mirror,ufs \ 
+-m /:/dev/dsk/c0t1d0s0,/dev/md/dsk/d31:attach -m /:/dev/dsk/c0t2d0s0,/dev/md/dsk/d32:attach \ 
+-m -:/dev/dsk/c0t1d0s1:swap -m -:/dev/dsk/c0t2d0s1:swap</userinput></screen><para>This command performs the following tasks: </para><itemizedlist><listitem><para>Creates a new boot environment, <literal>second_disk</literal>. </para>
+</listitem><listitem><para>Creates a mirror <literal>d30</literal> and configures a UFS
+file system.</para>
+</listitem><listitem><para>Creates a single-device concatenation on slice 0 of each physical
+disk. The concatenations are named <literal>d31</literal> and <literal>d32</literal>.</para>
+</listitem><listitem><para>Adds the two concatenations to mirror <literal>d30</literal>.</para>
+</listitem><listitem><para>Copies the root (<filename>/</filename>) file system to the
+mirror.</para>
+</listitem><listitem><para>Configures files systems for swap on slice 1 of each physical
+disk.</para>
+</listitem>
+</itemizedlist><figure id="luoverview-fig-10"><title>Create a Boot Environment and Create
+a Mirror</title><mediaobject><imageobject><imagedata entityref="lu-create-mirr"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect4><sect4 id="esqci"><title>Create a Boot Environment and Use the Existing Submirror</title><para><olink targetptr="luoverview-fig-11" remap="internal">Figure 2&ndash;6</olink> shows
+a new boot environment that contains a RAID-1 volume (mirror). The following
+command created the new boot environment and the mirror.</para><screen># <userinput>lucreate -n second_disk -m /:/dev/md/dsk/d20:ufs,mirror \ 
+-m /:/dev/dsk/c0t1d0s0:detach,attach,preserve</userinput></screen><para>This command performs the following tasks: </para><itemizedlist><listitem><para>Creates a new boot environment, <literal>second_disk</literal>.</para>
+</listitem><listitem><para>Breaks mirror <literal>d10</literal> and detaches concatenation <literal>d12</literal>.</para>
+</listitem><listitem><para>Preserves the contents of concatenation <literal>d12</literal>.
+File systems are not copied.</para>
+</listitem><listitem><para>Creates a new mirror <literal>d20</literal>. You now have
+two one-way mirrors <literal>d10</literal> and <literal>d20</literal>.</para>
+</listitem><listitem><para>Attaches concatenation <literal>d12</literal> to mirror <literal>d20</literal>.</para>
+</listitem>
+</itemizedlist><figure id="luoverview-fig-11"><title>Create a Boot Environment and Use the
+Existing Submirror</title><mediaobject><imageobject><imagedata entityref="lu-create-det-mirr"/>
+</imageobject><textobject><simpara>The illustration provides the context.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect4>
+</sect3>
+</sect2><sect2 id="luoverview-2"><title>Upgrading a Boot Environment</title><para>After you have created a boot environment, you can perform an
+upgrade on the boot environment. As part of that upgrade, the boot environment
+can contain RAID-1 volumes (mirrors) for any file systems. Or the boot environment
+can have non-global zones installed. The upgrade does not affect any files
+in the active boot environment. When you are ready, you activate the new boot
+environment, which then becomes the current boot environment. </para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><tbody><row><entry><para>For procedures about upgrading a boot environment</para>
+</entry><entry><para><olink targetptr="liveupgrade-1" remap="internal">Chapter&nbsp;5, Upgrading With Solaris
+Live Upgrade (Tasks)</olink></para>
+</entry>
+</row><row><entry><para>For an example of upgrading a boot environment with a RAID&ndash;1 volume
+file system</para>
+</entry><entry><para><olink targetptr="luexample-90" remap="internal">Example of Detaching and Upgrading One
+Side of a RAID-1 Volume (Mirror)</olink></para>
+</entry>
+</row><row><entry><para>For procedures about upgrading with non-global zones</para>
+</entry><entry><para><olink targetptr="gdzlc" remap="internal">Chapter&nbsp;9, Upgrading the Solaris OS on
+a System With Non-Global  Zones Installed</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para><olink targetptr="luoverview-fig-5" remap="internal">Figure 2&ndash;7</olink> shows an
+upgrade to an inactive boot environment. </para><figure id="luoverview-fig-5"><title>Upgrading an Inactive Boot Environment</title><mediaobject><imageobject><imagedata entityref="lu-upgrd-boot" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>Rather than an upgrade, you can install a Solaris Flash archive
+on a boot environment. The Solaris Flash installation feature enables
+you to create a single reference installation of the Solaris OS on a system.
+This system is called the master system. Then, you can replicate that installation
+on a number of systems that are called clone systems. In this situation, the
+inactive boot environment is a clone. When you install the Solaris Flash archive
+on a system, the archive replaces all the files on the existing boot environment
+as an initial installation would. </para><para>For procedures about installing a Solaris Flash archive, see <olink targetptr="luupgrade-83" remap="internal">Installing Solaris Flash Archives on a Boot Environment</olink>.</para><para>The following figures show an installation of a Solaris Flash archive
+on an inactive boot environment. <olink targetptr="luoverview-fig-12" remap="internal">Figure
+2&ndash;8</olink> shows a system with a single hard disk. <olink targetptr="luoverview-fig-12b" remap="internal">Figure 2&ndash;9</olink> shows a system with
+two hard disks.</para><figure id="luoverview-fig-12"><title>Installing a Solaris Flash Archive
+on a Single Disk</title><mediaobject><imageobject><imagedata entityref="lu-flash-boot"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure><figure id="luoverview-fig-12b"><title>Installing a Solaris Flash Archive
+on Two Disks</title><mediaobject><imageobject><imagedata entityref="lu-flash-boot2" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="luoverview-3"><title>Activating a Boot Environment</title><para>When you are ready to switch and make the new boot
+environment active, you quickly activate the new boot environment and reboot.
+Files are synchronized between boot environments the first time that you boot
+a newly created boot environment. &ldquo;Synchronize&rdquo; means that certain
+system files and directories are copied from the last-active boot environment
+to the boot environment being booted. When you reboot the system, the configuration
+that you installed on the new boot environment is active. The original boot
+environment then becomes an inactive boot environment. </para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><tbody><row><entry><para>For procedures about activating a boot environment</para>
+</entry><entry><para><olink targetptr="luupgrade-84" remap="internal">Activating a Boot Environment</olink></para>
+</entry>
+</row><row><entry><para>For information about synchronizing the active and inactive boot environment</para>
+</entry><entry><para><olink targetptr="luplanning-10" remap="internal">Synchronizing Files Between Boot Environments</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para><olink targetptr="chapter-fig-13" remap="internal">Figure 2&ndash;10</olink> shows a
+switch after a reboot from an inactive to an active boot environment.</para><figure id="chapter-fig-13"><title>Activating an Inactive Boot Environment</title><mediaobject><imageobject><imagedata entityref="lu-act-boot" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="luoverview-4"><title>Falling Back to the Original Boot Environment</title><para>If a failure
+occurs, you can quickly fall back to the original boot environment with an
+activation and reboot. The use of fallback takes only the time to reboot the
+system, which is much quicker than backing up and restoring the original.
+The new boot environment that failed to boot is preserved. The failure can
+then  be analyzed. You can only fall back to the boot environment that was
+used by <command>luactivate</command> to activate the new boot environment. </para><para>You fall back to the previous boot environment the following ways:</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="33.06*"/><colspec colwidth="66.94*"/><thead><row rowsep="1"><entry><para>Problem</para>
+</entry><entry><para>Action</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>The new boot environment boots successfully, but you are not happy with
+the results.</para>
+</entry><entry><para>Run the <command>luactivate</command> command with the name of the previous
+boot environment and reboot.</para><note arch="x86"><para><emphasis role="strong">Starting with the Solaris 10
+1/06 release</emphasis>, you can fall back by selecting the original boot
+environment that is found on the GRUB menu. The original boot environment
+and the new boot environment must be based on the GRUB software. Booting from
+the GRUB menu does not synchronize files between the old and new boot environments.
+For more information about synchronizing files, see <olink targetptr="luplanning-1110" remap="internal">Forcing a Synchronization Between Boot Environments</olink>.</para>
+</note>
+</entry>
+</row><row><entry><para>The new boot environment does not boot.</para>
+</entry><entry><para>Boot the fallback boot environment in single-user mode, run the <command>luactivate</command> command, and reboot.</para>
+</entry>
+</row><row><entry><para>You cannot boot in single-user mode.</para>
+</entry><entry><para>Perform one of the following:</para><itemizedlist><listitem><para>Boot from DVD or CD media or a net installation image</para>
+</listitem><listitem><para>Mount the root (<filename>/</filename>) file system on the
+fallback boot environment</para>
+</listitem><listitem><para>Run the <command>luactivate</command> command and reboot</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>For procedures to fall back, see <olink targetptr="luupgrade-85" remap="internal">Chapter&nbsp;6,
+Failure Recovery: Falling Back to the Original Boot Environment (Tasks)</olink>.</para><para><olink targetptr="chapter-fig-74" remap="internal">Figure 2&ndash;11</olink> shows the
+switch that is made when you reboot to fallback. </para><figure id="chapter-fig-74"><title>Fallback to the Original Boot Environment</title><mediaobject><imageobject><imagedata entityref="lu-fallback" width="100"/>
+</imageobject><textobject><simpara>The context describes the illustration.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="luoverview-5"><title>Maintaining a Boot Environment</title><para>You can also do various maintenance activities such as checking status,
+renaming, or deleting a boot environment. For maintenance procedures, see <olink targetptr="lumaintainence-1" remap="internal">Chapter&nbsp;7, Maintaining Solaris Live Upgrade
+Boot Environments (Tasks)</olink>.</para>
+</sect2>
+</sect1>
+</chapter>

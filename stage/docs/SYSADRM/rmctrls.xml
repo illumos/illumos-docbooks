@@ -1,0 +1,639 @@
+<chapter id="rmctrls-1"><title>Resource Controls (Overview)</title><highlights><para>After you determine the resource consumption of workloads on your system
+as described in <olink targetptr="rmacct-1" remap="internal">Chapter&nbsp;4, Extended Accounting
+(Overview)</olink>, you can place boundaries on resource usage. Boundaries
+prevent workloads from over-consuming resources. The <emphasis>resource controls</emphasis> facility
+is the constraint mechanism that is used for this purpose.</para><para>This chapter covers the following topics.</para><itemizedlist><listitem><para><olink targetptr="rmctrls-2" remap="internal">Resource Controls Concepts</olink></para>
+</listitem><listitem><para><olink targetptr="rmctrls-3" remap="internal">Configuring Resource Controls
+and Attributes</olink></para>
+</listitem><listitem><para><olink targetptr="rmctrls-12" remap="internal">Applying Resource Controls</olink></para>
+</listitem><listitem><para><olink targetptr="rmctrls-13" remap="internal">Temporarily Updating Resource
+Control Values on a Running System</olink></para>
+</listitem><listitem><para><olink targetptr="rmctrls-19" remap="internal">Commands Used With Resource
+Controls</olink></para>
+</listitem>
+</itemizedlist><para>For information about how to administer resource controls, see <olink targetptr="rmctrls.task-1" remap="internal">Chapter&nbsp;7, Administering Resource Controls
+(Tasks)</olink>.</para>
+</highlights><sect1 id="rmctrls-2"><title>Resource Controls Concepts</title><para>In the Solaris
+Operating System, the concept of a per-process resource limit has been extended
+to the task and project entities described in <olink targetptr="rmtaskproj-1" remap="internal">Chapter&nbsp;2,
+Projects and Tasks (Overview)</olink>. These enhancements are provided by
+the resource controls (rctls) facility. In addition, allocations that were
+set through the <filename>/etc/system</filename> tunables are now automatic
+or configured through the resource controls mechanism as well.</para><para>A resource control is identified by the prefix <literal>zone</literal>, <literal>project</literal>, <literal>task</literal>, or <literal>process</literal>.
+Resource controls can be observed on a system-wide basis. It is possible to
+update resource control values on a running system.</para><para>For a list of the standard resource controls that are available in this
+release, see <olink targetptr="rmctrls-4" remap="internal">Available Resource Controls</olink> See <olink targetptr="z.config.ov-17" remap="internal">Resource Type Properties</olink> for information
+on available zone-wide resource controls.</para><sect2 id="rmctrls-16"><title>Resource Limits and Resource Controls</title><para>UNIX systems have traditionally provided a resource limit facility (<emphasis>rlimit</emphasis>). The rlimit facility allows administrators to set one or
+more numerical limits on the amount of resources a process can consume. These
+limits include per-process CPU time used, per-process core file size, and
+per-process maximum heap size. <emphasis>Heap size</emphasis> is the amount
+of scratch memory that is allocated for the process data segment.</para><para>The resource
+controls facility provides compatibility interfaces for the resource limits
+facility. Existing applications that use resource limits continue to run unchanged.
+These applications can be observed in the same way as applications that are
+modified to take advantage of the resource controls facility.</para>
+</sect2><sect2 id="rmctrls-23"><title>Interprocess Communication and Resource Controls</title><para>Processes
+can communicate with each other by using one of several types of interprocess
+communication (IPC). IPC allows information transfer or synchronization to
+occur between processes. Prior to the Solaris 10 release, IPC tunable parameters
+were set by adding an entry to the <filename>/etc/system</filename> file.
+The resource controls facility now provides resource controls that define
+the behavior of the kernel's IPC facilities. These resource controls replace
+the <filename>/etc/system</filename> tunables.</para><para>Obsolete parameters might be included in the <filename>/etc/system</filename> file
+on this Solaris system. If so, the parameters are used to initialize the default
+resource control values as in previous Solaris releases. However, using the
+obsolete parameters is not recommended.</para><para>To observe which IPC objects are contributing to a project's usage,
+use the <command>ipcs</command> command with the <option>J</option> option.
+See <olink targetptr="rmctrls.task-13" remap="internal">How to Use ipcs</olink> to view an
+example display. For more information about the <command>ipcs</command> command,
+see <olink targetdoc="group-refman" targetptr="ipcs-1" remap="external"><citerefentry><refentrytitle>ipcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para><para>For information about Solaris system tuning, see the <olink targetdoc="soltuneparamref" remap="external"><citetitle remap="book">Solaris Tunable Parameters Reference Manual</citetitle></olink>.</para>
+</sect2><sect2 id="rmctrls-17"><title>Resource Control Constraint Mechanisms</title><para>Resource controls provide a mechanism for the constraint of system resources.
+Processes, tasks, projects, and zones can be prevented from consuming amounts
+of specified system resources. This mechanism leads to a more manageable system
+by preventing over-consumption of resources.</para><para>Constraint mechanisms can be used to support capacity-planning processes.
+An encountered constraint can provide information about application resource
+needs without necessarily denying the resource to the application.</para>
+</sect2><sect2 id="rmctrls-18"><title>Project Attribute Mechanisms</title><para>Resource controls can also serve as a simple attribute mechanism for
+resource management facilities. For example, the number of CPU shares made
+available to a project in the fair share scheduler (FSS) scheduling class
+is defined by the <literal>project.cpu-shares</literal> resource control.
+Because the project is assigned a fixed number of shares by the control, the
+various actions associated with exceeding a control are not relevant. In this
+context, the current value for the <literal>project.cpu-shares</literal> control
+is considered an attribute on the specified project.</para><para>Another type of project attribute is used to regulate the resource consumption
+of physical memory by collections of processes attached to a project. These
+attributes have the prefix <literal>rcap</literal>, for example, <literal>rcap.max-rss</literal>. Like a resource control, this type of attribute is configured
+in the <command>project</command> database. However, while resource controls
+are synchronously enforced by the kernel, resource caps are asynchronously
+enforced at the user level by the resource cap enforcement daemon, <command>rcapd</command>. For information on <command>rcapd</command>, see <olink targetptr="rm.rcapd-1" remap="internal">Chapter&nbsp;10, Physical Memory Control Using the
+Resource Capping Daemon (Overview)</olink> and <citerefentry><refentrytitle>rcapd</refentrytitle><manvolnum>1M</manvolnum></citerefentry>.</para><para>The <literal>project.pool</literal> attribute is used to specify a pool
+binding for a project. For more information on resource pools, see <olink targetptr="rmpool-1" remap="internal">Chapter&nbsp;12, Resource Pools (Overview)</olink>.</para>
+</sect2>
+</sect1><sect1 id="rmctrls-3"><title>Configuring Resource Controls and Attributes</title><para>The resource controls facility
+is configured through the <command>project</command> database. See <olink targetptr="rmtaskproj-1" remap="internal">Chapter&nbsp;2, Projects and Tasks (Overview)</olink>.
+Resource controls and other attributes are set in the final field of the <command>project</command> database entry. The values associated with each resource
+control are enclosed in parentheses, and appear as plain text separated by
+commas. The values in parentheses constitute an &ldquo;action clause.&rdquo;
+Each action clause is composed of a privilege level, a threshold value, and
+an action that is associated with the particular threshold. Each resource
+control can have multiple action clauses, which are also separated by commas.
+The following entry defines a per-task lightweight process limit and a per-process
+maximum CPU time limit on a project entity. The <literal>process.max-cpu-time</literal> 
+would send a process a SIGTERM after the process ran for 1 hour, and a SIGKILL
+if the process continued to run for a total of 1 hour and 1 minute. See <olink targetptr="rmctrls-tbl-8" remap="internal">Table&nbsp;6&ndash;3</olink>.</para><screen>development:101:Developers:::task.max-lwps=(privileged,10,deny);
+  process.max-cpu-time=(basic,3600,signal=TERM),(priv,3660,signal=KILL)
+<lineannotation>typed as one line</lineannotation></screen><note><para>On systems that have zones enabled, zone-wide resource controls
+are specified in the zone configuration using a slightly different format.
+See <olink targetptr="z.config.ov-12" remap="internal">Zone Configuration Data</olink> for
+more information.</para>
+</note><para>The <command>rctladm</command> command allows you to make runtime interrogations
+of and modifications to the resource controls facility, with <emphasis>global
+scope</emphasis>. The <command>prctl</command> command allows you to make
+runtime interrogations of and modifications to the resource controls facility,
+with <emphasis>local scope</emphasis>.</para><para>For more information, see <olink targetptr="rmctrls-7" remap="internal">Global and Local
+Actions on Resource Control Values</olink>, <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="prctl-1" remap="external"><citerefentry><refentrytitle>prctl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para><note><para>On a system with zones installed, you cannot use <command>rctladm</command> in
+a non-global zone to modify settings. You can use <command>rctladm</command> in
+a non-global zone to view the global logging state of each resource control.</para>
+</note><sect2 id="rmctrls-4"><title>Available Resource Controls</title><para>A list of the standard resource controls that are available in
+this release is shown in the following table.</para><para>The table describes the resource that is constrained by each control.
+The table also identifies the default units that are used by the <filename>project</filename> database for that resource. The default units are of two types:</para><itemizedlist><listitem><para>Quantities represent a limited amount.</para>
+</listitem><listitem><para>Indexes represent a maximum valid identifier.</para>
+</listitem>
+</itemizedlist><para>Thus, <literal>project.cpu-shares</literal> specifies the number of
+shares to which the project is entitled. <literal>process.max-file-descriptor</literal> specifies
+the highest file number that can be assigned to a process by the <olink targetdoc="group-refman" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call.</para><table frame="all" id="rmctrls-tbl-5"><title>Standard Project, Task, and Process
+Resource Controls</title><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="39*"/><colspec colwidth="39*"/><colspec colwidth="22*"/><thead><row><entry><para>Control Name</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Default Unit</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>project.cpu-cap</literal></para>
+</entry><entry><para>Absolute limit on the amount of CPU resources that can be consumed by
+a project. A value of <literal>100</literal> means 100% of one CPU as the <literal>project.cpu-cap</literal> setting. A value of <literal>125</literal> is 125%,
+because 100% corresponds to one full CPU on the system when using CPU caps.</para>
+</entry><entry><para>Quantity (number of CPUs)</para>
+</entry>
+</row><row><entry><para><literal>project.cpu-shares</literal></para>
+</entry><entry><para>Number of CPU shares granted to this project for use with the fair share
+scheduler (see <olink targetdoc="group-refman" targetptr="fss-7" remap="external"><citerefentry><refentrytitle>FSS</refentrytitle><manvolnum>7</manvolnum></citerefentry></olink>).</para>
+</entry><entry><para>Quantity (shares)</para>
+</entry>
+</row><row><entry><para><literal>project.max-crypto-memory</literal></para>
+</entry><entry><para>Total amount of kernel memory that can be used by <literal>libpkcs11</literal> for
+hardware crypto acceleration. Allocations for kernel buffers and session-related
+structures are charged against this resource control.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>project.max-locked-memory</literal></para>
+</entry><entry><para>Total amount of physical locked memory allowed.</para><para>If <literal>priv_proc_lock_memory</literal> is assigned to a user, consider
+setting this resource control as well to prevent that user from locking all
+memory.</para><para>Note that this resource control replaced <literal>project.max-device-locked-memory</literal>, which has been removed. This release control will be removed in
+a future release.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>project.max-msg-ids</literal></para>
+</entry><entry><para>Maximum number of message queue IDs allowed for this project.</para>
+</entry><entry><para>Quantity (message queue IDs)</para>
+</entry>
+</row><row><entry><para><literal>project.max-port-ids</literal></para>
+</entry><entry><para>Maximum allowable number of event ports.</para>
+</entry><entry><para>Quantity (number of event ports) </para>
+</entry>
+</row><row><entry><para><literal>project.max-sem-ids</literal></para>
+</entry><entry><para>Maximum number of semaphore IDs allowed for this project.</para>
+</entry><entry><para>Quantity (semaphore IDs)</para>
+</entry>
+</row><row><entry><para><literal>project.max-shm-ids</literal></para>
+</entry><entry><para>Maximum number of shared memory IDs allowed for this project.</para>
+</entry><entry><para>Quantity (shared memory IDs)</para>
+</entry>
+</row><row><entry><para><literal>project.max-shm-memory</literal></para>
+</entry><entry><para>Total amount of System V shared memory allowed for this project.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>project.max-lwps</literal></para>
+</entry><entry><para>Maximum number of LWPs simultaneously available to this project.</para>
+</entry><entry><para>Quantity (LWPs)</para>
+</entry>
+</row><row><entry><para><literal>project.max-tasks</literal></para>
+</entry><entry><para>Maximum number of tasks allowable in this project.</para>
+</entry><entry><para>Quantity (number of tasks)</para>
+</entry>
+</row><row><entry><para><literal>project.max-contracts</literal></para>
+</entry><entry><para>Maximum number of contracts allowed in this project.</para>
+</entry><entry><para>Quantity (contracts)</para>
+</entry>
+</row><row><entry><para><literal>task.max-cpu-time</literal></para>
+</entry><entry><para>Maximum CPU time that is available to this task's processes.</para>
+</entry><entry><para>Time (seconds)</para>
+</entry>
+</row><row><entry><para><literal>task.max-lwps</literal></para>
+</entry><entry><para>Maximum number of LWPs simultaneously available to this task's processes.</para>
+</entry><entry><para>Quantity (LWPs)</para>
+</entry>
+</row><row><entry><para><literal>process.max-cpu-time</literal></para>
+</entry><entry><para>Maximum CPU time that is available to this process.</para>
+</entry><entry><para>Time (seconds)</para>
+</entry>
+</row><row><entry><para><literal>process.max-file-descriptor</literal></para>
+</entry><entry><para>Maximum file descriptor index available to this process.</para>
+</entry><entry><para>Index (maximum file descriptor)</para>
+</entry>
+</row><row><entry><para><literal>process.max-file-size</literal></para>
+</entry><entry><para>Maximum file offset available for writing by this process.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-core-size</literal></para>
+</entry><entry><para>Maximum size of a core file created by this process.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-data-size</literal></para>
+</entry><entry><para>Maximum heap memory available to this process.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-stack-size</literal></para>
+</entry><entry><para>Maximum stack memory segment available to this process.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-address-space</literal></para>
+</entry><entry><para>Maximum amount of address space, as summed over segment sizes, that
+is available to this process.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-port-events</literal></para>
+</entry><entry><para>Maximum allowable number of events per event port.</para>
+</entry><entry><para>Quantity (number of events) </para>
+</entry>
+</row><row><entry><para><literal>process.max-sem-nsems</literal></para>
+</entry><entry><para>Maximum number of semaphores allowed per semaphore set.</para>
+</entry><entry><para>Quantity (semaphores per set)</para>
+</entry>
+</row><row><entry><para><literal>process.max-sem-ops</literal></para>
+</entry><entry><para>Maximum number of semaphore operations allowed per <literal>semop</literal> call
+(value copied from the resource control at <literal>semget()</literal> time).</para>
+</entry><entry><para>Quantity (number of operations)</para>
+</entry>
+</row><row><entry><para><literal>process.max-msg-qbytes</literal></para>
+</entry><entry><para>Maximum number of bytes of messages on a message queue (value copied
+from the resource control at <literal>msgget()</literal> time).</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>process.max-msg-messages</literal></para>
+</entry><entry><para>Maximum number of messages on a message queue (value copied from the
+resource control at <literal>msgget()</literal> time).</para>
+</entry><entry><para>Quantity (number of messages)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>You can display the default values for resource controls on a system
+that does not have any resource controls set or changed. Such a system contains
+no non-default entries in <filename>/etc/system</filename> or the <literal>project</literal> database. To display values, use the <command>prctl</command> command.</para>
+</sect2><sect2 id="gbrcy"><title>Zone-Wide Resource Controls</title><para>Zone-wide resource controls limit the total resource usage of all process
+entities within a zone. Zone-wide resource controls can also be set using
+global property names as described in <olink targetptr="z.config.ov-13" remap="internal">Setting
+Zone-Wide Resource Controls</olink> and <olink targetptr="z.conf.start-29" remap="internal">How
+to Configure the Zone</olink>.</para><table frame="all" id="gdswx"><title>Zones Resource Controls</title><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="39*"/><colspec colwidth="39*"/><colspec colwidth="22*"/><thead><row><entry><para>Control Name</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Default Unit</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>zone.cpu-cap</literal></para>
+</entry><entry><para>Absolute limit on the amount of CPU resources that can be consumed by
+a non-global zone. A value of <literal>100</literal> means 100% of one CPU
+as the <literal>project.cpu-cap</literal> setting. A value of <literal>125</literal> is
+125%, because 100% corresponds to one full CPU on the system when using CPU
+caps.</para>
+</entry><entry><para>Quantity (number of CPUs)</para>
+</entry>
+</row><row><entry><para><literal>zone.cpu-shares</literal></para>
+</entry><entry><para>Number of fair share scheduler (FSS) CPU shares for this zone</para>
+</entry><entry><para>Quantity (shares)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-locked-memory</literal></para>
+</entry><entry><para>Total amount of physical locked memory available to a zone.</para><para>When <literal>priv_proc_lock_memory</literal> is assigned to a zone,
+consider setting this resource control as well to prevent that zone from locking
+all memory.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-lwps</literal></para>
+</entry><entry><para>Maximum number of LWPs simultaneously available to this zone</para>
+</entry><entry><para>Quantity (LWPs)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-msg-ids</literal></para>
+</entry><entry><para>Maximum number of message queue IDs allowed for this zone</para>
+</entry><entry><para>Quantity (message queue IDs)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-sem-ids</literal></para>
+</entry><entry><para>Maximum number of semaphore IDs allowed for this zone</para>
+</entry><entry><para>Quantity (semaphore IDs)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-shm-ids</literal></para>
+</entry><entry><para>Maximum number of shared memory IDs allowed for this zone</para>
+</entry><entry><para>Quantity (shared memory IDs)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-shm-memory</literal></para>
+</entry><entry><para>Total amount of System V shared memory allowed for this zone</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row><row><entry><para><literal>zone.max-swap</literal></para>
+</entry><entry><para>Total amount of swap that can be consumed by user process address space
+mappings and <literal>tmpfs</literal> mounts for this zone.</para>
+</entry><entry><para>Size (bytes)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>For information on configuring zone-wide resource controls, see <olink targetptr="z.config.ov-17" remap="internal">Resource Type Properties</olink> and <olink targetptr="z.conf.start-29" remap="internal">How to Configure the Zone</olink>. To use zone-wide
+resource controls in <literal>lx</literal> branded zones, see <olink targetptr="gdbji" remap="internal">How to Configure, Verify, and Commit the lx Branded Zone</olink>.</para><para>Note that it is possible to apply a zone-wide resource control to the
+global zone. See <olink targetptr="z.admin.task-71" remap="internal">Using the Fair Share Scheduler
+on a Solaris System With Zones Installed</olink> for additional information.</para>
+</sect2><sect2 id="rmctrls-20"><title>Units Support</title><para>Global flags that identify resource control types are defined for all
+resource controls. The flags are used by the system to communicate basic type
+information to applications such as the <command>prctl</command> command.
+Applications use the information to determine the following:</para><itemizedlist><listitem><para>The unit strings that are appropriate for each resource control</para>
+</listitem><listitem><para>The correct scale to use when interpreting scaled values</para>
+</listitem>
+</itemizedlist><para>The following global flags are available:</para><informaltable frame="topbot"><tgroup cols="4" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colname="colspec0" colwidth="30*"/><colspec colwidth="18*"/><colspec colwidth="19*"/><thead><row><entry colsep="0" rowsep="1"><para>Global Flag</para>
+</entry><entry colname="colspec0" colsep="0"><para>Resource Control Type String</para>
+</entry><entry colsep="0" rowsep="1"><para>Modifier</para>
+</entry><entry colsep="0" rowsep="1"><para>Scale</para>
+</entry>
+</row>
+</thead><tbody><row><entry morerows="6" colsep="0" rowsep="1"><para>RCTL_GLOBAL_BYTES</para>
+</entry><entry colname="colspec0" colsep="0"><para>bytes</para>
+</entry><entry colsep="0" rowsep="0"><para>B</para>
+</entry><entry colsep="0" rowsep="0"><para>1</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>KB</para>
+</entry><entry colsep="0" rowsep="0"><para>2<superscript>10</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>MB</para>
+</entry><entry colsep="0" rowsep="0"><para>2<superscript>20</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>GB</para>
+</entry><entry colsep="0" rowsep="0"><para>2<superscript>30</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>TB</para>
+</entry><entry colsep="0" rowsep="0"><para>2<superscript>40</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>PB</para>
+</entry><entry colsep="0" rowsep="0"><para>2<superscript>50</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="1"><para>EB</para>
+</entry><entry colsep="0" rowsep="1"><para>2<superscript>60</superscript></para>
+</entry>
+</row><row><entry morerows="6" colsep="0" rowsep="1"><para>RCTL_GLOBAL_SECONDS</para>
+</entry><entry colname="colspec0" colsep="0"><para>seconds</para>
+</entry><entry colsep="0" rowsep="0"><para>s</para>
+</entry><entry colsep="0" rowsep="0"><para>1</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>Ks</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>3</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>Ms</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>6</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>Gs</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>9</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>Ts</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>12</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>Ps</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>15</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="1"><para>Es</para>
+</entry><entry colsep="0" rowsep="1"><para>10<superscript>18</superscript></para>
+</entry>
+</row><row><entry morerows="6" colsep="0" rowsep="1"><para>RCTL_GLOBAL_COUNT</para>
+</entry><entry colname="colspec0" colsep="0"><para>count</para>
+</entry><entry colsep="0" rowsep="0"><para>none</para>
+</entry><entry colsep="0" rowsep="0"><para>1</para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>K</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>3</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>M</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>6</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>G</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>9</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>T</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>12</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>P</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>15</superscript></para>
+</entry>
+</row><row><entry colname="colspec0" colsep="0"><para></para>
+</entry><entry colsep="0" rowsep="0"><para>E</para>
+</entry><entry colsep="0" rowsep="0"><para>10<superscript>18</superscript></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Scaled values can be used with resource controls. The following example
+shows a scaled threshold value:</para><programlisting>task.max-lwps=(priv,1K,deny)</programlisting><note><para>Unit modifiers are accepted by the <command>prctl</command>, <command>projadd</command>, and <command>projmod</command> commands. You cannot use
+unit modifiers in the <literal>project</literal> database itself.</para>
+</note>
+</sect2><sect2 id="rmctrls-6"><title>Resource Control Values and Privilege Levels</title><para>A threshold value on a resource control constitutes an enforcement
+point where local actions can be triggered or global actions, such as logging,
+can occur.</para><para>Each threshold value on a resource control must be associated
+with a privilege level. The privilege level must be one of the following three
+types.</para><itemizedlist><listitem><para>Basic, which can be modified by the owner of the calling process</para>
+</listitem><listitem><para>Privileged, which can be modified only by privileged (superuser)
+callers</para>
+</listitem><listitem><para>System, which is fixed for the duration of the operating system
+instance</para>
+</listitem>
+</itemizedlist><para>A resource control is guaranteed to have one system value, which is
+defined by the system, or resource provider. The system value represents how
+much of the resource the current implementation of the operating system is
+capable of providing.</para><para>Any number of privileged values can be defined, and only one basic value
+is allowed. Operations that are performed without specifying a privilege value
+are assigned a basic privilege by default.</para><para>The privilege level for a resource control value is defined in the privilege
+field of the resource control block as RCTL_BASIC, RCTL_PRIVILEGED, or RCTL_SYSTEM.
+See <olink targetdoc="group-refman" targetptr="setrctl-2" remap="external"><citerefentry><refentrytitle>setrctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> for
+more information. You can use the <command>prctl</command> command to modify
+values that are associated with basic and privileged levels.</para>
+</sect2><sect2 id="rmctrls-7"><title>Global and Local Actions on Resource Control
+Values</title><para>There are two categories of actions on resource
+control values: global and local.</para><sect3 id="rmctrls-25"><title>Global Actions on Resource Control Values</title><para>Global actions apply to resource control values for every resource
+control on the system. You can use the <command>rctladm</command> command
+described in the <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page to perform the following actions:</para><itemizedlist><listitem><para>Display the global state of active system resource controls</para>
+</listitem><listitem><para>Set global logging actions</para>
+</listitem>
+</itemizedlist><para>You can disable or enable the global logging action on resource controls.
+You can set the <literal>syslog</literal> action to a specific degree by assigning
+a severity level, <literal>syslog=</literal><replaceable>level</replaceable>.
+The possible settings for <replaceable>level</replaceable> are as follows:</para><itemizedlist><listitem><para><literal>debug</literal></para>
+</listitem><listitem><para><literal>info</literal></para>
+</listitem><listitem><para><literal>notice</literal></para>
+</listitem><listitem><para><literal>warning</literal></para>
+</listitem><listitem><para><literal>err</literal></para>
+</listitem><listitem><para><literal>crit</literal></para>
+</listitem><listitem><para><literal>alert</literal></para>
+</listitem><listitem><para><literal>emerg</literal></para>
+</listitem>
+</itemizedlist><para>By default, there is no global logging of resource control violations.
+The level <literal>n/a</literal> indicates resource controls on which no global
+action can be configured.</para>
+</sect3><sect3 id="rmctrls-24"><title>Local Actions on Resource Control Values</title><para>Local actions are taken on
+a process that attempts to exceed the control value. For each threshold value
+that is placed on a resource control, you can associate one or more actions.
+There are three types of local actions: <literal>none</literal>, <literal>deny</literal>,
+and <literal>signal=</literal>. These three actions are used as follows:</para><variablelist><varlistentry><term><literal>none</literal></term><listitem><para>No action is taken on resource requests for an amount that
+is greater than the threshold. This action is useful for monitoring resource
+usage without affecting the progress of applications. You can also enable
+a global message that displays when the resource control is exceeded, although
+the process exceeding the threshhold is not affected.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>deny</literal></term><listitem><para>You can deny resource requests for an amount that is greater
+than the threshold. For example, a <literal>task.max-lwps</literal> resource
+control with action <literal>deny</literal> causes a <command>fork</command> system
+call to fail if the new process would exceed the control value. See the <olink targetdoc="group-refman" targetptr="fork-2" remap="external"><citerefentry><refentrytitle>fork</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>signal=</literal></term><listitem><para>You can enable a global signal message action when the resource
+control is exceeded. A signal is sent to the process when the threshold value
+is exceeded. Additional signals are not sent if the process consumes additional
+resources. Available signals are listed in <olink targetptr="rmctrls-tbl-8" remap="internal">Table&nbsp;6&ndash;3</olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Not all of the actions can be applied to every resource control. For
+example, a process cannot exceed the number of CPU shares assigned to the
+project of which it is a member. Therefore, a deny action is not allowed on
+the <literal>project.cpu-shares</literal> resource control.</para><para>Due to implementation restrictions, the global properties of each control
+can restrict the range of available actions that can be set on the threshold
+value. (See the <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.) A list of available signal actions is presented in the following table.
+For additional information about signals, see the <olink targetdoc="group-refman" targetptr="signal-3head" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3HEAD</manvolnum></citerefentry></olink> man page.</para><table frame="topbot" id="rmctrls-tbl-8"><title>Signals Available to Resource
+Control Values</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="20*"/><colspec colwidth="40*"/><colspec colwidth="30*"/><thead><row rowsep="1"><entry><para>Signal</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Notes</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>SIGABRT</para>
+</entry><entry><para>Terminate the process.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGHUP</para>
+</entry><entry><para>Send a hangup signal. Occurs when carrier drops on an open line. Signal
+sent to the process group that controls the terminal.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGTERM</para>
+</entry><entry><para>Terminate the process. Termination signal sent by software.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGKILL</para>
+</entry><entry><para>Terminate the process and kill the program.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGSTOP</para>
+</entry><entry><para>Stop the process. Job control signal.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGXRES</para>
+</entry><entry><para>Resource control limit exceeded. Generated by resource control facility.</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry><para>SIGXFSZ</para>
+</entry><entry><para>Terminate the process. File size limit exceeded.</para>
+</entry><entry><para>Available only to resource controls with the RCTL_GLOBAL_FILE_SIZE property
+(<literal>process.max-file-size</literal>). See <olink targetdoc="group-refman" targetptr="rctlblk-set-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_value</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> for more information.</para>
+</entry>
+</row><row><entry><para>SIGXCPU</para>
+</entry><entry><para>Terminate the process. CPU time limit exceeded.</para>
+</entry><entry><para>Available only to resource controls with the RCTL_GLOBAL_CPUTIME property
+(<literal>process.max-cpu-time</literal>). See <olink targetdoc="group-refman" targetptr="rctlblk-set-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_value</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> for more information.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3>
+</sect2><sect2 id="rmctrls-9"><title>Resource Control Flags and Properties</title><para>Each resource control on the system has a certain set of associated
+properties. This set of properties is defined as a set of flags, which are
+associated with all controlled instances of that resource. Global flags cannot
+be modified, but the flags can be retrieved by using either <command>rctladm</command> or
+the <command>getrctl</command> system call.</para><para>Local flags define the default behavior and configuration for a specific
+threshold value of that resource control on a specific process or process
+collective. The local flags for one threshold value do not affect the behavior
+of other defined threshold values for the same resource control. However,
+the global flags affect the behavior for every value associated with a particular
+control. Local flags can be modified, within the constraints supplied by their
+corresponding global flags, by the  <command>prctl</command> command or the <command>setrctl</command> system call. See <olink targetdoc="group-refman" targetptr="setrctl-2" remap="external"><citerefentry><refentrytitle>setrctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para><para>For the complete list of local flags, global flags, and their 	definitions,
+see <olink targetdoc="group-refman" targetptr="rctlblk-set-value-3c" remap="external"><citerefentry><refentrytitle>rctlblk_set_value</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>.</para><para>To determine system behavior when a threshold value for a particular
+resource control is reached, use <command>rctladm</command> to display the
+global flags for the resource control . For example, to display the values
+for <literal>process.max-cpu-time</literal>, type the following:</para><screen width="100">$ <userinput>rctladm process.max-cpu-time</userinput>
+	process.max-cpu-time  syslog=off  [ lowerable no-deny cpu-time inf seconds ]</screen><para>The global flags indicate the following.</para><variablelist><varlistentry><term><literal>lowerable</literal></term><listitem><para>Superuser privileges are not required to lower the privileged
+values for this control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>no-deny</literal></term><listitem><para>Even when threshold values are exceeded, access to the resource
+is never denied.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>cpu-time</literal></term><listitem><para>SIGXCPU is available to be sent when threshold values of this
+resource are reached.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>seconds</literal></term><listitem><para>The time value for the resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>no-basic</literal></term><listitem><para>Resource control values with the privilege type <literal>basic</literal> cannot
+be set. Only privileged
+resource control values are allowed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>no-signal</literal></term><listitem><para>A local signal action cannot be set on resource control values.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>no-syslog</literal></term><listitem><para>The global <literal>syslog</literal> message action may not
+be set for this resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>deny</literal></term><listitem><para>Always deny request for resource when threshold
+values are exceeded.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>count</literal></term><listitem><para>A count (integer) value for the resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>bytes</literal></term><listitem><para>Unit of size for the resource control.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Use the <command>prctl</command> command to display local values and
+actions for the resource control.</para><screen>$ <userinput>prctl -n process.max-cpu-time $$</userinput>
+	process 353939: -ksh
+	NAME    PRIVILEGE    VALUE    FLAG   ACTION              RECIPIENT
+ process.max-cpu-time
+         privileged   18.4Es    inf   signal=XCPU                 -
+         system       18.4Es    inf   none </screen><para>The <literal>max</literal> (RCTL_LOCAL_MAXIMAL) flag
+is set for both threshold values, and the <literal>inf</literal> (RCTL_GLOBAL_INFINITE)
+flag is defined for this resource control. An <literal>inf</literal> value
+has an infinite quantity. The value is never enforced. Hence, as configured,
+both threshold quantities represent infinite values that are never exceeded.</para>
+</sect2><sect2 id="rmctrls-10"><title>Resource Control Enforcement</title><para>More than one resource control can exist on a resource. A resource control
+can exist at each containment level in the process model. If resource controls
+are active on the same resource at different container levels, the smallest
+container's control is enforced first. Thus, action is taken on <literal>process.max-cpu-time</literal> before <literal>task.max-cpu-time</literal> if both controls are
+encountered simultaneously.</para><figure id="rmctrl-fig-11"><title>Process Collectives, Container Relationships,
+and Their Resource Control Sets</title><mediaobject><imageobject><imagedata entityref="rmmultictrl"/>
+</imageobject><textobject><simpara>Diagram shows enforcement of each resource control at
+its containment level.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="rmctrls-11"><title>Global Monitoring of Resource Control Events</title><para>Often, the resource consumption of processes is unknown. To get more
+information, try using the global resource control actions that are available
+with the <command>rctladm</command> command. Use <command>rctladm</command> to
+establish a <literal>syslog</literal> action on a resource control. Then,
+if any entity managed by that resource control encounters a threshold value,
+a system message is logged at the configured logging level. See <olink targetptr="rmctrls.task-1" remap="internal">Chapter&nbsp;7, Administering Resource Controls
+(Tasks)</olink> and the <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</sect2>
+</sect1><sect1 id="rmctrls-12"><title>Applying Resource Controls</title><para>Each resource control listed in <olink targetptr="rmctrls-tbl-5" remap="internal">Table&nbsp;6&ndash;1</olink> can be assigned to a project at login or when <command>newtask</command>, <command>su</command>, or the other project-aware launchers <command>at</command>, <command>batch</command>, or <command>cron</command> are invoked. Each command that
+is initiated is launched in a separate task with the invoking user's default
+project. See the man pages <olink targetdoc="group-refman" targetptr="login-1" remap="external"><citerefentry><refentrytitle>login</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="newtask-1" remap="external"><citerefentry><refentrytitle>newtask</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="at-1" remap="external"><citerefentry><refentrytitle>at</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="cron-1m" remap="external"><citerefentry><refentrytitle>cron</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="su-1m" remap="external"><citerefentry><refentrytitle>su</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> for more information.</para><para>Updates to entries in the <filename>project</filename> database, whether
+to the <filename>/etc/project</filename> file or to a representation of the
+database in a network name service, are not applied to currently active projects.
+The updates are applied when a new task joins the project through login or <command>newtask</command>. </para>
+</sect1><sect1 id="rmctrls-13"><title>Temporarily Updating Resource Control Values
+on a Running System</title><para>Values changed in the <filename>project</filename> database
+only become effective for new tasks that are started in a project. However,
+you can use the <command>rctladm</command> and <command>prctl</command> commands
+to update resource controls on a running system.</para><sect2 id="rmctrls-15"><title>Updating Logging Status</title><para>The <command>rctladm</command> command affects the global logging state
+of each resource control on a system-wide basis. This command can be used
+to view the global state and to set up the level of <literal>syslog</literal> logging
+when controls are exceeded.</para>
+</sect2><sect2 id="rmctrls-14"><title>Updating Resource Controls</title><para>You can view and temporarily alter resource control
+values and actions on a per-process, per-task, or per-project basis by using
+the <command>prctl</command> command. A project, task, or process ID is given
+as input, and the command operates on the resource control at the level where
+the control is defined.</para><para>Any modifications to values and actions take effect immediately. However,
+these modifications apply to the current process, task, or project only. The
+changes are not recorded in the <filename>project</filename> database. If
+the system is restarted, the modifications are lost. Permanent changes to
+resource controls must be made in the <filename>project</filename> database.</para><para>All resource control settings that can be modified in the <filename>project</filename> database can also be modified with the <command>prctl</command> command.
+Both basic and privileged values can be added or be deleted. Their actions
+can also be modified. By default, the basic type is assumed for all set operations,
+but processes and users with superuser privileges can also modify privileged
+resource controls. System resource controls cannot be altered.</para>
+</sect2>
+</sect1><sect1 id="rmctrls-19"><title>Commands Used With Resource Controls</title><para>The commands that are used with resource controls are shown in
+the following table.</para><informaltable frame="all"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="30*"/><colspec colwidth="70*"/><thead><row><entry><para>Command Reference</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="ipcs-1" remap="external"><citerefentry><refentrytitle>ipcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Allows you to observe which IPC objects are contributing to a project's
+usage</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="prctl-1" remap="external"><citerefentry><refentrytitle>prctl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Allows you to make runtime interrogations of and modifications to the
+resource controls facility, with local scope</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> </para>
+</entry><entry><para>Allows you to make runtime interrogations of and modifications to the
+resource controls facility, with global scope</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The <olink targetdoc="group-refman" targetptr="resource-controls-5" remap="external"><citerefentry><refentrytitle>resource_controls</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink> man page describes  resource controls available through
+the project database, including units and scaling factors.</para>
+</sect1>
+</chapter>

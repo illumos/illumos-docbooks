@@ -1,0 +1,713 @@
+<chapter id="gavwg"><title>ZFS
+Troubleshooting and Data Recovery</title><highlights><para>This chapter describes how to identify and recover from ZFS failure
+modes. Information for preventing failures is provided as well.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gbbth" remap="internal">ZFS Failure Modes</olink></para>
+</listitem><listitem><para><olink targetptr="gbbwa" remap="internal">Checking ZFS Data Integrity</olink></para>
+</listitem><listitem><para><olink targetptr="gbbuw" remap="internal">Identifying Problems in ZFS</olink></para>
+</listitem><listitem><para><olink targetptr="gbbve" remap="internal">Repairing a Damaged ZFS Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="gbbvb" remap="internal">Repairing a Missing Device</olink></para>
+</listitem><listitem><para><olink targetptr="gbbvf" remap="internal">Repairing a Damaged Device</olink></para>
+</listitem><listitem><para><olink targetptr="gbbwl" remap="internal">Repairing Damaged Data</olink></para>
+</listitem><listitem><para><olink targetptr="gbbwc" remap="internal">Repairing an Unbootable System</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gbbth"><title>ZFS Failure Modes</title><para>As a combined file system and volume manager, ZFS can exhibit many different
+failure modes. This chapter begins by outlining the various failure modes,
+then discusses how to identify them on a running system. This chapter concludes
+by discussing how to repair the problems. ZFS can encounter three basic types
+of errors:</para><itemizedlist><listitem><para><olink targetptr="gbbxj" remap="internal">Missing Devices in a ZFS Storage
+Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gbbym" remap="internal">Damaged Devices in a ZFS Storage
+Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gbbwx" remap="internal">Corrupted ZFS Data</olink></para>
+</listitem>
+</itemizedlist><para>Note that a single pool can experience all three errors, so a complete
+repair procedure involves finding and correcting one error, proceeding to
+the next error, and so on.</para><sect2 id="gbbxj"><title>Missing Devices in a ZFS Storage Pool</title><para>If a device is completely removed from the system, ZFS detects that
+the device cannot be opened and places it in the <literal>FAULTED</literal> state.
+Depending on the data replication level of the pool, this might or might not
+result in the entire pool becoming unavailable. If one disk in a mirrored
+or RAID-Z device is removed, the pool continues to be accessible. If all components
+of a mirror are removed, if more than one device in a RAID-Z device is removed,
+or if a single-disk, top-level device is removed, the pool becomes <literal>FAULTED</literal>. No data is accessible until the device is reattached.</para>
+</sect2><sect2 id="gbbym"><title>Damaged Devices in a ZFS Storage Pool</title><para>The term &ldquo;damaged&rdquo; covers a wide variety of possible errors.
+Examples include the following errors:</para><itemizedlist><listitem><para>Transient I/O errors due to a bad disk or controller</para>
+</listitem><listitem><para>On-disk data corruption due to cosmic rays</para>
+</listitem><listitem><para>Driver bugs resulting in data being transferred to or from
+the wrong location</para>
+</listitem><listitem><para>Simply another user overwriting portions of the physical device
+by accident</para>
+</listitem>
+</itemizedlist><para>In some cases, these errors are transient, such as a random I/O error
+while the controller is having problems. In other cases, the damage is permanent,
+such as on-disk corruption. Even still, whether the damage is permanent does
+not necessarily indicate that the error is likely to occur again. For example,
+if an administrator accidentally overwrites part of a disk, no type of hardware
+failure has occurred, and the device need not be replaced. Identifying exactly
+what went wrong with a device is not an easy task and is covered in more detail
+in a later section.</para>
+</sect2><sect2 id="gbbwx"><title>Corrupted ZFS Data</title><para>Data corruption occurs when one or more device errors (indicating missing
+or damaged devices) affects a top-level virtual device. For example, one half
+of a mirror can experience thousands of device errors without ever causing
+data corruption. If an error is encountered on the other side of the mirror
+in the exact same location, corrupted data will be the result.</para><para>Data corruption is always permanent and requires special consideration
+during repair. Even if the underlying devices are repaired or replaced, the
+original data is lost forever. Most often this scenario requires restoring
+data from backups. Data errors are recorded as they are encountered, and can
+be controlled through routine disk scrubbing as explained in the following
+section. When a corrupted block is removed, the next scrubbing pass recognizes
+that the corruption is no longer present and removes any trace of the error
+from the system.</para>
+</sect2>
+</sect1><sect1 id="gbbwa"><title>Checking ZFS Data Integrity</title><para>No <command>fsck</command> utility equivalent exists for ZFS. This utility
+has traditionally served two purposes, data repair and data validation.</para><sect2 id="gbbyc"><title>Data Repair</title><para>With traditional file systems, the way in which data is written is inherently
+vulnerable to unexpected failure causing data inconsistencies. Because a traditional
+file system is not transactional, unreferenced blocks, bad link counts, or
+other inconsistent data structures are possible. The addition of journaling
+does solve some of these problems, but can introduce additional problems when
+the log cannot be rolled back. With ZFS, none of these problems exist. The
+only way for inconsistent data to exist on disk is through hardware failure
+(in which case the pool should have been redundant) or a bug in the ZFS software
+exists.</para><para>Given that the <command>fsck</command> utility is designed to repair
+known pathologies specific to individual file systems, writing such a utility
+for a file system with no known pathologies is impossible. Future experience
+might prove that certain data corruption problems are common enough and simple
+enough such that a repair utility can be developed, but these problems can
+always be avoided by using redundant pools.</para><para>If your pool is not redundant, the chance that data corruption can render
+some or all of your data inaccessible is always present.</para>
+</sect2><sect2 id="gbbyd"><title>Data Validation</title><para>In addition to data repair, the <command>fsck</command> utility validates
+that the data on disk has no problems. Traditionally, this task is done by
+unmounting the file system and running the <command>fsck</command> utility,
+possibly taking the system to single-user mode in the process. This scenario
+results in downtime that is proportional to the size of the file system being
+checked. Instead of requiring an explicit utility to perform the necessary
+checking, ZFS provides a mechanism to perform routine checking of all data.
+This functionality, known as <emphasis>scrubbing</emphasis>, is commonly used
+in memory and other systems as a method of detecting and preventing errors
+before they result in hardware or software failure.</para>
+</sect2><sect2 id="gbbxi"><title>Controlling ZFS Data Scrubbing</title><para>Whenever ZFS encounters an error, either through scrubbing or when accessing
+a file on demand, the error is logged internally so that you can get a quick
+overview of all known errors within the pool. </para><sect3 id="gbbws"><title>Explicit ZFS Data Scrubbing</title><para>The simplest way to check your data integrity is to initiate an explicit
+scrubbing of all data within the pool. This operation traverses all the data
+in the pool once and verifies that all blocks can be read. Scrubbing proceeds
+as fast as the devices allow, though the priority of any I/O remains below
+that of normal operations. This operation might negatively impact performance,
+though the file system should remain usable and nearly as responsive while
+the scrubbing occurs. To initiate an explicit scrub, use the <command>zpool
+scrub</command> command. For example:</para><screen># <userinput>zpool scrub tank</userinput></screen><para>The status of the current scrub can be displayed in the <command>zpool
+status</command> output. For example:</para><screen># <userinput>zpool status -v tank</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: scrub completed with 0 errors on Wed Aug 30 14:02:24 2006
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t0d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+
+errors: No known data errors</screen><para>Note that only one active scrubbing operation per pool can occur at
+one time.</para><para>You can stop a scrub that is in progress by using the <option>s</option> option.
+For example:</para><screen># zpool scrub -s tank</screen><para>In most cases, a scrub operation to ensure data integrity should continue
+to completion. Stop a scrub at your own discretion if system performance is
+impacted by a scrub operation.</para><para>Performing routine scrubbing also guarantees continuous I/O to all disks
+on the system. Routine scrubbing has the side effect of preventing power management
+from placing idle disks in low-power mode. If the system is generally performing
+I/O all the time, or if power consumption is not a concern, then this issue
+can safely be ignored.</para><para>For more information about interpreting <command>zpool status</command> output,
+see <olink targetptr="gaynp" remap="internal">Querying ZFS Storage Pool Status</olink>.</para>
+</sect3><sect3 id="gbbya"><title>ZFS Data Scrubbing and Resilvering</title><para>When a device is replaced, a resilvering operation is initiated to move
+data from the good copies to the new device. This action is a form of disk
+scrubbing. Therefore, only one such action can happen at a given time in the
+pool. If a scrubbing operation  is
+in progress, a resilvering operation suspends the current scrubbing, and restarts
+it after the resilvering is complete.</para><para>For more information about resilvering, see <olink targetptr="gbcus" remap="internal">Viewing
+Resilvering Status</olink>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="gbbuw"><title>Identifying Problems in ZFS</title><para>The following sections describe how to identify problems in your ZFS
+file systems or storage pools.</para><itemizedlist><listitem><para><olink targetptr="gbcwb" remap="internal">Determining if Problems Exist in
+a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gbcve" remap="internal">Reviewing zpool status Output</olink></para>
+</listitem><listitem><para><olink targetptr="gbcvk" remap="internal">System Reporting of ZFS Error Messages</olink></para>
+</listitem>
+</itemizedlist><para>You can use the following features to identify problems with your ZFS
+configuration:</para><itemizedlist><listitem><para>Detailed ZFS storage pool information with the <command>zpool
+status</command> command</para>
+</listitem><listitem><para>Pool and device failures are reported with ZFS/FMA diagnostic
+messages</para>
+</listitem><listitem><para>Previous ZFS commands that modified pool state information
+can be displayed with the <command>zpool history</command> command</para>
+</listitem>
+</itemizedlist><para>Most ZFS troubleshooting is centered around the <command>zpool status</command> command.
+This command analyzes the various failures in the system and identifies the
+most severe problem, presenting you with a suggested action and a link to
+a knowledge article for more information. Note that the command only identifies
+a single problem with the pool, though multiple problems can exist. For example,
+data corruption errors always imply that one of the devices has failed. Replacing
+the failed device does not fix the data corruption problems.</para><para>In addition, a ZFS diagnostic engine is provided to diagnose and report
+pool failures and device failures. Checksum, I/O, device, and pool errors
+associated with pool or device failures are also reported. ZFS failures as
+reported by <command>fmd</command> are displayed on the console as well as
+the system messages file. In most cases, the <command>fmd</command> message
+directs you to the <command>zpool status</command> command for further recovery
+instructions.</para><para>The basic recovery process is as follows:</para><itemizedlist><listitem><para>If appropriate, use the <command>zpool history</command> command
+to identify the previous ZFS commands that led up to the error scenario. For
+example:</para><screen># <userinput>zpool history</userinput>
+History for 'tank':
+2007-04-25.10:19:42 zpool create tank mirror c0t8d0 c0t9d0 c0t10d0
+2007-04-25.10:19:45 zfs create tank/erick
+2007-04-25.10:19:55 zfs set checksum=off tank/erick</screen><para>Notice in the above output that checksums are disabled for the <filename>tank/erick</filename> file system. This configuration is not recommended.</para>
+</listitem><listitem><para>Identify the errors through the <command>fmd</command> messages
+that are displayed on the system console or in the <filename>/var/adm/messages</filename> files.</para>
+</listitem><listitem><para>Find further repair instructions in the <command>zpool status
+-x</command> command.</para>
+</listitem><listitem><para>Repair the failures, such as:</para><itemizedlist><listitem><para>Replace the faulted or missing device and bring it online.</para>
+</listitem><listitem><para>Restore the faulted configuration or corrupted data from a
+backup.</para>
+</listitem><listitem><para>Verify the recovery by using the <command>zpool status</command> <option>x</option> command.</para>
+</listitem><listitem><para>Back up your restored configuration, if applicable.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><para>This chapter describes how to interpret <command>zpool status</command> output
+in order to diagnose the type of failure and directs you to one of the following
+sections on how to repair the problem. While most of the work is performed
+automatically by the command, it is important to understand exactly what problems
+are being identified in order to diagnose the type of failure.</para><sect2 id="gbcwb"><title>Determining if Problems Exist in a ZFS Storage Pool</title><para>The easiest way to determine if any known problems exist on the system
+is to use the <command>zpool status</command> <option>x</option> command.
+This command describes only pools exhibiting problems. If no bad pools exist
+on the system, then the command displays a simple message, as follows:</para><screen># <userinput>zpool status -x</userinput>
+all pools are healthy</screen><para>Without the <option>x</option> flag, the command displays the complete
+status for all pools (or the requested pool, if specified on the command line),
+even if the pools are otherwise healthy.</para><para>For more information about command-line options to the <command>zpool
+status</command> command, see <olink targetptr="gaynp" remap="internal">Querying ZFS Storage
+Pool Status</olink>.</para>
+</sect2><sect2 id="gbcve"><title>Reviewing <command>zpool status</command> Output</title><para>The complete <command>zpool status</command> output looks similar to
+the following:</para><screen># <userinput>zpool status tank</userinput>
+  pool: tank
+ state: DEGRADED
+status: One or more devices has been taken offline by the administrator.
+        Sufficient replicas exist for the pool to continue functioning in a
+        degraded state.
+action: Online the device using 'zpool online' or replace the device with
+        'zpool replace'.
+ scrub: none requested
+ config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         DEGRADED     0     0     0
+          mirror     DEGRADED     0     0     0
+            c1t0d0   ONLINE       0     0     0
+            c1t1d0   OFFLINE      0     0     0
+
+errors: No known data errors</screen><para>This output is divided into several sections:</para><sect3 id="gbcvl"><title>Overall Pool Status Information</title><para>This header section in the <command>zpool status</command> output contains
+the following fields, some of which are only displayed for pools exhibiting
+problems:</para><variablelist><varlistentry><term><literal>pool</literal></term><listitem><para>The name of the pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>state</literal></term><listitem><para>The current health of the pool. This information refers only
+to the ability of the pool to provide the necessary replication level. Pools
+that are <literal>ONLINE</literal> might still have failing devices or data
+corruption.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>status</literal></term><listitem><para>A description of what is wrong with the pool. This field is
+omitted if no problems are found.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>action</literal></term><listitem><para>A recommended action for repairing the errors. This field
+is an abbreviated form directing the user to one of the following sections.
+This field is omitted if no problems are found.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>see</literal></term><listitem><para>A reference to a knowledge article containing detailed repair
+information. Online articles are updated more often than this guide can be
+updated, and should always be referenced for the most up-to-date repair procedures.
+This field is omitted if no problems are found.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>scrub</literal></term><listitem><para>Identifies the current status of a scrub operation, which
+might include the date and time that the last scrub was completed, a scrub
+in progress, or if no scrubbing was requested.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>errors</literal></term><listitem><para>Identifies known data errors or the absence of known data
+errors.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="gbcvv"><title>Configuration Information</title><para>The <literal>config</literal> field in the <command>zpool status</command> output
+describes the configuration layout of the devices comprising the pool, as
+well as their state and any errors generated from the devices. The state can
+be one of the following: <literal>ONLINE</literal>, <literal>FAULTED</literal>, <literal>DEGRADED</literal>, <literal>UNAVAILABLE</literal>, or <literal>OFFLINE</literal>.
+If the state is anything but <literal>ONLINE</literal>, the fault tolerance
+of the pool has been compromised.</para><para>The second section of the configuration output displays error statistics.
+These errors are divided into three categories:</para><itemizedlist><listitem><para><literal>READ</literal> &ndash; I/O error occurred while issuing
+a read request.</para>
+</listitem><listitem><para><literal>WRITE</literal> &ndash; I/O error occurred while
+issuing a write request.</para>
+</listitem><listitem><para><literal>CKSUM</literal> &ndash; Checksum error. The device
+returned corrupted data as the result of a read request.</para>
+</listitem>
+</itemizedlist><para>These errors can be used to determine if the damage is permanent. A
+small number of I/O errors might indicate a temporary outage, while a large
+number might indicate a permanent problem with the device. These errors do
+not necessarily correspond to data corruption as interpreted by applications.
+If the device is in a redundant configuration, the disk devices might show
+uncorrectable errors, while no errors appear at the mirror or RAID-Z device
+level. If this scenario is the case, then ZFS successfully retrieved the good
+data and attempted to heal the damaged data from existing replicas.</para><para>For more information about interpreting these errors to determine device
+failure, see <olink targetptr="gbbzs" remap="internal">Determining the Type of Device Failure</olink>.</para><para>Finally, additional auxiliary information is displayed in the last column
+of the <command>zpool status</command> output. This information expands on
+the <literal>state</literal> field, aiding in diagnosis of failure modes.
+If a device is <literal>FAULTED</literal>, this field indicates whether the
+device is inaccessible or whether the data on the device is corrupted. If
+the device is undergoing resilvering, this field displays the current progress.</para><para>For more information about monitoring resilvering progress, see <olink targetptr="gbcus" remap="internal">Viewing Resilvering Status</olink>.</para>
+</sect3><sect3 id="gbcvd"><title>Scrubbing Status</title><para>The third section of the <command>zpool status</command> output describes
+the current status of any explicit  scrubs. This
+information is distinct from whether any errors are detected on the system,
+though this information can be used to determine the accuracy of the data
+corruption error reporting. If the last scrub ended recently, most likely,
+any known data corruption has been discovered.</para><para>For more information about data scrubbing and how to interpret this
+information, see <olink targetptr="gbbwa" remap="internal">Checking ZFS Data Integrity</olink>.</para>
+</sect3><sect3 id="gbcwe"><title>Data Corruption Errors</title><para>The <command>zpool status</command> command also shows whether any known
+errors are associated with the pool. These errors might have been found during
+disk scrubbing or during normal operation. ZFS maintains a persistent log
+of all data errors associated with the pool. This log is rotated whenever
+a complete scrub of the system finishes.</para><para>Data corruption errors are always fatal. Their presence indicates that
+at least one application experienced an I/O error due to corrupt data within
+the pool. Device errors within a redundant pool do not result in data corruption
+and are not recorded as part of this log. By default, only the number of errors
+found is displayed. A complete list of errors and their specifics can be found
+by using the <command>zpool status</command> <option>v</option> option. For
+example:</para><screen># <userinput>zpool status -v</userinput>
+  pool: tank
+ state: DEGRADED
+status: One or more devices has experienced an error resulting in data
+        corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+        entire pool from backup.
+   see: http://www.sun.com/msg/ZFS-8000-8A
+ scrub: resilver completed with 1 errors on Fri Mar 17 15:42:18 2006
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         DEGRADED     0     0     1
+          mirror     DEGRADED     0     0     1
+            c1t0d0   ONLINE       0     0     2
+            c1t1d0   UNAVAIL      0     0     0  corrupted data
+
+errors: The following persistent errors have been detected:
+
+          DATASET  OBJECT  RANGE
+          5        0       lvl=4294967295 blkid=0</screen><para>A similar message is also displayed by <command>fmd</command> on the
+system console and the <filename>/var/adm/messages</filename> file. These
+messages can also be tracked by using the <command>fmdump</command> command.</para><para>For more information about interpreting data corruption errors, see <olink targetptr="gbcuz" remap="internal">Identifying the Type of Data Corruption</olink>.</para>
+</sect3>
+</sect2><sect2 id="gbcvk"><title>System Reporting of ZFS Error Messages</title><para>In addition to persistently keeping track of errors within the pool,
+ZFS also displays syslog messages when events of interest occur. The following
+scenarios generate events to notify the administrator:</para><itemizedlist><listitem><para><emphasis role="strong">Device state transition</emphasis> &ndash;
+If a device becomes <literal>FAULTED</literal>, ZFS logs a message indicating
+that the fault tolerance of the pool might be compromised. A similar message
+is sent if the device is later brought online, restoring the pool to health.</para>
+</listitem><listitem><para><emphasis role="strong">Data corruption</emphasis> &ndash;
+If any data corruption is detected, ZFS logs a message describing when and
+where the corruption was detected. This message is only logged the first time
+it is detected. Subsequent accesses do not generate a message.</para>
+</listitem><listitem><para><emphasis role="strong">Pool failures and device failures</emphasis> &ndash;
+If a pool failure or device failure occurs, the fault manager daemon reports
+these errors through syslog messages as well as the <command>fmdump</command> command.</para>
+</listitem>
+</itemizedlist><para>If ZFS detects a device error and automatically recovers from it, no
+notification occurs. Such errors do not constitute a failure in the pool redundancy
+or data integrity. Moreover, such errors are typically the result of a driver
+problem accompanied by its own set of error messages.</para>
+</sect2>
+</sect1><sect1 id="gbbve"><title>Repairing a Damaged ZFS Configuration</title><para>ZFS maintains a cache of active pools and their configuration on the
+root file system. If this file is corrupted or somehow becomes out of sync
+with what is stored on disk, the pool can no longer be opened. ZFS tries to
+avoid this situation, though arbitrary corruption is always possible given
+the qualities of the underlying file system and storage. This situation typically
+results in a pool disappearing from the system when it should otherwise be
+available. This situation can also manifest itself as a partial configuration
+that is missing an unknown number of top-level virtual devices. In either
+case, the configuration can be recovered by exporting the pool (if it is visible
+at all), and re-importing it.</para><para>For more information about importing and exporting pools, see <olink targetptr="gbchy" remap="internal">Migrating ZFS Storage Pools</olink>.</para>
+</sect1><sect1 id="gbbvb"><title>Repairing a Missing Device</title><para>If a device cannot be opened, it displays as <literal>UNAVAILABLE</literal> in
+the <command>zpool status</command> output. This status means that ZFS was
+unable to open the device when the pool was first accessed, or the device
+has since become unavailable. If the device causes a top-level virtual device
+to be unavailable, then nothing in the pool can be accessed. Otherwise, the
+fault tolerance of the pool might be compromised. In either case, the device
+simply needs to be reattached to the system to restore normal operation.</para><para>For example, you might see a message similar to the following from <command>fmd</command> after a device failure:</para><screen>SUNW-MSG-ID: ZFS-8000-D3, TYPE: Fault, VER: 1, SEVERITY: Major
+EVENT-TIME: Thu Aug 31 11:40:59 MDT 2006
+PLATFORM: SUNW,Sun-Blade-1000, CSN: -, HOSTNAME: tank
+SOURCE: zfs-diagnosis, REV: 1.0
+EVENT-ID: e11d8245-d76a-e152-80c6-e63763ed7e4e
+DESC: A ZFS device failed.  Refer to http://sun.com/msg/ZFS-8000-D3 for more information.
+AUTO-RESPONSE: No automated response will occur.
+IMPACT: Fault tolerance of the pool may be compromised.
+REC-ACTION: Run 'zpool status -x' and replace the bad device.</screen><para>The next step is to use the <command>zpool status</command> <option>x</option> command
+to view more detailed information about the device problem and the resolution.
+For example:</para><screen># <userinput>zpool status -x</userinput>
+  pool: tank
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-D3
+ scrub: resilver completed with 0 errors on Thu Aug 31 11:45:59 MDT 2006
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         DEGRADED     0     0     0
+          mirror     DEGRADED     0     0     0
+            c0t1d0   UNAVAIL      0     0     0  cannot open
+            c1t1d0   ONLINE       0     0     0</screen><para>You can see from this output that the missing device <literal>c0t1d0</literal> is
+not functioning. If you determine that the drive is faulty, replace the device.</para><para>Then, use the <command>zpool online</command> command to online the
+replaced device. For example:</para><screen># <userinput>zpool online tank c0t1d0</userinput></screen><para>Confirm that the pool with the replaced device is healthy.</para><screen># <userinput>zpool status -x tank</userinput>
+pool 'tank' is healthy</screen><sect2 id="gbbxn"><title>Physically Reattaching the Device</title><para>Exactly how a missing device is reattached depends on the device in
+question. If the device is a network-attached drive, connectivity should be
+restored. If the device is a USB or other removable media, it should be reattached
+to the system. If the device is a local disk, a controller might have failed
+such that the device is no longer visible to the system. In this case, the
+controller should be replaced at which point the disks will again be available.
+Other pathologies can exist and depend on the type of hardware and its configuration.
+If a drive fails and it is no longer visible to the system (an unlikely event),
+the device should be treated as a damaged device. Follow the procedures outlined
+in <olink targetptr="gbbvf" remap="internal">Repairing a Damaged Device</olink>.</para>
+</sect2><sect2 id="gbbyi"><title>Notifying ZFS of Device Availability</title><para>Once a device is reattached to the system, ZFS might or might not automatically
+detect its availability. If the pool was previously faulted, or the system
+was rebooted as part of the attach procedure, then ZFS automatically rescans
+all devices when it tries to open the pool. If the pool was degraded and the
+device was replaced while the system was up, you must notify ZFS that the
+device is now available and ready to be reopened by using the <command>zpool
+online</command> command. For example:</para><screen># <userinput>zpool online tank c0t1d0</userinput></screen><para>For more information about bringing devices online, see <olink targetptr="gazgk" remap="internal">Bringing a Device Online</olink>.</para>
+</sect2>
+</sect1><sect1 id="gbbvf"><title>Repairing a Damaged Device</title><para>This section describes how to determine device failure types, clear
+transient errors, and replace a device.</para><sect2 id="gbbzs"><title>Determining the Type of Device Failure</title><para>The term <emphasis>damaged device</emphasis> is rather vague, and can
+describe a number of possible situations:</para><itemizedlist><listitem><para><emphasis role="strong">Bit rot</emphasis> &ndash; Over time,
+random events, such as magnetic influences and cosmic rays, can cause bits
+stored on disk to flip in unpredictable events. These events are relatively
+rare but common enough to cause potential data corruption in large or long-running
+systems. These errors are typically transient.</para>
+</listitem><listitem><para><emphasis role="strong">Misdirected reads or writes</emphasis> &ndash;
+Firmware bugs or hardware faults can cause reads or writes of entire blocks
+to reference the incorrect location on disk. These errors are typically transient,
+though a large number might indicate a faulty drive.</para>
+</listitem><listitem><para><emphasis role="strong">Administrator error</emphasis> &ndash;
+Administrators can unknowingly overwrite portions of the disk with bad data
+(such as copying <filename>/dev/zero</filename> over portions of the disk)
+that cause permanent corruption on disk. These errors are always transient.</para>
+</listitem><listitem><para><emphasis role="strong">Temporary outage</emphasis>&ndash;
+A disk might become unavailable for a period time, causing I/Os to fail. This
+situation is typically associated with network-attached devices, though local
+disks can experience temporary outages as well. These errors might or might
+not be transient.</para>
+</listitem><listitem><para><emphasis role="strong">Bad or flaky hardware</emphasis> &ndash;
+This situation is a catch-all for the various problems that bad hardware exhibits.
+This could be consistent I/O errors, faulty transports causing random corruption,
+or any number of failures. These errors are typically permanent.</para>
+</listitem><listitem><para><emphasis role="strong">Offlined device</emphasis> &ndash;
+If a device is offline, it is assumed that the administrator placed the device
+in this state because it is presumed faulty. The administrator who placed
+the device in this state can determine is this assumption is accurate.</para>
+</listitem>
+</itemizedlist><para>Determining exactly what is wrong can be a difficult process. The first
+step is to examine the error counts in the <command>zpool status</command> output
+as follows:</para><screen># <userinput>zpool status -v</userinput> <replaceable>pool</replaceable></screen><para>The errors are divided into I/O errors and checksum errors, both of
+which might indicate the possible failure type. Typical operation predicts
+a very small number of errors (just a few over long periods of time). If you
+are seeing large numbers of errors, then this situation probably indicates
+impending or complete device failure. However, the pathology for administrator
+error can result in large error counts. The other source of information is
+the system log. If the log shows a large number of SCSI or fibre channel driver
+messages, then this situation probably indicates serious hardware problems.
+If no syslog messages are generated, then the damage is likely transient.</para><para>The goal is to answer the following question:</para><para><emphasis>Is another error likely to occur on this device?</emphasis></para><para>Errors that happen only once are considered <emphasis>transient</emphasis>,
+and do not indicate potential failure. Errors that are persistent or severe
+enough to indicate potential hardware failure are considered &ldquo;fatal.&rdquo;
+The act of determining the type of error is beyond the scope of any automated
+software currently available with ZFS, and so much must be done manually by
+you, the administrator. Once the determination is made, the appropriate action
+can be taken. Either clear the transient errors or replace the device due
+to fatal errors. These repair procedures are described in the next sections.</para><para>Even if the device errors are considered transient, it still may have
+caused uncorrectable data errors within the pool. These errors require special
+repair procedures, even if the underlying device is deemed healthy or otherwise
+repaired. For more information on repairing data errors, see <olink targetptr="gbbwl" remap="internal">Repairing Damaged Data</olink>.</para>
+</sect2><sect2 id="gbbzv"><title>Clearing Transient Errors</title><para>If the device errors are deemed transient, in that they are unlikely
+to effect the future health of the device, then the device errors can be safely
+cleared to indicate that no fatal error occurred. To clear error counters
+for RAID-Z or mirrored devices, use the <command>zpool clear</command> command.
+For example:</para><screen># <userinput>zpool clear tank c1t0d0</userinput></screen><para>This syntax clears any errors associated with the device and clears
+any data error counts associated with the device.</para><para>To clear all errors associated with the virtual devices in the pool,
+and clear any data error counts associated with the pool, use the following
+syntax:</para><screen># <userinput>zpool clear tank</userinput></screen><para>For more information about clearing pool errors, see <olink targetptr="gazge" remap="internal">Clearing Storage Pool Devices</olink>.</para>
+</sect2><sect2 id="gbbzy"><title>Replacing a Device in a ZFS Storage Pool</title><para>If device damage is permanent or future permanent damage is likely,
+the device must be replaced. Whether the device can be replaced depends on
+the configuration.</para><itemizedlist><listitem><para><olink targetptr="gbcfb" remap="internal">Determining if a Device Can Be Replaced</olink></para>
+</listitem><listitem><para><olink targetptr="gbcdv" remap="internal">Devices That Cannot be Replaced</olink></para>
+</listitem><listitem><para><olink targetptr="gbcet" remap="internal">Replacing a Device in a ZFS Storage
+Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gbcus" remap="internal">Viewing Resilvering Status</olink></para>
+</listitem>
+</itemizedlist><sect3 id="gbcfb"><title>Determining if a Device Can Be Replaced</title><para>For a device to be replaced, the pool must be in the <literal>ONLINE</literal> state.
+The device must be part of a redundant configuration, or it must be healthy
+(in the <literal>ONLINE</literal> state). If the disk is part of a redundant
+configuration, sufficient replicas from which to retrieve good data must exist.
+If two disks in a four-way mirror are faulted, then either disk can be replaced
+because healthy replicas are available. However, if two disks in a four-way
+RAID-Z device are faulted, then neither disk can be replaced because not enough
+replicas from which to retrieve data exist. If the device is damaged but otherwise
+online, it can be replaced as long as the pool is not in the <literal>FAULTED</literal> state.
+However, any bad data on the device is copied to the new device unless there
+are sufficient replicas with good data.</para><para>In the following configuration, the disk <literal>c1t1d0</literal> can
+be replaced, and any data in the pool is copied from the good replica, <literal>c1t0d0</literal>.</para><screen>mirror            DEGRADED
+    c1t0d0             ONLINE
+    c1t1d0             FAULTED</screen><para>The disk <literal>c1t0d0</literal> can also be replaced, though no self-healing
+of data can take place because no good replica is available.</para><para>In the following configuration, neither of the faulted disks can be
+replaced. The <literal>ONLINE</literal> disks cannot be replaced either, because
+the pool itself is faulted.</para><screen>raidz             FAULTED
+    c1t0d0             ONLINE
+    c2t0d0             FAULTED
+    c3t0d0             FAULTED
+    c3t0d0             ONLINE</screen><para>In the following configuration, either top-level disk can be replaced,
+though any bad data present on the disk is copied to the new disk.</para><screen>c1t0d0         ONLINE
+c1t1d0         ONLINE</screen><para>If either disk were faulted, then no replacement could be performed
+because the pool itself would be faulted.</para>
+</sect3><sect3 id="gbcdv"><title>Devices That Cannot be Replaced</title><para>If the loss of a device causes the pool to become faulted, or the device
+contains too many data errors in an non-redundant configuration, then the
+device cannot safely be replaced. Without sufficient redundancy, no good data
+with which to heal the damaged device exists. In this case, the only option
+is to destroy the pool and re-create the configuration, restoring your data
+in the process.</para><para>For more information about restoring an entire pool, see <olink targetptr="gbctt" remap="internal">Repairing ZFS Storage Pool-Wide Damage</olink>.</para>
+</sect3><sect3 id="gbcet"><title>Replacing a Device in a ZFS Storage Pool</title><para>Once you have determined that a device can be replaced, use the <command>zpool
+replace</command> command to replace the device. If you are replacing the
+damaged device with another different device, use the following command:</para><screen># <userinput>zpool replace tank c1t0d0 c2t0d0</userinput></screen><para>This command begins migrating data to the new device from the damaged
+device, or other devices in the pool if it is in a redundant configuration.
+When the command is finished, it detaches the damaged device from the configuration,
+at which point the device can be removed from the system. If you have already
+removed the device and replaced it with a new device in the same location,
+use the single device form of the command. For example:</para><screen># <userinput>zpool replace tank c1t0d0</userinput></screen><para>This command takes an unformatted disk, formats it appropriately, and
+then begins resilvering data from the rest of the configuration.</para><para>For more information about the <command>zpool replace</command> command,
+see <olink targetptr="gazgd" remap="internal">Replacing Devices in a Storage Pool</olink>.</para>
+</sect3><sect3 id="gbcus"><title>Viewing Resilvering Status</title><para>The process of replacing a drive can take an extended period of time,
+depending on the size of the drive and the amount of data in the pool. The
+process of moving data from one device to another device is known as <emphasis>resilvering</emphasis>, and can be monitored by using the <command>zpool status</command> command.</para><para>Traditional file systems resilver data at the block level. Because ZFS
+eliminates the artificial layering of the volume manager, it can perform resilvering
+in a much more powerful and controlled manner. The two main advantages of
+this feature are as follows:</para><itemizedlist><listitem><para>ZFS only resilvers the minimum amount of necessary data. In
+the case of a short outage (as opposed to a complete device replacement),
+the entire disk can be resilvered in a matter of minutes or seconds, rather
+than resilvering the entire disk, or complicating matters with &ldquo;dirty
+region&rdquo; logging that some volume managers support. When an entire disk
+is replaced, the resilvering process takes time proportional to the amount
+of data used on disk. Replacing a 500-Gbyte disk can take seconds if only
+a few gigabytes of used space is in the pool.</para>
+</listitem><listitem><para>Resilvering is interruptible and safe. If the system loses
+power or is rebooted, the resilvering process resumes exactly where it left
+off, without any need for manual intervention.</para>
+</listitem>
+</itemizedlist><para>To view the resilvering process, use the <command>zpool status</command> command.
+For example:</para><screen># <userinput>zpool status tank</userinput>
+  pool: tank
+ state: DEGRADED
+reason: One or more devices is being resilvered.
+action: Wait for the resilvering process to complete.
+   see: http://www.sun.com/msg/ZFS-XXXX-08
+ scrub: none requested
+config:
+        NAME                  STATE     READ WRITE CKSUM 
+        tank                  DEGRADED     0     0     0
+          mirror              DEGRADED     0     0     0
+            replacing         DEGRADED     0     0     0  52% resilvered
+              c1t0d0          ONLINE       0     0     0
+              c2t0d0          ONLINE       0     0     0  
+            c1t1d0            ONLINE       0     0     0</screen><para>In this example, the disk <literal>c1t0d0</literal> is being replaced
+by <literal>c2t0d0</literal>. This event is observed in the status output
+by presence of the <emphasis>replacing</emphasis> virtual device in the configuration.
+This device is not real, nor is it possible for you to create a pool by using
+this virtual device type. The purpose of this device is solely to display
+the resilvering process, and to identify exactly which device is being replaced. </para><para>Note that any pool currently undergoing resilvering is placed in the <literal>DEGRADED</literal> state, because the pool cannot provide the desired level
+of redundancy until the resilvering process is complete. Resilvering proceeds
+as fast as possible, though the I/O is always scheduled with a lower priority
+than user-requested I/O, to minimize impact on the system. Once the resilvering
+is complete, the configuration reverts to the new, complete, configuration.
+For example:</para><screen># <userinput>zpool status tank</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: scrub completed with 0 errors on Thu Aug 31 11:20:18 2006
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+
+errors: No known data errors</screen><para>The pool is once again <literal>ONLINE</literal>, and the original bad
+disk (<literal>c1t0d0</literal>) has been removed from the configuration.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="gbbwl"><title>Repairing Damaged Data</title><para>The following sections describe how to identify the type of data corruption
+and how to repair the data, if possible.</para><itemizedlist><listitem><para><olink targetptr="gbcuz" remap="internal">Identifying the Type of Data Corruption</olink></para>
+</listitem><listitem><para><olink targetptr="gbctx" remap="internal">Repairing a Corrupted File or Directory</olink></para>
+</listitem><listitem><para><olink targetptr="gbctt" remap="internal">Repairing ZFS Storage Pool-Wide Damage</olink></para>
+</listitem>
+</itemizedlist><para>ZFS uses checksumming, redundancy, and self-healing data to minimize
+the chances of data corruption. Nonetheless, data corruption can occur if
+the pool isn't redundant, if corruption occurred while the pool was degraded,
+or an unlikely series of events conspired to corrupt multiple copies of a
+piece of data. Regardless of the source, the result is the same: The data
+is corrupted and therefore no longer accessible. The action taken depends
+on the type of data being corrupted, and its relative value. Two basic types
+of data can be corrupted:</para><itemizedlist><listitem><para>Pool metadata &ndash; ZFS requires a certain amount of data
+to be parsed to open a pool and access datasets. If this data is corrupted,
+the entire pool or complete portions of the dataset hierarchy will become
+unavailable.</para>
+</listitem><listitem><para>Object data &ndash; In this case, the corruption is within
+a specific file or directory. This problem might result in a portion of the
+file or directory being inaccessible, or this problem might cause the object
+to be broken altogether.</para>
+</listitem>
+</itemizedlist><para>Data is verified during normal operation as well as through scrubbing.
+For more information about how to verify the integrity of pool data, see <olink targetptr="gbbwa" remap="internal">Checking ZFS Data Integrity</olink>.</para><sect2 id="gbcuz"><title>Identifying the Type of Data Corruption</title><para>By default, the <command>zpool status</command> command shows only that
+corruption has occurred, but not where this corruption occurred. For example:</para><screen># <userinput>zpool status tank -v</userinput>
+   pool: tank
+	 state: ONLINE
+	status: One or more devices has experienced an error resulting in data
+		     corruption.  Applications may be affected.
+	action: Restore the file in question if possible.  Otherwise restore the
+		     entire pool from backup.
+	   see: http://www.sun.com/msg/ZFS-8000-8A
+	 scrub: none requested
+	config:
+
+		NAME         STATE     READ WRITE CKSUM
+		tank         ONLINE       1     0     0
+		  mirror     ONLINE       1     0     0
+		    c2t0d0   ONLINE       2     0     0
+		    c1t1d0   ONLINE       2     0     0
+
+	errors: The following persistent errors have been detected:
+
+		  DATASET  OBJECT  RANGE
+		  tank     6       0-512</screen><screen># <userinput>zpool status</userinput>
+   pool: monkey
+state: ONLINE
+status: One or more devices has experienced an error resulting in data
+         corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+         entire pool from backup.
+    see: http://www.sun.com/msg/ZFS-8000-8A
+scrub: none requested
+config:
+
+         NAME        STATE     READ WRITE CKSUM
+         monkey      ONLINE       0     0     0
+           c1t1d0s6  ONLINE       0     0     0
+           c1t1d0s7  ONLINE       0     0     0
+
+errors: 8 data errors, use '-v' for a list </screen><para>Each error indicates only that an error occurred at the given point
+in time. Each error is not necessarily still present on the system. Under
+normal circumstances, this situation is true. Certain temporary outages might
+result in data corruption that is automatically repaired once the outage ends.
+A complete scrub of the pool is guaranteed to examine every active block in
+the pool, so the error log is reset whenever a scrub finishes. If you determine
+that the errors are no longer present, and you don't want to wait for a scrub
+to complete, reset all errors in the pool by using the <command>zpool online</command> command.</para><para>If the data corruption is in pool-wide metadata, the output is slightly
+different. For example:</para><screen># <userinput>zpool status -v morpheus</userinput>
+  pool: morpheus
+    id: 1422736890544688191
+ state: FAULTED
+status: The pool metadata is corrupted.
+action: The pool cannot be imported due to damaged devices or data.
+   see: http://www.sun.com/msg/ZFS-8000-72
+config:
+
+        morpheus    FAULTED   corrupted data
+          c1t10d0   ONLINE</screen><para>In the case of pool-wide corruption, the pool is placed into the <literal>FAULTED</literal> state, because the pool cannot possibly provide the needed redundancy
+level.</para>
+</sect2><sect2 id="gbctx"><title>Repairing a Corrupted File or Directory</title><para>If a file or directory is corrupted, the system might still be able
+to function depending on the type of corruption. Any damage is effectively
+unrecoverable if no good copies of the data exist anywhere on the system.
+If the data is valuable, you have no choice but to restore the affected data
+from backup. Even so, you might be able to recover from this corruption without
+restoring the entire pool.</para><para>If the damage is within a file data block, then the file can safely
+be removed, thereby clearing the error from the system. Use the <command>zpool
+status</command> <option>v</option> command to display a list of filenames
+with persistent errors. For example:</para><screen># <userinput>zpool status -v</userinput>
+   pool: monkey
+state: ONLINE
+status: One or more devices has experienced an error resulting in data
+         corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+         entire pool from backup.
+    see: http://www.sun.com/msg/ZFS-8000-8A
+scrub: none requested
+config:
+
+         NAME        STATE     READ WRITE CKSUM
+         monkey      ONLINE       0     0     0
+           c1t1d0s6  ONLINE       0     0     0
+           c1t1d0s7  ONLINE       0     0     0
+
+errors: Permanent errors have been detected in the following files: 
+
+/monkey/a.txt
+/monkey/bananas/b.txt
+/monkey/sub/dir/d.txt
+/monkey/ghost/e.txt
+/monkey/ghost/boo/f.txt</screen><para>The preceding output is described as follows:</para><itemizedlist><listitem><para>If the full path to the file is found and the dataset is mounted,
+the full path to the file is displayed. For example:</para><screen>/monkey/a.txt</screen>
+</listitem><listitem><para>If the full path to the file is found, but the dataset is
+not mounted, then the dataset name with no preceding slash (/), followed by
+the path within the dataset to the file, is displayed. For example:</para><screen>monkey/ghost:/e.txt</screen>
+</listitem><listitem><para>If the object number to a file path cannot be successfully
+translated, either due to an error or because the object doesn't have a real
+file path associated with it , as is the case for a <literal>dnode_t</literal>,
+then the dataset name followed by the object's number is displayed. For example:</para><screen>monkey/dnode:&lt;0x0></screen>
+</listitem><listitem><para>If an object in the meta-object set (MOS) is corrupted, then
+a special tag of <literal>&lt;metadata></literal>, followed by the object
+number, is displayed.</para>
+</listitem>
+</itemizedlist><para>If the damage is within a file
+data block, then the file can safely be removed, thereby clearing the error
+from the system. The first step is to try to locate the file by using the <command>find</command> command and specify the object number that is identified in
+the <command>zpool status</command> output under <literal>DATASET/OBJECT/RANGE</literal> output
+as the inode number to find. For example:</para><screen># <userinput>find -inum 6</userinput></screen><para>Then, try removing the file with the <command>rm</command> command.
+If this command doesn't work, the corruption is within the file's metadata,
+and ZFS cannot determine which blocks belong to the file in order to remove
+the corruption.</para><para>If the corruption is within a directory or a file's metadata, the only
+choice is to move the file elsewhere. You can safely move any file or directory
+to a less convenient location, allowing the original object to be restored
+in place.</para>
+</sect2><sect2 id="gbctt"><title>Repairing ZFS Storage Pool-Wide Damage</title><para>If the damage is in pool metadata that damage prevents the pool from
+being opened, then you must restore the pool and all its data from backup.
+The mechanism you use varies widely by the pool configuration and backup strategy.
+First, save the configuration as displayed by <command>zpool status</command> so
+that you can recreate it once the pool is destroyed. Then, use <command>zpool
+destroy</command> <option>f</option> to destroy the pool. Also, keep a file
+describing the layout of the datasets and the various locally set properties
+somewhere safe, as this information will become inaccessible if the pool is
+ever rendered inaccessible. With the pool configuration and dataset layout,
+you can reconstruct your complete configuration after destroying the pool.
+The data can then be populated by using whatever backup or restoration strategy
+you use.</para>
+</sect2>
+</sect1><sect1 id="gbbwc"><title>Repairing an Unbootable System</title><para>ZFS is designed to be robust and stable despite errors. Even so, software
+bugs or certain unexpected pathologies might cause the system to panic when
+a pool is accessed. As part of the boot process, each pool must be opened,
+which means that such failures will cause a system to enter into a panic-reboot
+loop. In order to recover from this situation, ZFS must be informed not to
+look for any pools on startup.</para><para>ZFS maintains an internal cache of available pools and their configurations
+in <filename>/etc/zfs/zpool.cache</filename>. The location and contents of
+this file are private and are subject to change. If the system becomes unbootable,
+boot to the <literal>none</literal> milestone by using the <option>m milestone=none</option> boot option. Once the system is up, remount your root file system
+as writable and then remove <filename>/etc/zfs/zpool.cache</filename>. These
+actions cause ZFS to forget that any pools exist on the system, preventing
+it from trying to access the bad pool causing the problem. You can then proceed
+to a normal system state by issuing the <command>svcadm milestone all</command> command.
+You can use a similar process when booting from an alternate root to perform
+repairs.</para><para>Once the system is up, you can attempt to import the pool by using the <command>zpool import</command> command. However, doing so will likely cause the same
+error that occurred during boot, because the command uses the same mechanism
+to access pools. If more than one pool is on the system and you want to import
+a specific pool without accessing any other pools, you must re-initialize
+the devices  in the damaged
+pool, at which point you can safely import the good pool.</para>
+</sect1>
+</chapter>

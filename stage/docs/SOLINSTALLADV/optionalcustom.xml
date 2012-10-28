@@ -1,0 +1,546 @@
+<chapter id="optionalcustom-29530"><title>Using Optional Custom JumpStart
+Features (Tasks)</title><highlights><para>This chapter describes the optional features that are available to create
+additional custom JumpStart installation tools.</para><itemizedlist><listitem><para><olink targetptr="optionalcustom-59707" remap="internal">Creating Begin Scripts</olink></para>
+</listitem><listitem><para><olink targetptr="optionalcustom-44024" remap="internal">Creating Finish Scripts</olink></para>
+</listitem><listitem><para><olink targetptr="optionalcustom-4" remap="internal">Creating a Compressed
+Configuration File</olink></para>
+</listitem><listitem><para><olink targetptr="optionalcustom-77225" remap="internal">Creating Disk Configuration
+Files</olink></para>
+</listitem><listitem><para><olink targetptr="optionalcustom-73438" remap="internal">Using a Site-Specific
+Installation Program</olink></para>
+</listitem>
+</itemizedlist><note><para>Instructions in this
+chapter are valid for either a SPARC server or an x86 server that is being
+used to provide custom JumpStart files, called a profile server. A profile
+server can provide custom JumpStart files for different platform types. For
+example, a SPARC server can provide custom JumpStart files for both SPARC
+based systems and x86 based systems.</para>
+</note>
+</highlights><sect1 id="optionalcustom-59707"><title>Creating Begin Scripts</title><para>A begin script is a user-defined Bourne shell script that you
+specify in the <filename>rules</filename> file. A begin script performs tasks
+before the Solaris software is installed on a system. You can use begin scripts
+only when using custom JumpStart to install the Solaris software.</para><para>Use a begin script to perform one of the following tasks:</para><itemizedlist><listitem><para>Creating derived profiles</para>
+</listitem><listitem><para>Backing up files before upgrading</para>
+</listitem>
+</itemizedlist><sect2 id="optionalcustom-5"><title>Important Information About Begin Scripts</title><itemizedlist><listitem><para>Do not specify something
+in the script that would prevent the mounting of file systems onto <filename>/a</filename> during
+an initial or upgrade installation. If the JumpStart program cannot mount
+the file systems onto <filename>/a</filename>, an error occurs and installation
+fails.</para>
+</listitem><listitem><para>During the installation, output from the begin script is deposited
+in <filename>/tmp/begin.log</filename>. After the installation is completed,
+the log file is redirected to <filename>/var/sadm/system/logs/begin.log</filename>.</para>
+</listitem><listitem><para>Ensure that <literal>root</literal> owns the begin script and
+that the permissions are set to 644.</para>
+</listitem><listitem><para>You can use custom JumpStart environment variables in your
+begin scripts. For a list of environment variables, see <olink targetptr="jumpstartreference-4" remap="internal">Custom JumpStart Environment Variables</olink>.</para>
+</listitem><listitem><para>Save begin scripts in the JumpStart directory.</para>
+</listitem>
+</itemizedlist><note><para>In prior releases, the <literal>/etc/.NFS4inst_state.domain</literal> file was created by the <filename>sysidnfs4</filename> program. This file would suppress the prompt for an NFSv4 domain
+name during installation. This file is no longer created. Use the <filename>sysidcfg</filename> keyword,  <literal>nfs4_domain</literal>, instead.</para>
+</note>
+</sect2><sect2 id="optionalcustom-44541"><title>Creating Derived Profiles With a Begin
+Script</title><para>A derived profile is a
+profile that is dynamically created by a begin script during a custom JumpStart
+installation. Derived profiles are needed when you cannot set up the <filename>rules</filename> file to match specific systems to a profile. For example, you
+might need to use derived profiles for identical system models that have different
+hardware components, such as systems that contain different frame buffers.</para><para>To set up a rule to use a derived profile, you must perform the following
+tasks:</para><itemizedlist><listitem><para>Set the profile
+field to an equal sign (<literal>=</literal>) instead of a profile. </para>
+</listitem><listitem><para>Set the begin field to a begin script that creates a derived
+profile that depends on the system on which you intend to install Solaris.</para>
+</listitem>
+</itemizedlist><para>When a system matches a
+rule with the profile field equal to an equal sign (<literal>=</literal>),
+the begin script creates the derived profile that is used to install the Solaris
+software on the system. </para><para>The following is an example of a begin script that creates the same
+derived profile every time. You can write a begin script to create different
+derived profiles that depend on the evaluation of rules. </para><example id="optionalcustom-ex-11"><title>Begin Script That Creates a Derived
+Profile</title><programlisting role="complete">#!/bin/sh
+echo "install_type        initial_install"    > ${SI_PROFILE}
+echo "system_type         standalone"        >> ${SI_PROFILE}
+echo "partitioning        default"           >> ${SI_PROFILE}
+echo "cluster             SUNWCprog"         >> ${SI_PROFILE}
+echo "package       SUNWman     delete"      >> ${SI_PROFILE}
+echo "package       SUNWolman   delete"      >> ${SI_PROFILE}
+echo "package       SUNWxwman   delete"      >> ${SI_PROFILE}</programlisting><para>In the example,
+the begin script must use the <envar>SI_PROFILE</envar> environment variable
+for the name of the derived profile, which is set to <filename>/tmp/install.input</filename> by default.    </para>
+</example><note><para>If a begin script is used
+to create a derived profile, ensure the script does not have any errors. A
+derived profile is not verified by the <command>check</command> script because
+derived profiles are not created until the execution of the begin script.
+ </para>
+</note>
+</sect2>
+</sect1><sect1 id="optionalcustom-44024"><title>Creating Finish Scripts</title><para>A finish script is a user-defined
+Bourne shell script that you specify in the <filename>rules</filename> file.
+A finish script performs tasks after the Solaris software is installed on
+a system, but before the system reboots. You can use finish scripts only when
+using custom JumpStart to install Solaris.</para><para>Tasks that you can perform with a finish script include the following:</para><itemizedlist><listitem><para>Adding files</para>
+</listitem><listitem><para>Adding individual packages or patches in addition to the ones
+that are installed in a particular software group</para>
+</listitem><listitem><para>Customizing the root environment</para>
+</listitem><listitem><para>Setting the system's root password</para>
+</listitem><listitem><para>Installing additional software</para>
+</listitem>
+</itemizedlist><sect2 id="optionalcustom-8"><title>Important Information About Finish Scripts</title><itemizedlist><listitem><para>The Solaris installation program mounts the system's file systems
+on <filename>/a</filename>. The file systems remain mounted on <filename>/a</filename> until
+the system reboots. You can use the finish script to add, change, or remove
+files from the newly installed file system hierarchy by modifying the file
+systems that are respective to <filename>/a</filename>. </para>
+</listitem><listitem><para>During the installation, output from
+the finish script is deposited in <filename>/tmp/finish.log</filename>. After
+the installation is completed, the log file is redirected to <filename>/var/sadm/system/logs/finish.log</filename>. </para>
+</listitem><listitem><para>Ensure that <literal>root</literal> owns
+the finish script and that the permissions are set to 644.</para>
+</listitem><listitem><para>You can use custom JumpStart environment variables in your
+finish scripts. For a list of environment variables, see <olink targetptr="jumpstartreference-4" remap="internal">Custom JumpStart Environment Variables</olink>.</para>
+</listitem><listitem><para>Save finish scripts in the JumpStart directory.</para>
+</listitem>
+</itemizedlist>
+</sect2><task id="optionalcustom-1"><title>To Add Files With a Finish Script</title><tasksummary><para>Through a finish script, you can add files from the JumpStart directory
+to an already installed system. You can add the files because the JumpStart
+directory is mounted on the directory that is specified by the <envar>SI_CONFIG_DIR</envar> variable. The directory is set to <filename>/tmp/install_config</filename> by
+default. </para><note><para>You can also replace files by copying files from the JumpStart
+directory to already existing files on the installed system.</para>
+</note>
+</tasksummary><procedure><step id="optionalcustom-step-6a"><para>Copy all of the files that you are adding to the installed system
+to the JumpStart directory.</para>
+</step><step id="optionalcustom-step-2"><para>Insert the following line in the finish
+script for each file that you want to be copied to the newly installed file
+system hierarchy:</para><programlisting role="complete">cp ${SI_CONFIG_DIR}/<replaceable>file_name</replaceable> /a/<replaceable>path_name</replaceable></programlisting>
+</step>
+</procedure><example id="egyrk"><title>Adding a File With a Finish Script</title><para>For example, assume you have a special application, <literal>site_prog</literal>,
+developed for all users at your site. If you place a copy of <literal>site_prog</literal> into
+the JumpStart directory, the following line in a finish script copies <literal>site_prog</literal> from the JumpStart directory into a system's <filename>/usr/bin</filename> directory: </para><programlisting role="complete">cp ${SI_CONFIG_DIR}/site_prog  /a/usr/bin</programlisting>
+</example>
+</task><sect2 id="optionalcustom-11"><title>Adding Packages or Patches With a Finish
+Script</title><para>You can create a finish script to automatically add packages or patches
+after the Solaris software is installed on a system. By adding packages with
+a finish script, you reduce time and ensure consistency in which packages
+and patches are installed on different systems at your site.</para><para>When you use
+the <olink targetdoc="refman1m" targetptr="pkgadd-1m" remap="external"><citerefentry><refentrytitle>pkgadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> or <olink targetdoc="refman1m" targetptr="patchadd-1m" remap="external"><citerefentry><refentrytitle>patchadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> commands
+in finish scripts, use the <option>R</option> option to specify <filename>/a</filename> as
+the root path. </para><itemizedlist><listitem><para><olink targetptr="optionalcustom-ex-3" remap="internal">Example 4&ndash;3</olink> shows
+an example of a finish script that adds packages. </para>
+</listitem><listitem><para><olink targetptr="optionalcustom-ex-30" remap="internal">Example 4&ndash;4</olink> shows
+an example of a finish script that adds patches.</para>
+</listitem>
+</itemizedlist><example id="optionalcustom-ex-3"><title>Adding Packages With a Finish Script</title><programlisting role="complete">  #!/bin/sh
+ 
+  BASE=/a
+  MNT=/a/mnt
+  ADMIN_FILE=/a/tmp/admin
+ 
+  mkdir ${MNT}
+  mount -f nfs sherlock:/export/package ${MNT}
+  cat >${ADMIN_FILE} &lt;&lt;DONT_ASK
+  mail=root
+  instance=overwrite
+  partial=nocheck
+  runlevel=nocheck
+  idepend=nocheck
+  rdepend=nocheck
+  space=ask
+  setuid=nocheck
+  conflict=nocheck
+  action=nocheck
+  basedir=default
+  DONT_ASK
+ 
+  /usr/sbin/pkgadd -a ${ADMIN_FILE} -d ${MNT} -R ${BASE} SUNWxyz 
+  umount ${MNT}
+  rmdir ${MNT}</programlisting><para>The following describes some commands for this example.</para><itemizedlist><listitem><para>The following command mounts a directory on a server that
+contains the package to install.</para><screen>mount -f nfs sherlock:/export/package ${MNT}</screen>
+</listitem><listitem><para>The following command creates a temporary package administration
+file, <filename>admin</filename>, to force the <olink targetdoc="refman1m" targetptr="pkgadd-1m" remap="external"><citerefentry><refentrytitle>pkgadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command not to perform checks
+or prompt for questions when installing a package. Use the temporary package
+administration file to maintain a hands-off installation when you are adding
+packages.</para><screen>cat >${ADMIN_FILE} &lt;&lt;DONT_ASK</screen>
+</listitem><listitem><para>The following <command>pkgadd</command> command adds the package
+by using the <option>a</option> option, specifying the package administration
+file, and the <option>R</option> option, specifying the root path.</para><screen>/usr/sbin/pkgadd -a ${ADMIN_FILE} -d ${MNT} -R ${BASE} SUNWxyz</screen>
+</listitem>
+</itemizedlist>
+</example><example width="100" id="optionalcustom-ex-30"><title>Adding Patches With
+a Finish Script</title><programlisting width="80100" role="complete"> #!/bin/sh 
+
+########
+#
+# USER-CONFIGURABLE OPTIONS
+#
+########
+
+# The location of the patches to add to the system after it's installed.
+# The OS rev (5.x) and the architecture (`mach`) will be added to the
+# root.  For example, /foo on a 8 SPARC would turn into /foo/5.8/sparc
+LUPATCHHOST=ins3525-svr
+LUPATCHPATHROOT=/export/solaris/patchdb
+#########
+#
+# NO USER-SERVICEABLE PARTS PAST THIS POINT
+#
+#########
+
+BASEDIR=/a
+
+# Figure out the source and target OS versions
+echo Determining OS revisions...
+SRCREV=`uname -r`
+echo Source $SRCREV
+
+LUPATCHPATH=$LUPATCHPATHROOT/$SRCREV/`mach`
+
+#
+# Add the patches needed
+#
+echo Adding OS patches
+mount $LUPATCHHOST:$LUPATCHPATH /mnt >/dev/null 2>&amp;1
+if [ $? = 0 ] ; then
+	for patch in `cat /mnt/*Recommended/patch_order` ; do
+		(cd /mnt/*Recommended/$patch ; echo yes | patchadd -u -d -R $BASEDIR .)
+	done
+	cd /tmp
+	umount /mnt
+else
+	echo "No patches found"
+if</programlisting>
+</example><note><para>In the past, the <olink targetdoc="refman1m" targetptr="chroot-1m" remap="external"><citerefentry><refentrytitle>chroot</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+was used with the <command>pkgadd</command> and <command>patchadd</command> commands
+in the finish script environment. In rare instances, some packages or patches
+do not work with the <option>R</option> option. You must create a dummy <filename>/etc/mnttab</filename> file in the <filename>/a</filename> root path before
+issuing the <command>chroot</command> command.</para><para>To create a dummy <filename>/etc/mnttab</filename> file, add the
+following line to your finish script: </para><programlisting>cp /etc/mnttab /a/etc/mnttab</programlisting>
+</note>
+</sect2><sect2 id="optionalcustom-12"><title>Customizing the Root Environment With
+a Finish Script</title><para>You can also use finish scripts
+to customize files that are already installed on a system. For example, the
+finish script in <olink targetptr="optionalcustom-ex-4" remap="internal">Example 4&ndash;5</olink> customizes
+the root environment by appending information to the <filename>.cshrc</filename> file
+in the root (<filename>/</filename>) directory.</para><example id="optionalcustom-ex-4"><title>Customizing the Root Environment
+With a Finish Script</title><programlisting role="complete">#!/bin/sh
+#
+# Customize root's environment
+#
+echo "***adding customizations in /.cshrc"
+test -f a/.cshrc || {
+cat >> a/.cshrc &lt;&lt;EOF
+set history=100 savehist=200 filec ignoreeof prompt="\$user@`uname -n`> "
+alias cp cp -i
+alias mv mv -i
+alias rm rm -i
+alias ls ls -FC
+alias h history
+alias c clear
+unset autologout
+EOF
+}</programlisting>
+</example>
+</sect2><sect2 id="optionalcustom-13"><title>Setting a System's Root Password With
+a Finish Script</title><para>After the Solaris software is installed on a system, the system
+reboots. Before the boot process is completed, the system prompts for the
+root password. Until someone types a password, the system cannot finish booting.</para><para>A finish script that is named <filename>set_root_pw</filename> is saved
+in the <filename>auto_install_sample</filename> directory.  The finish script
+shows how to set the root password automatically, without prompting. <filename>set_root_pw</filename> is shown in <olink targetptr="optionalcustom-ex-5" remap="internal">Example 4&ndash;6</olink>.</para><note><para>If you set the system's root password with a finish script, users
+might attempt to discover the root password from the encrypted password in
+your finish script.  Ensure that you safeguard against users who might try
+to determine the root password. </para>
+</note><example id="optionalcustom-ex-5"><title>Setting the System's Root Password
+With a Finish Script</title><programlisting width="100" role="complete">	 #!/bin/sh
+	 #
+	 #       @(#)set_root_pw 1.4 93/12/23 SMI
+	 #
+	 # This is an example Bourne shell script to be run after installation.
+	 # It sets the system's root password to the entry defined in PASSWD.
+	 # The encrypted password is obtained from an existing root password entry
+	 # in /etc/shadow from an installed machine.
+ 
+	 echo "setting password for root"
+ 
+	 # set the root password
+ PASSWD=dKO5IBkSF42lw
+	 #create a temporary input file
+ cp /a/etc/shadow /a/etc/shadow.orig
+ 
+	 mv /a/etc/shadow /a/etc/shadow.orig
+ 	nawk -F: '{
+         if ( $1 == "root" )
+           printf"%s:%s:%s:%s:%s:%s:%s:%s:%s\n",$1,passwd,$3,$4,$5,$6,$7,$8,$9
+      else
+		        printf"%s:%s:%s:%s:%s:%s:%s:%s:%s\n",$1,$2,$3,$4,$5,$6,$7,$8,$9
+      }' passwd="$PASSWD" /a/etc/shadow.orig > /a/etc/shadow
+ #remove the temporary file
+ rm -f /a/etc/shadow.orig
+ # set the flag so sysidroot won't prompt for the root password
+ sed -e 's/0 # root/1 # root/' ${SI_SYS_STATE} > /tmp/state.$$
+  mv /tmp/state.$$ ${SI_SYS_STATE}</programlisting><para>The following describes some of the commands in this example.</para><itemizedlist><listitem><para>The following command sets the variable <envar>PASSWD</envar> to
+an encrypted root password that is obtained from an existing entry in a system's <filename>/etc/shadow</filename> file.</para><screen>#create a temporary input file</screen>
+</listitem><listitem><para>The following command creates a temporary input file of <filename>/a/etc/shadow</filename>.</para><screen>cp /a/etc/shadow /a/etc/shadow.orig</screen>
+</listitem><listitem><para>The following command changes the root entry in the <filename>/etc/shadow</filename> file for the newly installed system by using <envar>$PASSWD</envar> as
+the password field.</para><screen>if ( $1 == "root" )</screen>
+</listitem><listitem><para>The following command removes the temporary <filename>/a/etc/shadow</filename> file.</para><screen>rm -f /a/etc/shadow.orig</screen>
+</listitem><listitem><para>The following command changes the entry from <literal>0</literal> to
+a <literal>1</literal> in the state file so that the user is not prompted
+for the root password. The state file is accessed by using the variable <envar>SI_SYS_STATE</envar>, which has a value currently of <filename>/a/etc/.sysIDtool.state</filename>.
+To avoid problems with your scripts if this value changes, always reference
+this file by using <envar>$SI_SYS_STATE</envar>. The <command>sed</command> command
+that is shown here contains a tab character after the <literal>0</literal> and
+after the <literal>1</literal>.</para><screen>sed -e 's/0 # root/1 # root/' ${SI_SYS_STATE} > /tmp/state.$$</screen>
+</listitem>
+</itemizedlist>
+</example>
+</sect2><sect2 id="optionalcustom-2"><title>Non-Interactive Installations With Finish
+Scripts</title><para>You can use finish scripts to install additional software after the
+Solaris OS is installed. The Solaris installation program  prompts you to enter information during
+the installation. To maintain a hands-off installation, you can run the Solaris installation program  with
+the <option>nodisplay</option> or <option>noconsole</option> options.</para><table frame="topbot" id="webstart-tbl-110"><title>Solaris Installation Options</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="33.68*"/><colspec colwidth="66.32*"/><thead><row rowsep="1"><entry><para>Option</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><option>nodisplay</option></para>
+</entry><entry><para>Runs the installer without a graphic user interface.  Use the  default
+ product installation unless the installation was modified by the <option>locales</option> option.</para>
+</entry>
+</row><row><entry><para><option>noconsole</option></para>
+</entry><entry><para>Runs the installation without any interactive text console device. 
+  Useful when paired with <option>nodisplay</option> for UNIX script use.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>For more information, see the man page <olink targetdoc="refman1m" targetptr="installer-1m" remap="external"><citerefentry><refentrytitle>installer</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. </para>
+</sect2>
+</sect1><sect1 id="optionalcustom-4"><title>Creating a Compressed Configuration File</title><para>Instead of using the <command>add_install_client</command> command to
+specify the location of the custom JumpStart configuration files, you can
+specify the location of the files when you boot the system. However, you can
+only specify the name of one file. As a result, you must compress all of the
+custom JumpStart configuration files into one file. </para><itemizedlist><listitem><para><emphasis role="strong">For SPARC based systems</emphasis>,
+you specify the location of the file in the <command>boot</command> command </para>
+</listitem><listitem><para><emphasis role="strong">For x86 based systems</emphasis>,
+you specify the location of the files by editing the GRUB entry in the GRUB
+menu</para>
+</listitem>
+</itemizedlist><para>The compressed configuration file can be one of the following types:</para><itemizedlist><listitem><para><filename>tar</filename></para>
+</listitem><listitem><para>Compressed <filename>tar</filename></para>
+</listitem><listitem><para><filename>zip</filename></para>
+</listitem><listitem><para><command>bzip</command> <filename>tar</filename></para>
+</listitem>
+</itemizedlist><task id="optionalcustom-5a"><title>To Create a Compressed Configuration File</title><procedure><step id="optionalcustom-step-7"><para>Change the directory to the JumpStart
+directory on the profile server.</para><screen># <userinput>cd <replaceable>jumpstart_dir_path</replaceable></userinput></screen>
+</step><step id="optionalcustom-step-8"><para>Use a compression tool to compress
+the custom JumpStart configuration files into one file.</para><note><para>The compressed configuration file cannot contain relative paths.
+The custom JumpStart configuration files must be in the same directory as
+the compressed file.</para>
+</note><para>The compressed configuration file must contain the following files:</para><itemizedlist><listitem><para>Profile</para>
+</listitem><listitem><para><filename>rules</filename></para>
+</listitem><listitem><para><filename>rules.ok</filename></para>
+</listitem>
+</itemizedlist><para>You can also include the <filename>sysidcfg</filename> file in the compressed
+configuration file.</para>
+</step><step id="optionalcustom-step-9"><para>Save the compressed configuration file
+on an NFS server, an HTTP server, or on a local hard disk.</para>
+</step>
+</procedure>
+</task><sect2 id="optionalcustom-10"><title>Compressed Configuration File Example</title><para>The following example shows how to use the <command>tar</command> command
+to create a compressed configuration file that is named <filename>config.tar</filename>.
+The custom JumpStart configuration files are located in the <filename>/jumpstart</filename> directory.</para><example id="optionalcustom-ex-12"><title>Creating a Compressed Configuration
+File</title><screen># <userinput>cd /jumpstart</userinput>
+# <userinput>tar -cvf config.tar *</userinput>
+a profile 1K
+a rules 1K
+a rules.ok 1K
+a sysidcfg 1K</screen>
+</example>
+</sect2>
+</sect1><sect1 id="optionalcustom-77225"><title>Creating Disk Configuration Files</title><para>This section describes how to create single-disk
+and multiple-disk configuration files. Disk configuration files enable you
+to use <olink targetdoc="refman1m" targetptr="pfinstall-1m" remap="external"><citerefentry><refentrytitle>pfinstall</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> from
+a single system to test profiles against different disk configurations.</para><task id="optionalcustom-63517" arch="sparc"><title>To Create a Disk Configuration
+File</title><procedure><step id="optionalcustom-step-15"><para>Locate a SPARC based system with a disk you want to
+test.</para>
+</step>&suStepA;<step id="optionalcustom-step-16"><para>Create a single&ndash;disk configuration file
+by redirecting the output of the <olink targetdoc="refman1m" targetptr="prtvtoc-1m" remap="external"><citerefentry><refentrytitle>prtvtoc</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to a file.</para><screen># <userinput>prtvtoc /dev/rdsk/</userinput><replaceable>device_name</replaceable> <userinput>></userinput><replaceable>disk_config_file</replaceable></screen><variablelist><varlistentry><term><filename>/dev/rdsk/</filename><replaceable>device_name</replaceable></term><listitem><para>The device name of the system's disk. <replaceable>device_name</replaceable> must
+be in the form <literal>c</literal><replaceable>w</replaceable><literal>t</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s2</literal> or <literal>c</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s2</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>disk_config_file</replaceable></term><listitem><para>The name of the disk configuration file.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="optionalcustom-step-17"><para>Determine if you are testing the installation
+of Solaris software on multiple disks.</para><itemizedlist><listitem><para>If no, stop. You are finished.</para>
+</listitem><listitem><para>If yes, concatenate the single&ndash;disk configuration files
+and save the output in a new file.</para><screen># <userinput>cat</userinput> <replaceable>disk_file1 disk_file2</replaceable> <userinput>></userinput><replaceable>multi_disk_config</replaceable></screen><para>The new file becomes the multiple-disk configuration file, as in the
+following example.</para><screen># <userinput>cat 104_disk2 104_disk3 104_disk5 >multi_disk_test</userinput></screen>
+</listitem>
+</itemizedlist>
+</step><step id="optionalcustom-step-18"><para>Determine if the target numbers in
+the disk device names are unique in the multiple-disk configuration file that
+you created in the previous step.</para><itemizedlist><listitem><para>If yes, stop. You are finished.</para>
+</listitem><listitem><para>If no, open the file with a text editor and make the target
+numbers unique in the disk device names.</para><para>For example, assume that
+the file contains the same target number, <literal>t0</literal>, for different
+disk device names, as shown here.</para><programlisting role="complete">* /dev/rdsk/c0t0d0s2 partition map
+...
+* /dev/rdsk/c0t0d0s2 partition map</programlisting><para>Change the second target number to <literal>t2</literal>, as shown here:</para><programlisting role="complete">* /dev/rdsk/c0t0d0s2 partition map
+...
+* /dev/rdsk/c0t2d0s2 partition map</programlisting>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task><sect2 id="optionalcustom-20" arch="sparc"><title>Disk Configuration File
+Example</title><para>The following example shows how to create a single&ndash;disk configuration
+file, <filename>104_test</filename>, on a SPARC based system with a 104-Mbyte
+disk.</para><example id="optionalcustom-ex-13" arch="sparc"><title>Creating a Disk Configuration
+File</title><para>You redirect the output of the <command>prtvtoc</command> command to
+a single&ndash;disk configuration file that is named <filename>104_test</filename>:</para><screen># <userinput>prtvtoc /dev/rdsk/c0t3d0s2 >104_test</userinput></screen><para>The contents of the <filename>104_test</filename> file resemble the
+following:</para><programlisting width="100" role="complete">* /dev/rdsk/c0t3d0s2 partition map
+*
+* Dimensions:
+*     512 bytes/sector
+*      72 sectors/track
+*      14 tracks/cylinder
+*    1008 sectors/cylinder
+*    2038 cylinders*    2036 accessible cylinders
+* Flags:
+*   1: unmountable
+*  10: read-only
+*
+*                          First     Sector    Last
+* Partition  Tag  Flags    Sector     Count    Sector  Mount Directory
+       1      2    00          0     164304   164303   /
+       2      5    00          0    2052288  2052287  
+       3      0    00     164304     823536   987839   /disk2/b298
+       5      0    00     987840     614880  1602719   /install/298/sparc/work
+       7      0    00    1602720     449568  2052287   /space</programlisting><para>You have created disk configuration files for a SPARC based system. <olink targetptr="preparecustom-25808" remap="internal">Testing a Profile</olink> contains information
+about using disk configuration files to test profiles.</para>
+</example>
+</sect2><task id="optionalcustom-35662" arch="x86"><title>To Create a Disk Configuration
+File</title><procedure><step id="optionalcustom-step-22"><para>Locate an x86 based system
+that contains a disk that you are testing.</para>
+</step>&suStepA;<step id="optionalcustom-step-23"><para>Create part
+of the single-disk configuration file by saving the output of the <olink targetdoc="refman1m" targetptr="fdisk-1m" remap="external"><citerefentry><refentrytitle>fdisk</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command in a file.</para><screen># <userinput>fdisk -R -W</userinput> <replaceable>disk_config_file</replaceable> <userinput>-h /dev/rdsk/</userinput><replaceable>device_name</replaceable></screen><variablelist><varlistentry><term><replaceable>disk_config_file</replaceable></term><listitem><para>The name of a disk configuration file.</para>
+</listitem>
+</varlistentry><varlistentry><term><filename>/dev/rdsk/</filename><replaceable>device_name</replaceable></term><listitem><para>The device name of the <command>fdisk</command> layout of
+the entire disk. <replaceable>device_name</replaceable> must be in the form <literal>c</literal><replaceable>w</replaceable><literal>t</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s0</literal> or <literal>c</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s0</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="optionalcustom-step-24"><para>Append the output of the <olink targetdoc="refman1m" targetptr="prtvtoc-1m" remap="external"><citerefentry><refentrytitle>prtvtoc</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to the disk configuration
+file: </para><screen># <userinput>prtvtoc /dev/rdsk/</userinput><replaceable>device_name</replaceable> <userinput>>></userinput><replaceable>disk_config</replaceable></screen><variablelist><varlistentry><term><filename>/dev/rdsk/</filename><replaceable>device_name</replaceable></term><listitem><para>The device name of the system's disk. <replaceable>device_name</replaceable> must
+be in the form <literal>c</literal><replaceable>w</replaceable><literal>t</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s2</literal> or <literal>c</literal><replaceable>x</replaceable><literal>d</literal><replaceable>y</replaceable><literal>s2</literal>. </para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>disk_config</replaceable></term><listitem><para>The name of the disk configuration file.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="optionalcustom-step-25"><para>Determine if you are testing the installation
+of Solaris software on multiple disks.</para><itemizedlist><listitem><para>If no, stop. You are finished. </para>
+</listitem><listitem><para>If yes, concatenate the single-disk configuration files and
+save the output in a new file.</para><screen># <userinput>cat</userinput> <replaceable>disk_file1 disk_file2</replaceable> <userinput>></userinput><replaceable>multi_disk_config</replaceable></screen><para>The new file becomes the multiple-disk configuration file, as in the
+following example.</para><screen># <userinput>cat 104_disk2 104_disk3 104_disk5 >multi_disk_test</userinput></screen>
+</listitem>
+</itemizedlist>
+</step><step id="optionalcustom-step-6"><para>Determine if the target numbers in
+the disk device names are unique in the multiple-disk configuration file that
+you created in the previous step.</para><itemizedlist><listitem><para>If yes, stop. You are finished.</para>
+</listitem><listitem><para>If no, open the file with a text editor and make the target
+numbers unique.</para><para>For example, the file might contain the same target
+number, <literal>t0</literal>, for different disk device names as shown here:</para><programlisting role="complete">* /dev/rdsk/c0t0d0s2 partition map
+...
+* /dev/rdsk/c0t0d0s2 partition map</programlisting><para>Change the second target number to <literal>t2</literal>, as shown here:</para><programlisting role="complete">* /dev/rdsk/c0t0d0s2 partition map
+...
+* /dev/rdsk/c0t2d0s2 partition map</programlisting>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task><sect2 id="optionalcustom-28" arch="x86"><title>Disk Configuration File Example</title><para>The following example shows how to create a single-disk configuration
+file, <filename>500_test</filename>, on an x86 based system that contains
+a 500-Mbyte disk. </para><example id="optionalcustom-ex-14" arch="x86"><title>Creating a Disk Configuration
+File</title><para>First, you save the output of the <command>fdisk</command> command to
+a file that is named <filename>500_test</filename>: </para><screen># <userinput>fdisk -R -W 500_test -h /dev/rdsk/c0t0d0p0</userinput></screen><para>The <filename>500_test</filename> file looks like the following:</para><programlisting width="100" role="complete"> * /dev/rdsk/c0t0d0p0 default fdisk table
+* Dimensions:
+*     512 bytes/sector
+*      94 sectors/track
+*      15 tracks/cylinder
+*    1455 cylinders
+*
+*  HBA Dimensions:
+*     512 bytes/sector
+*      94 sectors/track
+*      15 tracks/cylinder
+*    1455 cylinders
+*
+* systid:
+*  1:    DOSOS12
+*  2:    PCIXOS
+*  4:    DOSOS16
+*  5:    EXTDOS
+*  6:    DOSBIG
+*  86:   DOSDATA
+*  98:   OTHEROS
+*  99:   UNIXOS
+* 130:   SUNIXOS
+*
+* Id  Act Bhead Bsect   Bcyl  Ehead  Esect  Ecyl Rsect  Numsect
+ 130  128 44    3       0     46    30     1001 1410   2050140</programlisting><para>Second, you append the output of the <command>prtvtoc</command> command
+to the <filename>500_test</filename> file: </para><screen># <userinput>prtvtoc /dev/rdsk/c0t0d0s2 >>500_test</userinput></screen><para>The <filename>500_test</filename> file is now a complete disk configuration
+file:</para><programlisting width="100" role="complete">* /dev/rdsk/c0t0d0p0 default fdisk table	
+* Dimensions:
+*     512 bytes/sector
+*      94 sectors/track
+*      15 tracks/cylinder
+*    1455 cylinders
+*
+*  HBA Dimensions:
+*     512 bytes/sector
+*      94 sectors/track
+*      15 tracks/cylinder
+*    1455 cylinders
+*
+* systid:
+*  1:    DOSOS12
+*  2:    PCIXOS
+*  4:    DOSOS16
+*  5:    EXTDOS
+*  6:    DOSBIG
+*  86:   DOSDATA
+*  98:   OTHEROS
+*  99:   UNIXOS
+*  130:  SUNIXOS
+*
+* Id  Act Bhead Bsect Bcyl  Ehead  Esec  Ecyl Rsect  Numsect
+ 130  128 44    3     0     46    30    1001 1410   2050140
+* /dev/rdsk/c0t0d0s2 partition map
+*
+* Dimensions:
+*      512 bytes/sector
+*       94 sectors/track
+*       15 tracks/cylinder
+*     1110 sectors/cylinder
+*     1454 cylinders
+*     1452 accessible cylinders
+*
+* Flags:
+*   1: unmountable
+*  10: read-only
+*                          First    Sector    Last
+* Partition  Tag  Flags    Sector     Count    Sector  Mount Directory
+       2      5    01       1410   2045910   2047319
+       7      6    00       4230   2043090   2047319  /space
+       8      1    01          0      1410     1409
+       9      9    01       1410      2820     422987</programlisting><para>You have created disk configuration files for an x86 based system. <olink targetptr="preparecustom-25808" remap="internal">Testing a Profile</olink> contains information
+about using disk configuration files to test profiles.</para>
+</example>
+</sect2>
+</sect1><sect1 id="optionalcustom-73438"><title>Using a Site-Specific Installation
+Program</title><para>You can also use begin and finish scripts to create your own installation
+program to install Solaris software.</para><para>When you specify a minus sign (<literal>-</literal>)
+in the profile field, begin and finish scripts control how Solaris software
+is installed on a system instead of the profile and the Solaris installation
+program.  </para><para>For example, if the following rule matches a system, the <filename>x_install.beg</filename> begin script and the <filename>x_install.fin</filename> finish
+script install Solaris software on the system that is named <literal>clover</literal>:</para><programlisting role="complete">hostname clover x_install.beg - x_install.fin</programlisting>
+</sect1>
+</chapter>

@@ -1,0 +1,1144 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Modifying Data Stored in Kernel Memory - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="dataondemand.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="eoqrv.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<p class="toc level2"><a href="fahrt.html">Displaying Data Stored in Kernel Memory</a></p>
+<p class="toc level2"><a href="dataondemand.html">Displaying Data on Demand</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Modifying Data Stored in Kernel Memory</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="ffdqq"></a><h3>Modifying Data Stored in Kernel Memory</h3>
+<a name="indexterm-422"></a><p><a name="indexterm-423"></a>In this third version of the Quote Of The Day driver, the
+user can write to the data that is stored in kernel memory. The
+pseudo device that is created in this section is a pseudo-disk device or
+ramdisk device. A ramdisk device simulates a disk device by allocating kernel memory
+that is subsequently used as data storage. See <a href="http://docs.sun.com/doc/819-2254/ramdisk-7d?a=view"><tt>ramdisk</tt>(7D)</a> for more information about ramdisk
+devices.</p><p>As in Version&nbsp;2 of the Quote Of The Day driver, this Version&nbsp;3 driver
+stores its data and makes the data available through its <tt>read</tt>(9E) entry point.
+This Version&nbsp;3 driver overwrites characters from the beginning of the data when the
+user writes to the device.</p><p>This section first discusses the important code differences between this version and the
+previous version of the Quote Of The Day driver. This section then shows
+you how you can modify and display the quotation.</p><p>In addition to changes in the driver, Quote Of The Day Version&nbsp;3 introduces
+a header file and an auxiliary program. The header file is discussed in
+the following section. The utility program is discussed in <a href="#ffzsc">Using Quote Of The Day Version 3</a>.</p>
+
+<a name="ffdqv"></a><h4>Writing Quote Of The Day Version 3</h4>
+<p>This third version of the Quote Of The Day driver is more
+complex than the second version because this third version enables a user to
+change the text that is stored in the device.</p><p>This section first explains some important features of this version of the driver.
+This section then shows all the source for this driver, including the header
+file and the configuration file.</p><p>The following list summarizes the new features in Version&nbsp;3 of the Quote Of
+The Day driver:</p>
+<ul><li><p>Version 3 of the driver allocates and frees kernel memory.</p></li>
+<li><p>Version 3 uses condition variables and mutexes to manage thread synchronization.</p></li>
+<li><p>Version 3 copies data from user space to kernel space to enable the user to change the quotation.</p></li>
+<li><p>Version 3 adds two new entry points: <a href="http://docs.sun.com/doc/819-2255/write-9e?a=view"><tt>write</tt>(9E)</a> and <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a>.</p></li>
+<li><p>Version 3 adds a third new routine. The <tt>qotd_rw()</tt> routine is called by both the <tt>read</tt>(9E) entry point and the <tt>write</tt>(9E) entry point.</p></li>
+<li><p><a name="indexterm-424"></a><a name="indexterm-425"></a><a name="indexterm-426"></a><a name="indexterm-427"></a><a name="indexterm-428"></a><a name="indexterm-429"></a>As in Version 2, Version 3 of the driver uses the <tt>uiomove</tt>(9F) function to make the quotation available to the user. Version&nbsp;3 uses the <a href="http://docs.sun.com/doc/819-2256/ddi-copyin-9f?a=view"><tt>ddi_copyin</tt>(9F)</a> function to copy the new quotation and the new device size from user space to kernel space. Version&nbsp;3 uses the <a href="http://docs.sun.com/doc/819-2256/ddi-copyout-9f?a=view"><tt>ddi_copyout</tt>(9F)</a> function to report the current device size back to the user.</p></li>
+<li><p><a name="indexterm-430"></a><a name="indexterm-431"></a><a name="indexterm-432"></a>Because the driver copies data between kernel space and user space, Version&nbsp;3 of the driver uses the <a href="http://docs.sun.com/doc/819-2256/ddi-model-convert-from-9f?a=view"><tt>ddi_model_convert_from</tt>(9F)</a> function to determine whether the data must be converted between 32-bit and 64-bit models. The 64-bit kernel supports both 64-bit and 32-bit user data.</p></li>
+<li><p>Version 3 defines one new constant to tell the driver whether the device is busy. Another new constant tells the driver whether the quotation has been modified. Version 3 defines four new constants to help the driver undo everything it has done.</p></li>
+<li><p>Version 3 includes a separate utility program to test the driver's I/O controls.</p></li></ul>
+<p>The following sections provide more detail about the additions and changes in Version
+3 of the Quote Of The Day driver. The <tt>dev_ops</tt>(9S) structure and
+the <tt>modlinkage</tt>(9S) structure are the same as they were in Version&nbsp;2 of
+the driver. The <tt>modldrv</tt>(9S) structure has not changed except for the version number
+of the driver. The <tt>_init</tt>(9E), <tt>_info</tt>(9E), <tt>_fini</tt>(9E), <tt>getinfo</tt>(9E), <tt>open</tt>(9E), and <tt>close</tt>(9E) functions are
+the same as in Version&nbsp;2 of the driver.</p>
+
+<a name="fggxn"></a><h5>Attaching, Allocating Memory, and Initializing a Mutex and a Condition Variable</h5>
+<a name="indexterm-433"></a><a name="indexterm-434"></a><p>The <tt>qotd_attach()</tt> entry point first allocates and gets the device soft state. The
+<tt>qotd_attach()</tt> routine then creates a minor node. All of this code is the
+same as in Version&nbsp;2 of the Quote Of The Day driver. If the
+call to <a href="http://docs.sun.com/doc/819-2256/ddi-create-minor-node-9f?a=view"><tt>ddi_create_minor_node</tt>(9F)</a> is successful, the <tt>qotd_attach()</tt> routine sets the <tt>QOTD_DIDMINOR</tt> flag in the
+new <tt>flags</tt> member of the <tt>qotd_state</tt> state structure.</p><p>Version&nbsp;3 of the Quote Of The Day driver defines four new constants that
+keep track of four different events. A routine can test these flags
+to determine whether to deallocate, close, or remove resources. All four of these flags
+are set in the <tt>qotd_attach()</tt> entry point. All four of these conditions are
+checked in the <tt>qotd_detach()</tt> entry point, and the appropriate action is taken for
+each condition.</p><p>Note that operations are undone in the <tt>qotd_detach()</tt> entry point in the opposite
+order in which they were done in the <tt>qotd_attach()</tt> entry point. The <tt>qotd_attach()</tt>
+routine creates a minor node, allocates memory for the quotation, initializes a mutex,
+and initializes a condition variable. The <tt>qotd_detach()</tt> routine destroys the condition variable, destroys the
+mutex, frees the memory, and removes the minor node.</p><p>After the minor node is created, the <tt>qotd_attach()</tt> routine allocates memory for the
+quotation. For information on allocating and freeing memory in this driver, see <a href="#ffdqy">Allocating and Freeing Kernel Memory</a>.
+If memory is allocated,  the <tt>qotd_attach()</tt> routine sets the <tt>QOTD_DIDALLOC</tt> flag in
+the <tt>flags</tt> member of the state structure.</p><p><a name="indexterm-435"></a><a name="indexterm-436"></a><a name="indexterm-437"></a><a name="indexterm-438"></a><a name="indexterm-439"></a><a name="indexterm-440"></a><a name="indexterm-441"></a><a name="indexterm-442"></a>The <tt>qotd_attach()</tt> routine then calls the <a href="http://docs.sun.com/doc/819-2256/mutex-init-9f?a=view"><tt>mutex_init</tt>(9F)</a> function to initialize a mutex. If
+this operation is successful, the <tt>qotd_attach()</tt> routine sets the <tt>QOTD_DIDMUTEX</tt> flag. The <tt>qotd_attach()</tt>
+routine then calls the <a href="http://docs.sun.com/doc/819-2256/cv-init-9f?a=view"><tt>cv_init</tt>(9F)</a> function to initialize a condition variable. If this
+operation is successful, the <tt>qotd_attach()</tt> routine sets the <tt>QOTD_DIDCV</tt> flag.</p><p>The <tt>qotd_attach()</tt> routine then calls the <a href="http://docs.sun.com/doc/819-2256/strlcpy-9f?a=view"><tt>strlcpy</tt>(9F)</a> function to copy the initial quotation
+string to the new quotation member of the device state structure. Note that
+the <tt>strlcpy</tt>(9F) function is used instead of the <a href="http://docs.sun.com/doc/819-2256/strncpy-9f?a=view"><tt>strncpy</tt>(9F)</a> function. The <tt>strncpy</tt>(9F) function
+can be wasteful because it always copies <i>n</i> characters, even if the destination
+is smaller than <i>n</i> characters. Try using <tt>strncpy</tt>(9F) instead of <tt>strlcpy</tt>(9F) and note
+the difference in the behavior of the driver.</p><p>Finally, the initial quotation length is copied to the new quotation length member
+of the state structure. The remainder of the <tt>qotd_attach()</tt> routine is the same
+as in Version&nbsp;2.</p>
+
+<a name="fgvsj"></a><h5>Checking for Changes, Cleaning Up, and Detaching</h5>
+<p>The <tt>qotd_detach()</tt> routine is almost all new. The <tt>qotd_detach()</tt> routine must first
+get the soft state because the <tt>qotd_detach()</tt> routine needs to check the
+<tt>flags</tt> member of the state structure.</p><p>The first flag the <tt>qotd_detach()</tt> routine checks is the <tt>QOTD_CHANGED</tt> flag. The <tt>QOTD_CHANGED</tt>
+flag indicates whether the device is in the initial state. The <tt>QOTD_CHANGED</tt> flag is
+set in the <tt>qotd_rw()</tt> routine and in the <tt>qotd_ioctl()</tt> entry point. The
+<tt>QOTD_CHANGED</tt> flag is set any time the user does anything to the device
+other than simply inspect the device. If the <tt>QOTD_CHANGED</tt> flag is set, the
+size or content of the storage buffer has been modified. See <a href="#ffdra">Writing New Data</a> for
+more information on the <tt>QOTD_CHANGED</tt> flag. When the <tt>QOTD_CHANGED</tt> flag is set, the
+detach operation fails because the device might contain data that is valuable to
+the user and the device should not be removed. If the <tt>QOTD_CHANGED</tt> flag is
+set, the <tt>qotd_detach()</tt> routine returns an error that the device is busy.</p><p>Once the quotation has been modified, the device cannot be detached until the
+user runs the <tt>qotdctl</tt> command with the <tt>-r</tt> option. The <tt>-r</tt> option reinitializes
+the quotation and indicates that the user is no longer interested in the
+contents of the device. See <a href="#fgvsf">Exercising the Driver's I/O Controls</a> for more information about the <tt>qotdctl</tt> command.</p><p><a name="indexterm-443"></a><a name="indexterm-444"></a><a name="indexterm-445"></a><a name="indexterm-446"></a><a name="indexterm-447"></a><a name="indexterm-448"></a><a name="indexterm-449"></a><a name="indexterm-450"></a>The <tt>qotd_detach()</tt> routine then checks the four flags that were set in the
+<tt>qotd_attach()</tt> routine. If the <tt>QOTD_DIDCV</tt> flag is set, the <tt>qotd_detach()</tt> routine calls the
+<a href="http://docs.sun.com/doc/819-2256/cv-destroy-9f?a=view"><tt>cv_destroy</tt>(9F)</a> function. If the <tt>QOTD_DIDMUTEX</tt> flag is set, the <tt>qotd_detach()</tt> routine calls the
+<a href="http://docs.sun.com/doc/819-2256/mutex-destroy-9f?a=view"><tt>mutex_destroy</tt>(9F)</a> function. If the <tt>QOTD_DIDALLOC</tt> flag is set, the <tt>qotd_detach()</tt> routine calls the
+<a href="http://docs.sun.com/doc/819-2256/ddi-umem-free-9f?a=view"><tt>ddi_umem_free</tt>(9F)</a> function. Finally, if the <tt>QOTD_DIDMINOR</tt> flag is set, the <tt>qotd_detach()</tt> routine calls
+the <a href="http://docs.sun.com/doc/819-2256/ddi-remove-minor-node-9f?a=view"><tt>ddi_remove_minor_node</tt>(9F)</a> function.</p>
+
+<a name="ffdqy"></a><h5>Allocating and Freeing Kernel Memory</h5>
+<a name="indexterm-451"></a><a name="indexterm-452"></a><a name="indexterm-453"></a><a name="indexterm-454"></a><p>One of the new members of the device state structure supports memory allocation
+and deallocation. The <tt>qotd_cookie</tt> member receives a value from the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-alloc-9f?a=view"><tt>ddi_umem_alloc</tt>(9F)</a> function. The
+<tt>qotd_cookie</tt> value is then used by the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-free-9f?a=view"><tt>ddi_umem_free</tt>(9F)</a> function to free the memory.</p><p>Version 3 of the Quote Of The Day driver allocates kernel memory
+in three places:</p>
+<ul><li><p>After the minor node is created</p></li>
+<li><p>In the <tt>QOTDIOCSSZ</tt> case of the <tt>qotd_ioctl()</tt> entry point</p></li>
+<li><p>In the <tt>QOTDIOCDISCARD</tt> case of the <tt>qotd_ioctl()</tt> entry point</p></li></ul>
+<p>The <tt>qotd_attach()</tt> routine allocates memory after the minor node is created. Memory must
+be allocated to enable the user to modify the quotation. The <tt>qotd_attach()</tt> routine
+calls the <tt>ddi_umem_alloc</tt>(9F) function with the <tt>DDI_UMEM_NOSLEEP</tt> flag so that the <tt>ddi_umem_alloc</tt>(9F) function
+will return immediately. If the requested amount of memory is not available, <tt>ddi_umem_alloc</tt>(9F)
+returns <tt>NULL</tt> immediately and does not wait for memory to become available. If
+no memory is allocated, <tt>qotd_attach()</tt> calls <tt>qotd_detach()</tt> and returns an error. If
+memory is allocated, <tt>qotd_attach()</tt> sets the <tt>QOTD_DIDALLOC</tt> flag so that this memory will
+be freed by <tt>qotd_detach()</tt> later.</p><p>The second place the driver allocates memory is in the <tt>QOTDIOCSSZ</tt> case of
+the <tt>qotd_ioctl()</tt> entry point. The <tt>QOTDIOCSSZ</tt> case sets a new size for the
+device. A new size is set when the user runs the <tt>qotdctl</tt>
+command with the <tt>-s</tt> option. See <a href="#fgvsf">Exercising the Driver's I/O Controls</a> for more information about the <tt>qotdctl</tt>
+command. This time, the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-alloc-9f?a=view"><tt>ddi_umem_alloc</tt>(9F)</a> function is called with the <tt>DDI_UMEM_SLEEP</tt> flag so
+that <tt>ddi_umem_alloc</tt>(9F) will wait for the requested amount of memory to be
+available. When the <tt>ddi_umem_alloc</tt>(9F) function returns, the requested memory has been allocated.</p><p><a name="indexterm-455"></a><a name="indexterm-456"></a><a name="indexterm-457"></a><a name="indexterm-458"></a>Note that you cannot always use the <tt>DDI_UMEM_SLEEP</tt> flag. See the <tt>CONTEXT</tt> sections
+of the <tt>ddi_umem_alloc</tt>(9F), <a href="http://docs.sun.com/doc/819-2256/kmem-alloc-9f?a=view"><tt>kmem_alloc</tt>(9F)</a>, and <a href="http://docs.sun.com/doc/819-2256/kmem-zalloc-9f?a=view"><tt>kmem_zalloc</tt>(9F)</a> man pages. Also note the behavioral
+differences among these three functions. The <tt>kmem_zalloc</tt>(9F) function is more efficient for small amounts
+of memory. The <tt>ddi_umem_alloc</tt>(9F) function is faster and better for large allocations. The
+<tt>ddi_umem_alloc</tt>(9F) function is used in this <tt>qotd_3</tt> driver because <tt>ddi_umem_alloc</tt>(9F) allocates whole
+pages of memory. The <tt>kmem_zalloc</tt>(9F) function might save memory because it might allocate
+smaller chunks of memory. This <tt>qotd_3</tt> driver demonstrates a ramdisk device. In a production
+ramdisk device, you would use <tt>ddi_umem_alloc</tt>(9F) to allocate page-aligned memory.</p><p>After the current quotation is copied to the new space, the <tt>qotd_ioctl()</tt>
+routine calls the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-free-9f?a=view"><tt>ddi_umem_free</tt>(9F)</a> function to free the memory that was previously allocated.</p><p>The third place the driver allocates memory is in the <tt>QOTDIOCDISCARD</tt> case
+of the <tt>qotd_ioctl()</tt> entry point. The <tt>QOTDIOCDISCARD</tt> case is called from the
+<tt>qotdctl</tt> command. The <tt>qotdctl</tt> command with the <tt>-r</tt> option sets the quotation back to
+its initial value. If the number of bytes allocated for the current quotation
+is different from the initial number of bytes, then new memory is allocated
+to reinitialize the quotation. Again, the <tt>DDI_UMEM_SLEEP</tt> flag is used so that
+when the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-alloc-9f?a=view"><tt>ddi_umem_alloc</tt>(9F)</a> function returns, the requested memory has been allocated. The <tt>qotd_ioctl()</tt>
+routine then calls the <a href="http://docs.sun.com/doc/819-2256/ddi-umem-free-9f?a=view"><tt>ddi_umem_free</tt>(9F)</a> function to free the memory that was previously
+allocated.</p>
+
+<a name="ffzre"></a><h5>Managing Thread Synchronization</h5>
+<a name="indexterm-459"></a><a name="indexterm-460"></a><a name="indexterm-461"></a><a name="indexterm-462"></a><a name="indexterm-463"></a><a name="indexterm-464"></a><p>The Quote Of The Day Version&nbsp;3 driver uses condition variables and mutual exclusion
+locks (mutexes) together to manage thread synchronization. See the <a href="http://docs.sun.com/doc/820-2173"><i>Multithreaded Programming Guide</i></a> for more information
+about mutexes, condition variables, and thread synchronization.</p><p>In this driver, the mutex and condition variable both are initialized in the
+<tt>qotd_attach()</tt> entry point and destroyed in the <tt>qotd_detach()</tt> entry point. The condition
+variable is tested in the <tt>qotd_rw()</tt> routine and in the <tt>qotd_ioctl()</tt> entry point.</p><p><a name="indexterm-465"></a>The condition variable waits on the <tt>QOTD_BUSY</tt> condition. This condition is needed because
+the driver must do some operations that rely on exclusive access to internal
+structures without holding a lock. Accessing the storage buffer or its metadata requires
+mutual exclusion, but the driver cannot hold a lock if the operation might
+sleep. Instead of holding a lock in this case, the driver waits on
+the <tt>QOTD_BUSY</tt> condition.</p><p>The driver acquires a mutex when the driver tests the condition variable and
+when the driver accesses the storage buffer. The mutex protects the storage buffer.
+Failure to use a mutual exclusion when accessing the storage buffer could allow
+one user process to resize the buffer while another user process tries to
+read the buffer, for example. The result of unprotected buffer access could be
+data corruption or a panic.</p><p><a name="indexterm-466"></a><a name="indexterm-467"></a><a name="indexterm-468"></a><a name="indexterm-469"></a>The condition variable is used when functions are called that might need to
+sleep. The <a href="http://docs.sun.com/doc/819-2256/ddi-copyin-9f?a=view"><tt>ddi_copyin</tt>(9F)</a>, <a href="http://docs.sun.com/doc/819-2256/ddi-copyout-9f?a=view"><tt>ddi_copyout</tt>(9F)</a>, and <a href="http://docs.sun.com/doc/819-2256/uiomove-9f?a=view"><tt>uiomove</tt>(9F)</a> functions can sleep. Memory allocation can sleep
+if you use the <tt>SLEEP</tt> flag. Functions must not hold a mutex while
+they are sleeping. Sleeping while holding a mutex can cause deadlock. When a
+function might sleep, set the <tt>QOTD_BUSY</tt> flag and take the condition variable, which
+drops the mutex. To avoid race conditions, the <tt>QOTD_BUSY</tt> flag can be set
+or cleared only when holding the mutex. For more information on deadlock, see
+<a href="http://docs.sun.com/doc/820-2173/sync-110?a=view">Using Mutual Exclusion Locks in <i>Multithreaded Programming Guide</i></a> and <a href="http://docs.sun.com/doc/820-2173/guide-35930?a=view">Avoiding Deadlock in <i>Multithreaded Programming Guide</i></a>.</p>
+
+<a name="fgpaf"></a><h5>Locking Rules for Quote Of The Day Version 3</h5>
+<p><a name="indexterm-470"></a><a name="indexterm-471"></a>The locking rules for this <tt>qotd_3</tt> driver are as follows:</p>
+<ol><li><p>You must have exclusive access to do any of the following operations. To have exclusive access, you must own the mutex or you must set <tt>QOTD_BUSY</tt>. Threads must wait on <tt>QOTD_BUSY</tt>.</p>
+<ul><li><p>Test the contents of the storage buffer.</p></li>
+<li><p>Modify the contents of the storage buffer.</p></li>
+<li><p>Modify the size of the storage buffer.</p></li>
+<li><p>Modify variables that refer to the address of the storage buffer.</p></li></ul>
+</li>
+<li><p>If your operation does not need to sleep, do the following actions:</p>
+<ol><li><p>Acquire the mutex.</p></li>
+<li><p>Wait until <tt>QOTD_BUSY</tt> is cleared. When the thread that set <tt>QOTD_BUSY</tt> clears <tt>QOTD_BUSY</tt>, that thread also should signal threads waiting on the condition variable and then drop the mutex.</p></li>
+<li><p>Perform your operation. You do not need to set <tt>QOTD_BUSY</tt> before you perform your operation.</p></li>
+<li><p>Drop the mutex.</p></li></ol>
+<p>The following code sample illustrates this rule:</p><pre>mutex_enter(&amp;qsp-&gt;lock);
+while (qsp-&gt;flags &amp; QOTD_BUSY) {
+        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                ddi_umem_free(new_cookie);
+                return (EINTR);
+        }
+}
+memcpy(new_qotd, qsp-&gt;qotd, min(qsp-&gt;qotd_len, new_len));
+ddi_umem_free(qsp-&gt;qotd_cookie);
+qsp-&gt;qotd = new_qotd;
+qsp-&gt;qotd_cookie = new_cookie;
+qsp-&gt;qotd_len = new_len;
+qsp-&gt;flags |= QOTD_CHANGED;
+mutex_exit(&amp;qsp-&gt;lock);</pre></li>
+<li><p>If your operation must sleep, do the following actions:</p>
+<ol><li><p>Acquire the mutex.</p></li>
+<li><p>Set <tt>QOTD_BUSY</tt>.</p></li>
+<li><p>Drop the mutex.</p></li>
+<li><p>Perform your operation.</p></li>
+<li><p>Reacquire the mutex.</p></li>
+<li><p>Signal any threads waiting on the condition variable.</p></li>
+<li><p>Drop the mutex.</p></li></ol>
+</li></ol>
+<p>These locking rules are very simple. These three rules ensure consistent access to
+the buffer and its metadata. Realistic drivers probably have more complex locking requirements.
+For example, drivers that use ring buffers or drivers that manage multiple register
+sets or multiple devices have more complex locking requirements.</p>
+
+<a name="fgvsa"></a><h5>Lock and Condition Variable Members of the State Structure</h5>
+<a name="indexterm-472"></a><a name="indexterm-473"></a><a name="indexterm-474"></a><a name="indexterm-475"></a><a name="indexterm-476"></a><a name="indexterm-477"></a><p>The device state structure for Version&nbsp;3 of the Quote Of The Day driver
+contains two new members to help manage thread synchronization:</p>
+<ul><li><p>The <tt>lock</tt> member is used to acquire and exit mutexes for the current instance of the device. The <tt>lock</tt> member is an argument to each <a href="http://docs.sun.com/doc/819-2256/mutex-9f?a=view"><tt>mutex</tt>(9F)</a> function call. The <tt>lock</tt> member also is an argument to the <a href="http://docs.sun.com/doc/819-2256/cv-wait-sig-9f?a=view"><tt>cv_wait_sig</tt>(9F)</a> function call. In the <tt>cv_wait_sig</tt>(9F) function call, the <tt>lock</tt> value ensures that the condition will not be changed before the <tt>cv_wait_sig</tt>(9F) function returns.</p></li>
+<li><p>The <tt>cv</tt> member is a condition variable. The <tt>cv</tt> member is an argument to each <a href="http://docs.sun.com/doc/819-2256/condvar-9f?a=view"><tt>condvar</tt>(9F)</a> (<tt>cv_</tt>) function call.</p></li></ul>
+
+
+<a name="fgvsd"></a><h5>Creating and Destroying Locks and Condition Variables</h5>
+<p>Version&nbsp;3 of the Quote Of The Day driver defines two constants to make
+sure the mutex and condition variable are destroyed when the driver is finished
+with them. The driver uses these constants to set and reset the new
+<tt>flags</tt> member of the device state structure.</p>
+<ul><li><p><a name="indexterm-478"></a><a name="indexterm-479"></a><a name="indexterm-480"></a><a name="indexterm-481"></a><a name="indexterm-482"></a><a name="indexterm-483"></a><a name="indexterm-484"></a><a name="indexterm-485"></a>The <tt>QOTD_DIDMUTEX</tt> flag is set in the <tt>qotd_attach()</tt> entry point immediately after a successful call to <a href="http://docs.sun.com/doc/819-2256/mutex-init-9f?a=view"><tt>mutex_init</tt>(9F)</a>. If the <tt>QOTD_DIDMUTEX</tt> flag is set when the <tt>qotd_detach()</tt> entry point is called, the <tt>qotd_detach()</tt> entry point calls the <a href="http://docs.sun.com/doc/819-2256/mutex-destroy-9f?a=view"><tt>mutex_destroy</tt>(9F)</a> function.</p></li>
+<li><p>The <tt>QOTD_DIDCV</tt> flag is set in the <tt>qotd_attach()</tt> entry point immediately after a successful call to <a href="http://docs.sun.com/doc/819-2256/cv-init-9f?a=view"><tt>cv_init</tt>(9F)</a>. If the <tt>QOTD_DIDCV</tt> flag is set when the <tt>qotd_detach()</tt> entry point is called, the <tt>qotd_detach()</tt> entry point calls the <a href="http://docs.sun.com/doc/819-2256/cv-destroy-9f?a=view"><tt>cv_destroy</tt>(9F)</a> function.</p></li></ul>
+
+
+<a name="fgvsc"></a><h5>Waiting on Signals</h5>
+<a name="indexterm-486"></a><a name="indexterm-487"></a><a name="indexterm-488"></a><a name="indexterm-489"></a><a name="indexterm-490"></a><a name="indexterm-491"></a><a name="indexterm-492"></a><a name="indexterm-493"></a><a name="indexterm-494"></a><a name="indexterm-495"></a><p>In the <tt>qotd_rw()</tt> and <tt>qotd_ioctl()</tt> routines, the <a href="http://docs.sun.com/doc/819-2256/cv-wait-sig-9f?a=view"><tt>cv_wait_sig</tt>(9F)</a> calls wait until the condition
+variable is signaled to proceed or until a <a href="http://docs.sun.com/doc/819-2243/signal-3c?a=view"><tt>signal</tt>(3C)</a> is received. Either the <a href="http://docs.sun.com/doc/819-2256/cv-signal-9f?a=view"><tt>cv_signal</tt>(9F)</a>
+function or the <a href="http://docs.sun.com/doc/819-2256/cv-broadcast-9f?a=view"><tt>cv_broadcast</tt>(9F)</a> function signals the <tt>cv</tt> condition variable to proceed.</p><p>A thread can wait on a condition variable until either the condition variable
+is signaled or a <a href="http://docs.sun.com/doc/819-2243/signal-3c?a=view"><tt>signal</tt>(3C)</a> is received by the process. The <a href="http://docs.sun.com/doc/819-2256/cv-wait-9f?a=view"><tt>cv_wait</tt>(9F)</a> function
+waits until the condition variable is signaled but ignores <tt>signal</tt>(3C) signals. This driver
+uses the <a href="http://docs.sun.com/doc/819-2256/cv-wait-sig-9f?a=view"><tt>cv_wait_sig</tt>(9F)</a> function instead of the <tt>cv_wait</tt>(9F) function because this driver responds
+if a signal is received by the process performing the operation. If a
+<tt>signal</tt>(3C) is taken by the process, this driver returns an interrupt error and
+does not complete the operation. The <tt>cv_wait_sig</tt>(9F) function usually is preferred to the
+<tt>cv_wait</tt>(9F) function because this implementation offers the user program more precise response. The
+<tt>signal</tt>(3C) causes an effect closer to the point at which the process was
+executing when the <tt>signal</tt>(3C) was received.</p><p>In some cases, you cannot use the <tt>cv_wait_sig</tt>(9F) function because your driver
+cannot be interrupted by a <tt>signal</tt>(3C). For example, you cannot use the <tt>cv_wait_sig</tt>(9F)
+function during a DMA transfer that will result in an interrupt later. In
+this case, if you abandon the <tt>cv_wait_sig</tt>(9F) call, you have nowhere to
+put the data when the DMA transfer is finished, and your driver will
+panic.</p>
+
+<a name="ffdra"></a><h5>Writing New Data</h5>
+<a name="indexterm-496"></a><a name="indexterm-497"></a><a name="indexterm-498"></a><a name="indexterm-499"></a><a name="indexterm-500"></a><a name="indexterm-501"></a><a name="indexterm-502"></a><p>The <a href="http://docs.sun.com/doc/819-2257/cb-ops-9s?a=view"><tt>cb_ops</tt>(9S)</a> structure for Version&nbsp;3 of the Quote Of The Day driver declares
+two new entry points that support modifying the quotation. The two new entry
+points are <a href="http://docs.sun.com/doc/819-2255/write-9e?a=view"><tt>write</tt>(9E)</a> and <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a>. The <tt>qotd_rw()</tt> routine is a third new routine
+in Version&nbsp;3 of the driver. The <tt>qotd_rw()</tt> routine is called by both the
+<tt>read</tt>(9E) entry point and the <tt>write</tt>(9E) entry point.</p><p>The device state structure for Version&nbsp;3 of the Quote Of The Day driver
+contains two new members that are used to modify the quotation. The
+<tt>qotd</tt> string holds the quotation for the current instance of the device. The
+<tt>qotd_len</tt> member holds the length in bytes of the current quotation.</p><p>Version&nbsp;3 of the driver also defines two new constants that support modifying the
+quotation. In place of <tt>QOTD_MAXLEN</tt>, Version&nbsp;3 of the driver defines <tt>QOTD_MAX_LEN</tt>. <tt>QOTD_MAX_LEN</tt> is used
+in the <tt>qotd_ioctl()</tt> entry point to test whether the user has entered a
+string that is too long. Version&nbsp;3 of the driver also defines <tt>QOTD_CHANGED</tt>. The
+<tt>QOTD_CHANGED</tt> flag is set in the <tt>qotd_rw()</tt> routine and in the <tt>qotd_ioctl()</tt> entry
+point when a new quotation is copied from the user.</p><p>When the <tt>qotd_3</tt> device is opened for writing, the kernel calls the <tt>qotd_write()</tt>
+entry point. The <tt>qotd_write()</tt> entry point then calls the <tt>qotd_rw()</tt> routine and passes
+a <tt>UIO_WRITE</tt> flag. The new <tt>qotd_read()</tt> entry point is exactly the same as
+the <tt>qotd_write()</tt> entry point, except that the <tt>qotd_read()</tt> entry point passes a <tt>UIO_READ</tt>
+flag. The <tt>qotd_rw()</tt> routine supports both reading and writing the device and thereby
+eliminates much duplicate code.</p><p><a name="indexterm-503"></a><a name="indexterm-504"></a>The <tt>qotd_rw()</tt> routine first gets the device soft state. Then the <tt>qotd_rw()</tt> routine checks
+the length of the I/O request in the <a href="http://docs.sun.com/doc/819-2257/uio-9s?a=view"><tt>uio</tt>(9S)</a> I/O request structure.
+If this length is zero, the <tt>qotd_rw()</tt> routine returns zero. If this
+length is not zero, the <tt>qotd_rw()</tt> routine enters a mutex.</p><p><a name="indexterm-505"></a><a name="indexterm-506"></a>While the device is busy, the <tt>qotd_rw()</tt> routine checks whether the condition variable
+has been signaled or a <a href="http://docs.sun.com/doc/819-2243/signal-3c?a=view"><tt>signal</tt>(3C)</a> is pending. If either of these conditions
+is true, the <tt>qotd_rw()</tt> routine exits the mutex and returns an error.</p><p>When the device is not busy, the <tt>qotd_rw()</tt> routine checks whether the data
+offset in the <a href="http://docs.sun.com/doc/819-2257/uio-9s?a=view"><tt>uio</tt>(9S)</a> I/O request structure is valid. If the offset
+is not valid, the <tt>qotd_rw()</tt> routine exits the mutex and returns an error. If
+the offset is valid, the local length variable is set to the difference
+between the offset in the I/O request structure and the length in the
+device state structure. If this difference is zero, the <tt>qotd_rw()</tt> routine exits the
+mutex and returns. If the device was opened for writing, the <tt>qotd_rw()</tt>
+routine returns a space error. Otherwise, the <tt>qotd_rw()</tt> routine returns zero.</p><p><a name="indexterm-507"></a><a name="indexterm-508"></a>The <tt>qotd_rw()</tt> routine then sets the <tt>QOTD_BUSY</tt> flag in the <tt>flags</tt> member of the
+device state structure and exits the mutex. The <tt>qotd_rw()</tt> routine then calls the
+<a href="http://docs.sun.com/doc/819-2256/uiomove-9f?a=view"><tt>uiomove</tt>(9F)</a> function to copy the quotation. If the <tt>rw</tt> argument is <tt>UIO_READ</tt>, then
+the quotation is transferred from the state structure to the I/O request structure.
+If the <tt>rw</tt> argument is <tt>UIO_WRITE</tt>, then the quotation is transferred from
+the I/O request structure to the state structure.</p><p><a name="indexterm-509"></a><a name="indexterm-510"></a>The <tt>qotd_rw()</tt> routine then enters a mutex again. If the device was opened
+for writing, the <tt>qotd_rw()</tt> routine sets the <tt>QOTD_CHANGED</tt> flag. The <tt>qotd_rw()</tt> routine
+then sets the device to not busy, calls <a href="http://docs.sun.com/doc/819-2256/cv-broadcast-9f?a=view"><tt>cv_broadcast</tt>(9F)</a> to unblock any
+threads that were blocked on this condition variable, and exits the mutex.</p><p>Finally, the <tt>qotd_rw()</tt> routine returns the quotation. The quotation is written to the
+device node.</p>
+
+<a name="fgham"></a><h5>Reporting and Setting Device Size and Re-initializing the Device</h5>
+<a name="indexterm-511"></a><a name="indexterm-512"></a><a name="indexterm-513"></a><a name="indexterm-514"></a><p>The behavior of the <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a> entry point depends on the command value passed
+in to the entry point. These constants are defined in the new <tt>qotd.h</tt>
+header file. The <tt>qotd_ioctl()</tt> routine reports the size of the space allocated
+for the quotation, sets a new amount of space to allocate for the
+quotation, or resets the quotation back to its initial value.</p><p>If the request is to report the size of the space allocated
+for the quotation, then the <tt>qotd_ioctl()</tt> routine first sets a local size variable to
+the value of the quotation length in the state structure. If the device
+was not opened for reading, the <tt>qotd_ioctl()</tt> routine returns an error.</p><p><a name="indexterm-515"></a><a name="indexterm-516"></a><a name="indexterm-517"></a><a name="indexterm-518"></a>Because the <tt>qotd_ioctl()</tt> routine transfers data between kernel space and user space, the
+<tt>qotd_ioctl()</tt> routine must check whether both spaces are using the same data model.
+If the return value of the <a href="http://docs.sun.com/doc/819-2256/ddi-model-convert-from-9f?a=view"><tt>ddi_model_convert_from</tt>(9F)</a> function is <tt>DDI_MODEL_ILP32</tt>, then the driver must
+convert to 32-bit data before calling <a href="http://docs.sun.com/doc/819-2256/ddi-copyout-9f?a=view"><tt>ddi_copyout</tt>(9F)</a> to transfer the current size of
+the quotation space. If the return value of the <tt>ddi_model_convert_from</tt>(9F) function is <tt>DDI_MODEL_NONE</tt>, then
+no data type conversion is necessary.</p><p>If the request is to set a new size for the space
+allocated for the quotation, then the <tt>qotd_ioctl()</tt> routine first sets local variables for the
+new size, the new quotation, and a new memory allocation cookie. If the
+device was not opened for writing, the <tt>qotd_ioctl()</tt> routine returns an error.</p><p><a name="indexterm-519"></a><a name="indexterm-520"></a>The <tt>qotd_ioctl()</tt> routine then checks again for data model mismatch. If the return
+value of the <a href="http://docs.sun.com/doc/819-2256/ddi-model-convert-from-9f?a=view"><tt>ddi_model_convert_from</tt>(9F)</a> function is <tt>DDI_MODEL_ILP32</tt>, then the driver declares a 32-bit
+size variable to receive the new size from <a href="http://docs.sun.com/doc/819-2256/ddi-copyin-9f?a=view"><tt>ddi_copyin</tt>(9F)</a>. When the new size
+is received, the size is converted to the data type of the
+kernel space.</p><p>If the new size is zero or is greater than <tt>QOTD_MAX_LEN</tt>, the <tt>qotd_ioctl()</tt>
+routine returns an error. If the new size is valid, then the <tt>qotd_ioctl()</tt>
+routine allocates new memory for the quotation and enters a mutex.</p><p><a name="indexterm-521"></a><a name="indexterm-522"></a>While the device is busy, the <tt>qotd_ioctl()</tt> routine checks whether the condition variable
+has been signaled or a <a href="http://docs.sun.com/doc/819-2243/signal-3c?a=view"><tt>signal</tt>(3C)</a> is pending. If either of these conditions
+is true, the <tt>qotd_ioctl()</tt> routine exits the mutex, frees the new memory it
+allocated, and returns an error.</p><p><a name="indexterm-523"></a><a name="indexterm-524"></a>When the device is not busy, the <tt>qotd_ioctl()</tt> routine uses <a href="http://docs.sun.com/doc/819-2256/memcpy-9f?a=view"><tt>memcpy</tt>(9F)</a> to copy
+the quotation from the driver's state structure to the new space. The
+<tt>qotd_ioctl()</tt> routine then frees the memory currently pointed to by the state structure,
+and updates the state structure members to the new values. The <tt>qotd_ioctl()</tt> routine
+then sets the <tt>QOTD_CHANGED</tt> flag, exits the mutex, and returns.</p><p>If the request is to discard the current quotation and reset to
+the initial quotation, then the <tt>qotd_ioctl()</tt> routine first sets local variables for the new
+quotation and a new memory allocation cookie. If the device was not opened
+for writing, the <tt>qotd_ioctl()</tt> routine returns an error. If the space allocated for
+the current quotation is different from the space allocated for the initial quotation,
+then the <tt>qotd_ioctl()</tt> routine allocates new memory that is the size of
+the initial space and enters a mutex.</p><p>While the device is busy, the <tt>qotd_ioctl()</tt> routine checks whether the condition variable
+has been signaled or a <a href="http://docs.sun.com/doc/819-2243/signal-3c?a=view"><tt>signal</tt>(3C)</a> is pending. If either of these conditions
+is true, the <tt>qotd_ioctl()</tt> routine exits the mutex, frees the new memory it
+allocated, and returns an error.</p><p><a name="indexterm-525"></a><a name="indexterm-526"></a><a name="indexterm-527"></a><a name="indexterm-528"></a>When the device is not busy, the <tt>qotd_ioctl()</tt> routine frees the memory currently pointed
+to by the state structure, updates the memory state structure members to the
+new values, and resets the length to its initial value. If the size
+of the current quotation space was the same as the initial size
+and no new memory was allocated, then <tt>qotd_ioctl()</tt> calls <a href="http://docs.sun.com/doc/819-2256/bzero-9f?a=view"><tt>bzero</tt>(9F)</a> to clear the
+current quotation. The <tt>qotd_ioctl()</tt> routine then calls the <a href="http://docs.sun.com/doc/819-2256/strlcpy-9f?a=view"><tt>strlcpy</tt>(9F)</a> function to copy the initial
+quotation string to the quotation member of the state structure.  The <tt>qotd_ioctl()</tt>
+routine then unsets the <tt>QOTD_CHANGED</tt> flag, exits the mutex, and returns.</p><p>Once the <tt>QOTD_CHANGED</tt> flag has been set, the only way to unset it
+is to run the <tt>qotdctl</tt> command with the <tt>-r</tt> option. See <a href="#fgvsf">Exercising the Driver's I/O Controls</a>
+for more information about the <tt>qotdctl</tt> command.</p>
+
+<a name="ffdqw"></a><h5>Quote Of The Day Version 3 Source</h5>
+<p>Enter the source code shown in the following example into a text
+file named <tt>qotd_3.c</tt>.</p><a name="ffdqz"></a><h6>Example&nbsp;3-5 Quote Of The Day Version 3 Source File</h6><pre>#include &lt;sys/types.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/open.h&gt;
+#include &lt;sys/cred.h&gt;
+#include &lt;sys/uio.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/ksynch.h&gt;
+#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/debug.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#include "qotd.h"
+
+#define QOTD_NAME       "qotd_3"
+
+static const char init_qotd[]
+        = "On the whole, I'd rather be in Philadelphia. - W. C. Fields\n";
+static const size_t init_qotd_len = 128;
+
+#define QOTD_MAX_LEN    65536           /* Maximum quote in bytes */
+#define QOTD_CHANGED    0x1             /* User has made modifications */
+#define QOTD_DIDMINOR   0x2             /* Created minors */
+#define QOTD_DIDALLOC   0x4             /* Allocated storage space */
+#define QOTD_DIDMUTEX   0x8             /* Created mutex */
+#define QOTD_DIDCV      0x10            /* Created cv */
+#define QOTD_BUSY       0x20            /* Device is busy */
+
+static void *qotd_state_head;
+
+struct qotd_state {
+        int             instance;
+        dev_info_t      *devi;
+        kmutex_t        lock;
+        kcondvar_t      cv;
+        char            *qotd;
+        size_t          qotd_len;
+        ddi_umem_cookie_t qotd_cookie;
+        int             flags;
+};
+
+static int qotd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int qotd_attach(dev_info_t *, ddi_attach_cmd_t);
+static int qotd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int qotd_open(dev_t *, int, int, cred_t *);
+static int qotd_close(dev_t, int, int, cred_t *);
+static int qotd_read(dev_t, struct uio *, cred_t *);
+static int qotd_write(dev_t, struct uio *, cred_t *);
+static int qotd_rw(dev_t, struct uio *, enum uio_rw);
+static int qotd_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+
+static struct cb_ops qotd_cb_ops = {
+        qotd_open,              /* cb_open */
+        qotd_close,             /* cb_close */
+        nodev,                  /* cb_strategy */
+        nodev,                  /* cb_print */
+        nodev,                  /* cb_dump */
+        qotd_read,              /* cb_read */
+        qotd_write,             /* cb_write */
+        qotd_ioctl,             /* cb_ioctl */
+        nodev,                  /* cb_devmap */
+        nodev,                  /* cb_mmap */
+        nodev,                  /* cb_segmap */
+        nochpoll,               /* cb_chpoll */
+        ddi_prop_op,            /* cb_prop_op */
+        (struct streamtab *)NULL,       /* cb_str */
+        D_MP | D_64BIT,         /* cb_flag */
+        CB_REV,                 /* cb_rev */
+        nodev,                  /* cb_aread */
+        nodev                   /* cb_awrite */
+};
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        qotd_getinfo,           /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        qotd_attach,            /* devo_attach */
+        qotd_detach,            /* devo_detach */
+        nodev,                  /* devo_reset */
+        &amp;qotd_cb_ops,           /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the day 3.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        int retval;
+
+        if ((retval = ddi_soft_state_init(&amp;qotd_state_head,
+            sizeof (struct qotd_state), 1)) != 0)
+                return retval;
+        if ((retval = mod_install(&amp;modlinkage)) != 0) {
+                ddi_soft_state_fini(&amp;qotd_state_head);
+                return (retval);
+        }
+
+        return (retval);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+
+int
+_fini(void)
+{
+        int retval;
+
+        if ((retval = mod_remove(&amp;modlinkage)) != 0)
+                return (retval);
+        ddi_soft_state_fini(&amp;qotd_state_head);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
+{
+        struct qotd_state *qsp;
+        int retval = DDI_FAILURE;
+
+        ASSERT(resultp != NULL);
+
+        switch (cmd) {
+        case DDI_INFO_DEVT2DEVINFO:
+                if ((qsp = ddi_get_soft_state(qotd_state_head,
+                    getminor((dev_t)arg))) != NULL) {
+                        *resultp = qsp-&gt;devi;
+                        retval = DDI_SUCCESS;
+                } else
+                        *resultp = NULL;
+                break;
+        case DDI_INFO_DEVT2INSTANCE:
+                *resultp = (void *)getminor((dev_t)arg);
+                retval = DDI_SUCCESS;
+                break;
+        }
+
+        return (retval);
+}
+
+static int
+qotd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_ATTACH:
+                if (ddi_soft_state_zalloc(qotd_state_head, instance)
+                    != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to allocate state for %d",
+                            instance);
+                        return (DDI_FAILURE);
+                }
+                if ((qsp = ddi_get_soft_state(qotd_state_head, instance))
+                    == NULL) {
+                        cmn_err(CE_WARN, "Unable to obtain state for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        return (DDI_FAILURE);
+                }
+                if (ddi_create_minor_node(dip, QOTD_NAME, S_IFCHR, instance,
+                    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to create minor node for %d",
+                            instance);
+                        (void)qotd_detach(dip, DDI_DETACH);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;flags |= QOTD_DIDMINOR;
+                qsp-&gt;qotd = ddi_umem_alloc(init_qotd_len, DDI_UMEM_NOSLEEP,
+                    &amp;qsp-&gt;qotd_cookie);
+                if (qsp-&gt;qotd == NULL) {
+                        cmn_err(CE_WARN, "Unable to allocate storage for %d",
+                            instance);
+                        (void)qotd_detach(dip, DDI_DETACH);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;flags |= QOTD_DIDALLOC;
+                mutex_init(&amp;qsp-&gt;lock, NULL, MUTEX_DRIVER, NULL);
+                qsp-&gt;flags |= QOTD_DIDMUTEX;
+                cv_init(&amp;qsp-&gt;cv, NULL, CV_DRIVER, NULL);
+                qsp-&gt;flags |= QOTD_DIDCV;
+
+                (void)strlcpy(qsp-&gt;qotd, init_qotd, init_qotd_len);
+                qsp-&gt;qotd_len = init_qotd_len;
+                qsp-&gt;instance = instance;
+                qsp-&gt;devi = dip;
+
+                ddi_report_dev(dip);
+                return (DDI_SUCCESS);
+        case DDI_RESUME:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+
+static int
+qotd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_DETACH:
+                qsp = ddi_get_soft_state(qotd_state_head, instance);
+                if (qsp != NULL) {
+                        ASSERT(!(qsp-&gt;flags &amp; QOTD_BUSY));
+                        if (qsp-&gt;flags &amp; QOTD_CHANGED)
+                                return (EBUSY);
+                        if (qsp-&gt;flags &amp; QOTD_DIDCV)
+                                cv_destroy(&amp;qsp-&gt;cv);
+                        if (qsp-&gt;flags &amp; QOTD_DIDMUTEX)
+                                mutex_destroy(&amp;qsp-&gt;lock);
+                        if (qsp-&gt;flags &amp; QOTD_DIDALLOC) {
+                                ASSERT(qsp-&gt;qotd != NULL);
+                                ddi_umem_free(qsp-&gt;qotd_cookie);
+                        }
+                        if (qsp-&gt;flags &amp; QOTD_DIDMINOR)
+                                ddi_remove_minor_node(dip, NULL);
+                }
+                ddi_soft_state_free(qotd_state_head, instance);
+                return (DDI_SUCCESS);
+        case DDI_SUSPEND:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+/*ARGSUSED*/
+static int
+qotd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+        int instance = getminor(*devp);
+        struct qotd_state *qsp;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        return qotd_rw(dev, uiop, UIO_READ);
+}
+
+/*ARGSUSED*/
+static int
+qotd_write(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        return qotd_rw(dev, uiop, UIO_WRITE);
+}
+
+static int
+qotd_rw(dev_t dev, struct uio *uiop, enum uio_rw rw)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+        size_t len = uiop-&gt;uio_resid;
+        int retval;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (len == 0)
+                return (0);
+
+        mutex_enter(&amp;qsp-&gt;lock);
+
+        while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                        mutex_exit(&amp;qsp-&gt;lock);
+                        return (EINTR);
+                }
+        }
+
+        if (uiop-&gt;uio_offset &lt; 0 || uiop-&gt;uio_offset &gt; qsp-&gt;qotd_len) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                return (EINVAL);
+        }
+
+        if (len &gt; qsp-&gt;qotd_len - uiop-&gt;uio_offset)
+                len = qsp-&gt;qotd_len - uiop-&gt;uio_offset;
+
+        if (len == 0) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                return (rw == UIO_WRITE ? ENOSPC : 0);
+        }
+
+        qsp-&gt;flags |= QOTD_BUSY;
+        mutex_exit(&amp;qsp-&gt;lock);
+
+        retval = uiomove((void *)(qsp-&gt;qotd + uiop-&gt;uio_offset), len, rw, uiop);
+
+        mutex_enter(&amp;qsp-&gt;lock);
+        if (rw == UIO_WRITE)
+                qsp-&gt;flags |= QOTD_CHANGED;
+        qsp-&gt;flags &amp;= ~QOTD_BUSY;
+        cv_broadcast(&amp;qsp-&gt;cv);
+        mutex_exit(&amp;qsp-&gt;lock);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        switch (cmd) {
+        case QOTDIOCGSZ: {
+                /* We are not guaranteed that ddi_copyout(9F) will read
+                 * automatically anything larger than a byte.  Therefore we
+                 * must duplicate the size before copying it out to the user.
+                 */
+                size_t sz = qsp-&gt;qotd_len;
+
+                if (!(mode &amp; FREAD))
+                        return (EACCES);
+
+#ifdef _MULTI_DATAMODEL
+                switch (ddi_model_convert_from(mode &amp; FMODELS)) {
+                case DDI_MODEL_ILP32: {
+                        size32_t sz32 = (size32_t)sz;
+                        if (ddi_copyout(&amp;sz32, (void *)arg, sizeof (size32_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        return (0);
+                }
+                case DDI_MODEL_NONE:
+                        if (ddi_copyout(&amp;sz, (void *)arg, sizeof (size_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        return (0);
+                default:
+                        cmn_err(CE_WARN, "Invalid data model %d in ioctl\n",
+                            ddi_model_convert_from(mode &amp; FMODELS));
+                        return (ENOTSUP);
+                }
+#else /* ! _MULTI_DATAMODEL */
+                if (ddi_copyout(&amp;sz, (void *)arg, sizeof (size_t), mode) != 0)
+                        return (EFAULT);
+                return (0);
+#endif /* _MULTI_DATAMODEL */
+        }
+        case QOTDIOCSSZ: {
+                size_t new_len;
+                char *new_qotd;
+                ddi_umem_cookie_t new_cookie;
+                uint_t model;
+
+                if (!(mode &amp; FWRITE))
+                        return (EACCES);
+
+#ifdef _MULTI_DATAMODEL
+                model = ddi_model_convert_from(mode &amp; FMODELS);
+
+                switch (model) {
+                case DDI_MODEL_ILP32: {
+                        size32_t sz32;
+                        if (ddi_copyin((void *)arg, &amp;sz32, sizeof (size32_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        new_len = (size_t)sz32;
+                        break;
+                }
+                case DDI_MODEL_NONE:
+                        if (ddi_copyin((void *)arg, &amp;new_len, sizeof (size_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        break;
+                default:
+                        cmn_err(CE_WARN, "Invalid data model %d in ioctl\n",
+                            model);
+                        return (ENOTSUP);
+                }
+#else /* ! _MULTI_DATAMODEL */
+                if (ddi_copyin((void *)arg, &amp;new_len, sizeof (size_t),
+                    mode) != 0)
+                        return (EFAULT);
+#endif /* _MULTI_DATAMODEL */
+
+                if (new_len == 0 || new_len &gt; QOTD_MAX_LEN)
+                        return (EINVAL);
+
+                new_qotd = ddi_umem_alloc(new_len, DDI_UMEM_SLEEP, &amp;new_cookie);
+
+                mutex_enter(&amp;qsp-&gt;lock);
+                while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                                mutex_exit(&amp;qsp-&gt;lock);
+                                ddi_umem_free(new_cookie);
+                                return (EINTR);
+                        }
+                }
+                memcpy(new_qotd, qsp-&gt;qotd, min(qsp-&gt;qotd_len, new_len));
+                ddi_umem_free(qsp-&gt;qotd_cookie);
+                qsp-&gt;qotd = new_qotd;
+                qsp-&gt;qotd_cookie = new_cookie;
+                qsp-&gt;qotd_len = new_len;
+                qsp-&gt;flags |= QOTD_CHANGED;
+                mutex_exit(&amp;qsp-&gt;lock);
+
+                return (0);
+        }
+        case QOTDIOCDISCARD: {
+                char *new_qotd = NULL;
+                ddi_umem_cookie_t new_cookie;
+
+                if (!(mode &amp; FWRITE))
+                        return (EACCES);
+
+                if (qsp-&gt;qotd_len != init_qotd_len) {
+                        new_qotd = ddi_umem_alloc(init_qotd_len,
+                            DDI_UMEM_SLEEP, &amp;new_cookie);
+                }
+
+                mutex_enter(&amp;qsp-&gt;lock);
+                while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                                mutex_exit(&amp;qsp-&gt;lock);
+                                if (new_qotd != NULL)
+                                        ddi_umem_free(new_cookie);
+                                return (EINTR);
+                        }
+                }
+                if (new_qotd != NULL) {
+                        ddi_umem_free(qsp-&gt;qotd_cookie);
+                        qsp-&gt;qotd = new_qotd;
+                        qsp-&gt;qotd_cookie = new_cookie;
+                        qsp-&gt;qotd_len = init_qotd_len;
+                } else {
+                        bzero(qsp-&gt;qotd, qsp-&gt;qotd_len);
+                }
+                (void)strlcpy(qsp-&gt;qotd, init_qotd, init_qotd_len);
+                qsp-&gt;flags &amp;= ~QOTD_CHANGED;
+                mutex_exit(&amp;qsp-&gt;lock);
+
+                return (0);
+        }
+        default:
+                return (ENOTTY);
+        }
+}</pre><p>Enter the definitions shown in the following example into a text file named
+<tt>qotd.h</tt>.</p><a name="ffzrj"></a><h6>Example&nbsp;3-6 Quote Of The Day Version 3 Header File</h6><pre>#ifndef _SYS_QOTD_H
+#define _SYS_QOTD_H
+
+#define QOTDIOC         ('q' &lt;&lt; 24 | 't' &lt;&lt; 16 | 'd' &lt;&lt; 8)
+
+#define QOTDIOCGSZ      (QOTDIOC | 1)   /* Get quote buffer size */
+#define QOTDIOCSSZ      (QOTDIOC | 2)   /* Set new quote buffer size */
+#define QOTDIOCDISCARD  (QOTDIOC | 3)   /* Discard quotes and reset */
+
+#endif /* _SYS_QOTD_H */</pre><p>Enter the configuration information shown in the following example into a text file
+named <tt>qotd_3.conf</tt>.</p><a name="ffdqx"></a><h6>Example&nbsp;3-7 Quote Of The Day Version 3 Configuration File</h6><pre>name="qotd_3" parent="pseudo" instance=0;</pre>
+
+<a name="ffdrd"></a><h4>Building and Installing Quote Of The Day Version&nbsp;3</h4>
+<p>Compile and link the driver. The following example shows compiling and linking for
+a 32-bit architecture:</p><pre>% <tt><b>cc -D_KERNEL -c qotd_3.c</b></tt>
+% <tt><b>ld -r -o qotd_3 qotd_3.o</b></tt></pre><p>Make sure you are user <tt>root</tt> when you install the driver.</p><p>Copy the driver binary to the <tt>/tmp</tt> directory as discussed in <a href="eoxzr.html">Building and Installing the Template Driver</a>.</p><pre># <tt><b>cp qotd_3 /tmp</b></tt>
+# <tt><b>ln -s /tmp/qotd_3 /usr/kernel/drv/qotd_3</b></tt></pre><p>Copy the configuration file to the kernel driver area of the system.</p><pre># <tt><b>cp qotd_3.conf /usr/kernel/drv</b></tt></pre><p>In a separate window, enter the following command:</p><pre>% <tt><b>tail -f /var/adm/messages</b></tt></pre><p>Make sure you are user <tt>root</tt> when you load the driver. Use the
+<a href="http://docs.sun.com/doc/819-2240/add-drv-1m?a=view"><tt>add_drv</tt>(1M)</a> command to load the driver:</p><pre># <tt><b>add_drv qotd_3</b></tt></pre><p>You should see the following messages in the window where you are
+viewing <tt>/var/adm/messages</tt>:</p><pre><i>date</i> <i>time</i> <i>machine</i> pseudo: [ID 129642 kern.info] pseudo-device: qotd_30
+<i>date</i> <i>time</i> <i>machine</i> genunix: [ID 936769 kern.info] qotd_30 is /pseudo/qotd_3@0</pre>
+
+<a name="ffzsc"></a><h4>Using Quote Of The Day Version 3</h4>
+<p>This section describes how to read and write the <tt>qotd_3</tt> device and how
+to test the driver's I/O controls. The I/O controls include retrieving the size
+of the storage buffer, setting a new size for the storage buffer, and
+reinitializing the storage buffer size and contents.</p>
+
+<a name="fgvse"></a><h5>Reading the Device</h5>
+<a name="indexterm-529"></a><p>When you access this <tt>qotd_3</tt> device for reading, the command you use to
+access the device retrieves the data from the device node. The command then
+displays the data in the same way that the command displays any other
+input. To get the name of the device special file, look in
+the <tt>/devices</tt> directory:</p><pre>% <tt><b>ls -l /devices/pseudo/qotd*</b></tt>
+crw-------   1 root   sys   122,  0 <i>date</i> <i>time</i> /devices/pseudo/qotd_3@0:qotd_3</pre><p>To read the <tt>qotd_3</tt> device, you can use the <a href="http://docs.sun.com/doc/819-2239/cat-1?a=view"><tt>cat</tt>(1)</a> command:</p><pre># <tt><b>cat /devices/pseudo/qotd_3@0:qotd_3</b></tt>
+On the whole, I'd rather be in Philadelphia. - W. C. Fields</pre>
+
+<a name="fgvsh"></a><h5>Writing the Device</h5>
+<a name="indexterm-530"></a><p>To write to the <tt>qotd_3</tt> device, you can redirect command-line input:</p><pre># <tt><b>echo "A life is not important except in the impact it has on others. - Jackie Robinson" &gt;&gt; /devices/pseudo/qotd_3@0:qotd_3</b></tt>
+# <tt><b>cat /devices/pseudo/qotd_3@0:qotd_3</b></tt>
+A life is not important except in the impact it has on others. - Jackie
+Robinson</pre>
+
+<a name="fgvsf"></a><h5>Exercising the Driver's I/O Controls</h5>
+<a name="indexterm-531"></a><a name="indexterm-532"></a><a name="indexterm-533"></a><a name="indexterm-534"></a><p>In addition to changes in the driver, Quote Of The Day Version&nbsp;3 introduces
+a new utility program. The <tt>qotdctl</tt> command enables you to test the driver's
+I/O controls.</p><p>The source for this command is shown in <a href="#ffzrf">Example&nbsp;3-8</a>. Compile the <tt>qotdctl</tt>
+utility as follows:</p><pre>% <tt><b>cc -o qotdctl qotdctl.c</b></tt></pre><p>The <tt>qotdctl</tt> command has the following options:</p><dl><dt><tt>-g</tt></dt>
+<dd><p>Get the size that is currently allocated. Call the <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a> entry point of the driver with the <tt>QOTDIOCGSZ</tt> request. The <tt>QOTDIOCGSZ</tt> request reports the current size of the space allocated for the quotation.</p></dd>
+<dt><tt>-s</tt> <i>size</i></dt>
+<dd><p>Set the new size to be allocated. Call the <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a> entry point of the driver with the <tt>QOTDIOCSSZ</tt> request. The <tt>QOTDIOCSSZ</tt> request sets a new size for the quotation space.</p></dd>
+<dt><tt>-r</tt></dt>
+<dd><p>Discard the contents and reset the device. Call the <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a> entry point of the driver with the <tt>QOTDIOCDISCARD</tt> request.</p><p>Invoking <tt>qotdctl</tt> with the <tt>-r</tt> option is the only way to unset the <tt>QOTD_CHANGED</tt> flag in the device. The device cannot be detached while the <tt>QOTD_CHANGED</tt> flag is set. This protects the contents of the ramdisk device from being unintentionally or automatically removed. For example, a device might be automatically removed by the automatic device unconfiguration thread.</p><p>When you are no longer interested in the contents of the device, run the <tt>qotdctl</tt> command with the <tt>-r</tt> option. Then you can remove the device.</p></dd>
+<dt><tt>-h</tt></dt>
+<dd><p>Display help text.</p></dd>
+<dt><tt>-V</tt></dt>
+<dd><p>Display the version number of the <tt>qotdctl</tt> command.</p></dd>
+<dt><tt>-d</tt> <i>device</i></dt>
+<dd><p>Specify the device node to use. The default value is <tt>/dev/qotd0</tt>.</p></dd>
+</dl>
+<p>Use the <tt>qotdctl</tt> command to test the driver's I/O controls:</p><pre># <tt><b>./qotdctl -V</b></tt>
+qotdctl 1.0
+# <tt><b>./qotdctl -h</b></tt>
+Usage: ./qotdctl [-d device] {-g | -h | -r | -s size | -V}
+# <tt><b>./qotdctl -g</b></tt>
+open: No such file or directory</pre><p>By default, the <tt>qotdctl</tt> command accesses the <tt>/dev/qotd0</tt> device. The <tt>qotd_3</tt> device
+in this example is <tt>/devices/pseudo/qotd_3@0:qotd_3</tt>. Either define a link from <tt>/dev/qotd0</tt> to
+<tt>/devices/pseudo/qotd_3@0:qotd_3</tt> or use the <tt>-d</tt> option to specify the correct device:</p><pre># <tt><b>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -g</b></tt>
+128
+# <tt><b>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -s 512</b></tt>
+# <tt><b>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -g</b></tt>
+512
+# <tt><b>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -r</b></tt>
+# <tt><b>cat /devices/pseudo/qotd_3@0:qotd_3</b></tt>
+On the whole, I'd rather be in Philadelphia. - W. C. Fields</pre><p>If you try to remove the device now, you will receive an
+error message:</p><pre># <tt><b>rem_drv qotd_3</b></tt>
+Device busy
+Cannot unload module: qotd_3
+Will be unloaded upon reboot.</pre><p>The device is still marked busy because you have not told the
+driver that you are no longer interested in this device. Run the <tt>qotdctl</tt>
+command with the <tt>-r</tt> option to unset the <tt>QOTD_CHANGED</tt> flag in the driver and
+mark the device not busy:</p><pre># <tt><b>./qotdctl -r</b></tt></pre><p>Enter the source code shown in the following example into a text
+file named <tt>qotdctl.c</tt>.</p><a name="ffzrf"></a><h6>Example&nbsp;3-8 Quote Of The Day I/O Control Command Source File</h6><pre>#include &lt;sys/ioctl.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;stdlib.h&gt;
+
+#include "qotd.h"
+
+static const char *DEFAULT_DEVICE = "/dev/qotd0";
+static const char *VERSION = "1.0";
+
+static void show_usage(const char *);
+static void get_size(const char *);
+static void set_size(const char *, size_t);
+static void reset_dev(const char *);
+
+int
+main(int argc, char *argv[])
+{
+        int op = -1;
+        int opt;
+        int invalid_usage = 0;
+        size_t sz_arg;
+        const char *device = DEFAULT_DEVICE;
+
+        while ((opt = getopt(argc, argv,
+            "d:(device)g(get-size)h(help)r(reset)s:(set-size)V(version)"))
+            != -1) {
+                switch (opt) {
+                case 'd':
+                        device = optarg;
+                        break;
+                case 'g':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCGSZ;
+                        break;
+                case 'h':
+                        show_usage(argv[0]);
+                        exit(0);
+                        /*NOTREACHED*/
+                case 'r':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCDISCARD;
+                        break;
+                case 's':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCSSZ;
+                        sz_arg = (size_t)atol(optarg);
+                        break;
+                case 'V':
+                        (void) printf("qotdctl %s\n", VERSION);
+                        exit(0);
+                        /*NOTREACHED*/
+                default:
+                        invalid_usage++;
+                        break;
+                }
+        }
+
+        if (invalid_usage &gt; 0 || op &lt; 0) {
+                show_usage(argv[0]);
+                exit(1);
+        }
+
+        switch (op) {
+        case QOTDIOCGSZ:
+                get_size(device);
+                break;
+        case QOTDIOCSSZ:
+                set_size(device, sz_arg);
+                break;
+        case QOTDIOCDISCARD:
+                reset_dev(device);
+                break;
+        default:
+                (void) fprintf(stderr,
+                    "internal error - invalid operation %d\n", op);
+                exit(2);
+        }
+
+        return (0);
+}
+
+static void
+show_usage(const char *execname)
+{
+        (void) fprintf(stderr,
+         "Usage: %s [-d device] {-g | -h | -r | -s size | -V}\n", execname);
+}
+
+static void
+get_size(const char *dev)
+{
+        size_t sz;
+        int fd;
+
+        if ((fd = open(dev, O_RDONLY)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCGSZ, &amp;sz) &lt; 0) {
+                perror("QOTDIOCGSZ");
+                exit(4);
+        }
+
+        (void) close(fd);
+
+        (void) printf("%zu\n", sz);
+}
+
+static void
+set_size(const char *dev, size_t sz)
+{
+        int fd;
+
+        if ((fd = open(dev, O_RDWR)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCSSZ, &amp;sz) &lt; 0) {
+                perror("QOTDIOCSSZ");
+                exit(4);
+        }
+
+        (void) close(fd);
+}
+
+static void
+reset_dev(const char *dev)
+{
+        int fd;
+
+        if ((fd = open(dev, O_RDWR)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCDISCARD) &lt; 0) {
+                perror("QOTDIOCDISCARD");
+                exit(4);
+        }
+
+        (void) close(fd);
+}</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="dataondemand.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="eoqrv.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

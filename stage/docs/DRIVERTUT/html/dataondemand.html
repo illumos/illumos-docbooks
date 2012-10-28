@@ -1,0 +1,501 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Displaying Data on Demand - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="fahrt.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ffdqq.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<p class="toc level2"><a href="fahrt.html">Displaying Data Stored in Kernel Memory</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Displaying Data on Demand</a></p>
+</div>
+<p class="toc level2"><a href="ffdqq.html">Modifying Data Stored in Kernel Memory</a></p>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="dataondemand"></a><h3>Displaying Data on Demand</h3>
+<p>The sample code in this section creates a pseudo device that is
+controlled by the driver. The driver stores data in the device and makes
+the data available when the user accesses the device for reading.</p><p>This section first discusses the important code differences between these two versions of
+the Quote Of The Day driver. This section then shows you how you
+can access the device to cause the quotation to display.</p>
+
+<a name="fcove"></a><h4>Writing Quote Of The Day Version 2</h4>
+<p>The driver that controls the pseudo device is more complex than the driver
+shown in the previous section. This section first explains some important features of
+this version of the driver. This section then shows all the source for
+this driver.</p><p>The following list summarizes the differences between the two versions of the Quote
+Of The Day driver:</p>
+<ul><li><p><a name="indexterm-340"></a>Version 2 of the driver defines a state structure that holds information about each instance of the device.</p></li>
+<li><p>Version 2 defines a <tt>cb_ops</tt>(9S) structure and a more complete <tt>dev_ops</tt>(9S) structure.</p></li>
+<li><p>Version 2 defines <tt>open</tt>(9E), <tt>close</tt>(9E), <tt>read</tt>(9E), <tt>getinfo</tt>(9E), <tt>attach</tt>(9E), and <tt>detach</tt>(9E) entry points.</p></li>
+<li><p>Version 1 uses the <tt>cmn_err</tt>(9F) function to write a constant string to a system log in the <tt>_init</tt>(9E) entry point of the driver. The <tt>_init</tt>(9E) entry point is called when the driver is loaded. Version 2 uses the <tt>uiomove</tt>(9F) function to copy the quotation from kernel memory. The copied data is returned by the <tt>read</tt>(9E) entry point. The <tt>read</tt>(9E) entry point is called when the driver is accessed for reading.</p></li>
+<li><p><a name="indexterm-341"></a><a name="indexterm-342"></a>Version 2 of the driver uses <a href="http://docs.sun.com/doc/819-2256/assert-9f?a=view"><tt>ASSERT</tt>(9F)</a> statements to check the validity of data.</p></li></ul>
+<p>The following sections provide more detail about the additions and changes in Version&nbsp;2
+of the Quote Of The Day driver.</p>
+
+<a name="fcowf"></a><h5>Managing Device State</h5>
+<a name="indexterm-343"></a><a name="indexterm-344"></a><a name="indexterm-345"></a><p>The <tt>_init</tt>(9E) and <tt>_fini</tt>(9E) entry points and all six new entry points defined
+in this driver maintain a soft state for the device. Most device drivers
+maintain state information with each instance of the device they control. An instance
+usually is a sub-device. For example, a disk driver might communicate with a
+hardware controller device that has several disk drives attached. See <a href="http://docs.sun.com/doc/819-3196/fappe?a=view">Retrieving Driver Soft State Information in <i>Writing Device Drivers</i></a> for
+more information about soft states.</p><p>This sample driver allows only one instance. The instance number is assigned in
+the configuration file. See <a href="#fcoux">Example&nbsp;3-4</a>. Most device drivers allow any number of
+instances of a device to be created. The system manages the device instance
+numbers, and the DDI soft state functions manage the instances.</p><p><a name="indexterm-346"></a><a name="indexterm-347"></a><a name="indexterm-348"></a><a name="indexterm-349"></a><a name="indexterm-350"></a><a name="indexterm-351"></a><a name="indexterm-352"></a><a name="indexterm-353"></a><a name="indexterm-354"></a><a name="indexterm-355"></a>The following flow gives an overview of how DDI soft state functions manage
+a state pointer and the state of a device instance:</p>
+<ol><li><p>The <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-init-9f?a=view"><tt>ddi_soft_state_init</tt>(9F)</a> function initializes the state pointer. The state pointer is an opaque handle that enables allocation, deallocation, and tracking of a state structure for each instance of a device. The state structure is a user-defined type that maintains data specific to this instance of the device. In this example, the state pointer and state structure are declared after the entry point declarations. See <tt>qotd_state_head</tt> and <tt>qotd_state</tt> in <a href="#fcova">Example&nbsp;3-3</a>.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-zalloc-9f?a=view"><tt>ddi_soft_state_zalloc</tt>(9F)</a> function uses the state pointer and the device instance to create the state structure for this instance.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/819-2256/ddi-get-soft-state-9f?a=view"><tt>ddi_get_soft_state</tt>(9F)</a> function uses the state pointer and the device instance to retrieve the state structure for this instance of the device.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-free-9f?a=view"><tt>ddi_soft_state_free</tt>(9F)</a> function uses the state pointer and the device instance to free the state structure for this instance.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-fini-9f?a=view"><tt>ddi_soft_state_fini</tt>(9F)</a> function uses the state pointer to destroy the state pointer and the state structures for all instances of this device.</p></li></ol>
+<p>The <tt>ddi_soft_state_zalloc</tt>(9F), <tt>ddi_get_soft_state</tt>(9F), and <tt>ddi_soft_state_free</tt>(9F) functions coordinate access to the underlying data
+structures in a way that is safe for multithreading. No additional locks should
+be necessary.</p>
+
+<a name="fcoye"></a><h5>Initializing and Unloading</h5>
+<a name="indexterm-356"></a><a name="indexterm-357"></a><a name="indexterm-358"></a><a name="indexterm-359"></a><a name="indexterm-360"></a><a name="indexterm-361"></a><a name="indexterm-362"></a><a name="indexterm-363"></a><a name="indexterm-364"></a><a name="indexterm-365"></a><a name="indexterm-366"></a><a name="indexterm-367"></a><p>The <a href="http://docs.sun.com/doc/819-2255/u-init-9e?a=view"><tt>_init</tt>(9E)</a> entry point first calls the <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-init-9f?a=view"><tt>ddi_soft_state_init</tt>(9F)</a> function to initialize the soft state.
+If the soft state initialization fails, that error code is returned. If the
+soft state initialization succeeds, the <tt>_init</tt>(9E) entry point calls the <a href="http://docs.sun.com/doc/819-2256/mod-install-9f?a=view"><tt>mod_install</tt>(9F)</a> function to
+load a new module. If the module install fails, the <tt>_init</tt>(9E) entry point
+calls the <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-fini-9f?a=view"><tt>ddi_soft_state_fini</tt>(9F)</a> function and returns the error code from the failed module
+install.</p><p>Your code must undo everything that it does. You must call <tt>ddi_soft_state_fini</tt>(9F)
+if the module install fails because the <tt>_init</tt>(9E) call succeeded and created a
+state pointer.</p><p>The <a href="http://docs.sun.com/doc/819-2255/u-fini-9e?a=view"><tt>_fini</tt>(9E)</a> entry point must undo everything the <tt>_init</tt>(9E) entry point did. The
+<tt>_fini</tt>(9E) entry point first calls the <a href="http://docs.sun.com/doc/819-2256/mod-remove-9f?a=view"><tt>mod_remove</tt>(9F)</a> function to remove the module that
+the <tt>_init</tt>(9E) entry point installed. If the module remove fails, that error code
+is returned. If the module remove succeeds, the <tt>_fini</tt>(9E) entry point calls the
+<a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-fini-9f?a=view"><tt>ddi_soft_state_fini</tt>(9F)</a> function to destroy the state pointer and the state structures for all
+instances of this device.</p>
+
+<a name="fcown"></a><h5>Attaching and Detaching</h5>
+<a name="indexterm-368"></a><a name="indexterm-369"></a><a name="indexterm-370"></a><a name="indexterm-371"></a><a name="indexterm-372"></a><a name="indexterm-373"></a><a name="indexterm-374"></a><a name="indexterm-375"></a><a name="indexterm-376"></a><a name="indexterm-377"></a><p>The <a href="http://docs.sun.com/doc/819-2255/attach-9e?a=view"><tt>attach</tt>(9E)</a> entry point first calls the <a href="http://docs.sun.com/doc/819-2256/ddi-get-instance-9f?a=view"><tt>ddi_get_instance</tt>(9F)</a> function to retrieve the instance number
+of the device information node. The <tt>attach</tt>(9E) entry point uses this instance number
+to call the <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-zalloc-9f?a=view"><tt>ddi_soft_state_zalloc</tt>(9F)</a>, <a href="http://docs.sun.com/doc/819-2256/ddi-get-soft-state-9f?a=view"><tt>ddi_get_soft_state</tt>(9F)</a>, and <a href="http://docs.sun.com/doc/819-2256/ddi-create-minor-node-9f?a=view"><tt>ddi_create_minor_node</tt>(9F)</a> functions.</p><p>The <tt>attach</tt>(9E) entry point calls the <tt>ddi_soft_state_zalloc</tt>(9F) function to create a state structure
+for this device instance. If creation of the soft state structure fails, <tt>attach</tt>(9E)
+writes an error message to a system log and returns failure. This device
+instance is not attached. If creation of the soft state structure succeeds, <tt>attach</tt>(9E)
+ calls the <tt>ddi_get_soft_state</tt>(9F) function to retrieve the state structure for this
+device instance.</p><p><a name="indexterm-378"></a><a name="indexterm-379"></a>If retrieval of the state structure fails, <tt>attach</tt>(9E) writes an error message to
+a system log, calls the <a href="http://docs.sun.com/doc/819-2256/ddi-soft-state-free-9f?a=view"><tt>ddi_soft_state_free</tt>(9F)</a> function to destroy the state structure that
+was created by <tt>ddi_soft_state_zalloc</tt>(9F), and returns failure. This device instance is not attached. If
+retrieval of the state structure succeeds, <tt>attach</tt>(9E) calls the <tt>ddi_create_minor_node</tt>(9F) function to create
+the device node.</p><p><a name="indexterm-380"></a><a name="indexterm-381"></a>At the top of this driver source file, a constant named <tt>QOTD_NAME</tt> is defined
+that holds the string name of the device. This constant is one
+of the arguments that is passed to <tt>ddi_create_minor_node</tt>(9F). If creation of the device node
+fails, <tt>attach</tt>(9E) writes an error message to a system log, calls the <tt>ddi_soft_state_free</tt>(9F)
+function to destroy the state structure that was created by <tt>ddi_soft_state_zalloc</tt>(9F), calls the
+<a href="http://docs.sun.com/doc/819-2256/ddi-remove-minor-node-9f?a=view"><tt>ddi_remove_minor_node</tt>(9F)</a> function, and returns failure. This device instance is not attached.</p><p><a name="indexterm-382"></a><a name="indexterm-383"></a><a name="indexterm-384"></a><a name="indexterm-385"></a>If creation of the device node succeeds, this device instance is attached. The
+<tt>attach</tt>(9E) entry point assigns the instance number that was retrieved with <tt>ddi_get_instance</tt>(9F) to
+the instance member of the state structure for this instance. Then <tt>attach</tt>(9E) assigns
+the <tt>dev_info</tt> structure pointer that was passed in the <tt>attach</tt>(9E) call to the
+<tt>dev_info</tt> structure pointer member of the state structure for this instance. The <a href="http://docs.sun.com/doc/819-2256/ddi-report-dev-9f?a=view"><tt>ddi_report_dev</tt>(9F)</a>
+function writes a message in the system log file when the device is
+added or when the system is booted. The message announces this device as
+shown in the following example:</p><pre>% <tt><b>dmesg</b></tt>
+<i>date</i> <i>time</i> <i>machine</i> pseudo: [ID 129642 kern.info] pseudo-device: qotd_20
+<i>date</i> <i>time</i> <i>machine</i> genunix: [ID 936769 kern.info] qotd_20 is /pseudo/qotd_2@0</pre><p><a name="indexterm-386"></a><a name="indexterm-387"></a>The <a href="http://docs.sun.com/doc/819-2255/detach-9e?a=view"><tt>detach</tt>(9E)</a> entry point first calls the <tt>ddi_get_instance</tt>(9F) function to retrieve the
+instance number of the device information node. The <tt>detach</tt>(9E) entry point uses this
+instance number to call the <tt>ddi_soft_state_free</tt>(9F) function to destroy the state structure
+that was created by <tt>ddi_soft_state_zalloc</tt>(9F) in the <tt>attach</tt>(9E) entry point. The <tt>detach</tt>(9E)
+entry point then calls the <tt>ddi_remove_minor_node</tt>(9F) function to remove the device that was created
+by <tt>ddi_create_minor_node</tt>(9F) in the <tt>attach</tt>(9E) entry point.</p>
+
+<a name="fcows"></a><h5>Opening the Device, Closing the Device, and Getting Module Information</h5>
+<a name="indexterm-388"></a><a name="indexterm-389"></a><a name="indexterm-390"></a><a name="indexterm-391"></a><a name="indexterm-392"></a><a name="indexterm-393"></a><a name="indexterm-394"></a><a name="indexterm-395"></a><a name="indexterm-396"></a><a name="indexterm-397"></a><p>The <a href="http://docs.sun.com/doc/819-2255/open-9e?a=view"><tt>open</tt>(9E)</a> and <a href="http://docs.sun.com/doc/819-2255/close-9e?a=view"><tt>close</tt>(9E)</a> entry points are identical in this sample driver. In
+each case, the entry point first calls the <a href="http://docs.sun.com/doc/819-2256/getminor-9f?a=view"><tt>getminor</tt>(9F)</a> function to retrieve the
+minor number of the device. Then each entry point uses this instance number
+to call the <a href="http://docs.sun.com/doc/819-2256/ddi-get-soft-state-9f?a=view"><tt>ddi_get_soft_state</tt>(9F)</a> function to retrieve the state structure for this device
+instance. If no state structure is retrieved, an error code is returned. If
+a state structure is retrieved, the <tt>open</tt>(9E) and <tt>close</tt>(9E) entry points both verify
+the type of this device. If this device is not a character device,
+the <tt>EINVAL</tt> (invalid) error code is returned.</p><p>If the user wants device information for this device instance, the <a href="http://docs.sun.com/doc/819-2255/getinfo-9e?a=view"><tt>getinfo</tt>(9E)</a>
+entry point returns the device information from the state structure. If the user
+wants the instance number of this device instance, the <tt>getinfo</tt>(9E) entry point uses the
+<tt>getminor</tt>(9F) function to return the minor number.</p>
+
+<a name="fcowr"></a><h5>Reading the Data</h5>
+<a name="indexterm-398"></a><a name="indexterm-399"></a><a name="indexterm-400"></a><a name="indexterm-401"></a><a name="indexterm-402"></a><a name="indexterm-403"></a><a name="indexterm-404"></a><a name="indexterm-405"></a><a name="indexterm-406"></a><a name="indexterm-407"></a><p>The <a href="http://docs.sun.com/doc/819-2255/read-9e?a=view"><tt>read</tt>(9E)</a> entry point first calls the <a href="http://docs.sun.com/doc/819-2256/getminor-9f?a=view"><tt>getminor</tt>(9F)</a> function to retrieve the minor number
+of the device. The <tt>read</tt>(9E) entry point uses this instance number to call
+the <a href="http://docs.sun.com/doc/819-2256/ddi-get-soft-state-9f?a=view"><tt>ddi_get_soft_state</tt>(9F)</a> function to retrieve the state structure for this device instance. If
+no state structure is retrieved, <tt>read</tt>(9E) returns an error code. If a state
+structure is retrieved, <tt>read</tt>(9E) calls the <a href="http://docs.sun.com/doc/819-2256/uiomove-9f?a=view"><tt>uiomove</tt>(9F)</a> function to copy the quotation from the
+driver to the <a href="http://docs.sun.com/doc/819-2257/uio-9s?a=view"><tt>uio</tt>(9S)</a> I/O request structure.</p>
+
+<a name="fgowt"></a><h5>Checking Data Validity</h5>
+<a name="indexterm-408"></a><a name="indexterm-409"></a><p>Version 2 of the driver uses <a href="http://docs.sun.com/doc/819-2256/assert-9f?a=view"><tt>ASSERT</tt>(9F)</a> statements to check the validity of
+data. If the asserted expression is true, the <tt>ASSERT</tt>(9F) statement does nothing. If
+the asserted expression is false, the <tt>ASSERT</tt>(9F) statement writes an error message to
+the console and causes the system to panic.</p><p>To use <tt>ASSERT</tt>(9F) statements, include the <tt>sys/debug.h</tt> header file in your source and
+define the <tt>DEBUG</tt> preprocessor symbol. If you do not define the <tt>DEBUG</tt> preprocessor
+symbol, then the <tt>ASSERT</tt>(9F) statements do nothing. Simply recompile to activate or inactivate
+<tt>ASSERT</tt>(9F) statements.</p>
+
+<a name="fcowy"></a><h5>Quote Of The Day Version 2 Source</h5>
+<p>Enter the source code shown in the following example into a text
+file named <tt>qotd_2.c</tt>.</p><a name="fcova"></a><h6>Example&nbsp;3-3 Quote Of The Day Version 2 Source File</h6><pre>#include &lt;sys/types.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/open.h&gt;
+#include &lt;sys/cred.h&gt;
+#include &lt;sys/uio.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/debug.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#define QOTD_NAME       "qotd"
+#define QOTD_MAXLEN     128
+
+static const char qotd[QOTD_MAXLEN]
+        = "You can't have everything. \
+Where would you put it? - Steven Wright\n";
+
+static void *qotd_state_head;
+
+struct qotd_state {
+        int             instance;
+        dev_info_t      *devi;
+};
+
+static int qotd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int qotd_attach(dev_info_t *, ddi_attach_cmd_t);
+static int qotd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int qotd_open(dev_t *, int, int, cred_t *);
+static int qotd_close(dev_t, int, int, cred_t *);
+static int qotd_read(dev_t, struct uio *, cred_t *);
+
+static struct cb_ops qotd_cb_ops = {
+        qotd_open,              /* cb_open */
+        qotd_close,             /* cb_close */
+        nodev,                  /* cb_strategy */
+        nodev,                  /* cb_print */
+        nodev,                  /* cb_dump */
+        qotd_read,              /* cb_read */
+        nodev,                  /* cb_write */
+        nodev,                  /* cb_ioctl */
+        nodev,                  /* cb_devmap */
+        nodev,                  /* cb_mmap */
+        nodev,                  /* cb_segmap */
+        nochpoll,               /* cb_chpoll */
+        ddi_prop_op,            /* cb_prop_op */
+        (struct streamtab *)NULL,       /* cb_str */
+        D_MP | D_64BIT,         /* cb_flag */
+        CB_REV,                 /* cb_rev */
+        nodev,                  /* cb_aread */
+        nodev                   /* cb_awrite */
+};
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        qotd_getinfo,           /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        qotd_attach,            /* devo_attach */
+        qotd_detach,            /* devo_detach */
+        nodev,                  /* devo_reset */
+        &amp;qotd_cb_ops,           /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the Day 2.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        int retval;
+
+        if ((retval = ddi_soft_state_init(&amp;qotd_state_head,
+            sizeof (struct qotd_state), 1)) != 0)
+                return retval;
+        if ((retval = mod_install(&amp;modlinkage)) != 0) {
+                ddi_soft_state_fini(&amp;qotd_state_head);
+                return (retval);
+        }
+
+        return (retval);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+
+int
+_fini(void)
+{
+        int retval;
+
+        if ((retval = mod_remove(&amp;modlinkage)) != 0)
+                return (retval);
+        ddi_soft_state_fini(&amp;qotd_state_head);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
+{
+        struct qotd_state *qsp;
+        int retval = DDI_FAILURE;
+
+        ASSERT(resultp != NULL);
+
+        switch (cmd) {
+        case DDI_INFO_DEVT2DEVINFO:
+                if ((qsp = ddi_get_soft_state(qotd_state_head,
+                    getminor((dev_t)arg))) != NULL) {
+                        *resultp = qsp-&gt;devi;
+                        retval = DDI_SUCCESS;
+                } else
+                        *resultp = NULL;
+                break;
+        case DDI_INFO_DEVT2INSTANCE:
+                *resultp = (void *)getminor((dev_t)arg);
+                retval = DDI_SUCCESS;
+                break;
+        }
+
+        return (retval);
+}
+
+static int
+qotd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_ATTACH:
+                if (ddi_soft_state_zalloc(qotd_state_head, instance)
+                    != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to allocate state for %d",
+                            instance);
+                        return (DDI_FAILURE);
+                }
+                if ((qsp = ddi_get_soft_state(qotd_state_head, instance))
+                    == NULL) {
+                        cmn_err(CE_WARN, "Unable to obtain state for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        return (DDI_FAILURE);
+                }
+                if (ddi_create_minor_node(dip, QOTD_NAME, S_IFCHR, instance,
+                    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Cannot create minor node for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        ddi_remove_minor_node(dip, NULL);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;instance = instance;
+                qsp-&gt;devi = dip;
+
+                ddi_report_dev(dip);
+                return (DDI_SUCCESS);
+        case DDI_RESUME:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+static int
+qotd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+
+        switch (cmd) {
+        case DDI_DETACH:
+                ddi_soft_state_free(qotd_state_head, instance);
+                ddi_remove_minor_node(dip, NULL);
+                return (DDI_SUCCESS);
+        case DDI_SUSPEND:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+/*ARGSUSED*/
+static int
+qotd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+        int instance = getminor(*devp);
+        struct qotd_state *qsp;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        return (uiomove((void *)qotd, min(uiop-&gt;uio_resid, strlen(qotd)),
+            UIO_READ, uiop));
+}</pre><p>Enter the configuration information shown in the following example into a text file
+named <tt>qotd_2.conf</tt>.</p><a name="fcoux"></a><h6>Example&nbsp;3-4 Quote Of The Day Version 2 Configuration File</h6><pre>name="qotd_2" parent="pseudo" instance=0;</pre>
+
+<a name="fcovc"></a><h4>Building, Installing, and Using Quote Of The Day Version&nbsp;2</h4>
+<a name="indexterm-410"></a><a name="indexterm-411"></a><p>Version 2 of the driver uses <a href="http://docs.sun.com/doc/819-2256/assert-9f?a=view"><tt>ASSERT</tt>(9F)</a> statements to check the validity of
+data. To use <tt>ASSERT</tt>(9F) statements, include the <tt>sys/debug.h</tt> header file in your source
+and define the <tt>DEBUG</tt> preprocessor symbol.</p><p>Compile and link the driver. If you use <a href="http://docs.sun.com/doc/819-2256/assert-9f?a=view"><tt>ASSERT</tt>(9F)</a> statements to check
+the validity of data, you must define the <tt>DEBUG</tt> preprocessor symbol:</p><pre>% <tt><b>cc -D_KERNEL -DDEBUG -c qotd_2.c</b></tt>
+% <tt><b>ld -r -o qotd_2 qotd_2.o</b></tt></pre><p>The following example shows compiling and linking for a 32-bit architecture if you
+are not using <tt>ASSERT</tt>(9F) statements:</p><pre>% <tt><b>cc -D_KERNEL -c qotd_2.c</b></tt>
+% <tt><b>ld -r -o qotd_2 qotd_2.o</b></tt></pre><p>Make sure you are user <tt>root</tt> when you install the driver.</p><p>Copy the driver binary to the <tt>/tmp</tt> directory as discussed in <a href="eoxzr.html">Building and Installing the Template Driver</a>.</p><pre># <tt><b>cp qotd_2 /tmp</b></tt>
+# <tt><b>ln -s /tmp/qotd_2 /usr/kernel/drv/qotd_2</b></tt></pre><p>Copy the configuration file to the kernel driver area of the system.</p><pre># <tt><b>cp qotd_2.conf /usr/kernel/drv</b></tt></pre><p>In a separate window, enter the following command:</p><pre>% <tt><b>tail -f /var/adm/messages</b></tt></pre><p>Make sure you are user <tt>root</tt> when you load the driver. Use the
+<a href="http://docs.sun.com/doc/819-2240/add-drv-1m?a=view"><tt>add_drv</tt>(1M)</a> command to load the driver:</p><pre># <tt><b>add_drv qotd_2</b></tt></pre><p>You should see the following messages in the window where you are
+viewing <tt>/var/adm/messages</tt>:</p><pre><i>date</i> <i>time</i> <i>machine</i> pseudo: [ID 129642 kern.info] pseudo-device: devinfo0
+<i>date</i> <i>time</i> <i>machine</i> genunix: [ID 936769 kern.info] devinfo0 is /pseudo/devinfo@0
+<i>date</i> <i>time</i> <i>machine</i> pseudo: [ID 129642 kern.info] pseudo-device: qotd_20
+<i>date</i> <i>time</i> <i>machine</i> genunix: [ID 936769 kern.info] qotd_20 is /pseudo/qotd_2@0</pre><p>When this version of the Quote Of The Day driver loads, it
+does not display its quotation. The <tt>qotd_1</tt> driver wrote a message to a system
+log through its <tt>_init</tt>(9E) entry point. This <tt>qotd_2</tt> driver stores its data and
+makes the data available through its <tt>read</tt>(9E) entry point.</p><p><a name="indexterm-412"></a><a name="indexterm-413"></a><a name="indexterm-414"></a><a name="indexterm-415"></a>You can use the <a href="http://docs.sun.com/doc/819-2240/modinfo-1m?a=view"><tt>modinfo</tt>(1M)</a> command to display the module information for this
+version of the Quote Of The Day driver. The module name is the
+value you entered for the second member of the <tt>modldrv</tt> structure. The
+value <tt>96</tt> is the major number of this module.</p><pre>% <tt><b>modinfo | grep qotd</b></tt>
+182 ed115948    754  96   1  qotd_2 (Quote of the Day 2.0)
+% <tt><b>grep qotd /etc/name_to_major</b></tt>
+qotd_1 94
+qotd_2 96</pre><p><a name="indexterm-416"></a><a name="indexterm-417"></a>This driver also is the most recent module listed by <tt>prtconf</tt>(1M) in the
+pseudo device section:</p><pre>% <tt><b>prtconf -P | grep qotd</b></tt>
+        qotd_1, instance #0 (driver not attached)
+        qotd_2, instance #0</pre><p><a name="indexterm-418"></a>When you access this <tt>qotd_2</tt> device for reading, the command you use to
+access the device retrieves the data from the device node. The command then
+displays the data in the same way that the command displays any other
+input. To get the name of the device special file, look in the
+<tt>/devices</tt> directory:</p><pre>% <tt><b>ls -l /devices/pseudo/qotd*</b></tt>
+crw-------   1 root   sys   96, 0 <i>date</i> <i>time</i> /devices/pseudo/qotd_2@0:qotd</pre><p><a name="indexterm-419"></a><a name="indexterm-420"></a><a name="indexterm-421"></a>This output shows that <tt>qotd_2@0:qotd</tt> is a character device. This listing also shows
+that only the <tt>root</tt> user has permission to read or write this device.
+Make sure you are user <tt>root</tt> when you test this driver. To
+test the <tt>qotd_2</tt> driver, you can use the <a href="http://docs.sun.com/doc/819-2239/more-1?a=view"><tt>more</tt>(1)</a> command to access the device
+file for reading:</p><pre># <tt><b>more /devices/pseudo/qotd_2@0:qotd</b></tt>
+You can't have everything. Where would you put it? - Steven Wright
+You can't have everything. Where would you put it? - Steven Wright</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="fahrt.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ffdqq.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

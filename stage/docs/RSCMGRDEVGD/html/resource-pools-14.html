@@ -1,0 +1,201 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Resource Pool Code Examples - Solaris Containers: Resource Management and Solaris Zones Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-05-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris Containers: Resource Management and Solaris Zones Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-pools-1.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-pools-35.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="concepts-2.html">1.&nbsp;&nbsp;Resource Management in the Solaris Operating System</a></p>
+<p class="toc level1 tocsp"><a href="tasks-3.html">2.&nbsp;&nbsp;Projects and Tasks</a></p>
+<p class="toc level1 tocsp"><a href="ext-acctg-11.html">3.&nbsp;&nbsp;Using the C Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="extacctg-perl-1.html">4.&nbsp;&nbsp;Using the Perl Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="resource-ctrls-8.html">5.&nbsp;&nbsp;Resource Controls</a></p>
+<p class="toc level1 tocsp"><a href="resource-pools-5.html">6.&nbsp;&nbsp;Resource Pools</a></p>
+<p class="toc level2"><a href="resource-pools-6.html">Overview of Resource Pools</a></p>
+<p class="toc level2"><a href="resource-pools-12.html">Dynamic Resource Pool Constraints and Objectives</a></p>
+<p class="toc level2"><a href="resource-pools-40.html">Using <tt>libpool</tt> to Manipulate Pool Configurations</a></p>
+<p class="toc level2"><a href="resource-pools-1.html">Resource Pools API Functions</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Resource Pool Code Examples</a></p>
+</div>
+<p class="toc level2"><a href="resource-pools-35.html">Programming Issues Associated With Resource Pools</a></p>
+<p class="toc level1 tocsp"><a href="fquzd.html">7.&nbsp;&nbsp;Design Considerations for Resource Management Applications in Solaris Zones</a></p>
+<p class="toc level1 tocsp"><a href="faate.html">8.&nbsp;&nbsp;Configuration Examples</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="resource-pools-14"></a><h3>Resource Pool Code Examples</h3>
+<p>This section contains code examples of the resource pools interface.</p>
+
+<a name="resource-pools-30"></a><h4>Ascertain the Number of CPUs in the Resource Pool</h4>
+<p><a name="indexterm-46"></a><tt>sysconf</tt>(3C) provides information about the number of CPUs on an entire system. The
+following example provides the granularity of ascertaining the number of CPUs that are
+defined in a particular application's pools <tt>pset</tt>.</p><p>The key points for this example include the following:</p>
+<ul><li><p><tt>pvals[]</tt> should be a NULL terminated array.</p></li>
+<li><p><tt>pool_query_pool_resources()</tt> returns a list of all resources that match the <tt>pvals</tt> array type <tt>pset</tt> from the application's pool <tt>my_pool</tt>. Because a pool can have only one instance of the <tt>pset</tt> resource, each instance is always returned in <tt>nelem</tt>. <tt>reslist[]</tt> contains only one element, the <tt>pset</tt> resource.</p></li></ul>
+<pre>pool_value_t *pvals[2] = {NULL};  /* pvals[] should be NULL terminated */
+
+/* NOTE: Return value checking/error processing omitted */
+/* in all examples for brevity */
+
+conf_loc = pool_dynamic_location();
+conf = pool_conf_alloc();
+pool_conf_open(conf, conf_loc, PO_RDONLY);
+my_pool_name = pool_get_binding(getpid());
+my_pool = pool_get_pool(conf, my_pool_name);
+pvals[0] = pool_value_alloc();
+pvals2[2] = { NULL, NULL };
+pool_value_set_name(pvals[0], "type");
+pool_value_set_string(pvals[0], "pset");
+
+reslist = pool_query_pool_resources(conf, my_pool, &amp;nelem, pvals);
+pool_value_free(pvals[0]);
+pool_query_resource_components(conf, reslist[0], &amp;nelem, NULL);
+printf("pool %s: %u cpu", my_pool_ name, nelem);
+pool_conf_close(conf);</pre>
+
+<a name="resource-pools-31"></a><h4>List All Resource Pools</h4>
+<p><a name="indexterm-47"></a>The following example lists all resource pools defined in an application's pools <tt>pset</tt>.</p><p>The key points of the example include the following:</p>
+<ul><li><p>Open the dynamic <tt>conf</tt> file read-only, PO_RDONLY. <tt>pool_query_pools()</tt> returns the list of pools in <tt>pl</tt> and the number of pools in <tt>nelem</tt>. For each pool, call <tt>pool_get_property()</tt> to get the <tt>pool.name</tt> property from the element into the <tt>pval</tt> value. </p></li>
+<li><p><tt>pool_get_property()</tt> calls <tt>pool_to_elem()</tt> to convert the <tt>libpool</tt> entity to an opaque value. <tt>pool_value_get_string()</tt> gets the string from the opaque pool value.</p></li></ul>
+<pre>conf    = pool_conf_alloc();
+pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY);
+pl = pool_query_pools(conf, &amp;nelem, NULL);
+pval = pool_value_alloc();
+for (i = 0; i &lt; nelem; i++) {
+    pool_get_property(conf, pool_to_elem(conf, pl[i]), "pool.name", pval);
+    pool_value_get_string(pval, &amp;fname);
+    printf("%s\n", name);
+}
+pool_value_free(pval);
+free(pl);
+pool_conf_close(conf);</pre>
+
+<a name="resource-pools-32"></a><h4>Report Pool Statistics for a Given Pool</h4>
+<p><a name="indexterm-48"></a>The following example reports statistics for the designated pool.</p><p>The key points for the example include the following:</p>
+<ul><li><p><tt>pool_query_pool_resources()</tt> gets a list of all resources in <tt>rl</tt>. Because the last argument to <tt>pool_query_pool_resources()</tt> is NULL, all resources are returned. For each resource, the <tt>name</tt>, <tt>load</tt> and <tt>size</tt> properties are read, and printed.</p></li>
+<li><p>The call to <tt>strdup()</tt> allocates local memory and copies the string returned by <tt>get_string()</tt>. The call to <tt>get_string()</tt> returns a pointer that is freed by the next call to <tt>get_property()</tt>. If the call to <tt>strdup()</tt> is not included, subsequent references to the string(s) could cause the application to fail with a segmentation fault.</p></li></ul>
+<pre>printf("pool %s\n:" pool_name);
+pool = pool_get_pool(conf, pool_name);
+rl = pool_query_pool_resources(conf, pool, &amp;nelem, NULL);
+for (i = 0; i &lt; nelem; i++) {
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), "type", pval);
+  pool_value_get_string(pval, &amp;type);
+  type = strdup(type);
+  snprintf(prop_name, 32, "%s.%s", type, "name");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_string(val, &amp;res_name);
+  res_name = strdup(res_name);
+  snprintf(prop_name, 32, "%s.%s", type, "load");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_uint64(val, &amp;load);
+  snprintf(prop_name, 32, "%s.%s", type, "size");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_uint64(val, &amp;size);
+  printf("resource %s: size %llu load %llu\n", res_name, size, load);
+  free(type);
+  free(res_name);
+}
+free(rl);</pre>
+
+<a name="resource-pools-33"></a><h4>Set <tt>pool.comment</tt> Property and Add New Property</h4>
+<p><a name="indexterm-49"></a>The following example sets the <tt>pool.comment</tt> property for the <tt>pset</tt>. The example also
+creates a new property in <tt>pool.newprop</tt>. </p><p>The key point for the example includes the following:</p>
+<ul><li><p>In the call to <tt>pool_conf_open()</tt>, using PO_RDWR on a static configuration file, requires the caller to be root. </p></li>
+<li><p>To commit these changes to the <tt>pset</tt> after running this utility, issue a <tt>pooladm -c</tt> command. To have the utility commit the changes, call <tt>pool_conf_commit()</tt> with a nonzero second argument.</p></li></ul>
+<pre>pool_set_comment(const char *pool_name, const char *comment)
+{
+  pool_t *pool;
+  pool_elem_t *pool_elem;
+  pool_value_t *pval = pool_value_alloc(); 
+  pool_conf_t  *conf = pool_conf_alloc();
+  /* NOTE: need to be root to use PO_RDWR on static configuration file */
+  pool_conf_open(conf, pool_static_location(), PO_RDWR);
+  pool = pool_get_pool(conf,  pool_name);
+  pool_value_set_string(pval, comment);
+  pool_elem = pool_to_elem(conf, pool);
+  pool_put_property(conf, pool_elem, "pool.comment", pval);
+  printf("pool %s: pool.comment set to %s\n:" pool_name, comment);
+  /* Now, create a new property, customized to installation site */
+  pool_value_set_string(pval, "New String Property");
+  pool_put_property(conf, pool_elem, "pool.newprop", pval);
+  pool_conf_commit(conf, 0); /* NOTE: use 0 to ensure only */
+                             /* static file gets updated */
+  pool_value_free(pval);
+  pool_conf_close(conf);
+  pool_conf_free(conf);
+  /* NOTE: Use "pooladm -c" later, or pool_conf_commit(conf, 1) */
+  /* above for changes to the running system */
+}</pre><p>An alternative way of modifying a pool's comment and adding a new
+pool property is to use <tt>poolcfg</tt>(1M).</p><pre>poolcfg -c 'modify pool pool-name (string pool.comment = "cmt-string")'
+poolcfg -c 'modify pool pool-name (string pool.newprop = 
+                                   "New String Property")'</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-pools-1.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-pools-35.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

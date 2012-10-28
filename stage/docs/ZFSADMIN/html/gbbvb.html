@@ -1,0 +1,151 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Repairing a Missing Device - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbve.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbvf.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level2"><a href="gbbth.html">ZFS Failure Modes</a></p>
+<p class="toc level2"><a href="gbbwa.html">Checking ZFS Data Integrity</a></p>
+<p class="toc level2"><a href="gbbuw.html">Identifying Problems in ZFS</a></p>
+<p class="toc level2"><a href="gbbve.html">Repairing a Damaged ZFS Configuration</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Repairing a Missing Device</a></p>
+</div>
+<p class="toc level2"><a href="gbbvf.html">Repairing a Damaged Device</a></p>
+<p class="toc level2"><a href="gbbwl.html">Repairing Damaged Data</a></p>
+<p class="toc level2"><a href="gbbwc.html">Repairing an Unbootable System</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbbvb"></a><h3>Repairing a Missing Device</h3>
+<p>If a device cannot be opened, it displays as <tt>UNAVAILABLE</tt> in the <tt>zpool status</tt>
+output. This status means that ZFS was unable to open the device when
+the pool was first accessed, or the device has since become unavailable. If
+the device causes a top-level virtual device to be unavailable, then nothing in
+the pool can be accessed. Otherwise, the fault tolerance of the pool might
+be compromised. In either case, the device simply needs to be reattached to
+the system to restore normal operation.<a name="indexterm-630"></a><a name="indexterm-631"></a><a name="indexterm-632"></a></p><p>For example, you might see a message similar to the following from
+<tt>fmd</tt> after a device failure:</p><pre>SUNW-MSG-ID: ZFS-8000-D3, TYPE: Fault, VER: 1, SEVERITY: Major
+EVENT-TIME: Thu Aug 31 11:40:59 MDT 2006
+PLATFORM: SUNW,Sun-Blade-1000, CSN: -, HOSTNAME: tank
+SOURCE: zfs-diagnosis, REV: 1.0
+EVENT-ID: e11d8245-d76a-e152-80c6-e63763ed7e4e
+DESC: A ZFS device failed.  Refer to http://sun.com/msg/ZFS-8000-D3 for more information.
+AUTO-RESPONSE: No automated response will occur.
+IMPACT: Fault tolerance of the pool may be compromised.
+REC-ACTION: Run 'zpool status -x' and replace the bad device.</pre><p>The next step is to use the <tt>zpool status</tt> <tt>-x</tt> command to view more
+detailed information about the device problem and the resolution. For example:</p><pre># <tt><b>zpool status -x</b></tt>
+  pool: tank
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-D3
+ scrub: resilver completed with 0 errors on Thu Aug 31 11:45:59 MDT 2006
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         DEGRADED     0     0     0
+          mirror     DEGRADED     0     0     0
+            c0t1d0   UNAVAIL      0     0     0  cannot open
+            c1t1d0   ONLINE       0     0     0</pre><p>You can see from this output that the missing device <tt>c0t1d0</tt> is not
+functioning. If you determine that the drive is faulty, replace the device.</p><p>Then, use the <tt>zpool online</tt> command to online the replaced device. For example:</p><pre># <tt><b>zpool online tank c0t1d0</b></tt></pre><p>Confirm that the pool with the replaced device is healthy.</p><pre># <tt><b>zpool status -x tank</b></tt>
+pool 'tank' is healthy</pre>
+
+<a name="gbbxn"></a><h4>Physically Reattaching the Device</h4>
+<p>Exactly how a missing device is reattached depends on the device in question.
+If the device is a network-attached drive, connectivity should be restored. If the
+device is a USB or other removable media, it should be reattached to
+the system. If the device is a local disk, a controller might
+have failed such that the device is no longer visible to the system.
+In this case, the controller should be replaced at which point the disks
+will again be available. Other pathologies can exist and depend on the type
+of hardware and its configuration. If a drive fails and it is no
+longer visible to the system (an unlikely event), the device should be treated
+as a damaged device. Follow the procedures outlined in <a href="gbbvf.html">Repairing a Damaged Device</a>.</p>
+
+<a name="gbbyi"></a><h4>Notifying ZFS of Device Availability</h4>
+<p>Once a device is reattached to the system, ZFS might or might
+not automatically detect its availability. If the pool was previously faulted, or the
+system was rebooted as part of the attach procedure, then ZFS automatically rescans all
+devices when it tries to open the pool. If the pool was
+degraded and the device was replaced while the system was up, you must
+notify ZFS that the device is now available and ready to be reopened
+by using the <tt>zpool online</tt> command. For example:<a name="indexterm-633"></a><a name="indexterm-634"></a><a name="indexterm-635"></a></p><pre># <tt><b>zpool online tank c0t1d0</b></tt></pre><p>For more information about bringing devices online, see <a href="gayrd.html#gazgk">Bringing a Device Online</a>.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbve.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbvf.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

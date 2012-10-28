@@ -1,0 +1,102 @@
+<chapter id="gfwcu"><title>Xvnc</title><highlights><para><literal>Xvnc</literal> is an X server based on the open source releases
+from the RealVNC project and X.Org Foundation. The Solaris operating system also includes the RealVNC <literal>vncviewer</literal> program.</para>
+</highlights><sect1><title>About Xvnc</title><para>Virtual network computing (VNC) is a remote control software that allows
+you to view and fully interact with one computer desktop, the Xvnc server,
+by using the VNC viewer on another computer desktop. The two computers do
+not have to be running the same type of operating system. VNC provides a guest
+domain graphical login.</para><para>By default, consoles for HVM guests are graphics consoles.  You can
+use VNC to view a Windows guest domain from a Solaris control domain.</para><para>Xvnc displays to a VNC viewer over the network. A VNC viewer is a remote
+framebuffer (RFB) graphical user interface. Xvnc is a simple protocol for
+allowing remote access to an RFB protocol client over the network, without
+requiring an existing X server session to be displayed on local hardware. Xvnc also
+includes the RealVNC <command>vncviewer</command>client to connect to
+remote VNC servers, and several associated management programs.</para><sect2 id="gfxqi"><title><literal>Xvnc</literal> Server</title><para><literal>Xvnc</literal> is the X VNC (Virtual	Network	Computing)
+server. Based on a standard X server,  <literal>Xvnc</literal> has a virtual screen rather
+than a physical one. X applications display through a VNC viewer as if to
+a physical X display.</para><para>The VNC server display number is the same as the X server display number.
+For example, <literal>snoopy:2</literal> refers to display <literal>2</literal>on
+machine <literal>snoopy</literal> for both VNC and an X server.</para><para>To see the list of Xvnc options, use the <option>help</option> option:</para><screen>Xvnc <option>help</option></screen><para>Many options are standard X server options. In addition to options that
+can only be set at the command line, there are also parameters set through
+both the command line and the <command>vncconfig</command>program.</para><para>To start <literal>Xvnc</literal>, use the <command>vncserver</command> script.</para><para>The server can be started by the <literal>x11-server</literal> SMF service.</para><para>For more information, see the <literal>Xvnc</literal>(1), <literal>Xserver</literal>(1), <literal>vncconfig</literal>(1) <command>vncviewer</command>(1),  <literal>vncserver</literal>(1)
+man pages.</para>
+</sect2><sect2 id="gfxrf"><title>Setting a VNC Password</title><para>Use the <command>vncpasswd</command> command to set the password used
+to access  VNC desktops. The password is stored on the server. For more information,
+see <command>vncpasswd</command>(1) and <olink targetptr="gfshb" remap="internal">Example&nbsp;40&ndash;6</olink>.</para>
+</sect2>
+</sect1><sect1 id="gfxsb"><title>Starting VNC</title><task id="gfxrz"><title>How to Set Up VNC to Provide a Solaris Guest
+Graphical Login</title><tasksummary><para>This procedure shows how to start VNC on demand from <literal>inetd</literal>,
+displaying the <literal>dtlogin</literal> login screen.</para><caution><para>When using this method, you must restart the service, which
+will <command>kill</command> all current <literal>dtlogin</literal> sessions.</para>
+</caution>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Enable XDMCP connections on <literal>dtlogin</literal> by removing <literal>-udpport 0</literal> from the arguments.</para><screen># <userinput>svccfg -s cde-login</userinput>
+svc:/application/graphical-login/cde-login> <userinput>setprop dtlogin/args=""</userinput></screen>
+</step><step><para>(Optional)
+If you are <emphasis>not</emphasis> running <literal>vncviewer</literal> locally
+on the control domain, set X11-server to listen to the <literal>tcp</literal> port
+as described in <olink targetptr="gfsha" remap="internal">Example&nbsp;40&ndash;7</olink>.</para><para>The VNC listen facility should be used with caution due to security
+considerations.</para>
+</step><step><para>Restart the service.</para><screen># <userinput>svccfg -s cde-login setprop 'dtlogin/args=""'</userinput>
+# <userinput>svcadm restart cde-login</userinput></screen>
+</step><step><para>Add <literal>xvnc</literal> service to <filename>/etc/services</filename> if
+it is not already there.</para><screen># <userinput>printf "vnc-server\t5900/tcp\t\t\t# VNC Server\n" >> /etc/services</userinput></screen>
+</step><step><para>Enable the <literal>Xvnc</literal> <literal>inetd</literal> service.</para><screen># <userinput>svcadm -e xvnc-inetd</userinput></screen>
+</step><step><para>Connect from another machine and verify that you see the login
+screen and can log in to a desktop session.</para><screen># <userinput>vncviewer hostname:0</userinput></screen>
+</step>
+</procedure>
+</task><task id="gfxtp"><title>How to Start VNC at System Boot</title><tasksummary><para>This procedure starts VNC at system boot from the <command>dtlogin</command>,
+displaying the <command>dtlogin</command> login screen.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Add an instance of x11-server service called <replaceable>display1</replaceable> for
+configuration, and configure it to run <literal>Xvnc</literal>.</para><screen remap="wide">svccfg -s application/x11/x11-server add display1
+svccfg -s application/x11/x11-server:display1 addpg options application
+svccfg -s application/x11/x11-server:display1 addpropvalue options/server: "/usr/X11/bin/Xvnc"
+
+
+svccfg -s application/x11/x11-server:display1 addpropvalue options/server: '"SecurityTypes=None"'</screen>
+</step><step><para>Configure <command>dtlogin</command> to start it.</para><screen remap="wide"> mkdir -p /etc/dt/config
+cp /usr/dt/config/Xservers /etc/dt/config/Xservers
+echo "   :1   Local local_uid@none root /usr/X11/bin/Xserver :1" >> /etc/dt/config/Xservers
+pkill -HUP dtlogin</screen>
+</step><step><para>Connect from another machine and verify that you see the login
+screen and can log in to a desktop session.</para><screen># <userinput>vncviewer hostname:0</userinput></screen>
+</step>
+</procedure>
+</task><task id="gfxtg"><title>How to Start VNC Manually</title><tasksummary><para>Starting VNC manually displays the session of the user. A VNC password
+is required.</para><caution><para>A VNC password should be different from a UNIX login password.
+A VNC password is not securely encoded on disk or across the network. Do not
+use a valuable password.</para>
+</caution>
+</tasksummary><procedure><step><para>Start VNC manually.</para><screen>% <userinput>/usr/bin/vncserver -httpd</userinput></screen>
+</step><step><para>From another machine, open a web browser.</para>
+</step><step><para>Go to <literal>http://hostname:5802/</literal>.</para><para>The
+number <literal>5802</literal> after the colon assumes that the VNC server
+said it was starting on display <replaceable>:2</replaceable>. If another
+display number was listed, change <literal>5802</literal> to <literal>5800</literal> plus
+the display ID.</para>
+</step><step><para>Enter the password you provided to the <literal>vncserver</literal><literal></literal> script.
+Verify that you see a simple desktop session in the viewer.</para>
+</step>
+</procedure>
+</task><task id="ggrhf"><title>How to Start a GNOME Session</title><procedure remap="single-step"><step><para>Use the following to start the GNOME session.</para><screen remap="wide"># /bin/sh
+# mkdir &lt;your homedir>/.vnc
+# echo "#!/bin/sh\n/usr/bin/dbus-launch /usr/bin/gnome-session" > &lt;your homedir>/.vnc/xstartup</screen>
+</step>
+</procedure>
+</task><task id="ggbgv"><title>How to View the VNC Man Pages</title><tasksummary><para>You can use the <command>man</command> command to view the man pages.</para><itemizedlist><listitem><para><command>man Xvnc</command> </para>
+</listitem><listitem><para><command>man vncviewer</command></para>
+</listitem><listitem><para><command>man vncpasswd</command></para>
+</listitem>
+</itemizedlist><note><para>Live linkss to these man pages cannot be made from this book.</para>
+</note><para>The <literal>MANPATH</literal> variable is normally set for you in desktop
+login sessions. If the entry is not found, check your <literal>MANPATH</literal> environment
+variable and add the path to the X11 man pages if necessary.</para>
+</tasksummary><procedure><step><para>View the <literal>MANPATH</literal>:</para><screen><userinput>echo $MANPATH</userinput>
+/usr/share/man:/usr/dt/man:/usr/openwin/share/man</screen>
+</step><step><para>If necessary, add the path to the <literal>X11</literal> man pages.</para><screen><userinput>setenv MANPATH /usr/share/man:/usr/dt/man:/usr/openwin/man:/usr/X11/man</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

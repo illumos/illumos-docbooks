@@ -1,0 +1,229 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bsol dash hellip gt lt minus?><?Pub CX solbook(book(title()bookinfo()chapter()?><chapter id="labelcode-1"><title>Label Code Examples</title><highlights><para><indexterm><primary>APIs</primary><secondary>labels</secondary></indexterm><indexterm><primary>label APIs</primary><secondary>labels</secondary><tertiary>code examples</tertiary></indexterm>This chapter contains several code examples that show how to use the label APIs that are described in <olink targetptr="labelapi-1" remap="internal">Chapter&nbsp;2, Labels and Clearances</olink>.</para><itemizedlist><para>This chapter covers the following topics:</para><listitem><para><olink targetptr="labelcode-9" remap="internal">Obtaining a Process Label</olink></para>
+</listitem><listitem><para><olink targetptr="labelcode-11" remap="internal">Obtaining a File Label</olink></para>
+</listitem><listitem><para><olink targetptr="labelcode-12" remap="internal">Setting a File Sensitivity Label</olink></para>
+</listitem><listitem><para><olink targetptr="labelcode-8" remap="internal">Determining the Relationship Between Two Labels</olink></para>
+</listitem><listitem><para><olink targetptr="labelcode-18" remap="internal">Obtaining the Color Names of Labels</olink></para>
+</listitem><listitem><para><olink targetptr="labelcode-22" remap="internal">Obtaining Printer Banner Information</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="labelcode-9"><title>Obtaining a Process Label</title><para><indexterm><primary><function>getplabel</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary>code examples</primary><secondary>labels</secondary><tertiary>obtaining process label</tertiary></indexterm>This code example shows how to obtain and print the sensitivity label of the zone in which this program is run.</para><programlisting>#include &lt;tsol/label.h&gt;
+
+main()
+{
+    m_label_t* pl;
+    char *plabel = NULL;
+    int retval;
+
+    /* allocate an m_label_t for the process sensitivity label */
+    pl = m_label_alloc(MAC_LABEL);
+    /* get the process sensitivity label */
+    if ((retval = getplabel(pl)) != 0) {
+        perror("getplabel(pl) failed");
+        exit(1);
+    }
+
+    /* Translate the process sensitivity label to text and print */
+    if ((retval = label_to_str(pl, &amp;plabel, M_LABEL, LONG_NAMES)) != 0) {
+        perror("label_to_str(M_LABEL, LONG_NAMES) failed");
+        exit(1);
+    }
+    printf("Process label = %s\n", plabel);
+
+    /* free allocated memory */
+    m_label_free(pl);
+    free(plabel);
+    }</programlisting><para>The <function>printf</function> statement prints the sensitivity label. The sensitivity label is inherited from the zone in which the program is run. The following shows the text output of this example program:</para><screen>Process label = ADMIN_LOW</screen><para>The text output depends on the specifications in the <filename>label_encodings</filename> file.</para>
+</sect1><sect1 id="labelcode-11"><title>Obtaining a File Label</title><para><indexterm><primary><function>getlabel</function> system call</primary><secondary>code example</secondary></indexterm><indexterm><primary>code examples</primary><secondary>labels</secondary><tertiary>obtaining on file system</tertiary></indexterm><indexterm><primary>code examples</primary><secondary>file systems</secondary><tertiary>obtaining label</tertiary></indexterm>You can obtain a file's sensitivity label and perform operations on that label.</para><para>This code example uses the <function>getlabel</function> routine to obtain the file's label. The <function>fgetlabel</function> routine can be used in the same way, but it operates on a file descriptor.</para><programlisting>#include &lt;tsol/label.h&gt;
+
+main()
+{
+    m_label_t* docLabel;
+    const char* path = "/zone/restricted/documents/designdoc.odt";
+    int retval;
+    char* label_string;
+
+    /* allocate label and get the file label specified by path */
+    docLabel = m_label_alloc(MAC_LABEL);
+    retval = getlabel(path, docLabel);
+
+    /* translate the file's label to a string and print the string */
+    retval = label_to_str(docLabel, &amp;label_string, M_LABEL, LONG_NAMES);
+    printf("The file's label = %s\n", label_string);
+    
+    /* free allocated memory */
+    m_label_free(docLabel);
+    free(label_string);
+    }</programlisting><para>When you run this program, the output might look similar to this:</para><screen>The file's label = CONFIDENTIAL : INTERNAL USE ONLY</screen>
+</sect1><sect1 id="labelcode-12"><title>Setting a File Sensitivity Label</title><para><indexterm><primary><function>setflabel</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>str_to_label</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary>code examples</primary><secondary>set file sensitivity label</secondary></indexterm>When you change the sensitivity label of a file, the file is moved to a new zone that matches the file's new label.</para><para>In this code example, the process is running at the <constant>CONFIDENTIAL</constant> label. The user who is running the process has a <constant>TOP SECRET</constant> clearance. The <constant>TOP SECRET</constant> label dominates the <constant>CONFIDENTIAL</constant> label. The process upgrades the sensitivity label to <constant>TOP SECRET</constant>. The user needs the Upgrade File Label RBAC authorization to successfully perform the upgrade.</para><para>The following program is called <command>upgrade-afile</command>.</para><programlisting>#include &lt;tsol/label.h&gt;
+
+main()
+{
+   int retval, error;
+   m_label_t *fsenslabel;
+   char *string = &ldquo;TOP SECRET&rdquo;;
+   *string1 = &ldquo;TOP SECRET&rdquo;;
+
+   /* Create new sensitivity label value */
+   if ((retval = str_to_label(string, &amp;fsenslabel, MAC_LABEL, L_DEFAULT, &amp;err)) != 0) {
+        perror("str_to_label(MAC_LABEL, L_DEFAULT) failed");
+        exit(1);
+    }
+
+   /* Set file label to new value */
+   if ((retval = setflabel(&ldquo;/export/home/zelda/afile&rdquo;, &amp;fsenslabel)) != 0) {
+        perror("setflabel(&ldquo;/export/home/zelda/afile&rdquo;) failed");
+        exit(1);
+    }
+
+   m_label_free(fsenslabel);
+}</programlisting><para><indexterm><primary><command>getlabel</command> command</primary></indexterm>The result of running this program depends on the process's label, relative to the label of the file that was passed to the process.</para><para>Before and after you run this program, you use the <command>getlabel</command> command to verify the file's label. As the following shows, before the program runs, the label for <filename>afile</filename> is <constant>CONFIDENTIAL</constant>. After the program runs, the label for <filename>afile</filename> is <constant>TOP SECRET</constant>.</para><screen>% <userinput>pwd</userinput>
+/export/home/zelda
+% <userinput>getlabel afile</userinput>
+afile: CONFIDENTIAL
+% <userinput>update-afile</userinput>
+% <userinput>getlabel afile</userinput>
+afile: TOP SECRET</screen><para>If you run the <command>getlabel</command> command from a window labeled <constant>CONFIDENTIAL</constant> after you reclassified the file, it is no longer visible. If you run the <command>getlabel</command> command in a window labeled <constant>TOP SECRET</constant>, you can see the reclassified file.</para>
+</sect1><sect1 id="labelcode-8"><title>Determining the Relationship Between Two Labels</title><para><indexterm><primary>labels</primary><secondary>relationships</secondary></indexterm>If your application accesses data at different sensitivity labels, perform checks in your code to ensure that the process label has the correct relationship to the data label before you permit an access operation to occur. You check the sensitivity label of the object that is being accessed to determine whether access is permitted by the system.</para><para><indexterm><primary>code examples</primary><secondary>label relationships</secondary></indexterm><indexterm><primary><function>blequal</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>blstrictdom</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>bldominates</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><command>getlabel</command> command</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>getplabel</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>m_label_alloc</function> routine</primary><secondary>code example</secondary></indexterm>The following code example shows how to test two sensitivity labels for equality, dominance, and strict dominance. The program checks whether a file's label is dominated by or is equal to the process's label.</para><programlisting>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+#include &lt;tsol/label.h&gt;
+
+main(int argc, char *argv[])
+{
+   m_label_t *plabel;
+   m_label_t *flabel;
+
+   plabel = m_label_alloc(MAC_LABEL);
+   flabel = m_label_alloc(MAC_LABEL);
+
+   if (getplabel(plabel) == -1) {
+      perror("getplabel");
+      exit(1);
+   }
+   if (getlabel(argv[1], flabel) == -1) {
+      perror("getlabel");
+      exit(1);
+   }
+
+   if (blequal(plabel, flabel)) {
+      printf("Labels are equal\n");
+   }
+   if (bldominates(plabel, flabel)) {
+      printf("Process label dominates file label\n");
+   }
+   if (blstrictdom(plabel, flabel)) {
+      printf("Process label strictly dominates file label\n");
+   }
+
+   m_label_free(plabel);
+   m_label_free(flabel);
+
+   return (0);
+}</programlisting><itemizedlist><para>The text output of this program depends on the process's label, relative to the label of the file that was passed to the process, as follows:</para><listitem><para>Because &ldquo;dominates&rdquo; includes &ldquo;equal,&rdquo; when the labels are equal, the output is the following:</para><screen>Labels are equal
+Process label dominates file label</screen>
+</listitem><listitem><para>If the process's label strictly dominates the file's label, the output is the following:</para><screen>Process label strictly dominates file label</screen>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="labelcode-18"><title>Obtaining the Color Names of Labels</title><para><indexterm><primary>code examples</primary><secondary><filename>label_encodings</filename> file</secondary><tertiary>obtaining character-coded color names</tertiary></indexterm><indexterm><primary>text</primary><secondary>color names</secondary></indexterm><indexterm><primary><filename>label_encodings</filename> file</primary><secondary>color names</secondary></indexterm><indexterm><primary><function>label_to_str</function> routine</primary><secondary>code example</secondary></indexterm><indexterm><primary><function>getplabel</function> routine</primary><secondary>code example</secondary></indexterm>This code example uses the <function>label_to_str</function> function to obtain the color name of a label. The mappings between color names and labels are defined in the <filename>label_encodings</filename> file.</para><programlisting>#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#include &lt;tsol/label.h&gt;
+
+int
+main()
+{
+   m_label_t *plabel;
+   char *label = NULL;
+   char *color = NULL;
+
+   plabel = m_label_alloc(MAC_LABEL);
+
+   if (getplabel(plabel) == -1) {
+      perror("getplabel");
+      exit(1);
+   }
+
+   if (label_to_str(plabel, &amp;color, M_COLOR, 0) != 0) {
+      perror("label_to_string(M_COLOR)");
+      exit(1);
+   }
+   if (label_to_str(plabel, &amp;label, M_LABEL, DEF_NAMES) != 0) {
+      perror("label_to_str(M_LABEL)");
+      exit(1);
+   }
+
+   printf("The color for the \"%s\" label is \"%s\".\n, label, color);
+
+   m_label_free(plabel);
+
+   return (0);
+}</programlisting><para>If the <filename>label_encodings</filename> file maps the color blue to the label <constant>CONFIDENTIAL</constant>, the program prints the following:</para><screen>The color for the "CONFIDENTIAL" label is "BLUE".</screen>
+</sect1><sect1 id="labelcode-22"><title>Obtaining Printer Banner Information</title><indexterm><primary>printer banner page</primary><secondary>label translation</secondary>
+</indexterm><indexterm><primary>code examples</primary><secondary>printer banner</secondary>
+</indexterm><indexterm><primary>code examples</primary><secondary><filename>label_encodings</filename> file</secondary><tertiary>creating printer banner</tertiary>
+</indexterm><indexterm><primary><function>label_to_str</function> routine</primary><secondary>code example</secondary>
+</indexterm><para>The <filename>label_encodings</filename> file defines several conversions that are useful for printing security information on printer output. Label conversions are printed at the top and at the bottom of pages. Other conversions, such as handling channels, can appear on the banner pages.</para><para>In the following code example, the <function>label_to_str</function> routine converts a label to strings, such as the header and footer, a caveats section, and handling channels. This routine is used internally by the Trusted Extensions print system, as shown in <olink targetptr="labelprint-1" remap="internal">Chapter&nbsp;4, Printing and the Label APIs</olink>.</para><programlisting>#include &lt;stdlib.h&gt;
+#include &lt;stdio.h&gt;
+
+#include &lt;tsol/label.h&gt;
+
+int
+main()
+{
+   m_label_t *plabel;
+   char *header = NULL;
+   char *label = NULL;
+   char *caveats = NULL;
+   char *channels = NULL;
+
+   plabel = m_label_alloc(MAC_LABEL);
+   if (getplabel(plabel) == -1) {
+      perror("getplabel");
+      exit(1);
+   }
+   if (label_to_str(plabel, &amp;header, PRINTER_TOP_BOTTOM, DEF_NAMES) != 0) {
+      perror("label_to_str: header");
+      exit(1);
+   }
+   if (label_to_str(plabel, &amp;label, PRINTER_LABEL, DEF_NAMES) != 0) {
+      perror("label_to_str: label");
+      exit(1);
+   }
+   if (label_to_str(plabel, &amp;caveats, PRINTER_CAVEATS, DEF_NAMES) != 0) {
+      perror("label_to_str: caveats");
+      exit(1);
+   }
+   if (label_to_str(plabel, &amp;channels, PRINTER_CHANNELS, DEF_NAMES) != 0) {
+      perror("label_to_str: channels");
+      exit(1);
+   }
+
+   printf("\t\t\t\"%s\"\n\n", header);
+   printf("\t\tUnless manually reviewed and downgraded, this output\n");
+   printf("\t\tmust be protected at the following label:\n\n");
+   printf("\t\t\t\"%s\"\n", label);
+   printf("\n\n\n");
+   printf("\t\t\"%s\"\n", caveats);
+   printf("\t\t\"%s\"\n", channels);
+   printf("\n\n");
+   printf("\t\t\t\"%s\"\n", header);
+
+   m_label_free(plabel);
+
+   return (0);
+}</programlisting><para>For a process label of <literal>TS SA SB</literal>, the text output might be the following:</para><screen>			"TOP SECRET"
+
+		Unless manually reviewed and downgraded, this output
+		must be protected at the following label:
+
+			"TOP SECRET A B SA SB"
+
+
+
+		"(FULL SB NAME) (FULL SA NAME)"
+		"HANDLE VIA (CH B)/(CH A) CHANNELS JOINTLY"
+
+
+			"TOP SECRET"</screen><para>For more information, see the <olink targetdoc="refman" targetptr="label-encodings-4" remap="external"><citerefentry><refentrytitle>label_encodings</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page, <olink targetdoc="wslblencode" remap="external"><citetitle remap="book">Compartmented Mode Workstation Labeling: Encodings Format</citetitle></olink>, and <olink targetdoc="trsollbladmin" remap="external"><citetitle remap="book">Solaris Trusted Extensions Label Administration</citetitle></olink>.</para>
+</sect1>
+</chapter>

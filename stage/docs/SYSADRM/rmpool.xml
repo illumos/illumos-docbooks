@@ -1,0 +1,768 @@
+<chapter id="rmpool-1"><title>Resource Pools (Overview)</title><highlights><para>This chapter discusses the following features:</para><itemizedlist><listitem><para>Resource pools, which are used for partitioning machine resources</para>
+</listitem><listitem><para>Dynamic resource pools (DRPs), which dynamically adjust each
+resource pool's resource allocation to meet established system goals</para>
+</listitem>
+</itemizedlist><para>Resource pools and dynamic resource pools are services in the Solaris
+service management facility (SMF). Each of these services is enabled separately.</para><para>The following topics are covered in this chapter:</para><itemizedlist><listitem><para><olink targetptr="rmpool-2" remap="internal">Introduction to Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gbtkx" remap="internal">Introduction to Dynamic Resource
+Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gbvil" remap="internal">About Enabling and Disabling Resource
+Pools and Dynamic Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-114" remap="internal">Resource Pools Used in Zones</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-3" remap="internal">When to Use Pools</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-12" remap="internal">Resource Pools Framework</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-17" remap="internal">Implementing Pools on a System</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-117" remap="internal">project.pool Attribute</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-58" remap="internal">Dynamic Reconfiguration Operations
+and Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-9" remap="internal">Creating Pools Configurations</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-72" remap="internal">Directly Manipulating the Dynamic
+Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-73" remap="internal">poold Overview</olink></para>
+</listitem><listitem><para><olink targetptr="gbxvv" remap="internal">Managing Dynamic Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-75" remap="internal">Configuration Constraints and
+Objectives</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-100" remap="internal">poold Features That Can Be Configured</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-81" remap="internal">How Dynamic Resource Allocation
+Works</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-107" remap="internal">Using poolstat to Monitor the
+Pools Facility and Resource Utilization</olink></para>
+</listitem><listitem><para><olink targetptr="rmpool-8" remap="internal">Commands Used With the Resource
+Pools Facility</olink></para>
+</listitem>
+</itemizedlist><para>For procedures using this functionality, see <olink targetptr="rmpool.task-1" remap="internal">Chapter&nbsp;13, Creating and Administering Resource
+Pools (Tasks)</olink>.</para>
+</highlights><sect1 id="rmpool-2"><title>Introduction to Resource Pools</title><para><emphasis>Resource pools</emphasis> enable
+you to separate workloads so that workload consumption of certain resources
+does not overlap. This resource reservation helps to achieve predictable performance
+on systems with mixed workloads.</para><para>Resource pools provide a persistent configuration mechanism for processor
+set (pset) configuration and, optionally, scheduling class assignment.</para><figure id="rmpool-fig-63"><title>Resource Pool Framework</title><mediaobject><imageobject><imagedata entityref="pool-component"/>
+</imageobject><textobject><simpara>Illustration shows that a pool is made up of one processor
+set and optionally, a scheduling class.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>A pool can be thought of as a specific binding of the various resource
+sets that are available on your system. You can create pools that represent
+different kinds of possible resource combinations:</para><simplelist><member><literal>pool1: pset_default</literal></member><member><literal>pool2: pset1</literal></member><member><literal>pool3: pset1, pool.scheduler="FSS"</literal></member>
+</simplelist><para>By grouping multiple partitions, pools provide a handle to associate
+with labeled workloads. Each project entry in the <filename>/etc/project</filename> file
+can have a single pool associated with that entry, which is specified using
+the <literal>project.pool</literal> attribute.</para><para>When pools are enabled,
+a <emphasis>default pool</emphasis> and a <emphasis>default processor set</emphasis> form
+the base configuration. Additional user-defined pools and processor sets can
+be created and added to the configuration. A CPU can only belong to one processor
+set. User-defined pools and processor sets can be destroyed. The default pool
+and the default processor set cannot be destroyed.</para><para>The default pool has the <literal>pool.default</literal> property set
+to <literal>true</literal>. The default processor set has the <literal>pset.default</literal> property set to <literal>true</literal>. Thus, both the default
+pool and the default processor set can be identified even if their names have
+been changed.</para><para>The user-defined pools mechanism is primarily for use on large machines
+of more than four CPUs. However, small machines can still benefit from this
+functionality. On small machines, you can create pools that share noncritical
+resource partitions. The pools are separated only on the basis of critical
+resources.</para>
+</sect1><sect1 id="gbtkx"><title>Introduction to Dynamic Resource Pools</title><para>Dynamic resource pools provide a mechanism for dynamically adjusting
+each pool's resource allocation in response to system events and application
+load changes. DRPs simplify and reduce the number of decisions required from
+an administrator. Adjustments are automatically made to preserve the system
+performance goals specified by an administrator. The changes made to the configuration
+are logged. These features are primarily enacted through the resource controller <command>poold</command>, a system daemon that should always be active when dynamic
+resource allocation is required. Periodically, <command>poold</command> examines
+the load on the system and determines whether intervention is required to
+enable the system to maintain optimal performance with respect to resource
+consumption. The <command>poold</command> configuration is held in the  <command>libpool</command> configuration. For more information on <command>poold</command>,
+see the <olink targetdoc="group-refman" targetptr="poold-1m" remap="external"><citerefentry><refentrytitle>poold</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</sect1><sect1 id="gbvil"><title>About Enabling and Disabling Resource Pools and Dynamic
+Resource Pools</title><para>To enable and disable resource pools and dynamic resource pools, see <olink targetptr="rmpool.task-57" remap="internal">Enabling and Disabling the Pools Facility</olink>.</para>
+</sect1><sect1 id="rmpool-114"><title>Resource Pools Used in Zones</title><para>As an alternative to associating a zone with a configured resource pool
+on your system, you can use the <command>zonecfg</command> command to create
+a temporary pool that is in effect while the zone is running. See <olink targetptr="gejlw" remap="internal">dedicated-cpu Resource</olink> for more information.</para><para>On a system that has zones enabled, a non-global zone can be associated
+with one resource pool, although the pool need not be exclusively assigned
+to a particular zone. Moreover, you cannot bind individual processes in non-global
+zones to a different pool by using the <command>poolbind</command> command
+from the global zone. To associate a non-global zone with a pool, see <olink targetptr="z.conf.start-85" remap="internal">Configuring, Verifying, and Committing a Zone</olink>.</para><para>Note that if you set a scheduling class for a pool and you associate
+a non-global zone with that pool, the zone uses that scheduling class by default.</para><para>If you are using dynamic resource pools, the scope of an executing instance
+of <command>poold</command> is limited to the global zone.</para><para>The <command>poolstat</command> utility run in a non-global zone displays
+only information about the pool associated with the zone. The <command>pooladm</command> command
+run without arguments in a non-global zone displays only information about
+the pool associated with the zone.</para><para>For information about resource pool commands, see <olink targetptr="rmpool-8" remap="internal">Commands Used With the Resource Pools Facility</olink>.</para>
+</sect1><sect1 id="rmpool-3"><title>When to Use Pools</title><para>Resource pools offer a versatile mechanism that can be applied to many
+administrative scenarios.</para><variablelist><varlistentry><term>Batch compute server</term><listitem><para>Use pools functionality to split a server into two pools.
+One pool is used for login sessions and interactive work by timesharing users.
+The other pool is used for jobs that are submitted through the batch system.</para>
+</listitem>
+</varlistentry><varlistentry><term>Application or database server</term><listitem><para>Partition the resources for interactive applications in accordance
+with the applications' requirements.</para>
+</listitem>
+</varlistentry><varlistentry><term>Turning on applications in phases</term><listitem><para>Set user expectations.</para><para>You might initially deploy a machine that is running only a fraction
+of the services that the machine is ultimately expected to deliver. User difficulties
+can occur if reservation-based resource management mechanisms are not established
+when the machine comes online.</para><para>For example, the fair share scheduler optimizes CPU utilization. The
+response times for a machine that is running only one application can be misleadingly
+fast. Users will not see these response times with multiple applications loaded.
+By using separate pools for each application, you can place a ceiling on the
+number of CPUs available to each application before you deploy all applications.</para>
+</listitem>
+</varlistentry><varlistentry><term>Complex timesharing server</term><listitem><para>Partition a server that supports large user populations. Server
+partitioning provides an isolation mechanism that leads to a more predictable
+per-user response.</para><para>By dividing users into groups that bind to separate pools, and using
+the fair share scheduling (FSS) facility, you can tune CPU allocations to
+favor sets of users that have priority. This assignment can be based on user
+role, accounting chargeback, and so forth.</para>
+</listitem>
+</varlistentry><varlistentry><term>Workloads that change seasonally</term><listitem><para>Use resource pools to adjust to changing demand.</para><para>Your site might experience predictable shifts in workload demand over
+long periods of time, such as monthly, quarterly, or annual cycles. If your
+site experiences these shifts,  you can alternate between multiple pools configurations
+by invoking <command>pooladm</command> from a <command>cron</command> job.
+(See <olink targetptr="rmpool-12" remap="internal">Resource Pools Framework</olink>.)</para>
+</listitem>
+</varlistentry><varlistentry><term>Real-time applications</term><listitem><para>Create a real-time pool by using the RT scheduler and designated
+processor resources.</para>
+</listitem>
+</varlistentry><varlistentry><term>System utilization</term><listitem><para>Enforce system goals that you  establish.</para><para>Use the automated pools daemon feature to identify available resources
+and then monitor workloads to detect when your specified objectives are no
+longer being satisfied. The daemon can take corrective action if possible,
+or the condition can be logged.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="rmpool-12"><title>Resource Pools Framework</title><para>The <filename>/etc/pooladm.conf</filename> configuration
+file describes the static pools configuration. A static configuration represents
+the way in which an administrator would like a system to be configured with
+respect to resource pools functionality. An alternate file name can be specified.</para><para>When the service management facility (SMF) or the <command>pooladm</command> <option>e</option> command is used to enable the resource pools framework, then, if
+an <literal>/etc/pooladm.conf</literal> file exists, the configuration contained
+in the file is applied to the system.</para><para>The kernel holds information about the disposition of resources within
+the resource pools framework. This is known as the dynamic configuration,
+and it represents the resource pools functionality for a particular system
+at a point in time. The dynamic configuration can be viewed by using the <command>pooladm</command> command. Note that the order in which properties are displayed
+for pools and resource sets can vary. Modifications to the dynamic configuration
+are made in the following ways:</para><itemizedlist><listitem><para>Indirectly, by applying a static configuration file</para>
+</listitem><listitem><para>Directly, by using the <command>poolcfg</command> command
+with the <option>d</option> option</para>
+</listitem>
+</itemizedlist><para>More than one static pools configuration file can exist, for activation
+at different times. You can alternate between multiple pools configurations
+by invoking <command>pooladm</command> from a <command>cron</command> job.
+See the <olink targetdoc="group-refman" targetptr="cron-1m" remap="external"><citerefentry><refentrytitle>cron</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information on the <command>cron</command> utility.</para><para>By default, the resource pools framework is not active. Resource pools
+must be enabled to create or modify the dynamic configuration. Static configuration
+files can be manipulated with the <command>poolcfg</command> or <command>libpool</command> commands
+even if the resource pools framework is disabled. Static configuration files
+cannot be created if the pools facility is not active. For more information
+on the configuration file, see <olink targetptr="rmpool-9" remap="internal">Creating Pools
+Configurations</olink>.</para><para>The commands used with resource pools and the <literal>poold</literal> system
+daemon are described in the following man pages:</para><itemizedlist><listitem><para><olink targetdoc="group-refman" targetptr="pooladm-1m" remap="external"><citerefentry><refentrytitle>pooladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="poolbind-1m" remap="external"><citerefentry><refentrytitle>poolbind</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="poolcfg-1m" remap="external"><citerefentry><refentrytitle>poolcfg</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><citerefentry><refentrytitle>poold</refentrytitle><manvolnum>1M</manvolnum></citerefentry></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="poolstat-1m" remap="external"><citerefentry><refentrytitle>poolstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><sect2 id="rmpool-70"><title><filename>/etc/pooladm.conf</filename> Contents</title><para>All resource pool configurations, including
+the dynamic configuration, can contain the following elements.</para><variablelist><varlistentry><term>system</term><listitem><para>Properties affecting the total behavior of the system</para>
+</listitem>
+</varlistentry><varlistentry><term>pool</term><listitem><para>A resource pool definition</para>
+</listitem>
+</varlistentry><varlistentry><term>pset</term><listitem><para>A processor set definition</para>
+</listitem>
+</varlistentry><varlistentry><term>cpu</term><listitem><para>A processor definition</para>
+</listitem>
+</varlistentry>
+</variablelist><para>All of these elements have properties that can be manipulated to alter
+the state and behavior of the resource pools framework. For example, the pool
+property <literal>pool.importance</literal> indicates the relative importance
+of a given pool. This property is used for possible resource dispute resolution.
+For more information, see <olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="rmpool-71"><title>Pools Properties</title><para>The pools facility supports named, typed properties that can be
+placed on a pool, resource, or component. Administrators can store additional
+properties on the various pool elements. A property namespace similar to the
+project attribute is used.</para><para>For example, the following comment indicates that a given pset is associated
+with a particular <literal>Datatree</literal> database.</para><para><literal>Datatree,pset.dbname=warehouse</literal></para><para>For additional information about property types, see <olink targetptr="rmpool-92" remap="internal">poold Properties</olink>.</para><note><para>A number of special properties are reserved for internal use and
+cannot be set or removed. See the <olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> man page for more information.</para>
+</note>
+</sect2>
+</sect1><sect1 id="rmpool-17"><title>Implementing Pools on a System</title><para>User-defined pools can be implemented on a system by using one
+of these methods.</para><itemizedlist><listitem><para>When the Solaris software boots, an <command>init</command> script
+checks to see if the <filename>/etc/pooladm.conf</filename> file exists. If
+this file is found and pools are enabled, then <command>pooladm</command> is
+invoked to make this configuration the active pools configuration. The system
+creates a dynamic configuration to reflect the organization that is requested
+in <filename>/etc/pooladm.conf</filename>, and the machine's resources are
+partitioned accordingly.</para>
+</listitem><listitem><para>When the Solaris system is running, a pools configuration
+can either be activated if it is not already present, or modified by using
+the <command>pooladm</command>  command. By default, the <command>pooladm</command> command
+operates on <filename>/etc/pooladm.conf</filename>. However, you can optionally
+specify an alternate location and file name, and use that file to update the
+pools configuration.</para>
+</listitem>
+</itemizedlist><para>For information about enabling and disabling resource pools, see <olink targetptr="rmpool.task-57" remap="internal">Enabling and Disabling the Pools Facility</olink>.
+The pools facility cannot be disabled when there are user-defined pools or
+resources in use.</para><para>To configure resource pools, you must have superuser privileges or have
+the Process Management profile in your list of profiles. The System Administrator
+role includes the Process Management profile.</para><para>The <command>poold</command> resource controller is started with the
+dynamic resource pools facility.</para>
+</sect1><sect1 id="rmpool-117"><title><literal>project.pool</literal> Attribute</title><para>The <literal>project.pool</literal> attribute
+can be added to a project entry in the <filename>/etc/project</filename> file
+to associate a single pool with that entry. New work that is started on a
+project is bound to the appropriate pool. See <olink targetptr="rmtaskproj-1" remap="internal">Chapter&nbsp;2,
+Projects and Tasks (Overview)</olink> for more information.</para><para>For example, you can use the <command>projmod</command> command to set
+the <literal>project.pool</literal> attribute for the project <replaceable>sales</replaceable> in
+the <filename>/etc/project</filename> file:</para><screen># <userinput>projmod -a -K project.pool=mypool sales</userinput></screen>
+</sect1><sect1 id="rmpool-58" arch="sparc"><title>Dynamic Reconfiguration Operations
+and Resource Pools</title><para>Dynamic Reconfiguration (DR) enables you to reconfigure
+hardware while the system is running. A DR operation can increase, reduce,
+or have no effect on a given type of resource. Because DR can affect available
+resource amounts, the pools facility must be included in these operations.
+When a DR operation is initiated, the pools framework acts to validate the
+configuration.</para><para>If the DR operation can proceed without causing the current pools configuration
+to become invalid, then the private configuration file is updated. An invalid
+configuration is one that cannot be supported by the available resources.</para><para>If the DR operation would cause the pools configuration to be invalid,
+then the operation fails and you are notified by a message to the message
+log. If you want to force the configuration to completion, you must use the
+DR force option. The pools configuration is then modified to comply with the
+new resource configuration. For information on the DR process and the force
+option, see the dynamic reconfiguration user guide for your Sun hardware.</para><para>If you are using dynamic resource pools, note that it is possible for
+a partition to move out of <command>poold</command> control while the daemon
+is active. For more information, see <olink targetptr="rmpool-87" remap="internal">Identifying
+a Resource Shortage</olink>.</para>
+</sect1><sect1 id="rmpool-9"><title>Creating Pools Configurations</title><para>The
+configuration file contains a description of the pools to be created on the
+system. The file describes the elements that can be manipulated.</para><itemizedlist><listitem><para>system</para>
+</listitem><listitem><para>pool</para>
+</listitem><listitem><para>pset</para>
+</listitem><listitem><para>cpu</para>
+</listitem>
+</itemizedlist><para>See <olink targetdoc="group-refman" targetptr="poolcfg-1m" remap="external"><citerefentry><refentrytitle>poolcfg</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> for
+more information on elements that be manipulated.</para><para>When pools are enabled, you can create a structured <filename>/etc/pooladm.conf</filename> file in two ways.</para><itemizedlist><listitem><para>You can use the <command>pooladm</command> command with the <option>s</option> option to discover the resources on the current system and place
+the results in a configuration file.</para><para>This method is preferred.
+All active resources and components on the system that are capable of being
+manipulated by the pools facility are recorded. The resources include existing
+processor set configurations. You can then modify the configuration to rename
+the processor sets or to create additional pools if necessary.</para>
+</listitem><listitem><para>You can use the <command>poolcfg</command> command with the <option>c</option> option and the <command>discover</command> or <command>create system</command> <replaceable>name</replaceable> subcommands to create a new pools configuration.</para><para>These
+options are maintained for backward compatibility with previous releases.</para>
+</listitem>
+</itemizedlist><para>Use <command>poolcfg</command> or <command>libpool</command> to modify
+the <filename>/etc/pooladm.conf</filename> file. Do not directly edit this
+file.</para>
+</sect1><sect1 id="rmpool-72"><title>Directly Manipulating the Dynamic Configuration</title><para>It is possible to directly manipulate CPU resource types in the dynamic
+configuration by using the <command>poolcfg</command> command with the <option>d</option> option.
+There are two methods used to transfer resources.</para><itemizedlist><listitem><para>You can make a general request to transfer any available identified
+resources between sets.</para>
+</listitem><listitem><para>You can transfer resources with specific IDs to a target set.
+Note that the system IDs associated with resources can change when the resource
+configuration is altered or after a system reboot.</para>
+</listitem>
+</itemizedlist><para>For an example, see <olink targetptr="rmpool.task-80" remap="internal">Transferring Resources</olink>.</para><para>If DRP is in use, note that the resource transfer might trigger action
+from <command>poold</command>. See <olink targetptr="rmpool-73" remap="internal">poold Overview</olink> for
+more information.</para>
+</sect1><sect1 id="rmpool-73"><title><command>poold</command> Overview</title><para>The pools resource controller, <command>poold</command>,
+uses system targets and observable statistics to preserve the system performance
+goals that you specify. This system daemon should always be active when dynamic
+resource allocation is required.</para><para>The <command>poold</command> resource controller identifies available
+resources and then monitors workloads to determine when the system usage objectives
+are no longer being met. <command>poold</command> then considers alternative
+configurations in terms of the objectives, and remedial action is taken. If
+possible, the resources are reconfigured so that objectives can be met. If
+this action is not possible, the daemon logs that user-specified objectives
+can no longer be achieved. Following a reconfiguration, the daemon resumes
+monitoring workload objectives.</para><para><command>poold</command> maintains a decision history that it can examine.
+The decision history is used to eliminate reconfigurations that historically
+did not show improvements.</para><para>Note that a reconfiguration can also be triggered asynchronously if
+the workload objectives are changed or if the resources available to the system
+are modified.</para>
+</sect1><sect1 id="gbxvv"><title>Managing Dynamic Resource Pools</title><para>The DRP service is managed by the service management facility (SMF)
+under the service identifier <literal> svc:/system/pools/dynamic</literal>.</para><para>Administrative actions on this service, such as enabling, disabling,
+or requesting restart, can be performed using the <command>svcadm</command> command.
+The service's status can be queried using the <command>svcs</command> command.
+See the <olink targetdoc="group-refman" targetptr="svcs-1" remap="external"><citerefentry><refentrytitle>svcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and<olink targetdoc="group-refman" targetptr="svcadm-1m" remap="external"><citerefentry><refentrytitle>svcadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man pages
+for more information.</para><para>The SMF interface is the preferred method for controlling DRP, but for
+backward compatibility, the following methods can also be used.</para><itemizedlist><listitem><para>If dynamic resource allocation is not required, <command>poold</command> can
+be stopped with the <literal>SIGQUIT</literal> or the <literal>SIGTERM</literal> signal.
+Either of these signals causes <command>poold</command> to terminate gracefully.</para>
+</listitem><listitem><para>Although <command>poold</command> will automatically detect
+changes in the resource or pools configuration, you can also force a reconfiguration
+to occur by using the <literal>SIGHUP</literal> signal.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="rmpool-75"><title>Configuration Constraints and Objectives</title><para>When making changes to a configuration, <command>poold</command> acts
+on directions that you provide. You specify these directions as a series of
+constraints and objectives. <command>poold</command> uses your specifications
+to determine the relative value of different configuration possibilities in
+relation to the existing configuration. <command>poold</command> then changes
+the resource assignments of the current configuration to generate new candidate
+configurations.</para><sect2 id="rmpool-76"><title>Configuration Constraints</title><para>Constraints affect the range of possible configurations
+by eliminating some of the potential changes that could be made to a configuration.
+The following constraints, which are specified in the <command>libpool</command> configuration,
+are available.</para><itemizedlist><listitem><para>The minimum and maximum CPU allocations</para>
+</listitem><listitem><para>Pinned components that are not available to be moved from
+a set</para>
+</listitem><listitem><para>The importance factor of the pool</para>
+</listitem>
+</itemizedlist><para>See the <olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> man
+page and <olink targetptr="rmpool-71" remap="internal">Pools Properties</olink> for more information
+about pools properties.</para><para>See <olink targetptr="gcvwh" remap="internal">How to Set Configuration Constraints</olink> for
+usage instructions.</para><sect3 id="rmpool-96"><title><literal>pset.min</literal> Property and <literal>pset.max</literal> Property Constraints</title><para>These two properties place limits on the number of processors that can
+be allocated to a processor set, both minimum and maximum. See <olink targetptr="rmpool-tbl-94" remap="internal">Table&nbsp;12&ndash;1</olink> for more details about
+these properties.</para><para>Within these constraints, a resource partition's resources are available
+to be allocated to other resource partitions in the same Solaris instance.
+Access to the resource is obtained by binding to a pool that is associated
+with the resource set. Binding is performed at login or manually by an administrator
+who has the <literal>PRIV_SYS_RES_CONFIG</literal> privilege.</para>
+</sect3><sect3 id="rmpool-97"><title><literal>cpu.pinned</literal> Property Constraint</title><para>The <literal>cpu-pinned</literal> property
+indicates that a particular CPU should not be moved by DRP from the processor
+set in which it is located. You can set this <command>libpool</command> property
+to maximize cache utilization for a particular application that is executing
+within a processor set.</para><para>See <olink targetptr="rmpool-tbl-94" remap="internal">Table&nbsp;12&ndash;1</olink> for more
+details about this property.</para>
+</sect3><sect3 id="gbvhv"><title><literal>pool.importance</literal> Property Constraint</title><para>The <literal>pool.importance</literal> property describes the relative
+importance of a pool as defined by the administrator.</para>
+</sect3>
+</sect2><sect2 id="rmpool-77"><title>Configuration Objectives</title><para>Objectives are specified similarly to constraints.
+The full set of objectives is documented in <olink targetptr="rmpool-tbl-94" remap="internal">Table&nbsp;12&ndash;1</olink>.</para><para>There are two categories of objectives.</para><variablelist><varlistentry><term>Workload dependent</term><listitem><para>A workload-dependent objective is an objective that will vary
+according to the nature of the workload running on the system. An example
+is the <literal>utilization</literal> objective. The utilization figure for
+a resource set will vary according to the nature of the workload that is active
+in the set.</para>
+</listitem>
+</varlistentry><varlistentry><term>Workload independent</term><listitem><para>A workload-independent objective is an objective that does
+not vary according to the nature of the workload running on the system. An
+example is the CPU <literal>locality</literal> objective. The evaluated measure
+of locality for a resource set does not vary with the nature of the workload
+that is active in the set.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>You can define three types of objectives.</para><informaltable frame="all"><tgroup cols="4" colsep="1" rowsep="1"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row><entry><para>Name</para>
+</entry><entry><para>Valid Elements</para>
+</entry><entry><para>Operators</para>
+</entry><entry><para>Values</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>wt-load</literal></para>
+</entry><entry><para><literal>system</literal></para>
+</entry><entry><para>N/A</para>
+</entry><entry><para>N/A</para>
+</entry>
+</row><row><entry><para><literal>locality</literal></para>
+</entry><entry><para><literal>pset</literal></para>
+</entry><entry><para>N/A</para>
+</entry><entry><para><literal>loose</literal> | <literal>tight</literal> | <literal>none</literal></para>
+</entry>
+</row><row><entry><para><literal>utilization</literal></para>
+</entry><entry><para><literal>pset</literal></para>
+</entry><entry><para><literal>&lt;</literal> <literal>></literal> <literal>~</literal></para>
+</entry><entry><para><literal>0</literal>&ndash;<literal>100%</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Objectives are stored in property strings in the <command>libpool</command> configuration.
+The property names are as follows:</para><itemizedlist><listitem><para><literal>system.poold.objectives</literal></para>
+</listitem><listitem><para><literal>pset.poold.objectives</literal></para>
+</listitem>
+</itemizedlist><para>Objectives have the following syntax:</para><itemizedlist><listitem><para><literal>objectives = objective [; objective]*</literal></para>
+</listitem><listitem><para><literal>objective = [n:] keyword [op] [value]</literal></para>
+</listitem>
+</itemizedlist><para>All objectives take an optional importance prefix. The importance acts
+as a multiplier for the objective and thus increases the significance of its
+contribution to the objective function evaluation. The range is from 0 to
+INT64_MAX (<literal>9223372036854775807</literal>). If not specified, the
+default importance value is <literal>1</literal>.</para><para>Some element types support more than one type of objective. An example
+is <literal>pset</literal>. You can specify multiple objective types for these
+elements. You can also specify multiple utilization objectives on a single <literal>pset</literal> element.</para><para>See <olink targetptr="rmpool.task-108" remap="internal">How to Define Configuration Objectives</olink> for usage examples.</para><sect3 id="rmpool-78"><title><literal>wt-load</literal> Objective</title><para>The <literal>wt-load</literal> objective favors configurations that
+match resource allocations to resource utilizations. A resource set that uses
+more resources will be given more resources when this objective is active. <literal>wt-load</literal> means <emphasis>weighted load</emphasis>.</para><para>Use this objective when you are satisfied with the constraints you have
+established using the minimum and maximum properties, and you would like the
+daemon to manipulate resources freely within those constraints.</para>
+</sect3><sect3 id="rmpool-79"><title>The <literal>locality</literal> Objective</title><para>The <literal>locality</literal> objective influences the impact that
+locality, as measured by locality group (<literal>lgroup</literal>) data,
+has upon the selected configuration. An alternate definition for locality
+is latency. An <literal>lgroup</literal> describes CPU and memory resources.
+The <literal>lgroup</literal> is used by the Solaris system to determine the
+distance between resources, using time as the measurement. For more information
+on the locality group abstraction, see <olink targetdoc="netproto" targetptr="lgroups-2" remap="external"><citetitle remap="section">Locality Groups Overview</citetitle> in <citetitle remap="book">Programming Interfaces Guide</citetitle></olink>.</para><para>This objective can take one of the following three values:</para><variablelist><varlistentry><term><literal>tight</literal></term><listitem><para>If set, configurations that maximize resource locality are
+favored.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>loose</literal></term><listitem><para>If set, configurations that minimize resource locality are
+favored.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>none</literal></term><listitem><para>If set, the favorableness of a configuration is not influenced
+by resource locality. This is the default value for the <literal>locality</literal> objective.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>In general, the <literal>locality</literal> objective should be set
+to <literal>tight</literal>. However, to maximize memory bandwidth or to minimize
+the impact of DR operations on a resource set, you could set this objective
+to <literal>loose</literal> or  keep it at the default setting of <literal>none</literal>.</para>
+</sect3><sect3 id="rmpool-80"><title><literal>utilization</literal> Objective</title><para>The <literal>utilization</literal> objective favors configurations that
+allocate resources to partitions that are not meeting the specified utilization
+objective.</para><para>This objective is specified by using operators and values. The operators
+are as follows:</para><variablelist><varlistentry><term><literal>&lt;</literal></term><listitem><para>The &ldquo;less than&rdquo; operator indicates that the specified
+value represents a maximum target value.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>></literal></term><listitem><para>The &ldquo;greater than&rdquo; operator indicates that the
+specified value represents a minimum target value.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>~</literal></term><listitem><para>The &ldquo;about&rdquo; operator indicates that the specified
+value is a target value about which some fluctuation is acceptable.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>A pset can only have one utilization objective set for each type of
+operator.</para><itemizedlist><listitem><para>If the <literal>~</literal> operator is set, then the <literal>&lt;</literal> and <literal>></literal> operators cannot be set.</para>
+</listitem><listitem><para>If the <literal>&lt;</literal> and <literal>></literal> operators
+ are set, then the <literal>~</literal> operator cannot be set. Note that
+the settings of the <literal>&lt;</literal> operator and the <literal>></literal> operator
+cannot contradict each other.</para>
+</listitem>
+</itemizedlist><para>You can set both a <literal>&lt;</literal> and a <literal>></literal> operator
+together to create a range. The values will be validated to make sure that
+they do not overlap.</para>
+</sect3><sect3 id="rmpool-109"><title>Configuration Objectives Example</title><para>In the following example, <command>poold</command> is to assess these
+objectives for the pset:</para><itemizedlist><listitem><para>The <literal>utilization</literal> should be kept between
+30 percent and 80 percent.</para>
+</listitem><listitem><para>The <literal>locality</literal> should be maximized for the
+processor set.</para>
+</listitem><listitem><para>The objectives should take the default importance of <literal>1</literal>.</para>
+</listitem>
+</itemizedlist><example id="rmpool-ex-108"><title><command>poold</command> Objectives Example</title><para><literal>pset.poold.objectives "utilization > 30; utilization &lt; 80;
+locality tight"</literal> </para>
+</example><para>See <olink targetptr="rmpool.task-108" remap="internal">How to Define Configuration Objectives</olink> for additional usage examples.</para>
+</sect3>
+</sect2><sect2 id="rmpool-92"><title><literal>poold</literal> Properties</title><para>There are four categories of properties:</para><itemizedlist><listitem><para>Configuration</para>
+</listitem><listitem><para>Constraint</para>
+</listitem><listitem><para>Objective</para>
+</listitem><listitem><para>Objective Parameter</para>
+</listitem>
+</itemizedlist><table frame="all" id="rmpool-tbl-94"><title>Defined Property Names</title><tgroup cols="4" colsep="1" rowsep="1"><colspec colwidth="45*"/><colspec colwidth="15*"/><colspec colwidth="15*"/><colspec colwidth="25*"/><thead><row><entry><para>Property Name</para>
+</entry><entry><para>Type</para>
+</entry><entry><para>Category</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>system.poold.log-level</literal></para>
+</entry><entry><para>string</para>
+</entry><entry><para>Configuration</para>
+</entry><entry><para>Logging level</para>
+</entry>
+</row><row><entry><para><literal>system.poold.log-location</literal></para>
+</entry><entry><para>string</para>
+</entry><entry><para>Configuration</para>
+</entry><entry><para>Logging location</para>
+</entry>
+</row><row><entry><para><literal>system.poold.monitor-interval</literal></para>
+</entry><entry><para>uint64</para>
+</entry><entry><para>Configuration</para>
+</entry><entry><para>Monitoring sample interval</para>
+</entry>
+</row><row><entry><para><literal>system.poold.history-file</literal></para>
+</entry><entry><para>string</para>
+</entry><entry><para>Configuration</para>
+</entry><entry><para>Decision history location</para>
+</entry>
+</row><row><entry><para><literal>pset.max</literal></para>
+</entry><entry><para>uint64</para>
+</entry><entry><para>Constraint</para>
+</entry><entry><para>Maximum number of CPUs for this processor set</para>
+</entry>
+</row><row><entry><para><literal>pset.min</literal></para>
+</entry><entry><para>uint64</para>
+</entry><entry><para>Constraint</para>
+</entry><entry><para>Minimum number of CPUs for this processor set</para>
+</entry>
+</row><row><entry><para><literal>cpu.pinned</literal></para>
+</entry><entry><para>bool</para>
+</entry><entry><para>Constraint</para>
+</entry><entry><para>CPUs pinned to this processor set</para>
+</entry>
+</row><row><entry><para><literal>system.poold.objectives</literal></para>
+</entry><entry><para>string</para>
+</entry><entry><para>Objective</para>
+</entry><entry><para>Formatted string following <literal>poold</literal>'s objective expression
+syntax</para>
+</entry>
+</row><row><entry><para><literal>pset.poold.objectives</literal></para>
+</entry><entry><para>string</para>
+</entry><entry><para>Objective</para>
+</entry><entry><para>Formatted string following <literal>poold</literal>'s expression syntax</para>
+</entry>
+</row><row><entry><para><literal>pool.importance</literal></para>
+</entry><entry><para>int64</para>
+</entry><entry><para>Objective parameter</para>
+</entry><entry><para>User-assigned importance</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="rmpool-100"><title><command>poold</command> Features That Can Be
+Configured</title><para>You can configure these aspects of the daemon's
+behavior.</para><itemizedlist><listitem><para>Monitoring interval</para>
+</listitem><listitem><para>Logging level</para>
+</listitem><listitem><para>Logging location</para>
+</listitem>
+</itemizedlist><para>These options are specified in the pools configuration. You can also
+control the logging level from the command line by invoking <command>poold</command>.</para><sect2 id="rmpool-101"><title><command>poold</command> Monitoring Interval</title><para>Use the property name <literal>system.poold.monitor-interval</literal> to
+specify a value in milliseconds.</para>
+</sect2><sect2 id="rmpool-95"><title><command>poold</command> Logging Information</title><para>Three categories of information are provided
+through logging. These categories are identified in the logs:</para><itemizedlist><listitem><para>Configuration</para>
+</listitem><listitem><para>Monitoring</para>
+</listitem><listitem><para>Optimization</para>
+</listitem>
+</itemizedlist><para>Use the property name <literal>system.poold.log-level</literal> to specify
+the logging parameter. If this property is not specified, the default logging
+level is <literal>NOTICE</literal>. The parameter levels are hierarchical.
+Setting a log level of <literal>DEBUG</literal> will cause <command>poold</command> to
+log all defined messages. The <literal>INFO</literal> level provides a useful
+balance of information for most administrators.</para><para>At the command line, you can use the <command>poold</command> command
+with the <option>l</option> option and a parameter to specify the level of
+logging information generated.</para><para>The following parameters are available:</para><itemizedlist><listitem><para><literal>ALERT</literal></para>
+</listitem><listitem><para><literal>CRIT</literal></para>
+</listitem><listitem><para><literal>ERR</literal></para>
+</listitem><listitem><para><literal>WARNING</literal></para>
+</listitem><listitem><para><literal>NOTICE</literal></para>
+</listitem><listitem><para><literal>INFO</literal></para>
+</listitem><listitem><para><literal>DEBUG</literal></para>
+</listitem>
+</itemizedlist><para>The parameter levels map directly onto their <command>syslog</command> equivalents.
+See <olink targetptr="rmpool-102" remap="internal">Logging Location</olink> for more information
+about using <command>syslog</command>.</para><para>For more information about how to configure <command>poold</command> logging,
+see <olink targetptr="rmpool.task-117" remap="internal">How to Set the poold Logging Level</olink>.</para><sect3 id="rmpool-104"><title>Configuration Information Logging</title><para>The following types of messages can be generated:</para><variablelist><varlistentry><term><literal>ALERT</literal></term><listitem><para>Problems accessing the <command>libpool</command> configuration,
+or some other fundamental, unanticipated failure of the <command>libpool</command> facility.
+Causes the daemon to exit and requires immediate administrative attention.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>CRIT</literal></term><listitem><para>Problems due to unanticipated failures. Causes the daemon
+to exit and requires immediate administrative attention.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ERR</literal></term><listitem><para>Problems with the user-specified parameters that control operation,
+such as unresolvable, conflicting utilization objectives for a resource set.
+Requires administrative intervention to correct the objectives. <command>poold</command> attempts
+to take remedial action by ignoring conflicting objectives, but some errors
+will cause the daemon to exit.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>WARNING</literal></term><listitem><para>Warnings related to the setting of configuration parameters
+that, while technically correct, might not be suitable for the given execution
+environment. An example is marking all CPU resources as pinned, which means
+that <command>poold</command> cannot move CPU resources between processor
+sets.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DEBUG</literal></term><listitem><para>Messages containing the detailed information that is needed
+when debugging configuration processing. This information is not generally
+used by administrators.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="rmpool-105"><title>Monitoring Information Logging</title><para>The following types of messages can be generated:</para><variablelist><varlistentry><term><literal>CRIT</literal></term><listitem><para>Problems due to unanticipated monitoring failures. Causes
+the daemon to exit and requires immediate administrative attention.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ERR</literal></term><listitem><para>Problems due to unanticipated monitoring error. Could require
+administrative intervention to correct.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>NOTICE</literal></term><listitem><para>Messages about resource control region transitions.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>INFO</literal></term><listitem><para>Messages about resource utilization statistics.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DEBUG</literal></term><listitem><para>Messages containing the detailed information that is needed
+when debugging monitoring processing. This information is not generally used
+by administrators.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3><sect3 id="rmpool-106"><title>Optimization Information Logging</title><para>The following types of messages can be generated:</para><variablelist><varlistentry><term><literal>WARNING</literal></term><listitem><para>Messages could be displayed regarding problems making optimal
+decisions. Examples could include resource sets that are too narrowly constrained
+by their minimum and maximum values or by the number of pinned components.</para><para>Messages could be displayed about problems performing an optimal reallocation
+due to unforseen limitations. Examples could include removing the last processor
+from a processor set which contains a bound resource consumer.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>NOTICE</literal></term><listitem><para>Messages about usable configurations or configurations that
+will not be implemented due to overriding decision histories could be displayed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>INFO</literal></term><listitem><para>Messages about alternate configurations considered could be
+displayed.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DEBUG</literal></term><listitem><para>Messages containing the detailed information that is needed
+when debugging optimization processing. This information is not generally
+used by administrators.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2><sect2 id="rmpool-102"><title>Logging Location</title><para>The <literal>system.poold.log-location</literal> property is used to
+specify the location for <command>poold</command> logged output. You can specify
+a location of <literal>SYSLOG</literal> for <command>poold</command> output
+(see <citerefentry><refentrytitle>syslog</refentrytitle><manvolnum>3C</manvolnum></citerefentry>).</para><para>If this property is not specified, the default location for <command>poold</command> logged
+output is <filename>/var/log/pool/poold</filename>.</para><para>When <command>poold</command> is invoked from the command line, this
+property is not used. Log entries are written to <literal>stderr</literal> on
+the invoking terminal.</para>
+</sect2><sect2 id="rmpool-103"><title>Log Management With <command>logadm</command></title><para>If <command>poold</command> is active, the <command>logadm.conf</command> file
+includes an entry to manage the default file <filename>/var/log/pool/poold</filename>.
+The entry is:</para><para><literal>/var/log/pool/poold -N -s 512k</literal></para><para>See the <citerefentry><refentrytitle>logadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry> and the <citerefentry><refentrytitle>logadm.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry> man pages.</para>
+</sect2>
+</sect1><sect1 id="rmpool-81"><title>How Dynamic Resource Allocation Works</title><para>This section explains the process and the factors that <command>poold</command> uses
+to dynamically allocate resources.</para><sect2 id="rmpool-86"><title>About Available Resources</title><para>Available resources are considered to be all of the resources that are
+available for use within the scope of the <command>poold</command> process.
+The scope of control is at most a single Solaris instance.</para><para>On a system that has zones enabled, the scope of an executing instance
+of <command>poold</command> is limited to the global zone.</para>
+</sect2><sect2 id="rmpool-82"><title>Determining Available Resources</title><para>Resource pools encompass all of the system resources that are available
+for consumption by applications.</para><para>For a single executing Solaris instance, a resource of a single type,
+such as a CPU, must be allocated to a single partition. There can be one or
+more partitions for each type of resource. Each partition contains a unique
+set of resources.</para><para>For example, a machine with four CPUs and two processor sets can have
+the following setup:</para><para>pset 0: 0 1</para><para>pset 1: 2 3</para><para>where 0, 1, 2 and 3 after the colon represent CPU IDs. Note that the
+two processor sets account for all four CPUs.</para><para>The same machine cannot have the following setup:</para><para>pset 0: 0 1</para><para>pset 1: 1 2 3</para><para>It cannot have this setup because CPU 1 can appear in only one pset
+at a time.</para><para>Resources cannot be accessed from any partition other than the partition
+to which they belong.</para><para>To discover the available resources, <command>poold</command> interrogates
+the active pools configuration to find partitions. All resources within all
+partitions are summed to determine the total amount of available resources
+for each type of resource that is controlled.</para><para>This quantity of resources is the basic figure that <command>poold</command> uses
+in its operations. However, there are constraints upon this figure that limit
+the flexibility that <command>poold</command> has to make allocations. For
+information about available constraints, see <olink targetptr="rmpool-76" remap="internal">Configuration
+Constraints</olink>.</para>
+</sect2><sect2 id="rmpool-87"><title>Identifying a Resource Shortage</title><para>The control scope for <literal>poold</literal> is
+defined as the set of available resources for which <literal>poold</literal> has
+primary responsibility for effective partitioning and management. However,
+other mechanisms that are allowed to manipulate resources within this control
+scope can still affect a configuration. If a partition should move out of
+control while <command>poold</command> is active, <command>poold</command> tries
+to restore control through the judicious manipulation of available resources.
+If <command>poold</command> cannot locate additional resources within its
+scope, then the daemon logs information about the resource shortage.</para>
+</sect2><sect2 id="rmpool-88"><title>Determining Resource Utilization</title><para><command>poold</command> typically spends the greatest amount of time
+observing the usage of the resources within its scope of control. This monitoring
+is performed to verify that workload-dependent objectives are being met.</para><para>For example, for processor sets, all measurements are made across all
+of the processors in a set. The resource utilization shows the proportion
+of time that the resource is in use over the sample interval. Resource utilization
+is displayed as a percentage from 0 to 100.</para>
+</sect2><sect2 id="rmpool-89"><title>Identifying Control Violations</title><para>The directives
+described in <olink targetptr="rmpool-75" remap="internal">Configuration Constraints and Objectives</olink> are used to detect the approaching failure of a system to meet its
+objectives. These objectives are directly related to workload.</para><para>A partition that is not meeting user-configured objectives is a control
+violation. The two types of control violations are synchronous and asynchronous.</para><itemizedlist><listitem><para>A synchronous violation of an objective is detected by the
+daemon in the course of its workload monitoring.</para>
+</listitem><listitem><para>An asynchronous violation of an objective occurs independently
+of monitoring action by the daemon.</para>
+</listitem>
+</itemizedlist><para>The following events cause asynchronous objective violations:</para><itemizedlist><listitem><para>Resources are added to or removed from a control scope.</para>
+</listitem><listitem><para>The control scope is reconfigured.</para>
+</listitem><listitem><para>The <command>poold</command> resource controller is restarted.</para>
+</listitem>
+</itemizedlist><para>The contributions of objectives that are not related to workload are
+assumed to remain constant between evaluations of the objective function.
+Objectives that are not related to workload are only reassessed when a reevaluation
+is triggered through one of the asynchronous violations.</para>
+</sect2><sect2 id="rmpool-91"><title>Determining Appropriate Remedial Action</title><para>When the resource controller determines that a resource consumer is
+short of resources, the initial response is that increasing the resources
+will improve performance.</para><para>Alternative configurations that meet the objectives specified in the
+configuration for the scope of control are examined and evaluated.</para><para>This process is refined over time as the results of shifting resources
+are monitored and each resource partition is evaluated for responsiveness.
+The decision history is consulted to eliminate reconfigurations that did not
+show improvements in attaining the objective function in the past. Other information,
+such as process names and quantities, are used to further evaluate the relevance
+of the historical data.</para><para>If the daemon cannot take corrective action, the condition is logged.
+For more information, see <olink targetptr="rmpool-95" remap="internal">poold Logging Information</olink>.</para>
+</sect2>
+</sect1><sect1 id="rmpool-107"><title>Using <command>poolstat</command> to Monitor
+the Pools Facility and Resource Utilization</title><para>The <command>poolstat</command> utility is used to
+monitor resource utilization when pools are enabled on your system. This utility
+iteratively examines all of the active pools on a system and reports statistics
+based on the selected output mode. The <command>poolstat</command> statistics
+enable you to determine which resource partitions are heavily utilized. You
+can analyze these statistics to make decisions about resource reallocation
+when the system is under pressure for resources.</para><para>The <command>poolstat</command> utility includes options that can be
+used to examine specific pools and report resource set-specific statistics.</para><para>If zones are implemented on your system and you use <command>poolstat</command> in
+a non-global zone, information about the resources associated with the zone's
+pool is displayed.</para><para>For more information about the <command>poolstat</command> utility,
+see the <olink targetdoc="group-refman" targetptr="poolstat-1m" remap="external"><citerefentry><refentrytitle>poolstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page. For <command>poolstat</command> task and usage information, see <olink targetptr="rmpool.task-104" remap="internal">Using poolstat to Report Statistics for Pool-Related
+Resources</olink>.</para><sect2 id="rmpool-110"><title><command>poolstat</command> Output</title><para>In default output format, <command>poolstat</command> outputs
+a heading line and then displays a line for each pool. A pool line begins
+with the pool ID and the name of the pool, followed by a column of statistical
+data for the processor set attached to the pool. Resource sets attached to
+more than one pool are listed multiple times, once for each pool.</para><para>The column headings are as follows:</para><variablelist><varlistentry><term><literal>id</literal></term><listitem><para>Pool ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool</literal></term><listitem><para>Pool name.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>rid</literal></term><listitem><para>Resource set ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>rset</literal></term><listitem><para>Resource set name.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>type</literal></term><listitem><para>Resource set type.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>min</literal></term><listitem><para>Minimum resource set size.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>max</literal></term><listitem><para>Maximum resource set size.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>size</literal></term><listitem><para>Current resource set size.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>used</literal></term><listitem><para>Measure of how much of the resource set is currently used.</para><para>This usage is calculated as the percentage of utilization of the resource
+set multiplied by the size of the resource set. If a resource set has been
+reconfigured during the last sampling interval, this value might be not reported.
+An unreported value appears as a hyphen (<literal>-</literal>).</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>load</literal></term><listitem><para>Absolute representation of the load that is put on the resource
+set.</para><para>For more information about this property, see the <olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>You can specify the following in <command>poolstat</command> output:</para><itemizedlist><listitem><para>The order of the columns</para>
+</listitem><listitem><para>The headings that appear</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="rmpool-112"><title>Tuning <command>poolstat</command> Operation
+Intervals</title><para>You can customize the operations performed by <command>poolstat</command>.
+You can set the sampling interval for the report and specify the number of
+times that statistics are repeated:</para><variablelist><varlistentry><term><replaceable>interval</replaceable></term><listitem><para>Tune the intervals for the periodic operations performed by <command>poolstat</command>. All intervals are specified in seconds.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>count</replaceable></term><listitem><para>Specify the number of times that the statistics are repeated.
+By default, <command>poolstat</command> reports statistics only once.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>If <replaceable>interval</replaceable> and <replaceable>count</replaceable> are
+not specified, statistics are reported once. If <replaceable>interval</replaceable> is
+specified and <replaceable>count</replaceable> is not specified, then statistics
+are reported indefinitely.</para>
+</sect2>
+</sect1><sect1 id="rmpool-8"><title>Commands Used With the Resource Pools Facility</title><para>The commands described in the following table provide the primary
+administrative interface to the pools facility. For information on using these
+commands on a system that has zones enabled, see <olink targetptr="rmpool-114" remap="internal">Resource
+Pools Used in Zones</olink>.</para><informaltable frame="all"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="30*"/><colspec colwidth="70*"/><thead><row><entry><para>Man Page Reference</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="pooladm-1m" remap="external"><citerefentry><refentrytitle>pooladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Enables or disables the pools facility on your system. Activates a particular
+configuration or removes the current configuration and returns associated
+resources to their default status. If run without options, <command>pooladm</command> prints
+out the current dynamic pools configuration.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="poolbind-1m" remap="external"><citerefentry><refentrytitle>poolbind</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Enables the manual binding of projects, tasks, and processes to a resource
+pool.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="poolcfg-1m" remap="external"><citerefentry><refentrytitle>poolcfg</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Provides configuration operations on pools and sets. Configurations
+created using this tool are instantiated on a target host by using <command>pooladm</command>.</para><para>If run with the <command>info</command> subcommand argument to the <option>c</option> option, <command>poolcfg</command> displays information about the
+static configuration at <filename>/etc/pooladm.conf</filename>. If a file
+name argument is added, this command displays information about the static
+configuration held in the named file. For example, <command>poolcfg</command> <option>c</option> <command>info</command> <filename>/tmp/newconfig</filename> displays
+information about the static configuration contained in the file <filename>/tmp/newconfig</filename>.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="poold-1m" remap="external"><citerefentry><refentrytitle>poold</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>The pools system daemon. The daemon uses system targets and observable
+statistics to preserve the system performance goals specified by the administrator.
+If unable to take corrective action when goals are not being met, <command>poold</command> logs
+the condition.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="poolstat-1m" remap="external"><citerefentry><refentrytitle>poolstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Displays statistics for pool-related resources. Simplifies performance
+analysis and provides information that supports system administrators in resource
+partitioning and repartitioning tasks. Options are provided for examining
+specified pools and reporting resource set-specific statistics.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>A library API is provided by <command>libpool</command> (see the <olink targetdoc="group-refman" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink> man page).
+The library can be used by programs to manipulate pool configurations.</para>
+</sect1>
+</chapter>

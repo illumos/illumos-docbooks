@@ -1,0 +1,1202 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Patching Packages - Application Packaging Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-09-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Application Packaging Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-9.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-49.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-10.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="ch1designpkg-51728.html">1.&nbsp;&nbsp;Designing  a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch2buildpkg-22939.html">2.&nbsp;&nbsp;Building a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch3enhancepkg-11350.html">3.&nbsp;&nbsp;Enhancing the Functionality of a Package (Tasks)</a></p>
+<p class="toc level1 tocsp"><a href="ch4verifypkg-18395.html">4.&nbsp;&nbsp;Verifying and Transferring a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch5pkgcasestudies-80583.html">5.&nbsp;&nbsp;Case Studies of Package Creation</a></p>
+<p class="toc level1 tocsp"><a href="ch6advtech-96543.html">6.&nbsp;&nbsp;Advanced Techniques for Creating Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-33.html">Specifying the Base Directory</a></p>
+<p class="toc level2"><a href="ch6advtech-53.html">Accommodating Relocation</a></p>
+<p class="toc level2"><a href="ch6advtech-10.html">Supporting Relocation in a Heterogeneous Environment</a></p>
+<p class="toc level2"><a href="ch6advtech-9.html">Making Packages Remotely Installable</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Patching Packages</a></p>
+</div>
+<p class="toc level2"><a href="ch6advtech-49.html">Upgrading Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-87.html">Creating Class Archive Packages</a></p>
+<p class="toc level1 tocsp"><a href="gloss-1.html">Glossary</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="ch6advtech-41"></a><h3>Patching Packages</h3>
+<p><a name="indexterm-309"></a><a name="indexterm-310"></a><a name="indexterm-311"></a>A patch to a package is just a sparse package designed to
+overwrite certain files in the original. There is no real reason for shipping
+a sparse package except to save space on the delivery medium. You could
+also ship the entire original package with a few files changed, or provide
+access to the modified package over a network. As long as only those
+new files are actually different (the other files were not recompiled), the <tt>pkgadd</tt>
+command installs the differences. Review the following guidelines regarding patching packages.</p>
+<ul><li><p>If the system is complex enough, it is wise to establish a patch identification system which assures that no two patches replace the same file in an attempt to correct different aberrant behaviors. For instance, Sun patch base numbers are assigned mutually exclusive sets of files for which they are responsible. </p></li>
+<li><p>It is necessary to be able to back out a patch.</p></li></ul>
+<p>It is crucial that the version number of the patch package be
+the same as that of the original package. You should keep track of
+the patch status of the package using a separate <tt>pkginfo</tt> file entry of
+the form </p><pre>PATCH=<i>patch_number</i></pre><p>If the package version is changed for a patch, you create another
+instance of the package and it becomes extremely difficult to manage the patched
+product. This method of progressive instance patching carried certain advantages in the early releases
+of the Solaris operating environment, but makes management of more complicated systems tedious.</p><p>All of the zone parameters in the patch must match the zone
+parameters in the package</p><p><a name="indexterm-312"></a>As far as the packages that make up the Solaris operating environment are
+concerned, there should be only one copy of the package in the
+package database, although there may be multiple patched instances. In order to remove an
+object from an installed package (using the <tt>removef</tt> command) you need to figure
+out what instances own that file. </p><p><a name="indexterm-313"></a>However, if your package (that is not part of the Solaris operating environment)
+needs to determine the patch level of a particular package that <b>is</b> part of
+the Solaris operating environment, this becomes a problem to be resolved here. The
+installation scripts can be quite large without significant impact since they are not
+stored on the target file system. Using class action scripts and various other
+procedure scripts, you can save changed files using the <tt>PKGSAV</tt> environment variable
+(or to some other, more permanent directory) in order to allow backing out
+installed patches. You can also monitor patch history by setting appropriate environment variables
+through the <tt>request</tt> scripts. The scripts in the next sections assume that
+there may be multiple patches whose numbering scheme carries some meaning when applied to
+a single package. In this case, individual patch numbers represent a subset of
+functionally related files within the package. Two different patch numbers cannot change the
+same file. </p><p>In order to make a regular sparse package into a patch package,
+the scripts described in the following sections can simply be folded into the package.
+All of them are recognizable as standard package components with the exception of
+the last two which are named <tt>patch_checkinstall</tt> and <tt>patch_postinstall</tt>. Those two scripts
+can be incorporated into the backout package, if you want to include the
+ability to back out the patch. The scripts are fairly simple and their
+various tasks are straightforward. </p>
+<hr><p><b>Note - </b>This method of patching can be used to patch client systems, but client
+root directories on the server must have the correct permissions to allow reading
+by the user <tt>install</tt> or <tt>nobody</tt>.</p>
+<hr>
+
+
+<a name="ch6advtech-43"></a><h4>The <tt>checkinstall</tt> Script</h4>
+<p><a name="indexterm-314"></a><a name="indexterm-315"></a>The <tt>checkinstall</tt> script verifies that the patch is appropriate for this particular package.
+Once that is confirmed, it constructs the <b>patch list</b> and the <b>patch info</b> list, and
+then inserts them into the response file for incorporation into the package database.</p><p>A patch list is the list of patches that have affected the
+current package. This list of patches is recorded in the installed package in
+the <tt>pkginfo</tt> file with a line that might look like this:</p><pre>PATCHLIST=<i>patch_id</i> <i>patch_id</i> ...</pre><p>A patch info list is the list of patches on which the
+current patch is dependent. This list of patches is also recorded in the
+<tt>pkginfo</tt> file with a line that might look like this.</p><pre>PATCH_INFO_103203-01=Installed... Obsoletes:103201-01 Requires: \ Incompatibles: 120134-01</pre>
+<hr><p><b>Note - </b>These lines (and their format) are declared as a public interface. Any company
+that ships patches for Solaris packages should update this list appropriately. When a
+patch is delivered, each package within the patch contains a <tt>checkinstall</tt> script that
+performs this task. That same <tt>checkinstall</tt> script also updates some other patch-specific
+parameters.  This is the new patch architecture, which is called Direct Instance
+Patching.</p>
+<hr>
+<p>In this example, both the original packages and their patches exist in the
+same directory. The two original packages are named <tt>SUNWstuf.v1</tt> and <tt>SUNWstuf.v2</tt>, and
+their patches are named <tt>SUNWstuf.p1</tt> and <tt>SUNWstuf.p2</tt>. What this means is that
+it could be very difficult for a procedure script to figure out what
+directory these files came from, since everything in the package name after the
+dot (&ldquo;.&rdquo;) is stripped for the <tt>PKG</tt> parameter, and the <tt>PKGINST</tt> environment variable refers
+to the installed instance not the source instance. So the procedure scripts can
+find the source directory, the <tt>checkinstall</tt> script (which is always executed from the
+source directory) makes the inquiry and passes the location on as the variable
+<tt>SCRIPTS_DIR</tt>. If there had been only one package in the source directory called
+<tt>SUNWstuf</tt>, then the procedure scripts could have found it using <tt>$INSTDIR/$PKG</tt>. </p><pre># checkinstall script to control a patch installation.
+# directory format options.
+#
+#       @(#)checkinstall 1.6 96/09/27 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+INFO_DIR=`dirname $0`
+INFO_DIR=`dirname $INFO_DIR`    # one level up
+ 
+NOVERS_MSG="PaTcH_MsG 8 Version $VERSION of $PKG is not installed on this system."
+ALRDY_MSG="PaTcH_MsG 2 Patch number $Patch_label is already applied."
+TEMP_MSG="PaTcH_MsG 23 Patch number $Patch_label cannot be applied until all \
+restricted patches are backed out."
+ 
+# Read the provided environment from what may have been a request script
+. $1
+ 
+# Old systems can't deal with checkinstall scripts anyway
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        exit 0
+fi
+ 
+#
+# Confirm that the intended version is installed on the system.
+#
+if [ "${UPDATE}" != "yes" ]; then
+        echo "$NOVERS_MSG"
+        exit 3
+fi
+ 
+#
+# Confirm that this patch hasn't already been applied and
+# that no other mix-ups have occurred involving patch versions and
+# the like.
+#
+Skip=0
+active_base=`echo $Patch_label | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+active_inst=`echo $Patch_label | nawk '
+        { print substr($0, match($0, "Patchvers_pfx")+Patchvers_pfx_lnth) } '`
+ 
+# Is this a restricted patch?
+if echo $active_base | egrep -s "Patchstrict_str"; then
+        is_restricted="true"
+        # All restricted patches are backoutable
+        echo "PATCH_NO_UNDO=" &gt;&gt; $1
+else
+        is_restricted="false"
+fi
+ 
+for patchappl in ${PATCHLIST}; do
+        # Is this an ordinary patch applying over a restricted patch?
+        if [ $is_restricted = "false" ]; then
+                if echo $patchappl | egrep -s "Patchstrict_str"; then
+                        echo "$TEMP_MSG"
+                        exit 3;
+                fi
+        fi
+ 
+        # Is there a newer version of this patch?
+        appl_base=`echo $patchappl | nawk '
+                { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+        if [ $appl_base = $active_base ]; then
+                appl_inst=`echo $patchappl | nawk '
+                        { print substr($0, match($0, "Patchvers_pfx")\
++Patchvers_pfx_lnth) } '`
+                result=`expr $appl_inst \&gt; $active_inst`
+                if [ $result -eq 1 ]; then
+                        echo "PaTcH_MsG 1 Patch number $Patch_label is \
+superceded by the already applied $patchappl."
+                        exit 3
+                elif [ $appl_inst = $active_inst ]; then
+                        # Not newer, it's the same
+                        if [ "$PATCH_UNCONDITIONAL" = "true" ]; then
+                                if [ -d $PKGSAV/$Patch_label ]; then
+                                        echo "PATCH_NO_UNDO=true" &gt;&gt; $1
+                                fi
+                        else
+                                echo "$ALRDY_MSG"
+                                exit 3;
+                        fi
+                fi
+        fi
+done
+ 
+# Construct a list of applied patches in order
+echo "PATCHLIST=${PATCHLIST} $Patch_label" &gt;&gt; $1
+ 
+#
+# Construct the complete list of patches this one obsoletes
+#
+ACTIVE_OBSOLETES=$Obsoletes_label
+ 
+if [ -n "$Obsoletes_label" ]; then
+        # Merge the two lists
+        echo $Obsoletes_label | sed 'y/\ /\n/' | \
+        nawk -v PatchObsList="$PATCH_OBSOLETES" '
+        BEGIN {
+                printf("PATCH_OBSOLETES=");
+                PatchCount=split(PatchObsList, PatchObsComp, " ");
+ 
+                for(PatchIndex in PatchObsComp) {
+                        Atisat=match(PatchObsComp[PatchIndex], "@");
+                        PatchObs[PatchIndex]=substr(PatchObsComp[PatchIndex], \
+0, Atisat-1);
+                        PatchObsCnt[PatchIndex]=substr(PatchObsComp\
+[PatchIndex], Atisat+1);
+                }
+        }
+        {
+                Inserted=0;
+                for(PatchIndex in PatchObs) {
+                        if (PatchObs[PatchIndex] == $0) {
+                                if (Inserted == 0) {
+                                        PatchObsCnt[PatchIndex]=PatchObsCnt\
+[PatchIndex]+1;
+                                        Inserted=1;
+                                } else {
+                                        PatchObsCnt[PatchIndex]=0;
+                                }
+                        }
+                }
+                if (Inserted == 0) {
+                        printf ("%s@1 ", $0);
+                }
+                next;
+        }        
+        END {
+                for(PatchIndex in PatchObs) {
+                        if ( PatchObsCnt[PatchIndex] != 0) {
+                                printf("%s@%d ", PatchObs[PatchIndex], \
+PatchObsCnt[PatchIndex]);
+                        }
+                }
+                printf("\n");
+        } ' &gt;&gt; $1
+        # Clear the parameter since it has already been used.
+        echo "Obsoletes_label=" &gt;&gt; $1
+ 
+        # Pass it's value on to the preinstall under another name
+        echo "ACTIVE_OBSOLETES=$ACTIVE_OBSOLETES" &gt;&gt; $1
+fi
+ 
+#
+# Construct PATCH_INFO line for this package.
+#                        
+ 
+tmpRequire=`nawk -F= ' $1 ~ /REQUIR/ { print $2 } ' $INFO_DIR/pkginfo `
+tmpIncompat=`nawk -F= ' $1 ~ /INCOMPAT/ { print $2 } ' $INFO_DIR/pkginfo `
+ 
+if [ -n "$tmpRequire" ] &amp;&amp; [ -n "$tmpIncompat" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: $tmpRequire \
+          Incompatibles: $tmpIncompat" &gt;&gt; $1
+elif [ -n "$tmpRequire" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: $tmpRequire \
+Incompatibles: " &gt;&gt; $1
+elif [ -n "$tmpIncompat" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: Incompatibles: \
+$tmpIncompat" &gt;&gt; $1
+else
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: Incompatibles: " &gt;&gt; $1
+fi
+ 
+#
+# Since this script is called from the delivery medium and we may be using
+# dot extensions to distinguish the different patch packages, this is the
+# only place we can, with certainty, trace that source for our backout
+# scripts. (Usually $INST_DATADIR would get us there).
+#
+echo "SCRIPTS_DIR=`dirname $0`" &gt;&gt; $1
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</pre>
+
+<a name="ch6advtech-44"></a><h4>The <tt>preinstall</tt> Script</h4>
+<p><a name="indexterm-316"></a>The <tt>preinstall</tt> script initializes the <tt>prototype</tt> file, information files, and installation scripts
+for the backout package to be constructed. This script is very simple and
+the remaining scripts in this example only allow a backout package to describe regular
+files.</p><p><a name="indexterm-317"></a>If you wanted to restore symbolic links, hard links, devices, and named pipes
+in a backout package, you could modify the <tt>preinstall</tt> script to use the
+<tt>pkgproto</tt> command to compare the delivered <tt>pkgmap</tt> file with the installed files,
+and then create a <tt>prototype</tt> file entry for each non-file to be
+changed in the backout package. The method you should use is similar to
+the method in the class action script.</p><p>The scripts <tt>patch_checkinstall</tt> and <tt>patch_postinstall</tt> are inserted into the package source tree
+from the <tt>preinstall</tt> script. These two scripts undo what the patch does.
+</p><pre># This script initializes the backout data for a patch package
+# directory format options.
+#
+#       @(#)preinstall 1.5 96/05/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+recovery="no"
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+# Check to see if this is a patch installation retry.
+if [ "$INTERRUPTION" = "yes" ]; then
+    if [ -d "$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST" ] || [ -d \
+"$PATCH_BUILD_DIR/$Patch_label.$PKGINST" ]; then
+        recovery="yes"
+    fi
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$BUILD_DIR/files/reloc
+ROOT_DIR=$BUILD_DIR/files/root
+PROTO_FILE=$BUILD_DIR/prototype
+PKGINFO_FILE=$BUILD_DIR/pkginfo
+THIS_DIR=`dirname $0`
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        # If this is being used in an old-style patch, insert
+        # the old-style script commands here.
+ 
+        #XXXOld_CommandsXXX#
+ 
+        exit 0
+fi
+ 
+#
+# Unless specifically denied, initialize the backout patch data by
+# creating the build directory and copying over the original pkginfo
+# which pkgadd saved in case it had to be restored.
+#
+if [ "$PATCH_NO_UNDO" != "true" ] &amp;&amp; [ "$recovery" = "no" ]; then
+        if [ -d $BUILD_DIR ]; then
+                rm -r $BUILD_DIR
+        fi
+ 
+        # If this is a retry of the same patch then recovery is set to
+        # yes. Which means there is a build directory already in
+        # place with the correct backout data.
+ 
+        if [ "$recovery" = "no" ]; then
+                mkdir $BUILD_DIR
+                mkdir -p $RELOC_DIR
+                mkdir $ROOT_DIR
+        fi
+ 
+        #
+        # Here we initialize the backout pkginfo file by first
+        # copying over the old pkginfo file and themn adding the
+        # ACTIVE_PATCH parameter so the backout will know what patch
+        # it's backing out.
+        #
+        # NOTE : Within the installation, pkgparam returns the
+        # original data.
+        #
+        pkgparam -v $PKGINST | nawk '
+                $1 ~ /PATCHLIST/        { next; }
+                $1 ~ /PATCH_OBSOLETES/  { next; }
+                $1 ~ /ACTIVE_OBSOLETES/ { next; }
+                $1 ~ /Obsoletes_label/  { next; }
+                $1 ~ /ACTIVE_PATCH/     { next; }
+                $1 ~ /Patch_label/      { next; }
+                $1 ~ /UPDATE/   { next; }
+                $1 ~ /SCRIPTS_DIR/      { next; }
+                $1 ~ /PATCH_NO_UNDO/    { next; }
+                $1 ~ /INSTDATE/ { next; }
+                $1 ~ /PKGINST/  { next; }
+                $1 ~ /OAMBASE/  { next; }
+                $1 ~ /PATH/     { next; }
+                { print; } ' &gt; $PKGINFO_FILE
+        echo "ACTIVE_PATCH=$Patch_label" &gt;&gt; $PKGINFO_FILE
+        echo "ACTIVE_OBSOLETES=$ACTIVE_OBSOLETES" &gt;&gt; $PKGINFO_FILE
+ 
+        # And now initialize the backout prototype file with the
+        # pkginfo file just formulated.
+        echo "i pkginfo" &gt; $PROTO_FILE
+ 
+        # Copy over the backout scripts including the undo class
+        # action scripts
+        for script in $SCRIPTS_DIR/*; do
+                srcscript=`basename $script`
+                targscript=`echo $srcscript | nawk '
+                        { script=$0; }
+                        /u\./ {
+                                sub("u.", "i.", script);
+                                print script;
+                                next;
+                        }
+                        /patch_/ {
+                                sub("patch_", "", script);
+                                print script;
+                                next;
+                        }
+                        { print "dont_use" } '`
+                if [ "$targscript" = "dont_use" ]; then
+                        continue
+                fi
+ 
+                echo "i $targscript=$FILE_DIR/$targscript" &gt;&gt; $PROTO_FILE
+                cp $SCRIPTS_DIR/$srcscript $FILE_DIR/$targscript
+        done
+         #
+        # Now add entries to the prototype file that won't be passed to
+        # class action scripts. If the entry is brand new, add it to the
+        # deletes file for the backout package.
+        #
+        Our_Pkgmap=`dirname $SCRIPTS_DIR`/pkgmap
+        BO_Deletes=$FILE_DIR/deletes
+ 
+        nawk -v basedir=${BASEDIR:-/} '
+                BEGIN { count=0; }
+                {
+                        token = $2;
+                        ftype = $1;
+                }
+                $1 ~ /[#\!:]/ { next; }
+                $1 ~ /[0123456789]/ {
+                        if ( NF &gt;= 3) {
+                                token = $3;
+                                ftype = $2;
+                        } else {
+                                next;
+                        }
+                }
+                { if (ftype == "i" || ftype == "e" || ftype == "f" || ftype == \
+"v" || ftype == "d") { next; } }
+                {
+                        equals=match($4, "=")-1;
+                        if ( equals == -1 ) { print $3, $4; }
+                        else { print $3, substr($4, 0, equals); }
+                }
+                ' &lt; $Our_Pkgmap | while read class path; do
+                        #
+                        # NOTE: If pkgproto is passed a file that is
+                        # actually a hard link to another file, it
+                        # will return ftype "f" because the first link
+                        # in the list (consisting of only one file) is
+                        # viewed by pkgproto as the source and always
+                        # gets ftype "f".
+                        #
+                        # If this isn't replacing something, then it
+                        # just goes to the deletes list.
+                        #
+                        if valpath -l $path; then
+                                Chk_Path="$BASEDIR/$path"
+                                Build_Path="$RELOC_DIR/$path"
+                                Proto_From="$BASEDIR"
+                        else    # It's an absolute path
+                                Chk_Path="$PKG_INSTALL_ROOT$path"
+                                Build_Path="$ROOT_DIR$path"
+                                Proto_From="$PKG_INSTALL_ROOT"
+                        fi
+                         #
+                        # Hard links have to be restored as regular files.
+                        # Unlike the others in this group, an actual
+                        # object will be required for the pkgmk.
+                        #
+                        if [ -f "$Chk_Path" ]; then
+                                mkdir -p `dirname $Build_Path`
+                                cp $Chk_Path $Build_Path
+                                cd $Proto_From
+                                pkgproto -c $class "$Build_Path=$path" 1&gt;&gt; \
+$PROTO_FILE 2&gt; /dev/null
+                                cd $THIS_DIR
+                        elif [ -h "$Chk_Path" -o \
+                             -c "$Chk_Path" -o \
+                             -b "$Chk_Path" -o \
+                             -p "$Chk_Path" ]; then
+                                pkgproto -c $class "$Chk_Path=$path" 1&gt;&gt; \
+$PROTO_FILE 2&gt; /dev/null
+                        else
+                                echo $path &gt;&gt; $BO_Deletes
+                        fi
+                done
+fi
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</pre>
+
+<a name="ch6advtech-45"></a><h4>The Class Action Script</h4>
+<p><a name="indexterm-318"></a>The class action script creates a copy of each file that replaces an
+existing file and adds a corresponding line to the <tt>prototype</tt> file for
+the backout package. This is all done with fairly simple <tt>nawk</tt> scripts.
+The class action script receives a list of source/destination pairs consisting of ordinary
+files that do not match the corresponding installed files. Symbolic links and other
+non-files must be dealt with in the <tt>preinstall</tt> script. </p><pre># This class action script copies the files being replaced
+# into a package being constructed in $BUILD_DIR. This class
+# action script is only appropriate for regular files that
+# are installed by simply copying them into place.
+#
+# For special package objects such as editable files, the patch
+# producer must supply appropriate class action scripts.
+#
+# directory format options.
+#
+#       @(#)i.script 1.6 96/05/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+ECHO="/usr/bin/echo"
+SED="/usr/bin/sed"
+PKGPROTO="/usr/bin/pkgproto"
+EXPR="/usr/bin/expr"    # used by dirname
+MKDIR="/usr/bin/mkdir"
+CP="/usr/bin/cp"
+RM="/usr/bin/rm"
+MV="/usr/bin/mv"
+ 
+recovery="no"
+Pn=$$
+procIdCtr=0
+ 
+CMDS_USED="$ECHO $SED $PKGPROTO $EXPR $MKDIR $CP $RM $MV"
+LIBS_USED=""
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+# Check to see if this is a patch installation retry.
+if [ "$INTERRUPTION" = "yes" ]; then
+        if [ -d "$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST" ] || 
+\
+[ -d "$PATCH_BUILD_DIR/$Patch_label.$PKGINST" ]; then
+                recovery="yes"
+        fi
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$FILE_DIR/reloc
+ROOT_DIR=$FILE_DIR/root
+BO_Deletes=$FILE_DIR/deletes
+PROGNAME=`basename $0`
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        PATCH_NO_UNDO="true"
+fi
+ 
+# Since this is generic, figure out the class.
+Class=`echo $PROGNAME | nawk ' { print substr($0, 3)  }'`
+ 
+# Since this is an update, $BASEDIR is guaranteed to be correct
+BD=${BASEDIR:-/}
+ 
+cd $BD
+ 
+#
+# First, figure out the dynamic libraries that can trip us up.
+#
+if [ -z "$PKG_INSTALL_ROOT" ]; then
+        if [ -x /usr/bin/ldd ]; then
+                LIB_LIST=`/usr/bin/ldd $CMDS_USED | sort -u | nawk '
+                        $1 ~ /\// { continue; }
+                        { printf "%s ", $3 } '`
+        else
+                LIB_LIST="/usr/lib/libc.so.1 /usr/lib/libdl.so.1 
+\
+/usr/lib/libw.so.1 /usr/lib/libintl.so.1 /usr/lib/libadm.so.1 \
+/usr/lib/libelf.so.1"
+        fi
+fi
+ 
+#
+# Now read the list of files in this class to be replaced. If the file
+# is already in place, then this is a change and we need to copy it
+# over to the build directory if undo is allowed. If it's a new entry
+# (No $dst), then it goes in the deletes file for the backout package.
+#
+procIdCtr=0
+while read src dst; do
+        if [ -z "$PKG_INSTALL_ROOT" ]; then
+                Chk_Path=$dst
+                for library in $LIB_LIST; do
+                        if [ $Chk_Path = $library ]; then
+                                $CP $dst $dst.$Pn
+                                LIBS_USED="$LIBS_USED $dst.$Pn"
+                                LD_PRELOAD="$LIBS_USED"
+                                export LD_PRELOAD
+                        fi
+                done
+        fi
+ 
+        if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+                # If this is being used in an old-style patch, insert
+                # the old-style script commands here.
+ 
+                #XXXOld_CommandsXXX#
+                echo &gt;/dev/null # dummy
+        fi
+ 
+        if [ "${PATCH_NO_UNDO}" != "true" ]; then
+                #
+                # Here we construct the path to the appropriate source
+                # tree for the build. First we try to strip BASEDIR. If
+                # there's no BASEDIR in the path, we presume that it is
+                # absolute and construct the target as an absolute path
+                # by stripping PKG_INSTALL_ROOT. FS_Path is the path to
+                # the file on the file system (for deletion purposes).
+                # Build_Path is the path to the object in the build
+                # environment.
+                #
+                if [ "$BD" = "/" ]; then
+                        FS_Path=`$ECHO $dst | $SED s@"$BD"@@`
+                else
+                        FS_Path=`$ECHO $dst | $SED s@"$BD/"@@`
+                fi
+ 
+                # If it's an absolute path the attempt to strip the
+                # BASEDIR will have failed.
+                if [ $dst = $FS_Path ]; then
+                        if [ -z "$PKG_INSTALL_ROOT" ]; then
+                                FS_Path=$dst
+                                Build_Path="$ROOT_DIR$dst"
+                        else
+                                Build_Path="$ROOT_DIR`echo $dst | \
+                                    sed s@"$PKG_INSTALL_ROOT"@@`"
+                                FS_Path=`echo $dst | \
+                                    sed s@"$PKG_INSTALL_ROOT"@@`
+                        fi
+                else
+                        Build_Path="$RELOC_DIR/$FS_Path"
+                fi
+ 
+                if [ -f $dst ]; then    # If this is replacing something
+                        cd $FILE_DIR
+                        #
+                        # Construct the prototype file entry. We replace
+                        # the pointer to the filesystem object with the
+                        # build directory object.
+                        #
+                        $PKGPROTO -c $Class $dst=$FS_Path | \
+                            $SED -e s@=$dst@=$Build_Path@ &gt;&gt; \
+                            $BUILD_DIR/prototype
+ 
+                        # Now copy over the file
+                        if [ "$recovery" = "no" ]; then
+                                DirName=`dirname $Build_Path`
+                                $MKDIR -p $DirName
+                                $CP -p $dst $Build_Path
+                        else
+                                # If this file is already in the build area skip it
+                                if [ -f "$Build_Path" ]; then
+                                        cd $BD
+                                        continue
+                                else
+                                        DirName=`dirname $Build_Path`
+                                        if [ ! -d "$DirName" ]; then
+                                                $MKDIR -p $DirName
+                                        fi
+                                        $CP -p $dst $Build_Path
+                                fi        
+                        fi
+ 
+                        cd $BD
+                else    # It's brand new
+                        $ECHO $FS_Path &gt;&gt; $BO_Deletes
+                fi
+        fi
+ 
+        # If special processing is required for each src/dst pair,
+        # add that here.
+        #
+        #XXXSpecial_CommandsXXX#
+        #
+ 
+        $CP $src $dst.$$$procIdCtr
+        if [ $? -ne 0 ]; then
+                $RM $dst.$$$procIdCtr 1&gt;/dev/null 2&gt;&amp;1
+        else
+                $MV -f $dst.$$$procIdCtr $dst
+                for library in $LIB_LIST; do
+                        if [ "$library" = "$dst" ]; then
+                                LD_PRELOAD="$dst"
+                                export LD_PRELOAD
+                        fi
+                done
+        fi                       
+        procIdCtr=`expr $procIdCtr + 1`
+done      
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+#
+# Release the dynamic libraries
+#
+for library in $LIBS_USED; do
+        $RM -f $library
+done
+ 
+exit 0</pre>
+
+<a name="ch6advtech-46"></a><h4>The <tt>postinstall</tt> Script</h4>
+<p><a name="indexterm-319"></a><a name="indexterm-320"></a><a name="indexterm-321"></a><a name="indexterm-322"></a>The <tt>postinstall</tt> script creates the backout package using the information provided by the
+other scripts. Since the <tt>pkgmk</tt> and <tt>pkgtrans</tt> commands do not require the
+package database, they can be executed within a package installation.  </p><p>In the example, undoing the patch is permitted by constructing a stream format
+package in the save directory (using the <tt>PKGSAV</tt> environment variable). It is not
+obvious, but this package must be in stream format, because the save directory
+gets moved around during a <tt>pkgadd</tt> operation. If the <tt>pkgadd</tt> command is applied
+to a package in its own save directory, assumptions about where the package
+source is at any given time become very unreliable. A stream format package
+is unpacked into a temporary directory and installed from there. (A directory format
+package would begin installing from the save directory and find itself suddenly relocated
+during a <tt>pkgadd</tt> fail-safe operation.) </p><p>To determine which patches are applied to a package, use this command:</p><pre>$ <tt><b>pkgparam SUNWstuf PATCHLIST</b></tt></pre><p>With the exception of <tt>PATCHLIST</tt>, which is a Sun public interface, there is
+nothing significant in the parameter names in this example. Instead of <tt>PATCH</tt> you
+could use the traditional <tt>SUNW_PATCHID</tt> and the various other lists such as
+<tt>PATCH_EXCL</tt> and <tt>PATCH_REQD</tt> could be renamed accordingly. </p><p>If certain patch packages depend upon other patch packages which are available from
+the same medium, the <tt>checkinstall</tt> script could determine this and create a script
+to be executed by the <tt>postinstall</tt> script in the same way that
+the upgrade example (see <a href="ch6advtech-49.html">Upgrading Packages</a>) does. </p><pre># This script creates the backout package for a patch package
+#
+# directory format options.
+#
+# @(#) postinstall 1.6 96/01/29 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+# Description:
+#       Set the TYPE parameter for the remote file
+#
+# Parameters:
+#       none
+#
+# Globals set:
+#       TYPE
+ 
+set_TYPE_parameter () {
+        if [ ${PATCH_UNDO_ARCHIVE:?????} = "/dev" ]; then
+                # handle device specific stuff
+                TYPE="removable"
+        else
+                TYPE="filesystem"
+        fi
+}
+ 
+#
+# Description:
+#       Build the remote file that points to the backout data
+#
+# Parameters:
+#       $1:     the un/compressed undo archive
+#
+# Globals set:
+#       UNDO, STATE
+ 
+build_remote_file () {
+        remote_path=$PKGSAV/$Patch_label/remote
+        set_TYPE_parameter
+        STATE="active"
+ 
+        if [ $1 = "undo" ]; then
+                UNDO="undo"
+        else
+                UNDO="undo.Z"
+        fi
+ 
+        cat &gt; $remote_path &lt;&lt; EOF
+# Backout data stored remotely
+TYPE=$TYPE
+FIND_AT=$ARCHIVE_DIR/$UNDO
+STATE=$STATE
+EOF
+}
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+if [ ! -n "$PATCH_UNDO_ARCHIVE" ]; then
+        PATCH_UNDO_ARCHIVE="none"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$FILE_DIR/reloc
+ROOT_DIR=$FILE_DIR/root
+BO_Deletes=$FILE_DIR/deletes
+THIS_DIR=`dirname $0`
+PROTO_FILE=$BUILD_DIR/prototype
+TEMP_REMOTE=$PKGSAV/$Patch_label/temp
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        # remove the scripts that are left behind
+        install_scripts=`dirname $0`
+        rm $install_scripts/checkinstall \
+$install_scripts/patch_checkinstall $install_scripts/patch_postinstall
+ 
+        # If this is being used in an old-style patch, insert
+        # the old-style script commands here.
+ 
+        #XXXOld_CommandsXXX#
+ 
+        exit 0
+fi
+#
+# At this point we either have a deletes file or we don't. If we do,
+# we create a prototype entry.
+#
+if [ -f $BO_Deletes ]; then
+        echo "i deletes=$BO_Deletes" &gt;&gt; $BUILD_DIR/prototype
+fi
+ 
+#
+# Now delete everything in the deletes list after transferring
+# the file to the backout package and the entry to the prototype
+# file. Remember that the pkgmap will get the CLIENT_BASEDIR path
+# but we have to actually get at it using the BASEDIR path. Also
+# remember that removef will import our PKG_INSTALL_ROOT
+#
+Our_Deletes=$THIS_DIR/deletes
+if [ -f $Our_Deletes ]; then
+        cd $BASEDIR
+ 
+        cat $Our_Deletes | while read path; do
+                Reg_File=0
+ 
+                if valpath -l $path; then
+                        Client_Path="$CLIENT_BASEDIR/$path"
+                        Build_Path="$RELOC_DIR/$path"
+                        Proto_Path=$BASEDIR/$path
+                else    # It's an absolute path
+                        Client_Path=$path
+                        Build_Path="$ROOT_DIR$path"
+                        Proto_Path=$PKG_INSTALL_ROOT$path
+                fi
+ 
+                # Note: If the file isn't really there, pkgproto
+                # doesn't write anything.
+                LINE=`pkgproto $Proto_Path=$path`
+                ftype=`echo $LINE | nawk '{ print $1 }'`
+                if [ $ftype = "f" ]; then
+                        Reg_File=1
+                fi
+ 
+                if [ $Reg_File = 1 ]; then
+                        # Add source file to the prototype entry
+                        if [ "$Proto_Path" = "$path" ]; then
+                                LINE=`echo $LINE | sed -e s@$Proto_Path@$Build_Path@2`
+                        else
+                                LINE=`echo $LINE | sed -e s@$Proto_Path@$Build_Path@`
+                        fi
+ 
+                        DirName=`dirname $Build_Path`
+                        # make room in the build tree
+                        mkdir -p $DirName
+                        cp -p $Proto_Path $Build_Path
+                fi
+ 
+                # Insert it into the prototype file
+                echo $LINE 1&gt;&gt;$PROTO_FILE 2&gt;/dev/null
+ 
+                # Remove the file only if it's OK'd by removef
+                rm `removef $PKGINST $Client_Path` 1&gt;/dev/null 2&gt;&amp;1
+        done
+        removef -f $PKGINST
+ 
+        rm $Our_Deletes
+fi
+ 
+#
+# Unless specifically denied, make the backout package.
+#
+if [ "$PATCH_NO_UNDO" != "true" ]; then
+        cd $BUILD_DIR   # We have to build from here.
+ 
+        if [ "$PATCH_UNDO_ARCHIVE" != "none" ]; then
+                STAGE_DIR="$PATCH_UNDO_ARCHIVE"
+                ARCHIVE_DIR="$PATCH_UNDO_ARCHIVE/$Patch_label/$PKGINST"
+                mkdir -p $ARCHIVE_DIR
+                mkdir -p $PKGSAV/$Patch_label
+        else
+                if [ -d $PKGSAV/$Patch_label ]; then
+                        rm -r $PKGSAV/$Patch_label
+                fi
+                STAGE_DIR=$PKGSAV
+                ARCHIVE_DIR=$PKGSAV/$Patch_label
+                mkdir $ARCHIVE_DIR
+        fi
+                 
+        pkgmk -o -d $STAGE_DIR 1&gt;/dev/null 2&gt;&amp;1
+        pkgtrans -s $STAGE_DIR $ARCHIVE_DIR/undo $PKG 1&gt;/dev/null 2&gt;&amp;1
+        compress $ARCHIVE_DIR/undo
+        retcode=$?
+        if [ "$PATCH_UNDO_ARCHIVE" != "none" ]; then
+                if [ $retcode != 0 ]; then
+                        build_remote_file "undo"
+                else
+                        build_remote_file "undo.Z"
+                fi
+        fi
+        rm -r $STAGE_DIR/$PKG
+          
+        cd ..
+        rm -r $BUILD_DIR
+        # remove the scripts that are left behind
+        install_scripts=`dirname $0`
+        rm $install_scripts/checkinstall $install_scripts/patch_\
+checkinstall $install_scripts/patch_postinstall
+fi
+ 
+#
+# Since this apparently worked, we'll mark as obsoleted the prior
+# versions of this patch - installpatch deals with explicit obsoletions.
+#                       
+cd ${PKG_INSTALL_ROOT:-/}
+cd var/sadm/pkg
+ 
+active_base=`echo $Patch_label | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+ 
+List=`ls -d $PKGINST/save/${active_base}*`
+if [ $? -ne 0 ]; then
+        List=""
+fi
+ 
+for savedir in $List; do
+        patch=`basename $savedir`
+        if [ $patch = $Patch_label ]; then
+                break
+        fi
+ 
+        # If we get here then the previous patch gets deleted
+        if [ -f $savedir/undo ]; then
+                mv $savedir/undo $savedir/obsolete
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif [ -f $savedir/undo.Z ]; then
+                mv $savedir/undo.Z $savedir/obsolete.Z
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif  [ -f $savedir/remote ]; then
+                `grep . $PKGSAV/$patch/remote | sed 's/STATE=.*/STATE=obsolete/
+' &gt; $TEMP_REMOTE`
+                rm -f $PKGSAV/$patch/remote
+                mv $TEMP_REMOTE $PKGSAV/$patch/remote
+                rm -f $TEMP_REMOTE
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif  [ -f $savedir/obsolete -o -f $savedir/obsolete.Z ]; then
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        fi
+done
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</pre>
+
+<a name="ch6advtech-47"></a><h4>The <tt>patch_checkinstall</tt> Script</h4>
+<pre># checkinstall script to validate backing out a patch.
+# directory format option.
+#
+#       @(#)patch_checkinstall 1.2 95/10/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+LATER_MSG="PaTcH_MsG 6 ERROR: A later version of this patch is applied."
+NOPATCH_MSG="PaTcH_MsG 2 ERROR: Patch number $ACTIVE_PATCH is not installed"
+NEW_LIST=""
+ 
+# Get OLDLIST
+. $1
+ 
+#
+# Confirm that the patch that got us here is the latest one installed on
+# the system and remove it from PATCHLIST.
+#
+Is_Inst=0
+Skip=0
+active_base=`echo $ACTIVE_PATCH | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+active_inst=`echo $ACTIVE_PATCH | nawk '
+        { print substr($0, match($0, "Patchvers_pfx")+1) } '`
+for patchappl in ${OLDLIST}; do
+        appl_base=`echo $patchappl | nawk '
+                { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+        if [ $appl_base = $active_base ]; then
+                appl_inst=`echo $patchappl | nawk '
+                        { print substr($0, match($0, "Patchvers_pfx")+1) } '`
+                result=`expr $appl_inst \&gt; $active_inst`
+                if [ $result -eq 1 ]; then
+                        puttext "$LATER_MSG"
+                        exit 3
+                elif [ $appl_inst = $active_inst ]; then
+                        Is_Inst=1
+                        Skip=1
+                fi
+        fi
+        if [ $Skip = 1 ]; then
+                Skip=0
+        else
+                NEW_LIST="${NEW_LIST} $patchappl"
+        fi
+done
+ 
+if [ $Is_Inst = 0 ]; then
+        puttext "$NOPATCH_MSG"
+        exit 3
+fi
+ 
+#
+# OK, all's well. Now condition the key variables.
+#
+echo "PATCHLIST=${NEW_LIST}" &gt;&gt; $1
+echo "Patch_label=" &gt;&gt; $1
+echo "PATCH_INFO_$ACTIVE_PATCH=backed out" &gt;&gt; $1
+ 
+# Get the current PATCH_OBSOLETES and condition it
+Old_Obsoletes=$PATCH_OBSOLETES
+ 
+echo $ACTIVE_OBSOLETES | sed 'y/\ /\n/' | \
+nawk -v PatchObsList="$Old_Obsoletes" '
+        BEGIN {  
+                printf("PATCH_OBSOLETES=");
+                PatchCount=split(PatchObsList, PatchObsComp, " ");
+ 
+                for(PatchIndex in PatchObsComp) {
+                        Atisat=match(PatchObsComp[PatchIndex], "@");
+                        PatchObs[PatchIndex]=substr(PatchObsComp[PatchIndex], \
+0, Atisat-1);
+                        PatchObsCnt[PatchIndex]=substr(PatchObsComp\
+[PatchIndex], Atisat+1);
+                }
+        }
+        {
+                for(PatchIndex in PatchObs) {
+                        if (PatchObs[PatchIndex] == $0) {
+                                PatchObsCnt[PatchIndex]=PatchObsCnt[PatchIndex]-1;
+                        }
+                }
+                next;
+        }        
+        END {
+                for(PatchIndex in PatchObs) {
+                        if ( PatchObsCnt[PatchIndex] &gt; 0 ) {
+                                printf("%s@%d ", PatchObs[PatchIndex], PatchObsCnt\
+[PatchIndex]);
+                        }
+                }
+                printf("\n");
+        } ' &gt;&gt; $1
+ 
+        # remove the used parameters
+        echo "ACTIVE_OBSOLETES=" &gt;&gt; $1
+        echo "Obsoletes_label=" &gt;&gt; $1
+ 
+exit 0</pre>
+
+<a name="ch6advtech-48"></a><h4>The <tt>patch_postinstall</tt> Script</h4>
+<pre># This script deletes the used backout data for a patch package
+# and removes the deletes file entries.
+#
+# directory format options.
+#
+#       @(#)patch_postinstall 1.2 96/01/29 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+PATH=/usr/sadm/bin:$PATH
+THIS_DIR=`dirname $0`
+ 
+Our_Deletes=$THIS_DIR/deletes
+ 
+#
+# Delete the used backout data
+#
+if [ -f $Our_Deletes ]; then
+        cat $Our_Deletes | while read path; do
+                if valpath -l $path; then
+                        Client_Path=`echo "$CLIENT_BASEDIR/$path" | sed s@//@/@`
+                else    # It's an absolute path
+                        Client_Path=$path
+                fi
+                rm `removef $PKGINST $Client_Path`
+        done
+        removef -f $PKGINST
+ 
+        rm $Our_Deletes
+fi
+ 
+#
+# Remove the deletes file, checkinstall and the postinstall
+#
+rm -r $PKGSAV/$ACTIVE_PATCH
+rm -f $THIS_DIR/checkinstall $THIS_DIR/postinstall
+ 
+exit 0</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-9.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-49.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

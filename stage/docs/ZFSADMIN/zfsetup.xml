@@ -1,0 +1,176 @@
+<chapter id="setup-1"><title>Getting
+Started With ZFS</title><highlights><para>This chapter provides step-by-step instructions on setting up simple
+ZFS configurations. By the end of this chapter, you should have a basic idea
+of how the ZFS commands work, and should be able to create simple pools and
+file systems. This chapter is not designed to be a comprehensive overview
+and refers to later chapters for more detailed information.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gbgxg" remap="internal">ZFS Hardware and Software Requirements
+and Recommendations</olink></para>
+</listitem><listitem><para><olink targetptr="gaypm" remap="internal">Creating a Basic ZFS File System</olink></para>
+</listitem><listitem><para><olink targetptr="gayob" remap="internal">Creating a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gaypa" remap="internal">Creating a ZFS File System Hierarchy</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gbgxg"><title>ZFS Hardware and Software Requirements and Recommendations</title><para>Make sure you review the following hardware and software requirements
+and recommendations before attempting to use the ZFS software:</para><itemizedlist><listitem><para>A <trademark>SPARC</trademark> or x86 system that is running
+the <trademark>Solaris</trademark> Nevada release, build 27 or later.</para>
+</listitem><listitem><para>The minimum disk size is 128 Mbytes. The minimum amount of
+disk space required for a storage pool is approximately 64 Mbytes.</para>
+</listitem><listitem><para>Currently, the minimum amount of memory recommended to install
+a Solaris system is 512 Mbytes. However, for good ZFS performance, at least
+one Gbyte or more of memory is recommended.</para>
+</listitem><listitem><para>If you create a mirrored disk configuration, multiple controllers
+are recommended.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="gaypm"><title>Creating a Basic ZFS File System</title><para>ZFS administration has been designed with simplicity in mind. Among
+the goals of the ZFS design is to reduce the number of commands needed to
+create a usable file system. When you create a new pool, a new ZFS file system
+is created and mounted automatically.</para><para>The following example illustrates how to create a non-redundant storage
+pool named <literal>tank</literal> and a ZFS file system name <filename>tank</filename> in
+one command. Assume that the whole disk <filename>/dev/dsk/c1t0d0</filename> is
+available for use.</para><screen># <userinput>zpool create tank c1t0d0</userinput></screen><note><para>This command creates a non-redundant pool. A non-redundant pool
+configuration is not recommended for production environments even if the single
+storage object is presented from a hardware RAID array or from a software
+volume manager. ZFS can only detect errors in these configurations. ZFS can
+corrects error in pool configurations with redundant data. For more information,
+about redundant ZFS pool configurations, see <olink targetptr="gcfof" remap="internal">Replication
+Features of a ZFS Storage Pool</olink>.</para>
+</note><para>The new ZFS file system, <filename>tank</filename>, can use as much
+of the disk space on <systemitem>c1t0d0</systemitem> as needed, and is automatically
+mounted at <filename>/tank</filename>.</para><screen># <userinput>mkfile 100m /tank/foo</userinput>
+# <userinput>df -h /tank</userinput>
+Filesystem             size   used  avail capacity  Mounted on
+tank                   80G   100M    80G     1%    /tank</screen><para>Within a pool, you will probably want to create additional file systems.
+File systems provide points of administration that allow you to manage different
+sets of data within the same pool.</para><para>The following example illustrates how to create a file system named <literal>fs</literal> in the storage pool <literal>tank</literal>. Assume that the
+whole disk <filename>/dev/dsk/c1t0d0</filename> is available for use.</para><screen># <userinput>zpool create tank mirror c1t0d0 c2t0d0</userinput>
+# <userinput>zfs create tank/fs</userinput></screen><para>The new ZFS file system, <filename>tank/fs</filename>, can use as much
+of the disk space on <systemitem>c1t0d0</systemitem> as needed, and is automatically
+mounted at <filename>/tank/fs</filename>.</para><screen># <userinput>mkfile 100m /tank/fs/foo</userinput>
+# <userinput>df -h /tank/fs</userinput>
+Filesystem             size   used  avail capacity  Mounted on
+tank/fs                 80G   100M    80G     1%    /tank/fs</screen><para>In most cases, you will probably want to create and organize a hierarchy
+of file systems that matches your organizational needs. For more information
+about creating a hierarchy of ZFS file systems, see <olink targetptr="gaypa" remap="internal">Creating
+a ZFS File System Hierarchy</olink>.</para>
+</sect1><sect1 id="gayob"><title>Creating a ZFS Storage Pool</title><para>The previous example illustrates the simplicity of ZFS. The remainder
+of this chapter demonstrates a more complete example similar to what you would
+encounter in your environment. The first tasks are to identify your storage
+requirements and create a storage pool. The pool describes the physical characteristics
+of the storage and must be created before any file systems are created.</para><task id="gayol"><title>How to Identify Storage Requirements for Your ZFS
+Storage Pool</title><procedure><step><para>Determine available devices.</para><para>Before creating a storage
+pool, you must determine which devices will store your data. These devices
+must be disks of at least 128 Mbytes in size, and they must not be in use
+by other parts of the operating system. The devices can be individual slices
+on a preformatted disk, or they can be entire disks that ZFS formats as a
+single large slice.</para><para>For the storage
+example used in <olink targetptr="gayok" remap="internal">How to Create a ZFS Storage Pool</olink>,
+assume that the whole disks <filename>/dev/dsk/c1t0d0</filename> and <filename>/dev/dsk/c1t1d0</filename> are available for use.</para><para>For more information about
+disks and how they are used and labeled, see <olink targetptr="gazdp" remap="internal">Using
+Disks in a ZFS Storage Pool</olink>.</para>
+</step><step><para>Choose data replication.</para><para>ZFS supports multiple types
+of data replication, which determines what types of hardware failures the
+pool can withstand. ZFS supports nonredundant (striped) configurations, as
+well as mirroring and RAID-Z (a variation on RAID-5). </para><para>For the
+storage example used in <olink targetptr="gayok" remap="internal">How to Create a ZFS Storage
+Pool</olink>, basic mirroring of two available disks is used.</para><para>For
+more information about ZFS replication features, see <olink targetptr="gcfof" remap="internal">Replication
+Features of a ZFS Storage Pool</olink>.</para>
+</step>
+</procedure>
+</task><task id="gayok"><title>How to Create a ZFS Storage Pool</title><procedure><step><para>Become root or assume an equivalent role with the appropriate
+ZFS rights profile.</para><para>For more information about the ZFS rights
+profiles, see <olink targetptr="gbfvq" remap="internal">ZFS Rights Profiles</olink>.</para>
+</step><step><para>Pick a pool name.</para><para>The pool name is used to identify
+the storage pool when you are using the <command>zpool</command> or <command>zfs</command> commands.
+Most systems require only a single pool, so you can pick any name that you
+prefer, provided it satisfies the naming requirements outlined in <olink targetptr="gbcpt" remap="internal">ZFS Component Naming Requirements</olink>. </para>
+</step><step><para>Create the pool.</para><para>For example, create a mirrored pool
+that is named <literal>tank</literal>.</para><screen># <userinput>zpool create tank mirror c1t0d0 c1t1d0</userinput></screen><para>If one or more devices contains another file system or is otherwise
+in use, the command cannot create the pool.</para><para>For more information
+about creating storage pools, see <olink targetptr="gaynr" remap="internal">Creating a ZFS
+Storage Pool</olink>.</para><para>For more information about how device usage
+is determined, see <olink targetptr="gazht" remap="internal">Detecting in Use Devices</olink>.</para>
+</step><step><para>View the results.</para><para>You can determine if your pool was
+successfully created by using the <command>zpool list</command> command.</para><screen># <userinput>zpool list</userinput>
+NAME                    SIZE    USED   AVAIL    CAP  HEALTH     ALTROOT
+tank                     80G    137K     80G     0%  ONLINE     -</screen><para>For more information about viewing pool status, see <olink targetptr="gaynp" remap="internal">Querying ZFS Storage Pool Status</olink>.</para>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="gaypa"><title>Creating a ZFS File System Hierarchy</title><para>After creating a storage pool to store your data, you can create your
+file system hierarchy. Hierarchies are simple yet powerful mechanisms for
+organizing information. They are also very familiar to anyone who has used
+a file system.</para><para>ZFS allows file systems to be organized into arbitrary hierarchies,
+where each file system has only a single parent. The root of the hierarchy
+is always the pool name. ZFS leverages this hierarchy by supporting property
+inheritance so that common properties can be set quickly and easily on entire
+trees of file systems.</para><task id="gaypd"><title>How to Determine Your ZFS File System Hierarchy</title><procedure><step><para>Pick the file system granularity.</para><para>ZFS file systems
+are the central point of administration. They are lightweight and can be created
+easily. A good model to use is a file system per user or project, as this
+model allows properties, snapshots, and backups to be controlled on a per-user
+or per-project basis. </para><para>Two ZFS file systems, <filename>bonwick</filename> and <filename>billm</filename>, are created in <olink targetptr="gayog" remap="internal">How to Create ZFS
+File Systems</olink>.</para><para>For more information on managing file systems,
+see <olink targetptr="gavwq" remap="internal">Chapter&nbsp;5, Managing ZFS File Systems</olink>.</para>
+</step><step><para>Group similar file systems.</para><para>ZFS allows file systems
+to be organized into hierarchies so that similar file systems can be grouped.
+This model provides a central point of administration for controlling properties
+and administering file systems. Similar file systems should be created under
+a common name.</para><para>For the example in <olink targetptr="gayog" remap="internal">How
+to Create ZFS File Systems</olink>, the two file systems are placed under
+a file system named <filename>home</filename>. </para>
+</step><step><para>Choose the file system properties.</para><para>Most file system
+characteristics are controlled by using simple properties. These properties
+control a variety of behavior, including where the file systems are mounted,
+how they are shared, if they use compression, and if any quotas are in effect. </para><para>For the example in <olink targetptr="gayog" remap="internal">How to Create ZFS File Systems</olink>,
+all home directories are mounted at <filename>/export/zfs/</filename><replaceable>user</replaceable>, are shared by using NFS, and with compression enabled.
+In addition, a quota of 10 Gbytes on <filename>bonwick</filename> is enforced.</para><para>For more information about properties, see <olink targetptr="gazss" remap="internal">Introducing
+ZFS Properties</olink>.</para>
+</step>
+</procedure>
+</task><task id="gayog"><title>How to Create ZFS File Systems</title><procedure><step><para>Become root or assume an equivalent role with the appropriate
+ZFS rights profile.</para><para>For more information about the ZFS rights
+profiles, see <olink targetptr="gbfvq" remap="internal">ZFS Rights Profiles</olink>.</para>
+</step><step><para>Create the desired hierarchy.</para><para>In this example, a file
+system that acts as a container for individual file systems is created.</para><screen># <userinput>zfs create tank/home</userinput></screen><para>Next, individual file systems are grouped under the <filename>home</filename> file
+system in the pool <filename>tank</filename>.</para>
+</step><step><para>Set the inherited properties.</para><para>After the file system
+hierarchy is established, set up any properties that should be shared among
+all users:</para><screen># <userinput>zfs set mountpoint=/export/zfs tank/home</userinput>
+# <userinput>zfs set sharenfs=on tank/home</userinput>
+# <userinput>zfs set compression=on tank/home</userinput>
+# <userinput>zfs get compression tank/home</userinput>
+NAME             PROPERTY       VALUE                      SOURCE
+tank/home        compression    on                         local</screen><para>A new feature is available that enables you to set file system properties
+when the file system is created. For example:</para><screen># <userinput>zfs create -o mountpoint=/export/zfs -o sharenfs=on -o compression=on tank/home</userinput></screen><para>For more information about properties and property inheritance, see <olink targetptr="gazss" remap="internal">Introducing ZFS Properties</olink>.</para>
+</step><step><para>Create the individual file systems.</para><para>Note that the
+file systems could have been created and then the properties could have been
+changed at the <filename>home</filename> level. All properties can be changed
+dynamically while file systems are in use.</para><screen># <userinput>zfs create tank/home/bonwick</userinput>
+# <userinput>zfs create tank/home/billm</userinput></screen><para>These file systems inherit their property settings from their parent,
+so they are automatically mounted at <filename>/export/zfs/</filename><replaceable>user</replaceable> and are NFS shared. You do not need to edit the <filename>/etc/vfstab</filename> or <filename>/etc/dfs/dfstab</filename> file.</para><para>For
+more information about creating file systems, see <olink targetptr="gazsf" remap="internal">Creating
+a ZFS File System</olink>.</para><para>For more information about mounting
+and sharing file systems, see <olink targetptr="gaynd" remap="internal">Mounting and Sharing
+ZFS File Systems</olink>.</para>
+</step><step><para>Set the file system-specific properties.</para><para>In this example,
+user <filename>bonwick</filename> is assigned a quota of 10 Gbytes. This property
+places a limit on the amount of space he can consume, regardless of how much
+space is available in the pool.</para><screen># <userinput>zfs set quota=10G tank/home/bonwick</userinput></screen>
+</step><step><para>View the results.</para><para>View available file system information
+by using the <command>zfs list</command> command:</para><screen># <userinput>zfs list</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank                  92.0K  67.0G   9.5K  /tank
+tank/home             24.0K  67.0G     8K  /export/zfs
+tank/home/billm          8K  67.0G     8K  /export/zfs/billm
+tank/home/bonwick        8K  10.0G     8K  /export/zfs/bonwick</screen><para>Note that the user <filename>bonwick</filename> only has 10 Gbytes of
+space available, while the user <filename>billm</filename> can use the full
+pool (67 Gbytes).</para><para>For more information about viewing
+file system status, see <olink targetptr="gazsu" remap="internal">Querying ZFS File System
+Information</olink>. </para><para>For more information about how space is
+used and calculated, see <olink targetptr="gbchp" remap="internal">ZFS Space Accounting</olink>.</para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

@@ -1,0 +1,151 @@
+<chapter id="bkupref-12756"><title>UFS Backup and Restore Commands (Reference)</title><highlights><para>This chapter contains reference information on the <command>ufsdump</command> and <command>ufsrestore</command> commands.</para><para>This is a list of the information in this chapter.</para><itemizedlist><listitem><para><olink targetptr="bkupref-37464" remap="internal">How the ufsdump Command Works</olink></para>
+</listitem><listitem><para><olink targetptr="bkupref-27877" remap="internal">Specifying ufsdump Command Options
+and Arguments</olink></para>
+</listitem><listitem><para><olink targetptr="bkupref-38756" remap="internal">The ufsdump Command and Security
+Issues</olink></para>
+</listitem><listitem><para><olink targetptr="bkupref-37873" remap="internal">Specifying ufsrestore Options
+and Arguments</olink></para>
+</listitem>
+</itemizedlist><para>For overview information about performing backups, see <olink targetptr="bkupconcepts-57422" remap="internal">Chapter&nbsp;23, Backing Up and Restoring File Systems (Overview)</olink>.</para><para>For information about backup tasks, see <olink targetptr="bkuptasks2-64128" remap="internal">Chapter&nbsp;24, Backing Up Files and File Systems (Tasks)</olink>.</para>
+</highlights><sect1 id="bkupref-37464"><title>How the <command>ufsdump</command> Command Works</title><para>The <command>ufsdump</command> command makes two passes when it backs up a file
+system. On the first pass, this command scans the raw device file for the file system
+and builds a table of directories and files in memory. Then, this command writes the
+table to the backup media. In the second pass, the <command>ufsdump</command> command
+goes through the inodes in numerical order, reading the file contents and writing
+the data to the backup media.</para><sect2 id="bkupref-1"><title>Determining Device Characteristics</title><para>The <command>ufsdump</command> command needs to know only an appropriate tape
+block size and how to detect the end of media.</para>
+</sect2><sect2 id="bkupref-2"><title>Detecting the End of Media</title><para>The <command>ufsdump</command> command writes a sequence of fixed-size records.
+When the <command>ufsdump</command> command receives notification that a record was
+only partially written, it assumes that it has reached the physical end of the media.
+This method works for most devices. If a device is not able to notify the <command>ufsdump</command> command that only a partial record has been written, a media error
+occurs as the <command>ufsdump</command> command tries to write another record. </para><note><para>DAT devices and 8-mm tape devices detect end-of-media. Cartridge
+tape devices and 1/2-inch tape devices do not detect end-of-media.</para>
+</note><para>The <command>ufsdump</command> command automatically detects the end-of-media
+for most devices. Therefore, you do not usually need to use the <option>c</option>, <option>d</option>, <option>s</option>, and <option>t</option> options to perform multivolume
+backups.</para><para>You need to use the end-of-media options when the <command>ufsdump</command> command
+does not understand the way the device detects the end-of-media.</para><para>To ensure compatibility with the <command>restore</command> command, the size
+option can still force the <command>ufsdump</command> command to go to the next tape
+or diskette before reaching the end of the current tape or diskette.</para>
+</sect2><sect2 id="bkupref-3"><title>Copying Data With the <command>ufsdump</command> Command</title><para>The <command>ufsdump</command> command copies data only from the raw disk slice.
+If the file system is still active, any data in memory buffers is probably not copied.
+The backup done by the <command>ufsdump</command> command does not copy free blocks,
+nor does it make an image of the disk slice. If symbolic links point to files on other
+slices, the link itself is copied.</para>
+</sect2><sect2 id="bkupref-4"><title>Purpose of the <filename>/etc/dumpdates</filename> File</title><para>The <command>ufsdump</command> command, when used with the <option>u</option> option,
+maintains and updates the <filename>/etc/dumpdates</filename> file. Each line in the <filename>/etc/dumpdates</filename> file shows the following information:</para><itemizedlist><listitem><para>The file system backed up</para>
+</listitem><listitem><para>The dump level of the last backup</para>
+</listitem><listitem><para>The day, date, and time of the backup</para>
+</listitem>
+</itemizedlist><para>For example:</para><screen># cat /etc/dumpdates
+/dev/rdsk/c0t0d0s0               0 Wed Jul 28 16:13:52 2004
+/dev/rdsk/c0t0d0s7               0 Thu Jul 29 10:36:13 2004
+/dev/rdsk/c0t0d0s7               9 Thu Jul 29 10:37:12 2004</screen><para>When you do an incremental
+backup, the <command>ufsdump</command> command checks the <filename>/etc/dumpdates</filename> file to find the date of the most recent backup of the next lower dump
+level. Then, this command copies to the media all files that were modified since the
+date of that lower-level backup. After the backup is complete, a new information line,
+which describes the backup you just completed, replaces the information line for the
+previous backup at that level.   </para><para>Use the <filename>/etc/dumpdates</filename> file to verify that backups are
+being done. This verification is particularly important if you are having equipment
+problems. If a backup cannot be completed because of equipment failure, the backup
+is not recorded in the <filename>/etc/dumpdates</filename> file.</para><para>If you need to restore an entire disk, check the <filename>/etc/dumpdates</filename> file
+for a list of the most recent dates and levels of backups so that you can determine
+which tapes you need to restore the entire file system.</para><note><para>The <filename>/etc/dumpdates</filename> file is a text file that can be
+edited. However, edit it only at your own risk. If you make changes to the file that
+do not match your archive tapes, you might be unable to find the tapes (or files)
+you need. </para>
+</note>
+</sect2><sect2 id="bkupref-5"><title>Backup Device (<replaceable>dump-file</replaceable>)
+Argument</title><para>The <replaceable>dump-file</replaceable> argument (to the <option>f</option> option)
+specifies the destination of the backup. The destination can be one of the following:</para><itemizedlist><listitem><para>Local tape drive</para>
+</listitem><listitem><para>Local diskette drive</para>
+</listitem><listitem><para>Remote tape drive</para>
+</listitem><listitem><para>Remote diskette drive</para>
+</listitem><listitem><para>Standard output</para>
+</listitem>
+</itemizedlist><para>Use this argument when the destination is not the default local tape drive <filename>/dev/rmt/0</filename>. If you use the <option>f</option> option, then you must specify
+a value for the <replaceable>dump-file</replaceable> argument.</para><note><para>The <replaceable>dump-file</replaceable> argument can also point to a
+file on a local disk or on a remote disk. If done by mistake, this usage can fill
+up a file system.</para>
+</note><sect3 id="bkupref-6"><title>Local Tape or Diskette Drive</title><para>Typically, the <replaceable>dump-file</replaceable> argument specifies a raw
+device file for a tape device or diskette. When the <command>ufsdump</command> command
+writes to an output device, it creates a single backup file that might span multiple
+tapes or diskettes.</para><para>You specify a tape device or a diskette on your system by using a device abbreviation.
+The first device is always 0. For example, if you have a SCSI tape controller and
+one QIC-24 tape drive that uses medium-density formatting, use this device name: </para><para><filename>/dev/rmt/0m</filename></para><para>When you specify a tape device name, you can also type the letter &ldquo;n&rdquo;
+at the end of the name to indicate that the tape drive should not rewind after the
+backup is completed. For example: </para><para><filename>/dev/rmt/0mn</filename></para><para>Use the &ldquo;no-rewind&rdquo; option if you want to put more than one file
+onto the tape. If you run out of space during a backup, the tape does not rewind before
+the <command>ufsdump</command> command asks for a new tape. For a complete description
+of device-naming conventions, see <olink targetptr="bkuptapedevice-27909" remap="internal">Backup Device
+Names</olink>.</para>
+</sect3><sect3 id="bkupref-7"><title>Remote Tape or Diskette Drive</title><para>You specify a remote tape device or a remote diskette by using the syntax <replaceable>host</replaceable><emphasis>:</emphasis><replaceable>device</replaceable>. The <command>ufsdump</command> command writes to the remote device when superuser on the local
+system has access to the remote system. If you usually run the <command>ufsdump</command> command
+as superuser, the name of the local system must be included in the <filename>/.rhosts</filename> file on the remote system. If you specify the device as <replaceable>user</replaceable>@<replaceable>host</replaceable>:<replaceable>device</replaceable>,
+the <command>ufsdump</command> command tries to access the device on the remote system
+as the specified user. In this case, the specified user must be included in the <filename>/.rhosts</filename> file on the remote system.</para><para>Use the naming convention for the device that matches the operating system for
+the system on which the device resides, not the system from which you run the <command>ufsdump</command> command. If the drive is on a system that is running a previous
+SunOS release (for example, 4.1.1), use the SunOS 4.1 device name (for example, <filename>/dev/rst0</filename>). If the system is running Solaris software, use the SunOS 5.9
+convention (for example, <filename>/dev/rmt/0</filename>).</para>
+</sect3><sect3 id="bkupref-8"><title>Using Standard Output With the <command>ufsdump</command> Command</title><para>When you specify a dash (<command>-</command>) as the <replaceable>dump-file</replaceable> argument, the <command>ufsdump</command> command writes to standard
+output.</para><note><para>The <option>v</option> option (verify) does not work when the <replaceable>dump-file</replaceable> argument is standard output.</para>
+</note><para>You can use the <command>ufsdump</command> and <command>ufsrestore</command> commands
+in a pipeline to copy a file system by writing to standard output with the <command>ufsdump</command> command and reading from standard input with the <command>ufsrestore</command> command. For example:</para><screen># <userinput>ufsdump 0f - /dev/rdsk/c0t0d0s7 | (cd /home; ufsrestore xf -)</userinput></screen>
+</sect3>
+</sect2><sect2 id="bkupref-9"><title>Specifying Files to Back Up</title><para>You must always include <replaceable>filenames</replaceable> as the last argument
+on the command line. This argument specifies the source or contents of the backup.</para><para>For a file system, specify the raw device file as follows:</para><para><filename>/dev/rdsk<replaceable>/c0t0d0s7</replaceable></filename></para><para>You can specify the file system by its mount point directory (for example, <filename>/export/home</filename>), as long as an entry for it exists in the <filename>/etc/vfstab</filename> file. </para><para>For a complete description of device-naming conventions, see <olink targetptr="bkuptapedevice-27909" remap="internal">Backup Device Names</olink>.</para><para>For individual files or directories, type one or more names separated by spaces.</para><note><para>When you use the <command>ufsdump</command> command to back up one or
+more directories or files (rather than a complete file system), a level 0 backup is
+done. Incremental backups do not apply.</para>
+</note>
+</sect2><sect2 id="bkupref-10"><title>Specifying Tape Characteristics</title><para>If you do not specify any tape characteristics, the <command>ufsdump</command> command
+uses a set of defaults. You can specify the tape cartridge (<literal>c</literal>),
+density (<literal>d</literal>), size (<literal>s</literal>), and number of tracks
+(<literal>t</literal>). Note that you can specify the options in any order, as long
+as the arguments that follow match the order of the options.</para>
+</sect2><sect2 id="bkupref-11"><title>Limitations of the <command>ufsdump</command> Command</title><para>The <command>ufsdump</command> command
+cannot do the following:</para><itemizedlist><listitem><para>Automatically calculate the number of tapes or diskettes that are
+needed for backing up file systems. You can use the dry run mode (<literal>S</literal> option)
+to determine how much space is needed before actually backing up file systems.</para>
+</listitem><listitem><para>Provide built-in error checking to minimize problems when it backs
+up an active file system.</para>
+</listitem><listitem><para>Back up files that are remotely mounted from a server. Files on the
+server must be backed up on the server itself. Users are denied permission to run
+the <command>ufsdump</command> command on files they own that are located on a server.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="bkupref-27877"><title>Specifying <command>ufsdump</command> Command Options
+and Arguments</title><para>This section describes how to specify options and arguments for the <command>ufsdump</command> command. The syntax for the <command>ufsdump</command> command is
+as follows:</para><screen>/usr/sbin/ufsdump <replaceable>options arguments filenames</replaceable></screen><variablelist><varlistentry><term><replaceable>options</replaceable></term><listitem><para>Is a single string of one-letter option names.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>arguments</replaceable></term><listitem><para>Identifies option arguments and might consist of multiple strings.
+The option letters and their associated arguments must be in the same order.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>filenames</replaceable></term><listitem><para>Identifies the files to back up. These arguments must always come
+last, each separated by a space.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect2 id="bkupref-12"><title>Default <command>ufsdump</command> Options</title><para>If you run the <command>ufsdump</command> command without any options, use this
+syntax:</para><screen># <userinput>ufsdump</userinput> <replaceable>filenames</replaceable></screen><para>The <command>ufsdump</command> command uses these options and arguments, by
+default:</para><screen>ufsdump 9uf /dev/rmt/0 <replaceable>filenames</replaceable></screen><para>These options do a level 9 incremental backup to the default tape drive at its
+preferred density.</para><para>For a description of the <command>ufsdump</command> options, see <olink targetdoc="refman1m" targetptr="ufsdump-1m" remap="external"><citerefentry><refentrytitle>ufsdump</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="bkupref-38756"><title>The <command>ufsdump</command> Command and Security
+Issues</title><para>If you are concerned about security, you should do the following:</para><itemizedlist><listitem><para>Require superuser access for the <command>ufsdump</command> command.</para>
+</listitem><listitem><para>Ensure superuser access entries are removed from <filename>/.rhosts</filename> files on clients and servers if you are doing centralized backups.</para><para>For general information on security, see <olink targetdoc="sysadv6" remap="external"><citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="bkupref-37873"><title>Specifying <command>ufsrestore</command> Options
+and Arguments</title><para>The syntax of the <command>ufsrestore</command> command is as
+follows:</para><screen>/usr/sbin/ufsrestore <replaceable>options</replaceable> <replaceable>arguments</replaceable> <replaceable>filenames</replaceable></screen><variablelist><varlistentry><term><replaceable>options</replaceable></term><listitem><para>Is a single string of one-letter option names. You must choose one
+and only one of these options: <command>i</command>, <command>r</command>, <command>R</command>, <command>t</command>, or <command>x</command>. For a description of the <command>ufsrestore</command> options, see <olink targetdoc="refman1m" targetptr="ufsrestore-1m" remap="external"><citerefentry><refentrytitle>ufsrestore</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>arguments</replaceable></term><listitem><para>Follows the option string with the arguments that match the options.
+The option letters and their associated arguments must be in the same order.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>filenames</replaceable></term><listitem><para>Specifies the file or files to be restored as arguments to the <command>x</command> or <command>t</command> options. These arguments must always come last,
+separated by spaces.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1>
+</chapter>

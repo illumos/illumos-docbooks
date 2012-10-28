@@ -1,0 +1,313 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Complete Template Driver Source - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="eoxzu.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="faatl.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level2"><a href="ffzpv.html">Overview of the Template Driver Example</a></p>
+<p class="toc level2"><a href="writedriver.html">Writing the Template Driver</a></p>
+<p class="toc level2"><a href="eoxzw.html">Writing the Device Configuration File</a></p>
+<p class="toc level2"><a href="eoxzr.html">Building and Installing the Template Driver</a></p>
+<p class="toc level2"><a href="eoxzu.html">Testing the Template Driver</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Complete Template Driver Source</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="eqbof"></a><h3>Complete Template Driver Source</h3>
+<p>The following code is the complete source for the <tt>dummy</tt> driver described in
+this chapter:</p><pre>/*
+ * Minimalist pseudo-device.
+ * Writes a message whenever a routine is entered.
+ *
+ * Build the driver:
+ *      cc -D_KERNEL -c dummy.c
+ *      ld -r -o dummy dummy.o
+ * Copy the driver and the configuration file to /usr/kernel/drv:
+ *      cp dummy.conf /usr/kernel/drv
+ *      cp dummy /tmp
+ *      ln -s /tmp/dummy /usr/kernel/drv/dummy
+ * Add the driver:
+ *      add_drv dummy
+ * Test (1) read from driver (2) write to driver:
+ *      cat /devices/pseudo/dummy@*
+ *      echo hello &gt; `ls /devices/pseudo/dummy@*`
+ * Verify the tests in another window:
+ *      tail -f /var/adm/messages
+ * Remove the driver:
+ *      rem_drv dummy
+ */
+
+#include &lt;sys/devops.h&gt;  /* used by dev_ops */
+#include &lt;sys/conf.h&gt;    /* used by dev_ops and cb_ops */
+#include &lt;sys/modctl.h&gt;  /* used by modlinkage, modldrv, _init, _info, */
+                         /* and _fini */
+#include &lt;sys/types.h&gt;   /* used by open, close, read, write, prop_op, */
+                         /* and ddi_prop_op */
+#include &lt;sys/file.h&gt;    /* used by open, close */
+#include &lt;sys/errno.h&gt;   /* used by open, close, read, write */
+#include &lt;sys/open.h&gt;    /* used by open, close, read, write */
+#include &lt;sys/cred.h&gt;    /* used by open, close, read */
+#include &lt;sys/uio.h&gt;     /* used by read */
+#include &lt;sys/stat.h&gt;    /* defines S_IFCHR used by ddi_create_minor_node */
+#include &lt;sys/cmn_err.h&gt; /* used by all entry points for this driver */
+#include &lt;sys/ddi.h&gt;     /* used by all entry points for this driver */
+                         /* also used by cb_ops, ddi_get_instance, and */
+                         /* ddi_prop_op */
+#include &lt;sys/sunddi.h&gt;  /* used by all entry points for this driver */
+                         /* also used by cb_ops, ddi_create_minor_node, */
+                         /* ddi_get_instance, and ddi_prop_op */
+
+static int dummy_attach(dev_info_t *dip, ddi_attach_cmd_t cmd);
+static int dummy_detach(dev_info_t *dip, ddi_detach_cmd_t cmd);
+static int dummy_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg,
+    void **resultp);
+static int dummy_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int flags, char *name, caddr_t valuep, int *lengthp);
+static int dummy_open(dev_t *devp, int flag, int otyp, cred_t *cred);
+static int dummy_close(dev_t dev, int flag, int otyp, cred_t *cred);
+static int dummy_read(dev_t dev, struct uio *uiop, cred_t *credp);
+static int dummy_write(dev_t dev, struct uio *uiop, cred_t *credp);
+
+/* cb_ops structure */
+static struct cb_ops dummy_cb_ops = {
+    dummy_open,
+    dummy_close,
+    nodev,              /* no strategy - nodev returns ENXIO */
+    nodev,              /* no print */
+    nodev,              /* no dump */
+    dummy_read,
+    dummy_write,
+    nodev,              /* no ioctl */
+    nodev,              /* no devmap */
+    nodev,              /* no mmap */
+    nodev,              /* no segmap */
+    nochpoll,           /* returns ENXIO for non-pollable devices */
+    dummy_prop_op,
+    NULL,               /* streamtab struct; if not NULL, all above */
+                        /* fields are ignored */
+    D_NEW | D_MP,       /* compatibility flags: see conf.h */
+    CB_REV,             /* cb_ops revision number */
+    nodev,              /* no aread */
+    nodev               /* no awrite */
+};
+
+/* dev_ops structure */
+static struct dev_ops dummy_dev_ops = {
+    DEVO_REV,
+    0,                         /* reference count */
+    dummy_getinfo,             /* no getinfo(9E) */
+    nulldev,                   /* no identify(9E) - nulldev returns 0 */
+    nulldev,                   /* no probe(9E) */
+    dummy_attach,
+    dummy_detach,
+    nodev,                     /* no reset - nodev returns ENXIO */
+    &amp;dummy_cb_ops,
+    (struct bus_ops *)NULL,
+    nodev,                     /* no power(9E) */
+    ddi_quiesce_not_needed,    /* no quiesce(9E) */
+};
+
+/* modldrv structure */
+static struct modldrv md = {
+    &amp;mod_driverops,     /* Type of module. This is a driver. */
+    "dummy driver",     /* Name of the module. */
+    &amp;dummy_dev_ops
+};
+
+/* modlinkage structure */
+static struct modlinkage ml = {
+    MODREV_1,
+    &amp;md,
+    NULL
+};
+
+/* dev_info structure */
+dev_info_t *dummy_dip;  /* keep track of one instance */
+
+
+/* Loadable module configuration entry points */
+int
+_init(void)
+{
+    cmn_err(CE_NOTE, "Inside _init");
+    return(mod_install(&amp;ml));
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+    cmn_err(CE_NOTE, "Inside _info");
+    return(mod_info(&amp;ml, modinfop));
+}
+
+int
+_fini(void)
+{
+    cmn_err(CE_NOTE, "Inside _fini");
+    return(mod_remove(&amp;ml));
+}
+
+/* Device configuration entry points */
+static int
+dummy_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+    cmn_err(CE_NOTE, "Inside dummy_attach");
+    switch(cmd) {
+    case DDI_ATTACH:
+        dummy_dip = dip;
+        if (ddi_create_minor_node(dip, "0", S_IFCHR,
+            ddi_get_instance(dip), DDI_PSEUDO,0)
+            != DDI_SUCCESS) {
+            cmn_err(CE_NOTE,
+                "%s%d: attach: could not add character node.",
+                "dummy", 0);
+            return(DDI_FAILURE);
+        } else
+            return DDI_SUCCESS;
+    default:
+        return DDI_FAILURE;
+    }
+}
+
+static int
+dummy_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+    cmn_err(CE_NOTE, "Inside dummy_detach");
+    switch(cmd) {
+    case DDI_DETACH:
+        dummy_dip = 0;
+        ddi_remove_minor_node(dip, NULL);
+        return DDI_SUCCESS;
+    default:
+        return DDI_FAILURE;
+    }
+}
+
+static int
+dummy_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, 
+    void **resultp)
+{
+    cmn_err(CE_NOTE, "Inside dummy_getinfo");
+    switch(cmd) {
+    case DDI_INFO_DEVT2DEVINFO:
+        *resultp = dummy_dip;
+        return DDI_SUCCESS;
+    case DDI_INFO_DEVT2INSTANCE:
+        *resultp = 0;
+        return DDI_SUCCESS;
+    default:
+        return DDI_FAILURE;
+    }
+}
+
+/* Main entry points */
+static int
+dummy_prop_op(dev_t dev, dev_info_t *dip, ddi_prop_op_t prop_op,
+    int flags, char *name, caddr_t valuep, int *lengthp)
+{
+    cmn_err(CE_NOTE, "Inside dummy_prop_op");
+    return(ddi_prop_op(dev,dip,prop_op,flags,name,valuep,lengthp));
+}
+
+static int
+dummy_open(dev_t *devp, int flag, int otyp, cred_t *cred)
+{
+    cmn_err(CE_NOTE, "Inside dummy_open");
+    return DDI_SUCCESS;
+}
+
+static int
+dummy_close(dev_t dev, int flag, int otyp, cred_t *cred)
+{
+    cmn_err(CE_NOTE, "Inside dummy_close");
+    return DDI_SUCCESS;
+}
+
+static int
+dummy_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+    cmn_err(CE_NOTE, "Inside dummy_read");
+    return DDI_SUCCESS;
+}
+
+static int
+dummy_write(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+    cmn_err(CE_NOTE, "Inside dummy_write");
+    return DDI_SUCCESS;
+}</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="eoxzu.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="faatl.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

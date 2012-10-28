@@ -1,0 +1,306 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Resource Controls Flags and Actions - Solaris Containers: Resource Management and Solaris Zones Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-05-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris Containers: Resource Management and Solaris Zones Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-ctrls-9.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-ctrls-13.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="concepts-2.html">1.&nbsp;&nbsp;Resource Management in the Solaris Operating System</a></p>
+<p class="toc level1 tocsp"><a href="tasks-3.html">2.&nbsp;&nbsp;Projects and Tasks</a></p>
+<p class="toc level1 tocsp"><a href="ext-acctg-11.html">3.&nbsp;&nbsp;Using the C Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="extacctg-perl-1.html">4.&nbsp;&nbsp;Using the Perl Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="resource-ctrls-8.html">5.&nbsp;&nbsp;Resource Controls</a></p>
+<p class="toc level2"><a href="resource-ctrls-9.html">Overview of Resource Controls</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Resource Controls Flags and Actions</a></p>
+</div>
+<p class="toc level2"><a href="resource-ctrls-13.html">Resource Controls API Functions</a></p>
+<p class="toc level2"><a href="resource-ctrls-12.html">Resource Control Code Examples</a></p>
+<p class="toc level2"><a href="resource-ctrls-19.html">Programming Issues Associated With Resource Controls</a></p>
+<p class="toc level1 tocsp"><a href="resource-pools-5.html">6.&nbsp;&nbsp;Resource Pools</a></p>
+<p class="toc level1 tocsp"><a href="fquzd.html">7.&nbsp;&nbsp;Design Considerations for Resource Management Applications in Solaris Zones</a></p>
+<p class="toc level1 tocsp"><a href="faate.html">8.&nbsp;&nbsp;Configuration Examples</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="resource-ctrls-1"></a><h3>Resource Controls Flags and Actions</h3>
+<p>This section describes flags, actions, and signals associated with resource controls.</p>
+
+<a name="faayq"></a><h4><tt>rlimit</tt>, Resource Limit</h4>
+<p><tt>rlimit</tt> is process-based. <tt>rlimit</tt> establishes a restricting boundary on the consumption of a
+variety of system resources by a process. Each process that the process creates
+inherits from the original process. A resource limit is defined by a pair
+of values. The values specify the current (soft) limit and the maximum (hard)
+limit. </p><p>A process might irreversibly lower its hard limit to any value that is
+greater than or equal to the soft limit. Only a process with
+superuser ID can raise the hard limit. See <tt>setrlimit()</tt> and <tt>getrlimit()</tt>.</p><p>The <tt>rlimit</tt> structure contains two members that define the soft limit and hard
+limit.</p><pre>rlim_t     rlim_cur;       /* current (soft) limit */
+rlim_t     rlim_max        /* hard limit */</pre>
+
+<a name="resource-ctrls-6"></a><h4><tt>rctl</tt>, Resource Control</h4>
+<p><tt>rctl</tt> extends the process-based limits of <tt>rlimit</tt> by controlling resource consumption by
+processes, tasks, and projects defined in the project database.</p>
+<hr><p><b>Note - </b>The <tt>rctl</tt> mechanism is preferred to the use of <tt>rlimit</tt> to set resource
+limits. The only reason to use the <tt>rlimit</tt> facility is when portability is
+required across UNIX platforms.</p>
+<hr>
+<p>Applications fall into the following broad categories depending on how an application deals
+with resource controls. Based on the action that is taken, resource controls can
+be further classified. Most report an error and terminate operation. Other resource controls
+allow applications to resume operation and adapt to the reduced resource usage. A
+progressive chain of actions at increasing values can be specified for each resource
+control.</p><p>The list of attributes for a resource control consists of a privilege level,
+a threshold value, and an action that is taken when the threshold
+is exceeded.</p>
+
+<a name="resource-ctrls-4"></a><h4>Resource Control Values and Privilege Levels</h4>
+<p><a name="indexterm-25"></a>Each threshold value on a resource control must be associated with one of
+the following privilege levels:</p><dl><dt>RCPRIV_BASIC</dt>
+<dd><p>Privilege level can be modified by the owner of the calling process. RCPRIV_BASIC is associated with a resource's soft limit.</p></dd>
+<dt>RCPRIV_PRIVILEGED</dt>
+<dd><p>Privilege level can be modified only by privileged (superuser) callers. RCPRIV_PRIVILEGED is associated with a resource's hard limit.</p></dd>
+<dt>RCPRIV_SYSTEM</dt>
+<dd><p>Privilege level remains fixed for the duration of the operating system instance.</p></dd>
+</dl>
+<p><a href="#resource-ctrls-fig-25">Figure&nbsp;5-2</a> shows the timeline for setting privilege levels for signals that are defined
+by the <tt>/etc/project</tt> file <tt>process.max-cpu-time</tt> resource control.</p>
+
+<a name="resource-ctrls-2"></a><h4>Local Actions and Local Flags</h4>
+<p><a name="indexterm-26"></a><a name="indexterm-27"></a>The local action and local flags are applied to the current resource control
+value represented by this resource control block. Local actions and local flags are
+value-specific. For each threshold value that is placed on a resource control, the
+following local actions and local flags are available:</p><dl><dt>RCTL_LOCAL_NOACTION</dt>
+<dd><p>No local action is taken when this resource control value is exceeded.</p></dd>
+<dt>RCTL_LOCAL_SIGNAL</dt>
+<dd><p>The specified signal, set by <tt>rctlblk_set_local_action()</tt>, is sent to the process that placed this resource control value in the value sequence.</p></dd>
+<dt>RCTL_LOCAL_DENY</dt>
+<dd><p>When this resource control value is encountered, the request for the resource is denied. Set on all values if RCTL_GLOBAL_DENY_ALWAYS is set for this control. Cleared on all values if RCTL_GLOBAL_DENY_NEVER is set for this control.</p></dd>
+<dt>RCTL_LOCAL_MAXIMAL</dt>
+<dd><p>This resource control value represents a request for the maximum amount of resource for this control. If RCTL_GLOBAL_INFINITE is set for this resource control, RCTL_LOCAL_MAXIMAL indicates an unlimited resource control value that is never exceeded.</p></dd>
+</dl>
+
+
+<a name="resource-ctrls-3"></a><h4>Global Actions and Global Flags</h4>
+<p><a name="indexterm-28"></a><a name="indexterm-29"></a>Global flags apply to all current resource control values represented by this resource
+control block. Global actions and global flags are set by <tt>rctladm</tt>(1M). Global actions
+and global flags cannot be set with <tt>setrctl()</tt>. Global flags apply to all resource
+controls. For each threshold value that is placed on a resource control, the
+following global actions and global flags are available:</p><dl><dt>RCTL_GLOBAL_NOACTION</dt>
+<dd><p>No global action is taken when a resource control value is exceeded on this control.</p></dd>
+<dt>RCTL_GLOBAL_SYSLOG</dt>
+<dd><p>A standard message is logged by the <tt>syslog()</tt> facility when any resource control value on a sequence associated with this control is exceeded.</p></dd>
+<dt>RCTL_GLOBAL_SECONDS</dt>
+<dd><p>Defines the unit string of the limit value as seconds.</p></dd>
+<dt>RCTL_GLOBAL_COUNT</dt>
+<dd><p>Defines the unit string of the limit value as count.</p></dd>
+<dt>RCTL_GLOBAL_BYTES</dt>
+<dd><p>Defines the unit string of the limit value as bytes.</p></dd>
+<dt>RCTL_GLOBAL_SYSLOG_NEVER</dt>
+<dd><p>Flag means that RCTL_GLOBAL_SYSLOG cannot be set for this resource control through <a href="http://docs.sun.com/doc/819-2240/rctladm-1m?a=view"><tt>rctladm</tt>(1M)</a>.</p></dd>
+<dt>RCTL_GLOBAL_NOBASIC</dt>
+<dd><p>No values with the RCPRIV_BASIC privilege are permitted on this control.</p></dd>
+<dt>RCTL_GLOBAL_LOWERABLE</dt>
+<dd><p>Non-privileged callers are able to lower the value of privileged resource control values on this control.</p></dd>
+<dt>RCTL_GLOBAL_DENY_ALWAYS</dt>
+<dd><p>The action that is taken when a control value is exceeded on this control always includes denial of the resource.</p></dd>
+<dt>RCTL_GLOBAL_DENY_NEVER</dt>
+<dd><p>The action that is taken when a control value is exceeded on this control always excludes denial of the resource. The resource is always granted, although other actions can also be taken.</p></dd>
+<dt>RCTL_GLOBAL_FILE_SIZE</dt>
+<dd><p>The valid signals for local actions include the SIGXFSZ signal.</p></dd>
+<dt>RCTL_GLOBAL_CPU_TIME</dt>
+<dd><p>The valid signals for local actions include the SIGXCPU signal.</p></dd>
+<dt>RCTL_GLOBAL_SIGNAL_NEVER</dt>
+<dd><p>No local actions are permitted on this control. The resource is always granted.</p></dd>
+<dt>RCTL_GLOBAL_INFINITE</dt>
+<dd><p>This resource control supports the concept of an unlimited value. Generally, an unlimited value applies only to accumulation-oriented resources, such as CPU time.</p></dd>
+<dt>RCTL_GLOBAL_UNOBSERVABLE</dt>
+<dd><p>Generally, a task or project related resource control does not support observational control values. An RCPRIV_BASIC privileged control value placed on a task or process generates an action only if the value is exceeded by the process that placed the value.</p></dd>
+</dl>
+
+
+<a name="resource-ctrls-28"></a><h4>Resource Control Sets Associated With a Project, Processes, and Tasks</h4>
+<p>The following figure shows the resource control sets associated with tasks, processes and
+a project.</p><a name="fblfq"></a><h6>Figure&nbsp;5-1 Resource Control Sets for Task, Project, and Process</h6><img src="figures/res-ctrls.rctls.gif" alt="represents resource control sets for a task, project, and processes."></img><p>More than one resource control can exist on a resource, each resource control
+at a containment level in the process model. Resource controls can be active
+on the same resource for both a process and collective task or
+collective project. In this case, the action for the process takes precedence. For
+example, action is taken on <tt>process.max-cpu-time</tt> before <tt>task.max-cpu-time</tt> if both controls are encountered
+simultaneously.</p>
+
+<a name="resource-ctrls-30"></a><h5>Resource Controls Associated With a Project</h5>
+<p><a name="indexterm-30"></a>Resource controls associated with a project include the following:</p><dl><dt><tt>project.cpu-cap</tt></dt>
+<dd><p>Absolute limit on the amount of CPU resources that can be consumed by a project. A value of <tt>100</tt> means 100 percent of one CPU as the <tt>project.cpu-cap</tt> setting. A value of <tt>125</tt> is 125 percent, because 100 percent corresponds to one full CPU on the system when using CPU caps.</p></dd>
+<dt><tt>project.cpu-shares</tt></dt>
+<dd><p>The number of CPU shares that are granted to this project for use with the fair share scheduler, <tt>FSS</tt>(7).</p></dd>
+<dt><tt>project.max-crypto-memory</tt></dt>
+<dd><p>Total amount of kernel memory that can be used by <tt>libpkcs11</tt> for hardware crypto acceleration. Allocations for kernel buffers and session-related structures are charged against this resource control.</p></dd>
+<dt><tt>project.max-locked-memory</tt></dt>
+<dd><p>Total amount of physical locked memory allowed.</p><p>Note that this resource control replaced <tt>project.max-device-locked-memory</tt>, which has been removed.</p></dd>
+<dt><tt>project.max-msg-ids</tt></dt>
+<dd><p>Maximum number of System V message queues allowed for a project.</p></dd>
+<dt><tt>project.max-port-ids</tt></dt>
+<dd><p>Maximum allowable number of event ports.</p></dd>
+<dt><tt>project.max-sem-ids</tt></dt>
+<dd><p>Maximum number of semaphore IDs allowed for a project.</p></dd>
+<dt><tt>project.max-shm-ids</tt></dt>
+<dd><p>Maximum number of shared memory IDs allowed for this project.</p></dd>
+<dt><tt>project.max-msg-ids</tt></dt>
+<dd><p>Maximum number of message queue IDs allowed for this project.</p></dd>
+<dt><tt>project.max-shm-memory</tt></dt>
+<dd><p>Total amount of System V shared memory allowed for this project.</p></dd>
+<dt><tt>project.max-lwps</tt></dt>
+<dd><p>Maximum number of LWPs simultaneously available to this project.</p></dd>
+<dt><tt>project.max-tasks</tt></dt>
+<dd><p>Maximum number of tasks allowable in this project.</p></dd>
+<dt><tt>project.max-contracts</tt></dt>
+<dd><p>Maximum number of contracts allowed in this project.</p></dd>
+</dl>
+
+
+<a name="resource-ctrls-32"></a><h5>Resource Controls Associated With Tasks</h5>
+<p><a name="indexterm-31"></a>Resource controls associated with tasks include the following:</p><dl><dt><tt>task.max-cpu-time</tt></dt>
+<dd><p>Maximum CPU time (seconds) available to this task's processes. </p></dd>
+<dt><tt>task.max-lwps</tt></dt>
+<dd><p>Maximum number of LWPs simultaneously available to this task's processes.</p></dd>
+</dl>
+
+
+<a name="resource-ctrls-31"></a><h5>Resource Controls Associated With Processes</h5>
+<p><a name="indexterm-32"></a>Resource controls associated with processes include the following:</p><dl><dt><tt>process.max-address-space</tt></dt>
+<dd><p>Maximum amount of address space (bytes), as summed over segment sizes, available to this process.</p></dd>
+<dt><tt>process.max-core-size</tt></dt>
+<dd><p>Maximum size (bytes) of a core file that is created by this process.</p></dd>
+<dt><tt>process.max-cpu-time</tt></dt>
+<dd><p>Maximum CPU time (seconds) available to this process.</p></dd>
+<dt><tt>process.max-file-descriptor</tt></dt>
+<dd><p>Maximum file descriptor index that is available to this process.</p></dd>
+<dt><tt>process.max-file-size</tt></dt>
+<dd><p>Maximum file offset (bytes) available for writing by this process.</p></dd>
+<dt><tt>process.max-msg-messages</tt></dt>
+<dd><p>Maximum number of messages on a message queue. This value is copied from the resource control at <tt>msgget()</tt> time.</p></dd>
+<dt><tt>process.max-msg-qbytes</tt></dt>
+<dd><p>Maximum number (bytes) of messages on a message queue. This value is copied from the resource control at <tt>msgget()</tt> time.When you set a new <tt>project.max-msg-qbytes</tt> value, initialization occurs only on the subsequently created values. The new <tt>project.max-msg-qbytes</tt> value does not effect existing values.</p></dd>
+<dt><tt>process.max-sem-nsems</tt></dt>
+<dd><p>Maximum number of semaphores allowed for a semaphore set.</p></dd>
+<dt><tt>process.max-sem-ops</tt></dt>
+<dd><p>Maximum number of semaphore operations that are allowed for a <tt>semop()</tt> call. This value is copied from the resource control at <tt>msgget()</tt> time.A new <tt>project.max-sem-ops</tt> value only affects the initialization of subsequently created values and has no effect on existing values.</p></dd>
+<dt><tt>process.max-port-events</tt></dt>
+<dd><p>Maximum number of events that are allowed per event port.</p></dd>
+</dl>
+
+
+<a name="geaas"></a><h5>Zone-Wide Resource Controls</h5>
+<p><a name="indexterm-33"></a><a name="indexterm-34"></a>Zone-wide resource controls are available on a system with zones installed. Zone-wide resource
+controls limit the total resource usage of all process entities within a zone.</p><dl><dt><tt>zone.cpu-cap</tt></dt>
+<dd><p>Absolute limit on the amount of CPU resources that can be consumed by a non-global zone. A value of <tt>100</tt> means 100 percent of one CPU as the <tt>project.cpu-cap</tt> setting. A value of <tt>125</tt> is 125 percent, because 100 percent corresponds to one full CPU on the system when using CPU caps.</p></dd>
+<dt><tt>zone.cpu-shares</tt></dt>
+<dd><p>Limit on the number of fair share scheduler (FSS) CPU shares for a zone. The scheduling class must be FSS. CPU shares are first allocated to the zone, and then further subdivided among projects within the zone as specified in the <tt>project.cpu-shares</tt> entries. A zone with a higher number of <tt>zone.cpu-shares</tt> is allowed to use more CPU than a zone with a low number of shares.</p></dd>
+<dt><tt>zone.max-locked-memory</tt></dt>
+<dd><p>Total amount of physical locked memory available to a zone.</p></dd>
+<dt><tt>zone.max-lwps</tt></dt>
+<dd><p>Maximum number of LWPs simultaneously available to this zone</p></dd>
+<dt><tt>zone.max-msg-ids</tt></dt>
+<dd><p>Maximum number of message queue IDs allowed for this zone</p></dd>
+<dt><tt>zone.max-sem-ids</tt></dt>
+<dd><p>Maximum number of semaphore IDs allowed for this zone</p></dd>
+<dt><tt>zone.max-shm-ids</tt></dt>
+<dd><p>Maximum number of shared memory IDs allowed for this zone</p></dd>
+<dt><tt>zone.max-shm-memory</tt></dt>
+<dd><p>Total amount of shared memory allowed for this zone</p></dd>
+<dt><tt>zone.max-swap</tt></dt>
+<dd><p>Total amount of swap that can be consumed by user process address space mappings and <tt>tmpfs</tt> mounts for this zone.</p></dd>
+</dl>
+<p>For information on configuring zone-wide resource controls, see <a href="http://docs.sun.com/doc/819-2450/z.config.ov-1?a=view">Chapter 17, Non-Global Zone Configuration (Overview), in <i>System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</i></a> and <a href="http://docs.sun.com/doc/819-2450/z.conf.start-1?a=view">Chapter 18, Planning and Configuring Non-Global Zones (Tasks), in <i>System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</i></a>. Note
+that it is possible to use the <tt>zonecfg</tt> command to apply a zone-wide
+resource control to the global zone on a system with non-global zones installed.</p>
+
+<a name="resource-ctrls-5"></a><h4>Signals Used With Resource Controls</h4>
+<p><a name="indexterm-35"></a>For each threshold value that is placed on a resource control, the following
+restricted set of signals is available:</p><dl><dt>SIGBART</dt>
+<dd><p>Terminate the process. </p></dd>
+<dt>SIGXRES</dt>
+<dd><p>Signal generated by resource control facility when the resource control limit is exceeded.</p></dd>
+<dt>SIGHUP</dt>
+<dd><p>When carrier drops on an open line, the process group that controls the terminal is sent a hangup signal, SIGHUP.</p></dd>
+<dt>SIGSTOP</dt>
+<dd><p>Job control signal. Stop the process. Stop signal not from terminal.</p></dd>
+<dt>SIGTERM</dt>
+<dd><p>Terminate the process. Termination signal sent by software.</p></dd>
+<dt>SIGKILL</dt>
+<dd><p>Terminate the process. Kill the program.</p></dd>
+<dt>SIGXFSX</dt>
+<dd><p>Terminate the process. File size limit exceeded. Available only to resource controls with the RCTL_GLOBAL_FILE_SIZE property. </p></dd>
+<dt>SIGXCPU</dt>
+<dd><p>Terminate the process. CPU time limit exceeded. Available only to resource controls with the RCTL_GLOBAL_CPUTIME property.</p></dd>
+</dl>
+<p>Other signals might be permitted due to  global properties of a
+specific control.</p>
+<hr><p><b>Note - </b>Calls to <tt>setrctl()</tt> with illegal signals fail.</p>
+<hr>
+<a name="resource-ctrls-fig-25"></a><h6>Figure&nbsp;5-2 Setting Privilege Levels for Signals</h6><img src="figures/res-ctrls.value-action.gif" alt="setting privilege levels for signals"></img>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-ctrls-9.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-ctrls-13.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

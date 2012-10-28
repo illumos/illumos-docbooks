@@ -1,0 +1,170 @@
+<?Pub UDT _bookmark _target?><?Pub CX solbook(?><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag atict:user user="sharonr"
+fullname="Sharon Veach"?><?Pub Tag atict:user user="ee194360"
+fullname="ERIC ERICKSON"?><?Pub Tag atict:user user="mseif" fullname=""?><part id="ghnmu"><title>Active
+Directory Naming Service</title><partintro><para><indexterm><primary>Active Directory</primary></indexterm><indexterm><primary>naming</primary><secondary>Active Directory (AD)</secondary></indexterm>This part describes the configuration and administration of the <filename>nss_ad</filename> naming service module. This naming service module enables
+a Solaris system to access user and group information from Active Directory
+(AD) servers in an AD domain.</para>
+</partintro><chapter id="ghnov"><title>Setting Up Solaris Active Directory
+Clients</title><highlights><para><indexterm><primary>Active Directory</primary><secondary>setting up clients</secondary></indexterm>The <filename>nss_ad</filename> naming service
+module provides a back end for the <filename>passwd</filename>, <filename>shadow</filename>,
+and <filename>group</filename> files. The <filename>nss_ad</filename> module
+uses Active Directory (AD) and its native schema as the naming service to
+resolve user and group names and IDs from across an AD forest.</para>
+</highlights><sect1><title>Overview of the <filename>nss_ad</filename> Naming Service Module</title><para><indexterm><primary>Active Directory</primary><secondary>AD naming service</secondary></indexterm>The Solaris client must be joined to an AD domain before any of
+the AD interoperability functionality, including <filename>nss_ad</filename>,
+can be used. The <filename>kclient</filename> utility is used to join the
+client to AD. During the join operation, <command>kclient</command> configures
+Kerberos v5 on the client. Thereafter, <filename>nss_ad</filename> can be
+used to resolve naming service requests by specifying <literal>ad</literal> as
+a source in the <filename>nsswitch.conf</filename> file for the supported
+databases. The <filename>nss_ad</filename> module uses host credentials to
+look up naming service information in AD.</para><para>The <filename>nss_ad</filename> module uses DNS server records to auto-discover
+AD directory servers, such as domain controllers and global catalog servers.
+Therefore, DNS must be properly configured on the Solaris client. The <filename>nss_ad</filename> module also uses the LDAP v3 protocol to access naming information
+from AD servers. The AD server schema requires no modification because <filename>nss_ad</filename> works with the native AD schema.</para><para>The <filename>nss_ad</filename> module does not currently support logins
+of Windows users onto a Solaris system. Until such logins are supported, such
+users should continue to log in by using traditional back ends such as <filename>nis</filename> and <filename>ldap</filename>.</para><para>The <filename>idmap</filename> and <filename>nscd</filename> services
+must be enabled to use <filename>nss_ad</filename>. The <filename>nss_ad</filename> module
+uses the <filename>idmap</filename> service to map between Windows security
+identifiers (SIDs), Solaris user identifiers (UIDs), and group identifiers
+(GIDs).</para><para>Ensure that all AD user and group names are qualified with domain names
+such as <literal>user@domain</literal> or <literal>group@domain</literal>.
+For example, <literal>getpwnam(dana)</literal> will fail, but <literal>getpwnam(dana@domain)</literal> will succeed, provided that <literal>dana</literal> is a valid
+Windows user in the domain named <literal>domain</literal>. </para><para>The following additional rules also pertain to the <filename>nss_ad</filename> module:</para><itemizedlist><listitem><para>Like AD, <filename>nss_ad</filename> performs case-insensitive
+matching of user and group names.</para>
+</listitem><listitem><para>Only use the <filename>nss_ad</filename> module in UTF-8 locales
+or in domains where users and groups have only ASCII characters in their names.</para>
+</listitem><listitem><para>Well-known SIDs are a set of SIDs that identify generic users
+or generic groups in the Windows world. They are not domain specific and their
+values remain constant across all Windows operating systems. The names of
+well-known SIDs are qualified with the string <literal>BUILTIN</literal>,
+for example, <literal>Remote Desktop Users@BUILTIN</literal>.</para>
+</listitem><listitem><para>The <filename>nss_ad</filename> module does not support enumeration.
+Therefore, the <function>getpwent</function> and <function>getgrent</function> interfaces
+and commands that use them such as <command>getent passwd</command> and <command>getent group</command> cannot retrieve information from AD.</para>
+</listitem><listitem><para>The <filename>nss_ad</filename> module currently supports
+only the <filename>passwd</filename> and <filename>group</filename> files. <filename>nss_ad</filename> does not support other naming service databases that follow
+the <filename>passwd</filename> entry, such as <filename>audit_user</filename> and <filename>user_attr</filename>. If the <literal>ad</literal> back end is processed (based
+on the configuration), it returns NOT FOUND for these databases.</para>
+</listitem>
+</itemizedlist><sect2><title>Configuring the <filename>nss_ad</filename> Naming Service Module</title><para><indexterm><primary>Active Directory</primary><secondary>configuring <filename>nss_ad</filename></secondary></indexterm>The <filename>nss_ad</filename> module
+requires that the Solaris client use DNS for host resolution.</para><task id="ghqce"><title>How to Configure the <filename>nss_ad</filename> Module</title><procedure><step><para>Edit the <filename>/etc/resolv.conf</filename> file to point to
+the correct domain, using the correct search order.</para><para>Pointing to
+the correct DNS domain and servers in the <filename>/etc/resolv.conf</filename> file
+usually involves specifying the domain controller as the DNS server.</para><note><para>The AD domain name must be specified in <filename>/etc/resolv.conf</filename> either
+by means of the <literal>domain</literal> directive or as the first item in
+the list specified by the <literal>search</literal> directive.</para><para>If
+both directives are specified, then whichever is last takes precedence. This
+is required for the <command>idmap</command> auto-discovery feature to work
+properly.</para>
+</note><para>In the following example, the AD domain, <literal>ad.example</literal>,
+is specified by the <literal>domain</literal> directive. The <command>dig</command> commands
+verify that the AD server, which is specified by the <literal>nameserver</literal> directive,
+can be resolved by using its name and IP address.</para><screen><userinput>% cat /etc/resolv.conf 
+domain ad.example
+nameserver 192.168.11.22
+% dig -x 192.168.11.22 +short 
+myserver.ad.example
+% dig myserver.ad.example +short 
+192.168.11.22</userinput></screen>
+</step><step><para>Edit the <filename>etc/nsswitch.conf</filename> file, and add <literal>dns</literal> to the list of naming services for <literal>hosts</literal> and <literal>ipnodes</literal>. </para><para>For example, the file might look like the
+following:</para><screen><userinput>% egrep '^hosts|^ipnodes' /etc/nsswitch.conf
+hosts:   	files  dns
+ipnodes:	 files  dns</userinput></screen><note><para>To include additional naming services such as <literal>nis</literal> or <literal>ldap</literal> for host resolution, add them after <literal>dns</literal> in
+the <filename>/etc/nsswitch.conf</filename> file.</para>
+</note>
+</step><step><para>Verify that the DNS service is enabled and online.</para><para>For
+example:</para><screen><userinput>% svcs svc:/network/dns/client
+STATE STIME FMRI
+online Oct_14 svc:/network/dns/client:default</userinput></screen>
+</step><step><para>Use the <command>kclient</command> utility to join the system
+to the AD domain.</para><para>For example:</para><screen><userinput>% /usr/sbin/kclient -T ms_ad</userinput></screen>
+</step><step><para>Edit the <filename>nsswitch.conf</filename> file by adding <literal>ad</literal> to <literal>passwd</literal> and <literal>group</literal>.</para><para>For example:</para><screen><userinput>% egrep '^passwd|^group' /etc/nsswitch.conf
+passwd:  files  nis  ad
+group:   files  nis  ad</userinput></screen><note><para><filename>/etc/nsswitch.ad</filename> is a sample configuration
+file that can be copied to <filename>/etc/nsswitch.conf</filename>. It uses
+AD for <literal>passwd</literal> and <literal>group</literal>, DNS for host
+lookups, and <filename>files</filename> for the remaining databases. Because
+the AD naming service is not yet a complete Solaris solution, add other naming
+services as appropriate to the <filename>nsswitch.conf</filename> file.</para>
+</note>
+</step><step><para>Enable the<literal> idmap</literal> service.</para><screen><userinput>% svcadm enable idmap</userinput></screen>
+</step><step><para>Enable the <literal>nscd</literal> service.</para><screen><userinput>% svcs name-service-cache
+STATE STIME FMRI
+disabled 13:15:48 svc:/system/name-service-cache:default
+
+% svcadm enable name-service-cache</userinput></screen><note><para>The <literal>nscd</literal> module automatically restarts whenever <filename>/etc/nsswitch.conf</filename> is changed.</para>
+</note>
+</step><step><para>Verify that you can access <literal>user</literal> and <literal>group</literal> information from AD.</para><para>For example:</para><screen><userinput>% getent passwd 'test_user@example'
+test_user@example:x:2154266625:2154266626:test_user::
+
+% getent passwd 2154266625
+test_user@example:x:2154266625:2154266626:test_user::</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect2>
+</sect1><sect1 id="ghnqm"><title>Password Updates</title><para><indexterm><primary>Active Directory</primary><secondary>updating passwords</secondary></indexterm>The <citerefentry><refentrytitle>passwd</refentrytitle><manvolnum>4</manvolnum></citerefentry> man page contains a list of valid
+formats for the <literal>passwd</literal> entry in the <filename>nsswitch.conf</filename> file.
+Adding<literal> ad</literal> to these configurations in the <filename>nsswitch.conf</filename> file is supported. However, changing AD user passwords through
+the <literal>passwd</literal> command is not supported. If found in the <literal>passwd</literal> entry during a password update, <literal>ad</literal> is
+skipped. Use the <command>kpasswd</command> command to update AD user passwords.</para><para>The <literal>ad</literal> search order can be added to existing valid <literal>passwd</literal> and <literal>group</literal> entries in <filename>nsswitch.conf</filename>.
+For example:</para><screen><userinput>passwd: files  ad
+group:  files  ad</userinput></screen>
+</sect1><sect1 id="ghuiq"><title>How the <filename>nss_ad</filename> Naming Service
+Module Retrieves Data From AD</title><para>The following section describes how the <filename>nss_ad</filename> module
+resolves naming service requests for the <filename>passwd</filename>, <filename>shadow</filename>, and <filename>group</filename> files by retrieving corresponding
+data from AD.</para><sect2 id="ghuid"><title>Retrieving <filename>passwd</filename> Information</title><para><indexterm><primary>Active Directory</primary><secondary>retrieving</secondary><tertiary><filename>passwd</filename> information</tertiary></indexterm>The
+following syntax shows the proper form of a <literal>passwd</literal> entry:</para><screen><replaceable>username</replaceable>:<replaceable>password</replaceable>:<replaceable>uid</replaceable>:<replaceable>gid</replaceable>:<replaceable>gecos</replaceable>:<replaceable>home-directory</replaceable>:<replaceable>login-shell</replaceable></screen><para>See the <olink targetdoc="group-refman" targetptr="passwd-4" remap="external"><citerefentry><refentrytitle>passwd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page for more information. </para><para>The <literal>nss_ad</literal> module retrieves <filename>passwd</filename> information
+from AD as follows:</para><itemizedlist><listitem><para><replaceable>username</replaceable> <emphasis role="strong">&ndash;</emphasis> Field uses the value of the <literal>samAccountName</literal> AD
+attribute and is qualified by the domain name in which the object resides,
+for example, <literal>terryb@example.com</literal>.</para>
+</listitem><listitem><para><replaceable>password</replaceable> <emphasis role="strong">&ndash;</emphasis> Field uses the value of <literal>x</literal> because the user
+password is not available in the AD object.</para>
+</listitem><listitem><para><replaceable>uid</replaceable> <emphasis role="strong">&ndash;</emphasis> Field
+uses the Windows user's SID from the <literal>objectSID</literal> AD attribute,
+which is mapped to the UID by using the <command>idmap</command> service.</para>
+</listitem><listitem><para><replaceable>gid</replaceable> <emphasis role="strong">&ndash;</emphasis> Field
+uses the Windows user's primary group SID, which is mapped to the GID by using
+the <command>idmap</command> service. The group SID is obtained by appending
+the value of the <literal>primaryGroupID</literal> AD attribute to the domain
+SID. For users in AD, the <literal>primaryGroupID</literal> attribute is an
+optional attribute, so it might not exist. If the attribute does not exist, <command>nss_ad</command> uses the <command>idmap</command> diagonal mapping facility
+to map the user SID from the <literal>objectSID</literal> attribute.</para>
+</listitem><listitem><para><replaceable>gecos</replaceable> <emphasis role="strong">&ndash;</emphasis> Value
+of the <literal>CN</literal> AD attribute.</para>
+</listitem><listitem><para><replaceable>home-directory</replaceable> <emphasis role="strong">&ndash;</emphasis> Value of the <literal>homeDirectory</literal> AD attribute,
+if a value exists. Otherwise, the field is left empty.</para>
+</listitem><listitem><para><replaceable>login-shell</replaceable> <emphasis role="strong">&ndash;</emphasis> Field is left empty because there is no login shell attribute
+in the native AD schema.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ghugr"><title>Retrieving <filename>shadow</filename> Information</title><para><indexterm><primary>Active Directory</primary><secondary>retrieving </secondary><tertiary><filename>shadow</filename> information</tertiary></indexterm>The
+following syntax shows the proper form of a <literal>shadow</literal> entry:</para><screen><replaceable>username</replaceable>:<replaceable>password</replaceable>:<replaceable>lastchg</replaceable>:<replaceable>min</replaceable>:<replaceable>max</replaceable>:<replaceable>warn</replaceable>:<replaceable>inactive</replaceable>:<replaceable>expire</replaceable>:<replaceable>flag</replaceable></screen><para>See the <olink targetdoc="group-refman" targetptr="shadow-4" remap="external"><citerefentry><refentrytitle>shadow</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page for more information.</para><para>The<literal> nss_ad</literal> module retrieves <filename>shadow</filename> information
+from AD as follows:</para><itemizedlist><listitem><para><replaceable>username</replaceable> <emphasis role="strong">&ndash;</emphasis> Field uses the value of the <literal>samAccountName</literal> AD
+attribute and is qualified by the domain name in which the object resides,
+for example, <literal>terryb@example.com</literal>.</para>
+</listitem><listitem><para><replaceable>password</replaceable> <emphasis role="strong">&ndash;</emphasis> Field uses the value of <literal>*NP*</literal> because the user
+password is not available in the AD object.</para>
+</listitem>
+</itemizedlist><para>The rest of the shadow fields are left empty because shadow fields are
+irrelevant with AD and Kerberos v5.</para>
+</sect2><sect2 id="ghugh"><title>Retrieving <filename>group</filename> Information</title><para><indexterm><primary>Active Directory</primary><secondary>retrieving </secondary><tertiary><filename>group</filename> information</tertiary></indexterm>The
+following syntax shows the proper form of a <literal>group</literal> entry:</para><screen><replaceable>groupname</replaceable>:<replaceable>password</replaceable>:<replaceable>gid</replaceable>:<replaceable>user-list</replaceable></screen><para>See the <olink targetdoc="group-refman" targetptr="group-4" remap="external"><citerefentry><refentrytitle>group</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> for
+man page for more information.</para><para>The <literal>nss_ad</literal> module retrieves information from AD as
+follows:</para><itemizedlist><listitem><para><replaceable>groupname</replaceable><emphasis role="strong"> &ndash;</emphasis> Field uses the value of the <literal>samAccountName</literal> AD
+attribute and is qualified by the domain name in which the object resides,
+for example, <literal>admins@example</literal>.</para>
+</listitem><listitem><para><replaceable>password</replaceable><emphasis role="strong"> &ndash;</emphasis> Field is left empty because the Windows groups do not have passwords.</para>
+</listitem><listitem><para><replaceable>gid</replaceable><emphasis role="strong"> &ndash;</emphasis> Field
+uses the Windows group's SID from the <literal>objectSID</literal> AD attribute,
+which is mapped to the GID by using the <command>idmap</command> service.</para>
+</listitem><listitem><para><replaceable>user-list</replaceable><emphasis role="strong"> &ndash;</emphasis> Field is left empty.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1>
+</chapter>
+</part>

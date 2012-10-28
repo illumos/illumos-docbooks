@@ -1,0 +1,468 @@
+<chapter id="mpoverview"><title>Introducing IPMP
+(Overview)</title><highlights><para>IP network multipathing (IPMP) provides physical interface failure 
+detection and transparent network access failover for a system with multiple
+interfaces on the same IP link. IPMP also provides  load spreading of packets
+for systems with multiple interfaces.</para><para>This chapter contains the following information:</para><itemizedlist><listitem><para><olink targetptr="chapter1-2" remap="internal">Why You Should Use IPMP</olink></para>
+</listitem><listitem><para><olink targetptr="eyprl" remap="internal">Basic Requirements of IPMP</olink></para>
+</listitem><listitem><para><olink targetptr="emqwq" remap="internal">IPMP Addressing</olink></para>
+</listitem><listitem><para><olink targetptr="mpoverview-22" remap="internal">Solaris IPMP Components</olink></para>
+</listitem><listitem><para><olink targetptr="eobra" remap="internal">IPMP Interface Configurations</olink></para>
+</listitem><listitem><para><olink targetptr="emqqq" remap="internal">IPMP Failure Detection and Recovery
+Features</olink></para>
+</listitem><listitem><para><olink targetptr="esqdy" remap="internal">IPMP and Dynamic Reconfiguration</olink></para>
+</listitem>
+</itemizedlist><para>For IPMP configuration tasks, refer to <olink targetptr="deploynetmult-56" remap="internal">Chapter&nbsp;31, Administering IPMP (Tasks)</olink>.</para>
+</highlights><sect1 id="chapter1-2"><title>Why You Should Use IPMP</title><para>IPMP provides increased reliability, availability, and network performance
+for systems with multiple physical interfaces. 	Occasionally, a physical
+interface or the networking hardware attached to that interface might fail
+or require maintenance. Traditionally, at that point, the system can no longer
+be contacted through any of the IP addresses that are associated with the
+failed interface.  Additionally, any existing connections to the system using
+those IP addresses are disrupted.</para><para>By using IPMP, you can configure one or more physical interfaces into
+an IP multipathing group, or <emphasis>IPMP group</emphasis>.  After configuring
+IPMP, the system automatically monitors the interfaces in the IPMP group for
+failure. If an interface in the group fails or is removed for maintenance,
+IPMP automatically migrates, or <emphasis>fails over</emphasis>, the failed
+interface's IP addresses. The recipient of these addresses is a functioning
+interface in the failed interface's IPMP group. The failover feature of IPMP
+preserves connectivity and prevents disruption of any existing connections.
+ Additionally, IPMP improves  overall network performance by automatically
+spreading out network traffic across the set of interfaces in the IPMP group.
+This process is called <emphasis>load spreading</emphasis>.</para><sect2 id="mpoverview-22"><title>Solaris IPMP Components</title><para>Solaris IPMP involves the following software:</para><itemizedlist><listitem><para>The <filename>in.mpathd</filename> daemon, which is explained
+fully in the <olink targetdoc="refman1m" targetptr="in.mpathd-1m" remap="external"><citerefentry><refentrytitle>in.mpathd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem><listitem><para>The <filename>/etc/default/mpathd</filename> configuration
+file, which is also described in the <command>in.mpathd</command>(1M) man
+page.</para>
+</listitem><listitem><para><command>ifconfig</command> options for IPMP configuration,
+as described in the <olink targetdoc="refman1m" targetptr="ifconfig-1m" remap="external"><citerefentry><refentrytitle>ifconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem>
+</itemizedlist><sect3 id="mpoverview-11"><title>Multipathing Daemon, <command>in.mpathd</command></title><para>The <filename>in.mpathd</filename> daemon detects interface failures,
+and then implements various procedures for failover and failback. After <filename>in.mpathd</filename> detects a failure or a repair, the daemon sends an <command>ioctl</command> to perform the failover or failback. The <literal>ip</literal> kernel
+module, which implements the <command>ioctl</command>, does the network access
+failover transparently and automatically.</para><note><para>Do not use Alternate Pathing while using IPMP on the same set
+of network interface cards. Likewise, you should not use IPMP while you are
+using Alternate Pathing. You can use Alternate Pathing and IPMP at the same
+time on different sets of interfaces. For more information about Alternate
+Pathing, refer to the <citetitle>Sun Enterprise Server Alternate Pathing 2.3.1
+User Guide</citetitle>.</para>
+</note><para>The <filename>in.mpathd</filename> daemon detects failures and
+repairs by sending out probes on all the interfaces that are part of an IPMP
+group. The <filename>in.mpathd</filename> daemon also detects failures and
+repairs by monitoring the <literal>RUNNING</literal> flag on each interface
+in the group. Refer to the <olink targetdoc="refman1m" targetptr="in.mpathd-1m" remap="external"><citerefentry><refentrytitle>in.mpathd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</sect3>
+</sect2><sect2 id="mpoverview-2"><title>IPMP Terminology and Concepts</title><para>This section introduces terms and concepts that are used throughout <olink targetptr="ipmptm-1" remap="internal">Part&nbsp;V, IPMP</olink>.</para><sect3 id="emjhn"><title>IP Link</title><para>In IPMP terminology, an <emphasis>IP link</emphasis> is a communication
+facility or medium over which nodes can communicate at the data-link layer
+of the Internet protocol suite. Types of IP links might include simple Ethernets,
+bridged Ethernets, hubs, or Asynchronous Transfer Mode (ATM) networks. An
+IP link can have one or more IPv4 subnet numbers, and, if applicable, one
+or more IPv6 subnet prefixes. A subnet number or prefix cannot be assigned
+to more than one IP link. In ATM LANE, an IP link is a single emulated local
+area network (LAN). With the Address Resolution Protocol (ARP), the scope
+of the ARP protocol is a single IP link.</para><note><para>Other IP-related documents, such as RFC 2460, <citetitle>Internet
+Protocol, Version 6 (IPv6)                              Specification</citetitle>,
+use the term <emphasis>link</emphasis> instead of <emphasis>IP link</emphasis>.
+Part VI uses the term <emphasis>IP link</emphasis> to avoid confusion with
+IEEE 802. In IEEE 802, <emphasis>link</emphasis> refers to a single wire from
+an Ethernet network interface card (NIC) to an Ethernet switch.</para>
+</note>
+</sect3><sect3 id="emjhd"><title>Physical Interface</title><para>The <emphasis>physical interface</emphasis> provides a system's attachment
+to an IP link. This attachment is often implemented as a device driver and
+a NIC. If a system has multiple interfaces attached to the same link, you
+can configure IPMP to perform failover if one of the interfaces fails. For
+more information on physical interfaces, refer to <olink targetptr="eobra" remap="internal">IPMP
+Interface Configurations</olink>.</para>
+</sect3><sect3 id="elfqr"><title>Network Interface Card</title><para>A <emphasis>network interface card</emphasis> is a network adapter that
+can be built in to the system. Or, the NIC can be a  separate card that serves
+as an interface from the system to an IP link. Some NICs can have multiple
+physical interfaces. For example, a <literal>qfe</literal> NIC can have four
+interfaces, <literal>qfe0</literal> through <literal>qfe3</literal>, and so
+on. </para>
+</sect3><sect3 id="emjid"><title>IPMP Group</title><para>An IP multipathing group, or <emphasis>IPMP</emphasis> group, consists
+of one or more physical interfaces on the same system that are configured
+with the same IPMP group name. All interfaces in the IPMP group must be connected
+to the same IP link. The same (non-null) character string IPMP group name
+identifies all interfaces in the group. You can place interfaces from NICs
+of different speeds within the same IPMP group, as long as the NICs are of
+the same type. For example, you can configure the interfaces of 100-megabit
+Ethernet NICs and the interfaces of one gigabit Ethernet NICs in the same
+group.  As another example, suppose you have two 100-megabit Ethernet NICs.
+You can configure one of the interfaces down to 10 megabits and still place
+the two interfaces into the same IPMP group. </para><para>You cannot place two interfaces of different media types into an IPMP
+group. For example, you cannot place an ATM interface in the same group as
+an Ethernet interface.</para>
+</sect3><sect3 id="elfqt"><title>Failure Detection and Failover</title><para><emphasis>Failure detection</emphasis> is the process of detecting when
+an interface or the path from an interface to an Internet layer device no
+longer works. IPMP provides systems with the ability to detect when an interface
+has failed. IPMP detects the following types of communication failures:</para><itemizedlist><listitem><para>The transmit or receive path of the interface has failed.</para>
+</listitem><listitem><para>The attachment of the interface to the IP link is down.</para>
+</listitem><listitem><para>The port on the switch does not transmit or receive packets.</para>
+</listitem><listitem><para>The physical interface in an IPMP group is not present at
+system boot.</para>
+</listitem>
+</itemizedlist><para>After detecting a failure, IPMP begins failover. <emphasis>Failover</emphasis> is
+the automatic process of switching the network access from a failed interface
+to a functioning physical interface in the same group. Network access includes
+IPv4 unicast, multicast, and broadcast traffic, as well as IPv6 unicast and
+multicast traffic. Failover can only occur when you have configured more than
+one interface in the IPMP group. The failover process ensures uninterrupted
+access to the network. </para>
+</sect3><sect3 id="elfre"><title>Repair Detection and Failback</title><para><emphasis>Repair detection</emphasis> is the process of detecting when
+a NIC or the path from  a NIC to an Internet layer device starts operating
+correctly after a failure. After detecting that a NIC has been repaired, IPMP
+performs <emphasis>failback</emphasis>, the process of switching network access
+back to the repaired interface. Repair detection assumes that you have enabled
+failbacks. See <olink targetptr="mpoverview-24" remap="internal">Detecting Physical Interface
+Repairs</olink> for more information.</para>
+</sect3><sect3 id="epmpt"><title>Target Systems</title><para>Probe-based failure detection uses <emphasis>target systems</emphasis> to
+determine the condition of an interface. Each target system must be attached
+to the same IP link as the members of the  IPMP group. The <command>in.mpathd</command> daemon
+on the local system sends ICMP probe messages to each target system. The probe
+messages help to determine the health of each interface in the IPMP group. </para><para>For more information about target system use in probe-based failure
+detection, refer to <olink targetptr="emqra" remap="internal">Probe-Based Failure Detection</olink>.</para>
+</sect3><sect3 id="emjif"><title>Outbound Load Spreading</title><para>With IPMP configured, outbound network packets are spread across multiple
+NICs without affecting the ordering of packets. This process is known as <emphasis>load spreading</emphasis>. As a result of load spreading, higher throughput
+is achieved. Load spreading occurs only when the network traffic is flowing
+to multiple destinations that use multiple connections.</para>
+</sect3><sect3 id="emjim"><title>Dynamic Reconfiguration</title><para><emphasis>Dynamic reconfiguration</emphasis> (DR) is the ability to
+reconfigure a system while the system is running, with little or no impact
+on existing operations.  Not all Sun platforms support DR. Some Sun platforms
+might only support DR of certain types of hardware.  On platforms that support
+DR of NIC's, IPMP can be used to transparently fail over network access, providing
+	uninterrupted network access to the system.</para><para>For more information on how IPMP supports DR, refer to <olink targetptr="esqdy" remap="internal">IPMP and Dynamic Reconfiguration</olink>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="eyprl"><title>Basic Requirements of IPMP</title><para>IPMP is built into the Solaris Operating System (Solaris OS) and does
+not require any special hardware.  Any interface that is supported by the
+Solaris OS can be used with IPMP.  However,  IPMP does impose the following
+requirements on your network configuration and topology:  </para><itemizedlist><listitem><para>All interfaces in an IPMP group must have unique MAC addresses. </para><para>Note that by default, the network interfaces on SPARC based systems
+all share a single MAC address.  Thus, you must explicitly change the default
+in order to use IPMP on SPARC based systems.  For more information, refer
+to <olink targetptr="emyil" remap="internal">How to Plan for an IPMP Group</olink>.</para>
+</listitem><listitem><para>All interfaces in an IPMP group must be of the same media
+type. For more information, refer to <olink targetptr="emjid" remap="internal">IPMP Group</olink>.</para>
+</listitem><listitem><para>All interfaces in an IPMP group must be on the same IP link.
+For more information, refer to <olink targetptr="emjid" remap="internal">IPMP Group</olink>.</para>
+</listitem><listitem><para>Depending on your failure detection requirements, you might
+need to either use specific types of network interfaces or configure additional
+IP addresses on each network interface.  Refer to <olink targetptr="mpoverview-23" remap="internal">Link-Based Failure Detection</olink> and <olink targetptr="emqra" remap="internal">Probe-Based Failure Detection</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="emqwq"><title>IPMP Addressing</title><para>You can configure IPMP failure detection on both IPv4 networks and dual-stack,
+IPv4 and IPv6 networks. Interfaces that are configured with IPMP support two
+types of addresses: data addresses and test addresses.</para><sect2 id="emqwg"><title>Data Addresses</title><para><emphasis>Data addresses</emphasis> are the conventional IPv4 and IPv6
+addresses that are assigned to an interface of a NIC at boot time or manually,
+through the <command>ifconfig</command> command. The standard IPv4 and, if
+applicable, IPv6 packet traffic through an interface is considered to be <emphasis>data traffic</emphasis>.</para>
+</sect2><sect2 id="emqvv"><title>Test Addresses</title><para><emphasis>Test addresses</emphasis> are IPMP-specific addresses
+that are used by the <command>in.mpathd</command> daemon. For an interface
+to use probe-based failure and repair detection, that interface must be configured
+with at least one test address.</para><note><para>You need to configure test addresses only if you want to use probe-based
+failure detection.</para>
+</note><para>The <command>in.mpathd</command> daemon uses test addresses to
+exchange ICMP probes, also called <emphasis>probe traffic</emphasis>, with
+other targets on the IP link. Probe traffic helps to determine the status
+of the interface and its NIC, including whether an interface has failed. The
+probes verify that the send and receive path to the interface is working correctly. </para><para>Each interface can be configured with an IP test address. For an interface
+on a dual-stack network, you can configure an IPv4 test address, an IPv6 test
+address, or both IPv4 and IPv6 test addresses.</para><para>After an interface fails, the test addresses remain on the failed interface
+so that <command>in.mpathd</command> can continue to send probes to check
+for subsequent repair. You must specifically configure test addresses so that
+applications do not accidentally use them. For more information, refer to <olink targetptr="emycj" remap="internal">Preventing Applications From Using Test Addresses</olink>.</para><para>For more information on probe-based failure detection, refer to <olink targetptr="emqra" remap="internal">Probe-Based Failure Detection</olink>.</para><sect3 id="emqyk"><title>IPv4 Test Addresses</title><para>In general, you can use any IPv4 address on your subnet as a test
+address. IPv4 test addresses do not need to be routeable. Because IPv4 addresses
+are a limited resource for many sites, you might want to use non-routeable
+RFC 1918 private addresses as test addresses. Note that the <command>in.mpathd</command> daemon
+exchanges only ICMP probes with other hosts on the same subnet as the test
+address.  If you do use RFC 1918-style test addresses, be sure to configure
+other systems, preferably routers, on the IP link with addresses on the appropriate
+RFC 1918 subnet. The <command>in.mpathd</command> daemon can then successfully
+exchange probes with target systems.  </para><para>The IPMP examples use RFC 1918 addresses from the <literal>192.168.0/24</literal> network
+as IPv4 test addresses.  For more information about RFC 1918 private addresses,
+refer to <ulink url="http://www.ietf.org/rfc/rfc1918.txt?number=1918" type="text_url">RFC 1918, Address Allocation for Private Internets.</ulink></para><para>To configure IPv4 test addresses, refer to the task <olink targetptr="emqul" remap="internal">How to Configure an IPMP Group With Multiple Interfaces</olink>.</para>
+</sect3><sect3 id="emqxv"><title>IPv6 Test Addresses</title><para>The only valid IPv6 test address is the link-local address of a physical
+interface. You do not need a separate IPv6 address to serve as an IPMP test
+address. The IPv6 link-local address is based on the Media Access Control
+(MAC ) address of the interface. Link-local addresses are automatically configured
+when the interface becomes IPv6-enabled at boot time or when the interface
+is manually configured through <command>ifconfig</command>. </para><para>To identify the link-local address of an interface, run the <command>ifconfig</command> <replaceable>interface</replaceable> command on an IPv6-enabled
+node. Check the output for the address that begins with the prefix <literal>fe80</literal>,
+the link-local prefix. The <literal>NOFAILOVER</literal> flag in the following <command>ifconfig</command> output indicates that the link-local address <literal>fe80::a00:20ff:feb9:17fa/10</literal> of  the <literal>hme0</literal> interface is used as the test address. </para><screen>hme0: flags=a000841&lt;UP,RUNNING,MULTICAST,IPv6,NOFAILOVER> mtu 1500 index 2
+        	inet6 fe80::a00:20ff:feb9:17fa/10 </screen><para>For more information on link-local addresses, refer to <olink targetptr="ipv6-overview-15" remap="internal">Link-Local Unicast Address</olink>.</para><para>When an IPMP group has both IPv4 and IPv6 plumbed on all the group's
+interfaces, you do not need to configure separate IPv4 test addresses. The <filename>in.mpathd</filename> daemon can use the IPv6 link-local addresses as test
+addresses.</para><para>To create an IPv6 test address, refer to the task <olink targetptr="emqul" remap="internal">How to Configure an IPMP Group With Multiple
+Interfaces</olink>.</para>
+</sect3>
+</sect2><sect2 id="emycj"><title>Preventing Applications From Using Test Addresses</title><para>After you have configured a test address, you need to ensure that
+this address is not used by applications. Otherwise, if the interface fails,
+the application is no longer reachable because test addresses do not fail
+over during the failover operation. To ensure that IP does not choose the
+test address for normal applications, mark the test address as <literal>deprecated</literal>.</para><para>IPv4 does not use a deprecated address as a source address for any communication,
+unless an application explicitly binds to the address. The <filename>in.mpathd</filename> daemon
+explicitly binds to such an address in order to send and receive probe traffic.</para><para>Because IPv6 link-local addresses are usually not present in a name
+service, DNS and NIS applications do not use link-local addresses for communication.
+Consequently, you must not mark IPv6 link-local addresses as <literal>deprecated</literal>.</para><para>IPv4 test addresses should not be placed in the DNS and NIS name service
+tables. In IPv6, link-local addresses  are not normally placed in the name
+service tables.</para>
+</sect2>
+</sect1><sect1 id="eobra"><title>IPMP Interface Configurations</title><para>An IPMP configuration typically consists of two or more physical
+interfaces  on the same system that are attached to the same IP link. These
+physical interfaces might or might not be on the same NIC. The interfaces
+are configured as members of the same IPMP group.   If the system has additional
+interfaces on a second IP link, you  must configure these interfaces as another
+IPMP group.</para><para>A single interface can be configured in its own IPMP group. The single
+interface IPMP group has the same behavior as an IPMP group with multiple
+interfaces. However, failover and failback cannot occur  for an IPMP group
+with only one interface.</para><sect2 id="emylr"><title>Standby Interfaces in an IPMP Group</title><para>The <emphasis>standby interface</emphasis> in an IPMP group is not used
+for data traffic unless some other interface in the group fails. When a failure
+occurs, the data addresses on the failed interface migrate to the standby
+interface. Then, the standby interface is treated the same as other active
+interfaces until the failed interface is repaired. Some failovers might not
+choose a standby interface. Instead, these failovers might choose an active
+interface with fewer data addresses that are configured as UP than the standby
+interface. </para><para>You should configure only test addresses on a standby interface.
+IPMP does not permit you to add a data address to an interface that is configured
+through the <command>ifconfig</command> command as <option role="nodash">standby</option>.
+Any attempt to create this type of configuration will fail. Similarly, if
+you configure as <option role="nodash">standby</option> an interface that
+already has data addresses, these addresses automatically fail over to another
+interface in the IPMP group.  Due to these restrictions, you must use 	the <command>ifconfig</command> command to mark any test addresses as <option role="nodash">deprecated</option> and <option>failover</option> prior to setting the interface as <option role="nodash">standby</option>. To configure standby interfaces, refer to <olink targetptr="enfiu" remap="internal">How to Configure a Standby Interface for an IPMP Group</olink>.</para>
+</sect2><sect2 id="emrap"><title>Common IPMP Interface Configurations</title><para>As mentioned in <olink targetptr="emqwq" remap="internal">IPMP Addressing</olink>, interfaces
+in an IPMP group handle regular data traffic and probe traffic, depending
+on the interfaces' configuration. You use IPMP options of the <command>ifconfig</command> command
+to create the configuration. </para><para>An <emphasis>active interface</emphasis> is a physical interface that
+transmits both data traffic and probe traffic. You configure the interface
+as &ldquo;active&rdquo; by performing either the task <olink targetptr="emqul" remap="internal">How
+to Configure an IPMP Group With Multiple Interfaces</olink> or the task <olink targetptr="enfoy" remap="internal">How to Configure a Single Interface IPMP Group</olink>.</para><para>The following are two common types of IPMP configurations:</para><variablelist><varlistentry><term><emphasis role="strong">Active-active configuration</emphasis></term><listitem><para>A two interface IPMP group where both interfaces are &ldquo;active,&rdquo;
+that is they might be transmitting both probe and data traffic at all times.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Active-standby configuration</emphasis></term><listitem><para>A two interface IPMP group where one interface is configured as &ldquo;standby.&rdquo;</para>
+</listitem>
+</varlistentry>
+</variablelist><sect3 id="eojdb"><title>Checking the Status of an Interface</title><para>You can check the status of an interface by issuing the <command>ifconfig</command> <replaceable>interface</replaceable> command. For general information on <command>ifconfig</command> status
+reporting, refer to <olink targetptr="ipconfig-46" remap="internal">How to Get Information
+About a Specific Interface</olink>. </para><para>For example, you can use the <command>ifconfig</command> command to
+obtain the status of a standby interface. When the standby interface is not
+hosting any data address, the interface has the <literal>INACTIVE</literal> flag
+for its status. You can observe this flag in the status lines for the interface
+in the <command>ifconfig</command> output. </para>
+</sect3>
+</sect2>
+</sect1><sect1 id="emqqq"><title>IPMP Failure Detection and Recovery Features</title><para>The <filename>in.mpathd</filename> daemon handles the following
+types of failure detection:</para><itemizedlist><listitem><para>Link-based failure detection, if supported by the NIC driver</para>
+</listitem><listitem><para>Probe-based failure detection, when test addresses are configured</para>
+</listitem><listitem><para>Detection of interfaces that were missing at boot time</para>
+</listitem>
+</itemizedlist><para>The <olink targetdoc="refman1m" targetptr="in.mpathd-1m" remap="external"><citerefentry><refentrytitle>in.mpathd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page completely describes how the <command>in.mpathd</command> daemon handles
+the detection of interface failures.</para><sect2 id="mpoverview-23"><title>Link-Based Failure Detection</title><para>Link-based failure detection is always enabled, provided that the interface
+supports this type of failure detection. The following Sun network drivers
+are supported in the current release of the Solaris OS:</para><itemizedlist><listitem><para><literal>hme</literal></para>
+</listitem><listitem><para><literal>eri</literal></para>
+</listitem><listitem><para><literal>ce</literal></para>
+</listitem><listitem><para><literal>ge</literal></para>
+</listitem><listitem><para><literal>bge</literal></para>
+</listitem><listitem><para><literal>qfe</literal></para>
+</listitem><listitem><para><literal>dmfe</literal></para>
+</listitem>
+</itemizedlist><para>To determine whether a third-party interface supports link-based failure
+detection, refer to the manufacturer's documentation.</para><para>These network interface drivers monitor the interface's link state and
+notify the networking subsystem when that link state changes. When  notified
+of a change, the networking subsystem either sets or clears the  <literal>RUNNING</literal> flag for that interface, as appropriate. When the daemon detects
+that the interface's <literal>RUNNING</literal> flag has been cleared, the
+ daemon immediately fails the interface. </para>
+</sect2><sect2 id="emqra"><title>Probe-Based Failure Detection</title><para>The <command>in.mpathd</command> daemon performs probe-based failure
+detection on each interface in the IPMP group that has a test address. Probe-based
+failure detection involves the sending and receiving of ICMP probe messages
+that use test addresses. These messages go out over the interface to one or
+more target systems on the same IP link. For an introduction to test addresses,
+refer to <olink targetptr="emqvv" remap="internal">Test Addresses</olink>. For information
+on configuring test addresses, refer to <olink targetptr="emqul" remap="internal">How to Configure
+an IPMP Group With Multiple Interfaces</olink>.</para><para>The <filename>in.mpathd</filename> daemon determines which target
+systems to probe dynamically. Routers that are connected to the IP link are
+automatically selected as targets for probing. If no routers exist on the
+link, <command>in.mpathd</command> sends probes to neighbor hosts on the link.
+A multicast packet that is sent to the all hosts multicast address, <literal>224.0.0.1</literal> in IPv4 and <literal>ff02::1</literal> in IPv6, determines which
+hosts to use as target systems. The first few hosts that respond to the echo
+packets are chosen as targets for probing. If <filename>in.mpathd</filename> cannot
+find routers or hosts that responded to the ICMP echo packets, <filename>in.mpathd</filename> cannot detect probe-based failures. </para><para>You can use host routes to explicitly configure a list of target systems
+to be used by <command>in.mpathd</command>. For instructions, refer to <olink targetptr="etmkd" remap="internal">Configuring Target Systems</olink>.</para><para>To ensure that each interface in the IPMP group functions properly, <filename>in.mpathd</filename> probes all the targets separately through all the interfaces
+in the IPMP group. If no replies are made in response to five consecutive
+probes, <filename>in.mpathd</filename> considers the interface to have failed.
+The probing rate depends on the <emphasis>failure detection time</emphasis> (FDT).
+The default value for failure detection time is 10 seconds. However, you can
+tune the failure detection time in the <command>/etc/default/mpathd</command> file.
+For instructions, go to <olink targetptr="deploynetmult-48" remap="internal">How to Configure
+the /etc/default/mpathd File</olink>.</para><para>For a repair detection time of 10 seconds, the probing rate is  approximately
+one probe every two seconds. The minimum repair detection time is twice the
+failure detection time , 20 seconds by default, because replies to 10 consecutive
+probes must be received. The failure  and repair detection times apply only
+to probe-based failure detection.</para>
+</sect2><sect2 id="mpoverview-29"><title>Group Failures</title><para>A <emphasis>group failure</emphasis> occurs when all interfaces in an
+IPMP group appear to fail at the same time. The <command>in.mpathd</command> daemon
+does not perform failovers for a group failure. Also, no failover occurs when
+all the target systems fail at the same time. In this instance, <command>in.mpathd</command> flushes all of its current target systems and discovers new target
+systems.</para>
+</sect2><sect2 id="mpoverview-24"><title>Detecting Physical Interface Repairs</title><para>For the <filename>in.mpathd</filename> daemon to consider an interface
+to be repaired, the <literal>RUNNING</literal> flag must be set for the interface.
+If probe-based failure detection is used, the <filename>in.mpathd</filename> daemon
+must receive responses to 10 consecutive probe packets from the interface
+before that interface is considered repaired. When an interface is considered
+repaired, any addresses that failed over to another interface then fail back
+to the repaired interface. If the interface was configured as &ldquo;active&rdquo;
+before it failed, after repair that interface can resume sending and receiving
+traffic.</para>
+</sect2><sect2 id="eoqse"><title>What Happens During Interface Failover</title><para>The following two examples show a typical configuration and how
+that configuration automatically changes when an interface fails. When the <literal>hme0</literal> interface fails, notice that all data addresses move from <literal>hme0</literal> to <literal>hme1</literal>.</para><example id="mpoverview-ex-12"><title>Interface Configuration Before an Interface
+Failure</title><screen width="100">hme0: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4> mtu 1500 index 2
+     inet 192.168.85.19 netmask ffffff00 broadcast 192.168.85.255
+     groupname test
+hme0:1: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,DEPRECATED,IPv4,NOFAILOVER> mtu 1500 
+     index 2 inet 192.168.85.21 netmask ffffff00 broadcast 192.168.85.255
+hme1: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4> mtu 1500 index 2
+8     inet 192.168.85.20 netmask ffffff00 broadcast 192.168.85.255
+     groupname test
+hme1:1: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,DEPRECATED,IPv4,NOFAILOVER> mtu 1500 
+     index 2 inet 192.168.85.22 netmask ffffff00 broadcast 192.168.85.255
+hme0: flags=a000841&lt;UP,RUNNING,MULTICAST,IPv6,NOFAILOVER> mtu 1500 index 2
+     inet6 fe80::a00:20ff:feb9:19fa/10
+     groupname test
+hme1: flags=a000841&lt;UP,RUNNING,MULTICAST,IPv6,NOFAILOVER> mtu 1500 index 2
+     inet6 fe80::a00:20ff:feb9:1bfc/10
+     groupname test</screen>
+</example><example id="mpoverview-ex-13"><title>Interface Configuration After an Interface
+Failure</title><screen width="100">hme0: flags=19000842&lt;BROADCAST,RUNNING,MULTICAST,IPv4,NOFAILOVER,FAILED> mtu 0 index 2
+        inet 0.0.0.0 netmask 0 
+        groupname test
+hme0:1: flags=19040843&lt;UP,BROADCAST,RUNNING,MULTICAST,DEPRECATED,IPv4,NOFAILOVER,FAILED> 
+        mtu 1500 index 2 inet 192.168.85.21 netmask ffffff00 broadcast 10.0.0.255
+hme1: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4> mtu 1500 index 2
+        inet 192.168.85.20 netmask ffffff00 broadcast 192.168.85.255
+        groupname test
+hme1:1: flags=9000843&lt;UP,BROADCAST,RUNNING,MULTICAST,DEPRECATED,IPv4,NOFAILOVER> mtu 1500 
+        index 2 inet 192.168.85.22 netmask ffffff00 broadcast 10.0.0.255
+hme1:2: flags=1000843&lt;UP,BROADCAST,RUNNING,MULTICAST,IPv4> mtu 1500 index 6
+        inet 192.168.85.19 netmask ffffff00 broadcast 192.168.18.255
+hme0: flags=a000841&lt;UP,RUNNING,MULTICAST,IPv6,NOFAILOVER,FAILED> mtu 1500 index 2
+        inet6 fe80::a00:20ff:feb9:19fa/10 
+        groupname test
+hme1: flags=a000841&lt;UP,RUNNING,MULTICAST,IPv6,NOFAILOVER> mtu 1500 index 2
+        inet6 fe80::a00:20ff:feb9:1bfc/10 
+        groupname test</screen>
+</example><para>You can see that the <literal>FAILED</literal> flag is set on <literal>hme0</literal> to indicate that this interface has failed. You can also see that <literal>hme1:2</literal> has been created. <literal>hme1:2</literal> was originally <literal>hme0</literal>. The address <literal>192.168.85.19</literal> then becomes
+accessible through <literal>hme1</literal>. </para><para>Multicast memberships that are associated with <literal>192.168.85.19</literal> can
+still receive packets, but they now receive packets through <literal>hme1</literal>.
+When the failover of address <literal>192.168.85.19</literal> from <literal>hme0</literal> to <literal>hme1</literal> occurred, a dummy address <literal>0.0.0.0</literal> was created
+on <literal>hme0</literal>. The dummy address was created so that <literal>hme0</literal> can
+still be accessed. <literal>hme0:1</literal> cannot exist without <literal>hme0</literal>.
+The dummy address is removed when a subsequent failback takes place.</para><para>Similarly, failover of the IPv6 address from <literal>hme0</literal> to <literal>hme1</literal> occurred. In IPv6, multicast memberships are associated with
+interface indexes. Multicast memberships also fail over from <literal>hme0</literal> to <literal>hme1</literal>. All the addresses that <filename>in.ndpd</filename> configured
+also moved. This action is not shown in the examples.</para><para>The <filename>in.mpathd</filename> daemon continues to probe through
+the failed interface <literal>hme0</literal>. After the daemon receives 10
+consecutive replies for a default repair detection time of 20 seconds, the
+daemon determines that the interface is repaired. Because the <literal>RUNNING</literal> flag
+is also set on <literal>hme0</literal>, the daemon invokes the failback. After
+failback, the original configuration is restored.</para><para>For a description of all error messages that are logged on the console
+during failures and repairs, see the <command>in.mpathd</command>(1M) man
+page. </para>
+</sect2>
+</sect1><sect1 id="esqdy"><title>IPMP and Dynamic Reconfiguration</title><para>The dynamic reconfiguration (DR) feature enables you to reconfigure
+system hardware, such as interfaces, while the system is running. This section
+explains how DR interoperates with IPMP. </para><para>On a system that supports DR of NICs, IPMP can be used to preserve connectivity
+and prevent disruption of existing connections. You can safely attach, detach,
+or reattach NIC's on a system that supports DR and uses IPMP. This is possible
+because IPMP is integrated into the Reconfiguration Coordination Manager (RCM)
+framework. <emphasis>RCM</emphasis> manages the dynamic reconfiguration of
+system components. </para><para>You typically use the <command>cfgadm</command> command to perform DR
+operations. However, some platforms provide other methods. Consult your platform's
+documentation for details. You can find specific documentation about DR from
+the following resources.</para><table frame="topbot" id="eterj"><title>Documentation Resources for Dynamic
+Reconfiguration</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para>Description</para>
+</entry><entry><para>For Information</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Detailed information on the <command>cfgadm</command> command </para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="cfgadm-1m" remap="external"><citerefentry><refentrytitle>cfgadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page</para>
+</entry>
+</row><row><entry><para>Specific information about DR in the Sun Cluster environment</para>
+</entry><entry><para><citetitle>Sun Cluster 3.1 System Administration Guide</citetitle></para>
+</entry>
+</row><row><entry><para>Specific information about DR in the Sun Fire environment</para>
+</entry><entry><para><citetitle>Sun Fire 880 Dynamic Reconfiguration Guide</citetitle></para>
+</entry>
+</row><row><entry><para>Introductory information about DR and the <command>cfgadm</command> command</para>
+</entry><entry><para><olink targetdoc="sagdfs" targetptr="devconfig2-1" remap="external">Chapter 6, <citetitle remap="chapter">Dynamically Configuring Devices (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Devices and File Systems</citetitle></olink></para>
+</entry>
+</row><row><entry><para>Tasks for administering IPMP groups on a system that supports DR</para>
+</entry><entry><para><olink targetptr="deploynetmult-92" remap="internal">Replacing a Failed Physical Interface
+on Systems That Support Dynamic Reconfiguration</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="esxiu"><title>Attaching NICs</title><para>You can add interfaces to an IPMP group at any time by using the <command>ifconfig</command> command, as explained in <olink targetptr="emqul" remap="internal">How to Configure
+an IPMP Group With Multiple Interfaces</olink>. Thus, any interfaces on system
+components that you attach after system boot can be plumbed and added to an
+existing IPMP group. Or, if appropriate, you can configure the newly added
+interfaces into their own IPMP group. </para><para>These interfaces and the data addresses that are configured on them
+are immediately available for use by the IPMP group.  However, for the system
+to automatically configure and use the interfaces after a reboot, you must
+create an <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file
+for each new interface. For instructions, refer to  <olink targetptr="fpdcn" remap="internal">How
+to Configure a Physical Interface After System Installation</olink>.</para><para>If an <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file
+already exists when the interface is attached, then RCM automatically configures
+the interface according to the contents of this file.  Thus, the interface
+receives the same configuration that it would have received after system boot.</para>
+</sect2><sect2 id="esxjb"><title>Detaching NICs</title><para>All requests to detach system components that contain NICs are first
+checked to ensure that connectivity can be preserved.  For instance, by default
+you cannot detach a NIC that is not in an IPMP group. You also cannot detach
+a NIC that contains the only functioning interfaces in an IPMP group.  However,
+if you must remove the system component, you can override this behavior by
+using the <option>f</option> option of <command>cfgadm</command>, as explained
+in the <olink targetdoc="refman1m" targetptr="cfgadm-1m" remap="external"><citerefentry><refentrytitle>cfgadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><para>If the checks are successful, the data addresses associated with the
+detached NIC fail over to a functioning NIC in the same group, as if the NIC
+being detached had failed.  When the NIC is detached, all test addresses on
+the NIC's interfaces are unconfigured. Then, the NIC is unplumbed from the
+system.  If any of these steps fail, or if the DR of other hardware on the
+same system component fails, then the previous configuration is restored to
+its original state. You should receive a status message regarding this event.
+Otherwise, the detach request completes successfully. You can remove the component
+from the system.  No existing connections are disrupted.</para>
+</sect2><sect2 id="esxja"><title>Reattaching NICs</title><para>RCM records the configuration information associated with any NIC's
+that are detached from a running system.  As a result, RCM treats the reattachment
+of a NIC that had been previously detached identically as it would to the
+attachment of a new NIC. That is, RCM only performs plumbing.</para><para>However, reattached NICs typically have an existing <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file.  In this case, RCM automatically
+configures the interface according to the contents of the existing <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file.  Additionally, RCM informs
+the <command>in.mpathd</command> daemon of each data address that was originally
+hosted on the reattached interface.  Thus, once the reattached interface is
+functioning properly, all of its data addresses are failed back to the reattached
+interface as if it had been repaired.</para><para>If the NIC being reattached does not have an <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file, then no configuration information is available.
+RCM has no information regarding how to configure the interface. One consequence
+of this situation is that addresses that were previously failed over to another
+interface are not failed back.</para>
+</sect2><sect2 id="esxji"><title>NICs That Were Missing at System Boot</title><para>NICs that are not present at system boot represent a special instance
+of failure detection.  At boot time, the startup scripts track any interfaces
+with <filename>/etc/hostname.</filename><replaceable>interface</replaceable> files
+that cannot be plumbed.  Any data addresses in such an interface's <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file are automatically hosted
+on an alternative interface in the IPMP group.  </para><para>In such an event, you receive error messages similar to the following</para><screen>moving addresses from failed IPv4 interfaces: hme0 (moved to hme1)
+moving addresses from failed IPv6 interfaces: hme0 (moved to hme1)</screen><para>If no alternative interface exists, you receive error messages similar
+to the following:</para><screen width="100">moving addresses from failed IPv4 interfaces: hme0 (couldn't move; 
+   no alternative interface) 
+ moving addresses from failed IPv6 interfaces: hme0 (couldn't move; 
+   no alternative interface) </screen><note><para>In this instance of failure detection, only data addresses that
+are explicitly specified in the missing interface's <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file move to an alternative interface. Any addresses
+that are usually acquired through other means, such as through RARP or DHCP,
+are not acquired or moved.   </para>
+</note><para>If an interface with the same name as another interface that was missing
+at system boot is reattached using DR, RCM automatically plumbs the interface.
+Then, RCM configures the interface according to the contents of the interface's <filename>/etc/hostname.</filename><replaceable>interface</replaceable> file. Finally,
+RCM fails back any data addresses, just as if the interface had been repaired.
+Thus, the final network configuration is identical to the configuration that
+would have been made if the system had been booted with the interface present.</para>
+</sect2>
+</sect1>
+</chapter>

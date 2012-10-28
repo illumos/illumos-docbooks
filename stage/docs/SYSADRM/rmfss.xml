@@ -1,0 +1,303 @@
+<chapter id="rmfss-1"><title>Fair Share Scheduler (Overview)</title><highlights><para>The analysis of workload data can indicate that a particular workload
+or group of workloads is monopolizing CPU resources. If these workloads are
+not violating resource constraints on CPU usage, you can modify the allocation
+policy for CPU time on the system. The fair share scheduling class described
+in this chapter enables you to allocate CPU time based on shares instead of
+the priority scheme of the timesharing (TS) scheduling class.</para><para>This chapter covers the following topics.</para><itemizedlist><listitem><para><olink targetptr="rmfss-2" remap="internal">Introduction to the Scheduler</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-4" remap="internal">CPU Share Definition</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-5" remap="internal">CPU Shares and Process State</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-6" remap="internal">CPU Share Versus Utilization</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-7" remap="internal">CPU Share Examples</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-14" remap="internal">FSS Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-19" remap="internal">FSS and Processor Sets</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-17" remap="internal">Combining FSS With Other Scheduling
+Classes</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-21" remap="internal">Setting the Scheduling Class for
+the System</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-22" remap="internal">Scheduling Class on a System with
+Zones Installed</olink></para>
+</listitem><listitem><para><olink targetptr="rmfss-20" remap="internal">Commands Used With FSS</olink></para>
+</listitem>
+</itemizedlist><para>To begin using the fair share scheduler, see <olink targetptr="rmfss.task-1" remap="internal">Chapter&nbsp;9, Administering the Fair Share Scheduler
+(Tasks)</olink>.</para>
+</highlights><sect1 id="rmfss-2"><title>Introduction to the Scheduler</title><para>A fundamental job of the operating system is to arbitrate which processes
+get access to the system's resources. The process scheduler, which is also
+called the dispatcher, is the portion of the kernel that controls allocation
+of the CPU to processes. The scheduler supports the concept of scheduling
+classes. Each class defines a scheduling policy that is used to schedule processes
+within the class. The default scheduler in the Solaris Operating System, the
+TS scheduler, tries to give every process relatively equal access to the available
+CPUs. However, you might want to specify that certain processes be given more
+resources than others.</para><para>You
+can use the <emphasis>fair share scheduler</emphasis> (FSS) to control the
+allocation of available CPU resources among workloads, based on their importance.
+This importance is expressed by the number of <emphasis>shares</emphasis> of
+CPU resources that you assign to each workload.</para><para>You give each project CPU shares to control the project's entitlement
+to CPU resources. The FSS guarantees a fair dispersion of CPU resources among
+projects that is based on allocated shares, independent of the number of processes
+that are attached to a project. The FSS achieves fairness by reducing a project's
+entitlement for heavy CPU usage and increasing its entitlement for light usage,
+in accordance with other projects.</para><para>The FSS consists of a
+kernel scheduling class module and class-specific versions of the <olink targetdoc="group-refman" targetptr="dispadmin-1m" remap="external"><citerefentry><refentrytitle>dispadmin</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="priocntl-1" remap="external"><citerefentry><refentrytitle>priocntl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> commands.
+Project shares used by the FSS are specified through the <literal>project.cpu-shares</literal> property in the <olink targetdoc="group-refman" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> database.</para><note><para>If you are using the <literal>project.cpu-shares</literal> resource
+control on a Solaris system with zones installed, see <olink targetptr="z.config.ov-12" remap="internal">Zone Configuration Data</olink>, <olink targetptr="z.admin.ov-3" remap="internal">Resource Controls Used in Non-Global Zones</olink>,
+and <olink targetptr="z.admin.task-71" remap="internal">Using the Fair Share Scheduler on a
+Solaris System With Zones Installed</olink>.</para>
+</note>
+</sect1><sect1 id="rmfss-4"><title>CPU Share Definition</title><para>The term &ldquo;share&rdquo; is used to
+define a portion of the system's CPU resources that is allocated to a project.
+If you assign a greater number of CPU shares to a project, relative to other
+projects, the project receives more CPU resources from the fair share scheduler.</para><para>CPU shares are not equivalent to percentages of CPU resources. Shares
+are used to define the relative importance of workloads in relation to other
+workloads. When you assign CPU shares to a project, your primary concern is
+not the number of shares the project has. Knowing how many shares the project
+has in comparison with other projects is more important. You must also take
+into account how many of those other projects will be competing with it for
+CPU resources.</para><note><para>Processes in projects with zero shares always run at the lowest
+system priority (0). These processes only run when projects with nonzero shares
+are not using CPU resources.</para>
+</note>
+</sect1><sect1 id="rmfss-5"><title>CPU Shares and Process State</title><para>In the Solaris system, a project workload usually consists of
+more than one process. From the fair share scheduler perspective, each project
+workload can be in either an <emphasis>idle</emphasis> state or an <emphasis>active</emphasis> state. A project is considered idle if none of its processes are
+using any CPU resources. This usually means that such processes are either <emphasis>sleeping</emphasis> (waiting for I/O completion) or stopped. A project is
+considered active if at least one of its processes is using CPU resources.
+The sum of shares of all active projects is used in calculating the portion
+of CPU resources to be assigned to projects.</para><para>When more projects become active, each project's CPU allocation is reduced,
+but the proportion between the allocations of different projects does not
+change.</para>
+</sect1><sect1 id="rmfss-6"><title>CPU Share Versus Utilization</title><para>Share allocation is not the same as utilization. A project that is allocated
+50 percent of the CPU resources might average only a 20 percent CPU use. Moreover,
+shares serve to limit CPU usage only when there is competition from other
+projects. Regardless of how low a project's allocation is, it always receives
+100 percent of the processing power if it is running alone on the system.
+Available CPU cycles are never wasted. They are distributed between projects.</para><para>The allocation of a small share to a busy workload might slow its performance.
+However, the workload is not prevented from completing its work if the system
+is not overloaded.</para>
+</sect1><sect1 id="rmfss-7"><title>CPU Share Examples</title><para>Assume you have a system with two CPUs running two parallel CPU-bound
+workloads called <replaceable>A</replaceable> and <replaceable>B</replaceable>,
+respectively. Each workload is running as a separate project. The projects
+have been configured so that project <replaceable>A</replaceable> is assigned <replaceable>S</replaceable><subscript><replaceable>A</replaceable></subscript> shares,
+and project <replaceable>B</replaceable> is assigned <replaceable>S</replaceable><subscript><replaceable>B</replaceable></subscript> shares.</para><para>On average, under the traditional TS scheduler, each of the workloads
+that is running on the system would be given the same amount of CPU resources.
+Each workload would get 50 percent of the system's capacity.</para><para>When run under the control of the FSS scheduler with <replaceable>S</replaceable><subscript><replaceable>A</replaceable></subscript>=<replaceable>S</replaceable><subscript><replaceable>B</replaceable></subscript>, these projects are also given approximately the
+same amounts of CPU resources. However, if the projects are given different
+numbers of shares, their CPU resource allocations are different.</para><para>The next three examples illustrate how shares work in different configurations.
+These examples show that shares are only mathematically accurate for representing
+the usage if demand meets or exceeds available resources.</para><sect2 id="rmfss-10"><title>Example 1: Two CPU-Bound Processes in Each Project</title><para>If <replaceable>A</replaceable> and <replaceable>B</replaceable> each
+have two CPU-bound processes, and <replaceable>S</replaceable><subscript><replaceable>A</replaceable></subscript> = <replaceable>1</replaceable> and <replaceable>S</replaceable><subscript><replaceable>B</replaceable></subscript> = <replaceable>3</replaceable>, then the total
+number of shares is 1 + 3 = 4. In this configuration, given sufficient CPU
+demand, projects <replaceable>A</replaceable> and <replaceable>B</replaceable> are
+allocated 25 percent and 75 percent of CPU resources, respectively.</para><mediaobject><imageobject><imagedata entityref="rmschedex1"/>
+</imageobject><textobject><simpara>Illustration. The context describes the graphic.</simpara>
+</textobject>
+</mediaobject>
+</sect2><sect2 id="rmfss-9"><title>Example 2: No Competition Between Projects</title><para>If <replaceable>A</replaceable> and <replaceable>B</replaceable> have
+only <emphasis>one</emphasis> CPU-bound process each, and <replaceable>S</replaceable><subscript><replaceable>A</replaceable></subscript> = <replaceable>1</replaceable> and <replaceable>S</replaceable><subscript><replaceable>B</replaceable></subscript> = <replaceable>100</replaceable>, then the total
+number of shares is 101. Each project cannot use more than one CPU because
+each project has only one running process. Because no competition exists between
+projects for CPU resources in this configuration, projects <replaceable>A</replaceable> and <replaceable>B</replaceable> are each allocated 50 percent of all CPU resources. In this
+configuration, CPU share values are irrelevant. The projects' allocations
+would be the same (50/50), even if both projects were assigned zero shares.</para><mediaobject><imageobject><imagedata entityref="rmschedex2"/>
+</imageobject><textobject><simpara>Illustration. The context describes the graphic.</simpara>
+</textobject>
+</mediaobject>
+</sect2><sect2 id="rmfss-8"><title>Example 3: One Project Unable to Run</title><para>If <replaceable>A</replaceable> and <replaceable>B</replaceable> have
+two CPU-bound processes each, and project <replaceable>A</replaceable> is
+given 1 share and project <replaceable>B</replaceable> is given 0 shares,
+then project <replaceable>B</replaceable> is not allocated any CPU resources
+and project <replaceable>A</replaceable> is allocated all CPU resources. Processes
+in <replaceable>B</replaceable> always run at system priority 0, so they will
+never be able to run because processes in project  <replaceable>A</replaceable> always
+have higher priorities.</para><mediaobject><imageobject><imagedata entityref="rmschedex3"/>
+</imageobject><textobject><simpara>Illustration. The context describes the graphic.</simpara>
+</textobject>
+</mediaobject>
+</sect2>
+</sect1><sect1 id="rmfss-14"><title>FSS Configuration</title><sect2 id="rmfss-11"><title>Projects and Users</title><para>Projects are the workload containers in the FSS scheduler. Groups of
+users who are assigned to a project are treated as single controllable blocks.
+Note that you can create a project with its own number of shares for an individual
+user.</para><para>Users can be members of multiple projects that have different numbers
+of shares assigned. By moving processes from one project to another project,
+processes can be assigned CPU resources in varying amounts.</para><para>For more information on the <olink targetdoc="group-refman" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> database and name services,
+see <olink targetptr="rmtaskproj-9" remap="internal">project Database</olink>.</para>
+</sect2><sect2 id="rmfss-15"><title>CPU Shares Configuration</title><para>The
+configuration of CPU shares is managed by the name service as a property of
+the <filename>project</filename> database.</para><para>When the first task (or process) that is associated with a project is
+created through the <olink targetdoc="group-refman" targetptr="setproject-3project" remap="external"><citerefentry><refentrytitle>setproject</refentrytitle><manvolnum>3PROJECT</manvolnum></citerefentry></olink> library
+function, the number of CPU shares defined as resource control <literal>project.cpu-shares</literal> in the <filename>project</filename> database is passed to the kernel.
+A project that does not have the <literal>project.cpu-shares</literal>  resource
+control defined is assigned one share.</para><para>In the following example, this entry in the <filename>/etc/project</filename> file
+sets the number of shares for project <replaceable>x-files</replaceable> to <emphasis>5</emphasis>:</para><screen>x-files:100::::project.cpu-shares=(privileged,5,none)</screen><para>If you alter the number of CPU shares allocated to a project in the
+database when processes are already running, the number of shares for that
+project will not be modified at that point. The project must be restarted
+for the change to become effective.</para><para>If you want to temporarily change the number of shares assigned to a
+project without altering the project's attributes in the <filename>project</filename> database,
+use the <command>prctl</command> command. For example, to change the value
+of project <replaceable>x-files</replaceable>'s <literal>project.cpu-shares</literal> resource
+control to <replaceable>3</replaceable> while processes associated with that
+project are running, type the following:</para><screen># <userinput>prctl -r -n project.cpu-shares -v 3 -i project <replaceable>x-files</replaceable></userinput></screen><para>See the <olink targetdoc="group-refman" targetptr="prctl-1" remap="external"><citerefentry><refentrytitle>prctl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para><variablelist><varlistentry><term><option>r</option></term><listitem><para>Replaces the current value for the named resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>n</option> <replaceable>name</replaceable></term><listitem><para>Specifies the name of the resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>v</option> <replaceable>val</replaceable></term><listitem><para>Specifies the value for the resource control.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>i</option> <replaceable>idtype</replaceable></term><listitem><para>Specifies the ID type of the next argument.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>x-files</replaceable></term><listitem><para>Specifies the object of the change. In this instance, project <replaceable>x-files</replaceable> is the object.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Project <literal>system</literal> with project ID 0 includes all system daemons that are started
+by the boot-time initialization scripts. <literal>system</literal> can be
+viewed as a project with an unlimited number of shares. This means that <literal>system</literal> is always scheduled first, regardless of how many shares
+have been given to other projects. If you do not want the <literal>system</literal> project
+to have unlimited shares, you can specify a number of shares for this project
+in the <literal>project</literal> database.</para><para>As stated previously, processes that belong to projects with zero shares
+are always given zero system priority. Projects with one or more shares are
+running with priorities one and higher. Thus, projects with zero shares are
+only scheduled when CPU resources are available that are not requested by
+a nonzero share project.</para><para>The maximum number of shares that can be assigned to one project is
+65535.</para>
+</sect2>
+</sect1><sect1 id="rmfss-19"><title>FSS and Processor Sets</title><para>The FSS can be used in conjunction with
+processor sets to provide more fine-grained controls over allocations of CPU
+resources among projects that run on each processor set than would be available
+with processor sets alone. The FSS scheduler treats processor sets as entirely
+independent partitions, with each processor set controlled independently with
+respect to CPU allocations.</para><para>The CPU allocations of projects running in one processor set are not
+affected by the CPU shares or activity of projects running in another processor
+set because the projects are not competing for the same resources. Projects
+only compete with each other if they are running within the same processor
+set.</para><para>The number of shares allocated to a project is system wide. Regardless
+of which processor set it is running on, each portion of a project is given
+the same amount of shares.</para><para>When processor sets are used, project CPU allocations are calculated
+for active projects that run within each processor set.</para><para>Project partitions that run on different processor sets
+might have different CPU allocations. The CPU allocation for each project
+partition in a processor set depends only on the allocations of other projects
+that run on the same processor  set.</para><para>The performance and availability of applications that run within the
+boundaries of their processor sets are not affected by the introduction of
+new processor sets. The applications are also not affected by changes that
+are made to the share allocations of projects that run on other processor
+sets.</para><para>Empty processor sets (sets without processors in them) or processor
+sets without processes bound to them do not have any impact on the FSS scheduler
+behavior.</para><sect2 id="rmfss-16"><title>FSS and Processor Sets Examples</title><para>Assume that a server with eight CPUs is running several CPU-bound applications
+in projects <replaceable>A</replaceable>, <replaceable>B</replaceable>, and <replaceable>C</replaceable>. Project <replaceable>A</replaceable> is allocated one share,
+project <replaceable>B</replaceable> is allocated two shares, and project <replaceable>C</replaceable> is allocated three shares.</para><para>Project <replaceable>A</replaceable> is running only on processor set
+1. Project <replaceable>B</replaceable> is running on processor sets 1 and
+2. Project <replaceable>C</replaceable> is running on processor sets 1, 2,
+and 3. Assume that each project has enough processes to utilize all available
+CPU power. Thus, there is always competition for CPU resources on each processor
+set.</para><mediaobject><imageobject><imagedata entityref="rmscheduler"/>
+</imageobject><textobject><simpara>Diagram shows total system-wide project CPU allocations
+on a server with eight CPUs that is running several CPU-bound applications
+in three projects.</simpara>
+</textobject>
+</mediaobject><para>The total system-wide project CPU allocations on such a system are shown
+in the following table.</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="75*"/><thead><row><entry><para>Project</para>
+</entry><entry><para>Allocation</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Project A</para>
+</entry><entry><para>4% = (1/6 X 2/8)<subscript>pset1</subscript></para>
+</entry>
+</row><row><entry><para>Project B</para>
+</entry><entry><para>28% = (2/6 X 2/8)<subscript>pset1</subscript>+ (2/5 * 4/8)<subscript>pset2</subscript></para>
+</entry>
+</row><row><entry><para>Project C</para>
+</entry><entry><para>67% = (3/6 X 2/8)<subscript>pset1</subscript>+ (3/5 X 4/8)<subscript>pset2</subscript>+
+(3/3 X 2/8)<subscript>pset3</subscript></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>These percentages do not match the corresponding amounts of CPU shares
+that are given to projects. However, within each processor set, the per-project
+CPU allocation ratios are proportional to their respective shares.</para><para>On the same system <emphasis>without</emphasis> processor sets, the
+distribution of CPU resources would be different, as shown in the following
+table.</para><informaltable frame="none"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="50*"/><thead><row><entry><para>Project</para>
+</entry><entry><para>Allocation</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Project A</para>
+</entry><entry><para>16.66% = (1/6)</para>
+</entry>
+</row><row><entry><para>Project B</para>
+</entry><entry><para>33.33% = (2/6)</para>
+</entry>
+</row><row><entry><para>Project C</para>
+</entry><entry><para>50% = (3/6)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2>
+</sect1><sect1 id="rmfss-17"><title>Combining FSS With Other Scheduling Classes</title><para>By default,
+the FSS scheduling class uses the same range of priorities (0 to 59) as the
+timesharing (TS), interactive (IA), and fixed priority (FX) scheduling classes.
+Therefore, you should avoid having processes from these scheduling classes
+share <emphasis>the same</emphasis> processor set. A mix of processes in the
+FSS, TS, IA, and FX classes could result in unexpected scheduling behavior.</para><para>With the use of processor sets, you can mix TS, IA, and FX with FSS
+in one system. However, all the processes that run on each processor set must
+be in <emphasis>one</emphasis> scheduling class, so they do not compete for
+the same CPUs. The FX scheduler in particular should not be used in conjunction
+with the FSS scheduling class unless processor sets are used. This action
+prevents applications in the FX class from using priorities high enough to
+starve applications in the FSS class.</para><para>You can mix processes in the TS and IA classes in the same processor
+set, or on the same system without processor sets.</para><para>The Solaris system also offers a real-time (RT) scheduler to users with
+superuser privileges. By default, the RT scheduling class uses system priorities
+in a different range (usually from 100 to 159) than FSS. Because RT and FSS
+are using <emphasis>disjoint</emphasis>, or non-overlapping, ranges of priorities,
+FSS can coexist with the RT scheduling class within the same processor set.
+However, the FSS scheduling class does not have any control over processes
+that run in the RT class.</para><para>For example, on a four-processor system, a single-threaded RT process
+can consume one entire processor if the process is CPU bound. If the system
+also runs FSS, regular user processes compete for the three remaining CPUs
+that are not being used by the RT process. Note that the RT process might
+not use the CPU continuously. When the RT process is idle, FSS utilizes all
+four processors.</para><para>You can type the following command to find out which scheduling classes
+the processor sets are running in and ensure that each processor set is configured
+to run either TS, IA, FX, or FSS processes.</para><screen>$ <userinput>ps -ef -o pset,class | grep -v CLS | sort | uniq</userinput>
+1 FSS
+1 SYS
+2 TS
+2 RT
+3 FX</screen>
+</sect1><sect1 id="rmfss-21"><title>Setting the Scheduling Class for the System</title><para>To set the default scheduling class for the system, see <olink targetptr="rmfss.task-6" remap="internal">How to Make FSS the Default Scheduler Class</olink>, <olink targetptr="gejen" remap="internal">Scheduling Class</olink>, and <olink targetdoc="group-refman" targetptr="dispadmin-1m" remap="external"><citerefentry><refentrytitle>dispadmin</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. To move running processes
+into a different scheduling class, see <olink targetptr="rmfss.task-5" remap="internal">Configuring
+the FSS</olink> and <olink targetdoc="group-refman" targetptr="priocntl-1" remap="external"><citerefentry><refentrytitle>priocntl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para>
+</sect1><sect1 id="rmfss-22"><title>Scheduling Class on a System with Zones Installed</title><para>Non-global zones use the default scheduling class for  the system. If
+the system is updated with a new default  scheduling class setting, non-global
+zones obtain the new setting when booted or rebooted.</para><para>The preferred way to use FSS in this case is to set FSS to be the system
+default scheduling class with the <command>dispadmin</command> command. All
+zones then benefit from getting a fair share of the system CPU resources.
+See <olink targetptr="gejen" remap="internal">Scheduling Class</olink> for more information
+on scheduling class when zones are in use.</para><para>For information about moving running processes into a different scheduling
+class  without changing the default scheduling class and rebooting, see <olink targetptr="z.admin.ov-tbl-34" remap="internal">Table&nbsp;26&ndash;5</olink> and the <olink targetdoc="group-refman" targetptr="priocntl-1" remap="external"><citerefentry><refentrytitle>priocntl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man page.</para>
+</sect1><sect1 id="rmfss-20"><title>Commands Used With FSS</title><para>The commands that are shown in the following
+table provide the primary administrative interface to the fair share scheduler.</para><informaltable frame="all"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="30*"/><colspec colwidth="70*"/><thead><row><entry><para>Command Reference</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="priocntl-1" remap="external"><citerefentry><refentrytitle>priocntl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Displays or sets scheduling parameters of specified processes, moves
+running processes into a different scheduling class.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Lists information about running processes, identifies in which scheduling
+classes processor sets are running.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="dispadmin-1m" remap="external"><citerefentry><refentrytitle>dispadmin</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Sets the default scheduler for the system. Also used to examine and
+tune the FSS scheduler's time quantum value.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="fss-7" remap="external"><citerefentry><refentrytitle>FSS</refentrytitle><manvolnum>7</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Describes the fair share scheduler (FSS).</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

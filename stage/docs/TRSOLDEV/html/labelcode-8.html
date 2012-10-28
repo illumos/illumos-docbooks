@@ -1,0 +1,147 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Determining the Relationship Between Two Labels - Solaris Trusted Extensions Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-08-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Trusted Extensions Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="labelcode-12.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="labelcode-18.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="api-intro-1.html">1.&nbsp;&nbsp;Solaris Trusted Extensions APIs and Security Policy</a></p>
+<p class="toc level1 tocsp"><a href="labelapi-1.html">2.&nbsp;&nbsp;Labels and Clearances</a></p>
+<p class="toc level1 tocsp"><a href="labelcode-1.html">3.&nbsp;&nbsp;Label Code Examples</a></p>
+<p class="toc level2"><a href="labelcode-9.html">Obtaining a Process Label</a></p>
+<p class="toc level2"><a href="labelcode-11.html">Obtaining a File Label</a></p>
+<p class="toc level2"><a href="labelcode-12.html">Setting a File Sensitivity Label</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Determining the Relationship Between Two Labels</a></p>
+</div>
+<p class="toc level2"><a href="labelcode-18.html">Obtaining the Color Names of Labels</a></p>
+<p class="toc level2"><a href="labelcode-22.html">Obtaining Printer Banner Information</a></p>
+<p class="toc level1 tocsp"><a href="labelprint-1.html">4.&nbsp;&nbsp;Printing and the Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="ipcapi-1.html">5.&nbsp;&nbsp;Interprocess Communications</a></p>
+<p class="toc level1 tocsp"><a href="windowapi-1.html">6.&nbsp;&nbsp;Trusted X Window System</a></p>
+<p class="toc level1 tocsp"><a href="lbuilder-1.html">7.&nbsp;&nbsp;Label Builder APIs</a></p>
+<p class="toc level1 tocsp"><a href="webguard.html">8.&nbsp;&nbsp;Trusted Web Guard Prototype</a></p>
+<p class="toc level1 tocsp"><a href="javatxlabelapis.html">9.&nbsp;&nbsp;Experimental Java Bindings for the Solaris Trusted Extensions Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="appa-1.html">A.&nbsp;&nbsp;Programmer's Reference</a></p>
+<p class="toc level1 tocsp"><a href="appb-1.html">B.&nbsp;&nbsp;Solaris Trusted Extensions API Reference</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="labelcode-8"></a><h3>Determining the Relationship Between Two Labels</h3>
+<p><a name="indexterm-221"></a>If your application accesses data at different sensitivity labels, perform checks in
+your code to ensure that the process label has the correct relationship
+to the data label before you permit an access operation to occur.
+You check the sensitivity label of the object that is being accessed
+to determine whether access is permitted by the system.</p><p><a name="indexterm-222"></a><a name="indexterm-223"></a><a name="indexterm-224"></a><a name="indexterm-225"></a><a name="indexterm-226"></a><a name="indexterm-227"></a><a name="indexterm-228"></a>The following code example shows how to test two sensitivity labels for
+equality, dominance, and strict dominance. The program checks whether a file's label
+is dominated by or is equal to the process's label.</p><pre>#include &lt;stdio.h&gt;
+#include &lt;stdlib.h&gt;
+
+#include &lt;tsol/label.h&gt;
+
+main(int argc, char *argv[])
+{
+   m_label_t *plabel;
+   m_label_t *flabel;
+
+   plabel = m_label_alloc(MAC_LABEL);
+   flabel = m_label_alloc(MAC_LABEL);
+
+   if (getplabel(plabel) == -1) {
+      perror("getplabel");
+      exit(1);
+   }
+   if (getlabel(argv[1], flabel) == -1) {
+      perror("getlabel");
+      exit(1);
+   }
+
+   if (blequal(plabel, flabel)) {
+      printf("Labels are equal\n");
+   }
+   if (bldominates(plabel, flabel)) {
+      printf("Process label dominates file label\n");
+   }
+   if (blstrictdom(plabel, flabel)) {
+      printf("Process label strictly dominates file label\n");
+   }
+
+   m_label_free(plabel);
+   m_label_free(flabel);
+
+   return (0);
+}</pre><p>The text output of this program depends on the process's label, relative
+to the label of the file that was passed to the process,
+as follows:</p>
+<ul><li><p>Because &ldquo;dominates&rdquo; includes &ldquo;equal,&rdquo; when the labels are equal, the output is the following:</p><pre>Labels are equal
+Process label dominates file label</pre></li>
+<li><p>If the process's label strictly dominates the file's label, the output is the following:</p><pre>Process label strictly dominates file label</pre></li></ul>
+
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="labelcode-12.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="labelcode-18.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

@@ -1,0 +1,387 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Migrating ZFS Storage Pools - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gaynp.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gavwq.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level2"><a href="gcfog.html">Components of a ZFS Storage Pool</a></p>
+<p class="toc level2"><a href="gcfof.html">Replication Features of a ZFS Storage Pool</a></p>
+<p class="toc level2"><a href="gaypw.html">Creating and Destroying ZFS Storage Pools</a></p>
+<p class="toc level2"><a href="gayrd.html">Managing Devices in ZFS Storage Pools</a></p>
+<p class="toc level2"><a href="gfifk.html">Managing ZFS Storage Pool Properties</a></p>
+<p class="toc level2"><a href="gaynp.html">Querying ZFS Storage Pool Status</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Migrating ZFS Storage Pools</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbchy"></a><h3>Migrating ZFS Storage Pools</h3>
+<p>Occasionally, you might need to move a storage pool between machines. To do
+so, the storage devices must be disconnected from the original machine and reconnected
+to the destination machine. This task can be accomplished by physically recabling the
+devices, or by using multiported devices such as the devices on a SAN.
+ZFS enables you to export the pool from one machine and import it
+on the destination machine, even if the machines are of different endianness. For
+information about replicating or migrating file systems between different storage pools, which might
+reside on different machines, see <a href="gbchx.html">Saving and Restoring ZFS Data</a>.<a name="indexterm-227"></a><a name="indexterm-228"></a></p>
+<ul><li><p><a href="#gazre">Preparing for ZFS Storage Pool Migration</a></p></li>
+<li><p><a href="#gazqr">Exporting a ZFS Storage Pool</a></p></li>
+<li><p><a href="#gazru">Determining Available Storage Pools to Import</a></p></li>
+<li><p><a href="#gaztk">Finding ZFS Storage Pools From Alternate Directories</a></p></li>
+<li><p><a href="#gazuf">Importing ZFS Storage Pools</a></p></li>
+<li><p><a href="#gcfhw">Recovering Destroyed ZFS Storage Pools</a></p></li>
+<li><p><a href="#gcikw">Upgrading ZFS Storage Pools</a></p></li></ul>
+
+
+<a name="gazre"></a><h4>Preparing for ZFS Storage Pool Migration</h4>
+<p>Storage pools should be explicitly exported to indicate that they are ready to
+be migrated. This operation flushes any unwritten data to disk, writes data to
+the disk indicating that the export was done, and removes all knowledge of
+the pool from the system.</p><p>If you do not explicitly export the pool, but instead remove the
+disks manually, you can still import the resulting pool on another system. However, you
+might lose the last few seconds of data transactions, and the pool
+will appear faulted on the original machine because the devices are no longer
+present. By default, the destination machine refuses to import a pool that has
+not been explicitly exported. This condition is necessary to prevent accidentally importing an active
+pool that consists of network attached storage that is still in use on
+another system.</p>
+
+<a name="gazqr"></a><h4>Exporting a ZFS Storage Pool</h4>
+<p>To export a pool, use the <tt>zpool export</tt> command. For example:</p><pre># <tt><b>zpool export tank</b></tt></pre><p>Once this command is executed, the pool <tt>tank</tt> is no longer visible on
+the system. The command attempts to unmount any mounted file systems within the
+pool before continuing. If any of the file systems fail to unmount, you
+can forcefully unmount them by using the <tt>-f</tt> option. For example:</p><pre># <tt><b>zpool export tank</b></tt>
+cannot unmount '/export/home/eschrock': Device busy
+# <tt><b>zpool export -f tank</b></tt></pre><p>If devices are unavailable at the time of export, the disks cannot
+be specified as cleanly exported. If one of these devices is later attached
+to a system without any of the working devices, it appears as &ldquo;potentially active.&rdquo;
+If ZFS volumes are in use in the pool, the pool cannot
+be exported, even with the <tt>-f</tt> option. To export a pool with an
+ZFS volume, first make sure that all consumers of the volume are no
+longer active.<a name="indexterm-229"></a><a name="indexterm-230"></a><a name="indexterm-231"></a></p><p>For more information about ZFS volumes, see <a href="gaypf.html">ZFS Volumes</a>.</p>
+
+<a name="gazru"></a><h4>Determining Available Storage Pools to Import</h4>
+<p>Once the pool has been removed from the system (either through export or
+by forcefully removing the devices), attach the devices to the target system. Although
+ZFS can handle some situations in which only a portion of the
+devices is available, all devices within the pool must be moved between the
+systems. The devices do not necessarily have to be attached under the same
+device name. ZFS detects any moved or renamed devices, and adjusts the configuration
+appropriately. To discover available pools, run the <tt>zpool import</tt> command with no options. For example:</p><pre># <tt><b>zpool import</b></tt>
+  pool: tank
+    id: 3778921145927357706
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        tank        ONLINE
+          mirror    ONLINE
+            c1t0d0  ONLINE
+            c1t1d0  ONLINE</pre><p>In this example, the pool <tt>tank</tt> is available to be imported on the
+target system. Each pool is identified by a name as well as a
+unique numeric identifier. If multiple pools available to import have the same name,
+you can use the numeric identifier to distinguish between them.<a name="indexterm-232"></a><a name="indexterm-233"></a><a name="indexterm-234"></a></p><p>Similar to the <tt>zpool status</tt> command, the <tt>zpool import</tt> command refers to a knowledge
+article available on the web with the most up-to-date information regarding repair procedures
+for a problem that is preventing a pool from being imported. In this
+case, the user can force the pool to be imported. However, importing a
+pool that is currently in use by another system over a storage network
+can result in data corruption and panics as both systems attempt to write
+to the same storage. If some devices in the pool are not available
+but enough redundancy is available to have a usable pool, the pool appears
+in the <tt>DEGRADED</tt> state. For example:</p><pre># <tt><b>zpool import</b></tt>
+  pool: tank
+    id: 3778921145927357706
+ state: DEGRADED
+status: One or more devices are missing from the system.
+action: The pool can be imported despite missing or damaged devices.  The
+        fault tolerance of the pool may be compromised if imported.
+   see: http://www.sun.com/msg/ZFS-8000-2Q
+config:
+
+        tank         DEGRADED
+          mirror     DEGRADED
+            c1t0d0   UNAVAIL   cannot open
+            c1t1d0   ONLINE</pre><p>In this example, the first disk is damaged or missing, though you
+can still import the pool because the mirrored data is still accessible. If
+too many faulted or missing devices are present, the pool cannot be imported. For
+example:</p><pre># <tt><b>zpool import</b></tt>
+  pool: dozer
+    id: 12090808386336829175
+ state: FAULTED
+action: The pool cannot be imported. Attach the missing
+        devices and try again.
+   see: http://www.sun.com/msg/ZFS-8000-6X
+config:
+        raidz               FAULTED
+          c1t0d0    ONLINE
+          c1t1d0    FAULTED
+          c1t2d0    ONLINE
+          c1t3d0    FAULTED</pre><p>In this example, two disks are missing from a RAID-Z virtual device, which
+means that sufficient redundant data is not available to reconstruct the pool. In
+some cases, not enough devices are present to determine the complete configuration. In
+this case, ZFS doesn't know what other devices were part of the pool,
+though ZFS does report as much information as possible about the situation. For
+example:</p><pre># <tt><b>zpool import</b></tt>
+pool: dozer
+    id: 12090808386336829175
+ state: FAULTED
+status: One or more devices are missing from the system.
+action: The pool cannot be imported. Attach the missing
+        devices and try again.
+   see: http://www.sun.com/msg/ZFS-8000-6X
+config:
+        dozer          FAULTED   missing device
+          raidz       ONLINE
+            c1t0d0    ONLINE
+            c1t1d0    ONLINE
+            c1t2d0    ONLINE
+            c1t3d0    ONLINE
+        Additional devices are known to be part of this pool, though their
+        exact configuration cannot be determined.</pre>
+
+<a name="gaztk"></a><h4>Finding ZFS Storage Pools From Alternate Directories</h4>
+<p>By default, the <tt>zpool import</tt> command only searches devices within the <tt>/dev/dsk</tt> directory. If
+devices exist in another directory, or you are using pools backed by files,
+you must use the <tt>-d</tt> option to search different directories. For example:</p><pre># <tt><b>zpool create dozer mirror /file/a /file/b</b></tt>
+# <tt><b>zpool export dozer</b></tt>
+# <tt><b>zpool import -d /file</b></tt>
+  pool: dozer
+    id: 10952414725867935582
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer        ONLINE
+          mirror     ONLINE
+            /file/a  ONLINE
+            /file/b  ONLINE
+# <tt><b>zpool import -d /file dozer</b></tt></pre><p>If devices exist in multiple directories, you can specify multiple <tt>-d</tt> options.<a name="indexterm-235"></a><a name="indexterm-236"></a><a name="indexterm-237"></a></p>
+
+<a name="gazuf"></a><h4>Importing ZFS Storage Pools</h4>
+<p>Once a pool has been identified for import, you can import it
+by specifying the name of the pool or its numeric identifier as an
+argument to the <tt>zpool import</tt> command. For example:</p><pre># <tt><b>zpool import tank</b></tt></pre><p>If multiple available pools have the same name, you can specify which pool
+to import using the numeric identifier. For example:</p><pre># <tt><b>zpool import</b></tt>
+  pool: dozer
+    id: 2704475622193776801
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer       ONLINE
+          c1t9d0    ONLINE
+
+  pool: dozer
+    id: 6223921996155991199
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer       ONLINE
+          c1t8d0    ONLINE
+# <tt><b>zpool import dozer</b></tt>
+cannot import 'dozer': more than one matching pool
+import by numeric ID instead
+# <tt><b>zpool import 6223921996155991199</b></tt></pre><p>If the pool name conflicts with an existing pool name, you can
+import the pool under a different name. For example:</p><pre># <tt><b>zpool import dozer zeepool</b></tt></pre><p>This command imports the exported pool <tt>dozer</tt> using the new name <tt>zeepool</tt>. If
+the pool was not cleanly exported, ZFS requires the <tt>-f</tt> flag to prevent
+users from accidentally importing a pool that is still in use on another
+system. For example:</p><pre># <tt><b>zpool import dozer</b></tt>
+cannot import 'dozer': pool may be in use on another system
+use '-f' to import anyway
+# <tt><b>zpool import -f dozer</b></tt></pre><p>Pools can also be imported under an alternate root by using the
+<tt>-R</tt> option. For more information on alternate root pools, see <a href="gbcgl.html">Using ZFS Alternate Root Pools</a>.<a name="indexterm-238"></a><a name="indexterm-239"></a><a name="indexterm-240"></a></p>
+
+<a name="gcfhw"></a><h4>Recovering Destroyed ZFS Storage Pools</h4>
+<p>You can use the <tt>zpool import</tt> <tt>-D</tt> command to recover a storage pool that
+has been destroyed. For example:</p><pre># <tt><b>zpool destroy tank</b></tt>
+# <tt><b>zpool import -D</b></tt>
+pool: tank
+    id: 3778921145927357706
+ state: ONLINE (DESTROYED)
+action: The pool can be imported using its name or numeric identifier.  The
+        pool was destroyed, but can be imported using the '-Df' flags.
+config:
+
+        tank        ONLINE
+          mirror    ONLINE
+            c1t0d0  ONLINE
+            c1t1d0  ONLINE</pre><p>In the above <tt>zpool import</tt> output, you can identify this pool as the destroyed
+pool because of the following state information:</p><pre>state: ONLINE (DESTROYED)</pre><p>To recover the destroyed pool, issue the <tt>zpool import</tt> <tt>-D</tt> command again with
+the pool to be recovered and the <tt>-f</tt> option. For example:</p><pre># <tt><b>zpool import -Df tank</b></tt>
+# <tt><b>zpool status tank</b></tt>
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t0d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>If one of the devices in the destroyed pool is faulted or
+unavailable, you might be able to recover the destroyed pool anyway. In this
+scenario, import the degraded pool and then attempt to fix the device failure.
+For example:<a name="indexterm-241"></a><a name="indexterm-242"></a><a name="indexterm-243"></a></p><pre># <tt><b>zpool destroy dozer</b></tt>
+# <tt><b>zpool import -D</b></tt>
+pool: dozer
+    id: 
+ state: DEGRADED (DESTROYED)
+status: One or more devices are missing from the system.
+action: The pool can be imported despite missing or damaged devices.  The
+        fault tolerance of the pool may be compromised if imported.  The
+        pool was destroyed, but can be imported using the '-Df' flags.
+   see: http://www.sun.com/msg/ZFS-8000-2Q
+config:
+
+        dozer        DEGRADED
+           raidz      ONLINE
+            c1t0d0    ONLINE
+            c1t1d0    ONLINE
+            c1t2d0    UNAVAIL  cannot open
+            c1t3d0    ONLINE
+# <tt><b>zpool import -Df dozer</b></tt>
+# <tt><b>zpool status -x</b></tt>
+  pool: dozer
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-D3
+ scrub: resilver completed with 0 errors on Fri Mar 17 16:11:35 2006
+config:
+
+        NAME                     STATE     READ WRITE CKSUM
+        dozer                    DEGRADED     0     0     0
+          raidz                  ONLINE       0     0     0
+            c1t0d0               ONLINE       0     0     0
+            c1t1d0               ONLINE       0     0     0
+            c1t2d0               UNAVAIL      0     0     0  cannot open
+            c1t3d0               ONLINE       0     0     0
+
+errors: No known data errors
+# <tt><b>zpool online dozer c1t2d0</b></tt>
+Bringing device c1t2d0 online
+# <tt><b>zpool status -x</b></tt>
+all pools are healthy</pre>
+
+<a name="gcikw"></a><h4>Upgrading ZFS Storage Pools</h4>
+<p>If you have ZFS storage pools from a previous Solaris release, such as
+the Solaris 10 6/06 release, you can upgrade your pools with the
+<tt>zpool upgrade</tt> command to take advantage of the pool features in the Solaris 10
+11/06 release. In addition, the <tt>zpool status</tt> command has been modified to notify you
+when your pools are running older versions. For example:<a name="indexterm-244"></a><a name="indexterm-245"></a><a name="indexterm-246"></a></p><pre># <tt><b>zpool status</b></tt>
+  pool: test
+ state: ONLINE
+status: The pool is formatted using an older on-disk format.  The pool can
+        still be used, but some features are unavailable.
+action: Upgrade the pool using 'zpool upgrade'.  Once this is done, the
+        pool will no longer be accessible on older software versions.
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        test        ONLINE       0     0     0
+          c1t27d0   ONLINE       0     0     0
+
+errors: No known data errors</pre><p>You can use the following syntax to identify additional information about a particular
+version and supported releases.</p><pre># <tt><b>zpool upgrade -v</b></tt>
+This system is currently running ZFS version 3.
+
+The following versions are supported:
+
+VER  DESCRIPTION
+---  --------------------------------------------------------
+ 1   Initial ZFS version
+ 2   Ditto blocks (replicated metadata)
+ 3   Hot spares and double parity RAID-Z
+
+For more information on a particular version, including supported releases, see:
+
+http://www.opensolaris.org/os/community/zfs/version/N
+
+Where 'N' is the version number.</pre><p>Then, you can run the <tt>zpool upgrade</tt> command to upgrade your pools. For example:</p><pre># <tt><b>zpool upgrade -a</b></tt></pre>
+<hr><p><b>Note - </b>If you upgrade your pools to the latest version, they will not be
+accessible on systems that run older ZFS versions.</p>
+<hr>
+
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gaynp.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gavwq.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

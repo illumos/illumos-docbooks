@@ -1,0 +1,2306 @@
+<?Pub EntList bull rArr sect?><chapter id="ch6advtech-96543"><title>Advanced Techniques for Creating Packages</title><highlights><para>The full capabilities of System V packaging as implemented in the Solaris
+operating environment provide a powerful tool for the installation of software
+products. As a package designer, you can take advantage of these capabilities.
+Packages that are not part of the Solaris operating environment (unbundled
+packages) may use the class mechanism to customize server/client installations.
+Relocatable packages can be designed to accommodate the desires of the administrator.
+A complex product can be delivered as a set of composite packages that automatically
+resolve package dependencies. Upgrading and patching may be customized by
+the package designer. Patched packages can be delivered in the same way as
+unpatched packages, and the backout archives can also be included in the product. </para><para>This is a list of the overview information in this chapter.</para><itemizedlist><listitem><para><olink targetptr="ch6advtech-33" remap="internal">Specifying the Base Directory</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-53" remap="internal">Accommodating Relocation</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-10" remap="internal">Supporting Relocation in
+a Heterogeneous Environment</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-9" remap="internal">Making Packages Remotely Installable</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-41" remap="internal">Patching Packages</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-49" remap="internal">Upgrading Packages</olink></para>
+</listitem><listitem><para><olink targetptr="ch6advtech-87" remap="internal">Creating Class Archive Packages</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="ch6advtech-33"><title>Specifying the Base Directory</title><para><indexterm><primary>base directory</primary></indexterm>You can use
+several methods to specify where a package will be installed, and it is important
+to be able to change the installation base dynamically at install time. If
+this is accomplished correctly, an administrator can install multiple versions
+and multiple architectures without complications. </para><para>This section discusses common methods first, followed by approaches
+that enhance installations to heterogeneous systems. </para><sect2 id="ch6advtech-34"><title>The Administrative Defaults File</title><para><indexterm><primary>administrative defaults file</primary></indexterm><indexterm><primary>base directory</primary><secondary>in the administrative defaults file</secondary></indexterm>Administrators responsible for installing packages
+can use administration files to control package installation. However, as
+a package designer, you need to know about administration files and how an
+administrator can alter your intended package installation. </para><para><indexterm><primary><command>pkgadd</command> command</primary><secondary>and the administrative defaults file</secondary></indexterm>An administration
+file tells the <command>pkgadd</command> command whether to perform any of
+the checks or prompts that it normally does. Consequently, administrators
+should fully understand a package's installation process and the scripts involved
+before using administration files. </para><para>A basic administrative defaults file is shipped with the SunOS operating
+system in <filename>/var/sadm/install/admin/default</filename>. This is the
+file that establishes the most basic level of administrative policy as regards
+the installation of software products. The file looks like this as shipped: </para><programlisting role="complete">#ident "@(#)default
+1.4 92/12/23 SMI"	/* SVr4.0 1.5.2.1	*/ 
+mail=
+instance=unique
+partial=ask
+runlevel=ask
+idepend=ask
+rdepend=ask
+space=ask
+setuid=ask
+conflict=ask
+action=ask
+basedir=default</programlisting><para>The administrator may edit this file to establish new default behaviors,
+or create a different administration file and specify its existence by using
+the <option>a</option> option to the <command>pkgadd</command> command. </para><para>Eleven parameters  can be defined in an administration file, but not
+all need to be defined. For more information, see <olink targetdoc="refman4" targetptr="admin-4" remap="external"><citerefentry><refentrytitle>admin</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. </para><para>The <literal>basedir</literal> parameter specifies how the base directory
+will be derived when a package is installed. Most administrators leave this
+as <literal>default</literal>, but <literal>basedir</literal> can be set to
+one of the following:</para><itemizedlist><listitem><para><literal>ask</literal>, which means always ask the administrator
+for a base directory</para>
+</listitem><listitem><para>An absolute path name </para>
+</listitem><listitem><para>An absolute path name containing the <envar>$PKGINST</envar> construction,
+which means always install to a base directory derived from the package instance </para>
+</listitem>
+</itemizedlist><note><para>If the <command>pkgadd</command> command is called with the argument <option>a none</option>, it always asks the administrator for a base directory. Unfortunately,
+this also sets <emphasis>all</emphasis> parameters in the file to the default
+value of <literal>quit</literal>, which can result in additional problems. </para>
+</note><sect3 id="ch6advtech-37"><title>Becoming Comfortable With Uncertainty</title><para>An administrator has control over all packages being installed on a
+system by using an administration file. Unfortunately, an alternate administrative
+defaults file is often provided by the <emphasis>package designer</emphasis>,
+bypassing the wishes of the administrator. </para><para>Package designers sometimes include an alternate administration file
+so that they, not the administrator, control a package's installation. Because
+the <literal>basedir</literal> entry in the administrative defaults file overrides
+all other base directories, it provides a simple method for selecting the
+appropriate base directory at install time. In all versions of the Solaris
+operating environment prior to the Solaris 2.5 release, this was considered
+the simplest method for controlling the base directory. </para><para><indexterm><primary><filename>request</filename> script</primary></indexterm><indexterm><primary><filename>checkinstall</filename> script</primary></indexterm>However, it is necessary for you to accept the administrator's
+desires regarding the installation of the product. Providing a temporary administrative
+defaults file for the purpose of controlling the installation leads to mistrust
+on the part of administrators. You should use a <filename>request</filename> script
+and <filename>checkinstall</filename> script to control these installations
+under the supervision of the administrator. If the <filename>request</filename> script
+faithfully involves the administrator in the process, System V packaging will
+serve both administrators and package designers. </para>
+</sect3>
+</sect2><sect2 id="ch6advtech-38"><title>Using the <envar>BASEDIR</envar> Parameter</title><para><indexterm><primary>base directory</primary><secondary>using the <envar>BASEDIR</envar> parameter</secondary></indexterm>The <filename>pkginfo</filename> file
+for any relocatable package must include a default base directory in the form
+of an entry like this: </para><screen>BASEDIR=<replaceable>absolute_path</replaceable></screen><para>This is only the default base directory; it can be changed by the administrator
+during installation. </para><para><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>determining the base directory</secondary></indexterm>While some packages require more
+than one base directory, the advantage to using this parameter to position
+the package is because the base directory is guaranteed to be in place and
+writable as a valid directory by the time installation begins. The correct
+path to the base directory for the server and client is available to all procedure
+scripts in the form of reserved environment variables, and the <command>pkginfo
+-r SUNWstuf</command> command displays the current installation base for the
+package. </para><para>In the <filename>checkinstall</filename> script, <envar>BASEDIR</envar> is
+the parameter exactly as defined in the <filename>pkginfo</filename> file
+(it has not been conditioned yet). In order to inspect the target base directory,
+the <literal>${PKG_INSTALL_ROOT}$BASEDIR</literal> construction is required.
+This means that the <filename>request</filename> or <filename>checkinstall</filename> script
+can change the value of <envar>BASEDIR</envar> in the installation environment
+with predictable results. By the time the <filename>preinstall</filename> script
+is called, the <envar>BASEDIR</envar> parameter is the fully conditioned pointer
+to the actual base directory on the target system, even if the system is a
+client. </para><note><para>The <filename>request</filename> script utilizes the <envar>BASEDIR</envar> parameter
+differently for different releases of the SunOS operating system. In order
+to test a <envar>BASEDIR</envar> parameter in a <filename>request</filename> script,
+the following code should be used to determine the actual base directory in
+use.</para><programlisting role="complete"># request script
+constructs base directory
+if [ ${CLIENT_BASEDIR} ]; then
+	  LOCAL_BASE=$BASEDIR
+else
+	  LOCAL_BASE=${PKG_INSTALL_ROOT}$BASEDIR
+fi</programlisting>
+</note>
+</sect2><sect2 id="ch6advtech-39"><title>Using Parametric Base Directories</title><para><indexterm><primary>base directory</primary><secondary>using parametric path names</secondary></indexterm><indexterm><primary>parametric path name</primary></indexterm>If a package requires multiple base directories, you can establish
+them with parametric path names. This method has become quite popular, although
+it has the following drawbacks. </para><itemizedlist><listitem><para>A package with parametric path names usually behaves like
+an absolute package but is treated by the <command>pkgadd</command> command
+like a relocatable package. The <envar>BASEDIR</envar> parameter must be defined
+even if it is not used. </para>
+</listitem><listitem><para>The administrator cannot ascertain the installation base for
+the package using the System V utilities (the <command>pkginfo -r</command> command
+will not work). </para>
+</listitem><listitem><para>The administrator cannot use the established method to relocate
+the package (it is called relocatable but it acts absolute). </para>
+</listitem><listitem><para>Multiple architecture or multiple version installations require
+contingency planning for each of the target base directories which often means
+multiple complex class action scripts. </para>
+</listitem>
+</itemizedlist><para>While the parameters that determine the base directories are defined
+in the <filename>pkginfo</filename> file, they may be modified by the <filename>request</filename> script. That is one of the primary reasons for the popularity
+of this approach. The drawbacks, however are chronic and you should consider
+this configuration a last resort. </para><sect3 id="ch6advtech-69"><title>Examples&mdash;Using Parametric Base Directories</title><sect4 id="ch6advtech-75"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example</secondary>
+</indexterm><indexterm><primary>parametric path name</primary><secondary>example</secondary>
+</indexterm><programlisting role="complete"># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/
+EZDIR=/usr/stuf/EZstuf
+HRDDIR=/opt/SUNWstuf/HRDstuf
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none
+PSTAMP=hubert980707141632</programlisting>
+</sect4><sect4 id="ch6advtech-74"><title>The <filename>pkgmap</filename> File</title><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>parametric path name example</secondary>
+</indexterm><programlisting role="complete">: 1 1758
+1 d none $EZDIR 0775 root bin
+1 f none $EZDIR/dirdel 0555 bin bin 40 773 751310229
+1 f none $EZDIR/usrdel 0555 bin bin 40 773 751310229
+1 f none $EZDIR/filedel 0555 bin bin 40 773 751310229
+1 d none $HRDDIR 0775 root bin
+1 f none $HRDDIR/mksmart 0555 bin bin 40 773 751310229
+1 f none $HRDDIR/mktall 0555 bin bin 40 773 751310229
+1 f none $HRDDIR/mkcute 0555 bin bin 40 773 751310229
+1 f none $HRDDIR/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc	? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 f none /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865</programlisting>
+</sect4>
+</sect3>
+</sect2><sect2 id="ch6advtech-40"><title>Managing the Base Directory</title><para><indexterm><primary><filename>request</filename> script</primary><secondary>managing the base directory</secondary></indexterm><indexterm><primary><filename>checkinstall</filename> script</primary><secondary><literal>BASEDIR</literal> parameter</secondary></indexterm><indexterm><primary>base directory</primary><secondary>walking the</secondary></indexterm>Any package that is available
+in multiple versions or for multiple architectures should be designed to <firstterm>walk</firstterm> the base directory, if needed. Walking a base directory means
+that if a previous version or a different architecture of the package being
+installed already exists in the base directory, the package being installed
+resolves this issue, perhaps by creating a new base directory with a slightly
+different name. The <filename>request</filename> and <filename>checkinstall</filename> scripts
+in the Solaris 2.5 and compatible releases have the ability to modify the <envar>BASEDIR</envar> environment variable. This is not true for any prior version
+of the Solaris operating environment. </para><para>Even in older versions of the Solaris operating environment, the <filename>request</filename> script had the authority to redefine directories within
+the installation base. The <filename>request</filename> script can do this
+in a way that still supports most administrative preferences. </para>
+</sect2>
+</sect1><sect1 id="ch6advtech-53"><title>Accommodating Relocation</title><para>While you can select base directories for various packages that are
+guaranteed unique to an architecture and version, this leads to unnecessary
+levels of directory hierarchy. For example, for a product designed for SPARC
+and x86 based processors, you could organize the base directories by processor
+and version as shown below.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="198*"/><colspec colwidth="198*"/><thead><row rowsep="1"><entry><para>Base Directory</para>
+</entry><entry><para>Version and Processor</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>/opt/SUNWstuf/sparc/1.0</filename></para>
+</entry><entry><para>Version 1.0, SPARC</para>
+</entry>
+</row><row><entry><para><filename>/opt/SUNWstuf/sparc/1.2</filename></para>
+</entry><entry><para>Version 1.2, SPARC</para>
+</entry>
+</row><row><entry><para><filename>/opt/SUNWstuf/x86/1.0</filename></para>
+</entry><entry><para>Version 1.0, x86</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>This is okay and it does work, but you are treating names and numbers
+as though they mean something to the administrator. A better approach is to
+do this automatically <emphasis>after</emphasis> explaining it to the administrator
+and obtaining permission.</para><para>This means that you can do the whole job in the package without requiring
+the administrator to do it manually. You can assign the base directory arbitrarily
+and then transparently establish the appropriate client links in a <filename>postinstall</filename> script. You can also use the <command>pkgadd</command> command
+to install all or part of the package to the clients in the <filename>postinstall</filename> script. You can even ask the administrator which users or clients
+need to know about this package and automatically update <envar>PATH</envar> environment
+variables and <filename>/etc</filename> files. This is completely acceptable
+as long as whatever the package does upon installation, it undoes upon removal. </para><sect2 id="ch6advtech-59"><title>Walking Base Directories</title><para><indexterm><primary>base directory</primary><secondary>walking the</secondary></indexterm><indexterm><primary><filename>request</filename> script</primary><secondary>walking the base directory</secondary></indexterm>You can take
+advantage of two methods for controlling the base directory at install time.
+The first is best for new packages that will install only to Solaris 2.5 and
+compatible releases; it provides very useful data for the administrator and
+supports multiple installed versions and architectures and requires minimal
+special work. The second method can be used by any package and makes use of
+the <filename>request</filename> script's inherent control over build parameters
+to ensure successful installations. </para><sect3 id="ch6advtech-79"><title>Using the <envar>BASEDIR</envar> Parameter</title><para><indexterm><primary><filename>checkinstall</filename> script</primary><secondary><literal>BASEDIR</literal> parameter</secondary></indexterm>The <filename>checkinstall</filename> script can select the appropriate base directory at
+install time, which means that the base directory can be placed very low in
+the directory tree. This example increments the base directory sequentially,
+leading to directories of the form <literal>/opt/SUNWstuf</literal>, <literal>/opt/SUNWstuf.1</literal>, and <literal>/opt/SUNWstuf.2</literal>. The administrator can
+use the <command>pkginfo</command> command to determine which architecture
+and version are installed in each base directory. </para><para>If the <literal>SUNWstuf</literal> package (containing a set of utilities
+that do stuff) uses this method, its <filename>pkginfo</filename> and <filename>pkgmap</filename> files would look like this.</para><sect4 id="ch6advtech-80"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example</secondary>
+</indexterm><programlisting role="complete"># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt/SUNWstuf
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none daemon
+PSTAMP=hubert990707141632</programlisting>
+</sect4><sect4 id="ch6advtech-81"><title>The <filename>pkgmap</filename> File</title><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>using the <literal>BASEDIR</literal> parameter example</secondary>
+</indexterm><programlisting role="complete">: 1 1758
+1 d none EZstuf 0775 root bin
+1 f none EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none HRDstuf 0775 root bin
+1 f none HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc	? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 f daemon /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865
+1 i i.daemon 509 39560 752978103
+1 i r.daemon 320 24573 742152591</programlisting>
+</sect4>
+</sect3><sect3 id="ch6advtech-71"><title>Example&mdash;Analysis Scripts That Walk
+a <envar>BASEDIR</envar></title><para>Assume that the x86 version of <literal>SUNWstuf</literal> is already
+installed on the server in <filename>/opt/SUNWstuf</filename>. When the administrator
+uses the <command>pkgadd</command> command to install the SPARC version, the <filename>request</filename> script needs to detect the existence of the x86 version
+and interact with the administrator regarding the installation. </para><note><para>The base directory could be walked without administrator interaction
+in a <filename>checkinstall</filename> script, but if arbitrary operations
+like this happen too often, administrators lose confidence in the process. </para>
+</note><para>The <filename>request</filename> script and <filename>checkinstall</filename> script
+for a package that handle this situation might look like this.		 </para><sect4 id="ch6advtech-72"><title>The <filename>request</filename> Script</title><indexterm><primary>base directory</primary><secondary>walking the</secondary><tertiary>example</tertiary>
+</indexterm><indexterm><primary><filename>request</filename> script</primary>
+</indexterm><programlisting width="100" role="complete"># request script
+for SUNWstuf to walk the BASEDIR parameter.
+ 
+PATH=/usr/sadm/bin:${PATH}	# use admin utilities
+ 
+GENMSG="The base directory $LOCAL_BASE already contains a \
+different architecture or version of $PKG."
+ 
+OLDMSG="If the option \"-a none\" was used, press the  \
+key and enter an unused base directory when it is requested."
+ 
+OLDPROMPT="Do you want to overwrite this version? "
+ 
+OLDHELP="\"y\" will replace the installed package, \"n\" will \
+stop the installation."
+ 
+SUSPEND="Suspending installation at user request using error \
+code 1."
+ 
+MSG="This package could be installed at the unused base directory $WRKNG_BASE."
+ 
+PROMPT="Do you want to use to the proposed base directory? "
+ 
+HELP="A response of \"y\" will install to the proposed directory and continue,
+\"n\" will request a different directory. If the option \"-a none\" was used,
+press the  key and enter an unused base directory when it is requested."
+ 
+DIRPROMPT="Select a preferred base directory ($WRKNG_BASE) "
+ 
+DIRHELP="The package $PKG will be installed at the location entered."
+ 
+NUBD_MSG="The base directory has changed. Be sure to update \
+any applicable search paths with the actual location of the \
+binaries which are at $WRKNG_BASE/EZstuf and $WRKNG_BASE/HRDstuf."
+ 
+OldSolaris=""
+Changed=""
+Suffix="0"
+ 
+#
+# Determine if this product is actually installed in the working
+# base directory.
+#
+Product_is_present () {
+	  if [ -d $WRKNG_BASE/EZstuf -o -d $WRKNG_BASE/HRDstuf ]; then
+		    return 1
+	  else
+		    return 0
+	  fi
+}
+ 
+if [ ${BASEDIR} ]; then
+	  # This may be an old version of Solaris. In the latest Solaris
+	  # CLIENT_BASEDIR won't be defined yet. In older version it is.
+	  if [ ${CLIENT_BASEDIR} ]; then
+		    LOCAL_BASE=$BASEDIR
+		    OldSolaris="true"
+	  else	# The base directory hasn't been processed yet
+		    LOCAL_BASE=${PKG_INSTALL_ROOT}$BASEDIR
+fi
+ 
+WRKNG_BASE=$LOCAL_BASE
+ 
+	# See if the base directory is already in place and walk it if
+	# possible
+while [ -d ${WRKNG_BASE} -a Product_is_present ]; do
+		 # There is a conflict
+		 # Is this an update of the same arch &amp; version?
+		 if [ ${UPDATE} ]; then
+			   exit 0	# It's out of our hands.
+		 else
+			   # So this is a different architecture or
+			   # version than what is already there.
+			   # Walk the base directory
+			   Suffix=`expr $Suffix + 1`
+			   WRKNG_BASE=$LOCAL_BASE.$Suffix
+			   Changed="true"
+		 fi
+done
+ 
+	# So now we can propose a base directory that isn't claimed by
+	# any of our other versions.
+if [ $Changed ]; then
+		 puttext "$GENMSG"
+		 if [ $OldSolaris ]; then
+			   puttext "$OLDMSG"
+			   result=`ckyorn -Q -d "a" -h "$OLDHELP" -p "$OLDPROMPT"`
+			   if [ $result="n" ]; then
+				     puttext "$SUSPEND"
+				     exit 1	# suspend installation
+			   else
+				     exit 0
+			   fi
+		 else	# The latest functionality is available
+			   puttext "$MSG"
+			   result=`ckyorn -Q -d "a" -h "$HELP" -p "$PROMPT"`
+			   if [ $? -eq 3]; then
+				     echo quitinstall &gt;&gt; $1
+				     exit 0
+			   fi
+ 
+			   if [ $result="n" ]; then
+				     WRKNG_BASE=`ckpath -ayw -d "$WRKNG_BASE" \
+				     -h "$DIRHELP" -p "$DIRPROMPT"`
+			   else if [ $result="a" ]
+				     exit 0
+			   fi
+		    fi
+		    echo "BASEDIR=$WRKNG_BASE" &gt;&gt; $1
+		    puttext "$NUBD_MSG"
+	  fi
+fi
+exit 0</programlisting>
+</sect4><sect4 id="ch6advtech-73"><title>The <filename>checkinstall</filename> Script</title><programlisting role="complete"># checkinstall
+script for SUNWstuf to politely suspend
+ 
+grep quitinstall $1
+if [ $? -eq 0 ]; then
+	exit 3		# politely suspend installation
+fi
+ 
+exit 0</programlisting><para><indexterm><primary><filename>checkinstall</filename> script</primary><secondary>example of</secondary></indexterm>This approach would not work
+very well if the base directory was simply <filename>/opt</filename>. This
+package has to call out the <envar>BASEDIR</envar> more precisely since <filename>/opt</filename> would be difficult to walk. In fact, depending on the mount
+scheme, it may not be possible. The example walks the base directory by creating
+a new directory under <filename>/opt</filename>, which does not introduce
+any problems. </para><para>This example uses a <filename>request</filename> script and a <filename>checkinstall</filename> script even though versions of Solaris prior to the 2.5 release
+cannot run a <filename>checkinstall</filename> script. The <filename>checkinstall</filename> script in this example is used for the purpose of politely halting
+the installation in response to a private message in the form of the string &ldquo;quitinstall.&rdquo;
+If this script executes under the Solaris 2.3 release, the <filename>checkinstall</filename> script is ignored and the <filename>request</filename> script
+halts the installation with an error message. </para><para>Remember that prior to the Solaris 2.5 and compatible releases, the <envar>BASEDIR</envar> parameter is a read-only parameter and cannot be changed by
+the <filename>request</filename> script. For this reason, if an old version
+of the SunOS operating system is detected (by testing for a conditioned <envar>CLIENT_BASEDIR</envar> environment variable), the <filename>request</filename> script has
+only two options&mdash;continue or quit. </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-76"><title>Using Relative Parametric Paths</title><para><indexterm><primary>parametric path name</primary></indexterm>If your
+software product might be installed on older versions of the SunOS operating
+system, the <filename>request</filename> script needs to do all the necessary
+work. This approach can also be used to manipulate multiple directories. If
+additional directories are required, they still need to be included under
+a single base directory in order to provide an easily administrable product.
+While the <envar>BASEDIR</envar> parameter does not provide the level of granularity
+available in the latest Solaris release, your package can still walk the base
+directory by using the <filename>request</filename> script to manipulate parametric
+paths. This is how the <filename>pkginfo</filename> and <filename>pkgmap</filename> files
+might look.</para><sect4 id="ch6advtech-78"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example, <literal>BASEDIR</literal> parameter</secondary>
+</indexterm><programlisting role="complete"># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt
+SUBBASE=SUNWstuf
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none daemon
+PSTAMP=hubert990707141632</programlisting>
+</sect4><sect4 id="ch6advtech-77"><title>The <filename>pkgmap</filename> File</title><programlisting role="complete">: 1 1758
+1 d none $SUBBASE/EZstuf 0775 root bin
+1 f none $SUBBASE/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none $SUBBASE/HRDstuf 0775 root bin
+1 f none $SUBBASE/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc	? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 f daemon /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865
+1 i i.daemon 509 39560 752978103
+1 i r.daemon 320 24573 742152591</programlisting><para><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>using relative parametric path example</secondary></indexterm>This example is not
+perfect. A <command>pkginfo -r</command> command returns <filename>/opt</filename> for
+the installation base, which is pretty ambiguous. Many packages are in <filename>/opt</filename>, but at least it is a meaningful directory. Just like the
+previous example, this next example fully supports multiple architectures
+and versions. The <filename>request</filename> script can be tailored to the
+needs of the specific package and resolve whatever dependencies are applicable. </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-70"><title>Example&mdash;A <filename>request</filename> Script
+That Walks a Relative Parametric Path</title><indexterm><primary>base directory</primary><secondary>walking the</secondary><tertiary>example</tertiary>
+</indexterm><programlisting role="complete"># request script
+for SUNWstuf to walk a parametric path
+ 
+PATH=/usr/sadm/bin:${PATH}	# use admin utilities
+ 
+MSG="The target directory $LOCAL_BASE already contains \
+different architecture or version of $PKG. This package \
+could be installed at the unused target directory $WRKNG_BASE."
+ 
+PROMPT="Do you want to use to the proposed directory? "
+ 
+HELP="A response of \"y\" will install to the proposed directory \
+and continue, \"n\" will request a different directory. If \
+the option \"-a none\" was used, press the &lt;RETURN&gt; key and \
+enter an unused base directory when it is requested."
+ 
+DIRPROMPT="Select a relative target directory under $BASEDIR/"
+ 
+DIRHELP="The package $PKG will be installed at the location entered."
+ 
+SUSPEND="Suspending installation at user request using error \
+code 1."
+ 
+NUBD_MSG="The location of this package is not the default. Be \
+sure to update any applicable search paths with the actual \
+location of the binaries which are at $WRKNG_BASE/EZstuf \
+and $WRKNG_BASE/HRDstuf."
+ 
+Changed=""
+Suffix="0"
+ 
+#
+# Determine if this product is actually installed in the working
+# base directory.
+#
+Product_is_present () {
+	  if [ -d $WRKNG_BASE/EZstuf -o -d $WRKNG_BASE/HRDstuf ]; then
+		    return 1
+	  else
+		    return 0
+ 
+	  fi
+}
+ 
+if [ ${BASEDIR} ]; then
+	  # This may be an old version of Solaris. In the latest Solaris
+	  # CLIENT_BASEDIR won't be defined yet. In older versions it is.
+	  if [ ${CLIENT_BASEDIR} ]; then
+		    LOCAL_BASE=$BASEDIR/$SUBBASE
+	  else	# The base directory hasn't been processed yet
+		    LOCAL_BASE=${PKG_INSTALL_ROOT}$BASEDIR/$SUBBASE
+	  fi
+ 
+WRKNG_BASE=$LOCAL_BASE
+ 
+# See if the base directory is already in place and walk it if
+# possible
+while [ -d ${WRKNG_BASE} -a Product_is_present ]; do
+		 # There is a conflict
+		 # Is this an update of the same arch &amp; version?
+		 if [ ${UPDATE} ]; then
+			   exit 0	# It's out of our hands.
+		 else
+			   # So this is a different architecture or
+			   # version than what is already there.
+			   # Walk the base directory
+			   Suffix=`expr $Suffix + 1`
+			   WRKNG_BASE=$LOCAL_BASE.$Suffix
+			   Changed="true"
+		 fi
+done
+ 
+# So now we can propose a base directory that isn't claimed by
+# any of our other versions.
+if [ $Changed ]; then
+		 puttext "$MSG"
+		 result=`ckyorn -Q -d "a" -h "$HELP" -p "$PROMPT"`
+		 if [ $? -eq 3 ]; then
+			   puttext "$SUSPEND"
+			   exit 1
+		 fi
+ 
+		 if [ $result="n" ]; then
+			   WRKNG_BASE=`ckpath -lyw -d "$WRKNG_BASE" -h "$DIRHELP" \
+			   -p "$DIRPROMPT"`
+ 
+		    elif [ $result="a" ]; then
+			       exit 0
+		    else
+			       exit 1
+		    fi
+		    echo SUBBASE=$SUBBASE.$Suffix &gt;&gt; $1
+		    puttext "$NUBD_MSG"
+	  fi
+fi
+exit 0</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch6advtech-10"><title>Supporting Relocation in a Heterogeneous
+Environment</title><para><indexterm><primary>relocation</primary><secondary>supporting in a heterogeneous environment</secondary></indexterm>The original concept behind System V packaging
+assumed one architecture per system. The concept of a server did not play
+a role in the design. Now, of course, a single server may provide support
+for several architectures, which means there may be several copies of the
+same software on a server, each for a different architecture. While Solaris
+packages are sequestered within recommended file system boundaries (for example, <filename>/</filename> and <filename>/usr</filename>), with product databases on the
+server as well as each client, not all installations necessarily support this
+division. Certain implementations support an entirely different structure
+and imply a common product database. While pointing the clients to different
+versions is straightforward, actually installing System V packages to different
+base directories can introduce complications for the administrator.</para><para>When you design your package, you should also consider the common methods
+administrators use for introducing new software versions. Administrators often
+seek to install and test the latest version side-by-side with the currently
+installed version. The procedure involves installing the new version to a
+different base directory than the current version and directing a handful
+of non-critical clients to the new version as a test. As confidence builds,
+the administrator redirects more and more clients to the new version. Eventually,
+the administrator retains the old version only for emergencies and then finally
+deletes it. </para><para>What this means is that packages destined for modern heterogeneous systems
+must support true relocation in the sense that the administrator may put them
+any reasonable place on the file system and still see full functionality.
+The Solaris 2.5 and compatible releases provide a number of useful tools which
+allow multiple architectures and versions to install cleanly to the same system.
+Solaris 2.4 and compatible versions also support true relocation but accomplishing
+the task is not quite as obvious. </para><sect2 id="ch6advtech-11"><title>Traditional Approach</title><sect3 id="ch6advtech-12"><title>Relocatable Packages</title><para><indexterm><primary>relocatable package</primary></indexterm>The System
+V ABI implies that the original intention behind the relocatable package was
+to make installing the package more convenient for the administrator. Now
+the need for relocatable packages goes much further. Convenience is not the
+only issue, rather it is quite possible that during the installation an active
+software product is already installed in the default directory. A package
+that is not designed to deal with this situation either overwrites the existing
+product or fails to install. However, a package designed handle multiple architectures
+and multiple versions can install smoothly and offer the administrator a wide
+range of options that are fully compatible with existing administrative traditions.</para><para>In some ways the problem of multiple architectures and the problem of
+multiple versions is the same. It must be possible to install a variant of
+the existing package side by side with other variants, and direct clients
+or standalone consumers of exported file systems to any one of those variants,
+without degraded functionality. While Sun has established methods for dealing
+with multiple architectures on a server, the administrator may not adhere
+to those recommendations. All packages need to be capable of complying with
+the administrators' reasonable wishes regarding installation. </para>
+</sect3><sect3 id="ch6advtech-13"><title>Example-A Traditional Relocatable Package</title><para><indexterm><primary>relocatable package</primary><secondary>traditional example</secondary></indexterm><indexterm><primary>package</primary><secondary>relocatable</secondary></indexterm>This example shows what a traditional relocatable
+package may look like. The package is to be located in <literal>/opt/SUNWstuf</literal>,
+and its <filename>pkginfo</filename> file and <filename>pkgmap</filename> file
+might look like this. </para><sect4 id="ch6advtech-14"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example, relocatable package</secondary>
+</indexterm><programlisting role="complete"># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none
+PSTAMP=hubert990707141632</programlisting>
+</sect4><sect4 id="ch6advtech-64"><title>The <filename>pkgmap</filename> File</title><programlisting role="complete">: 1 1758
+1 d none SUNWstuf 0775 root bin
+1 d none SUNWstuf/EZstuf 0775 root bin
+1 f none SUNWstuf/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none SUNWstuf/HRDstuf 0775 root bin
+1 f none SUNWstuf/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865</programlisting><para><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>traditional relocatable package example</secondary></indexterm>This is referred to as
+the traditional method because every package object is installed to the base
+directory defined by the <envar>BASEDIR</envar> parameter from the <filename>pkginfo</filename> file. For example, the first object in the <filename>pkgmap</filename> file
+is installed as the directory <literal>/opt/SUNWstuf</literal>. </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-15"><title>Absolute Packages</title><para><indexterm><primary>absolute package</primary></indexterm>An absolute
+package is one that installs to a particular root (<filename>/</filename>)
+file system. These packages are difficult to deal with from the standpoint
+of multiple versions and architectures. As a general rule, all packages should
+be relocatable. There are, however very good reasons to include absolute elements
+in a relocatable package. </para>
+</sect3><sect3 id="ch6advtech-16"><title>Example-A Traditional Absolute Package</title><para><indexterm><primary>absolute package</primary><secondary>traditional example</secondary></indexterm><indexterm><primary>package</primary><secondary>absolute</secondary></indexterm>If the <literal>SUNWstuf</literal> package was an
+absolute package, the <envar>BASEDIR</envar> parameter should not be defined
+in the <filename>pkginfo</filename> file, and the <filename>pkgmap</filename> file
+would look like this.</para><sect4 id="ch6advtech-82"><title>The <filename>pkgmap</filename> File</title><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>traditional absolute package example</secondary>
+</indexterm><programlisting role="complete">: 1 1758
+1 d none /opt ? ? ?
+1 d none /opt/SUNWstuf 0775 root bin
+1 d none /opt/SUNWstuf/EZstuf 0775 root bin
+1 f none /opt/SUNWstuf/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none /opt/SUNWstuf/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none /opt/SUNWstuf/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none /opt/SUNWstuf/HRDstuf 0775 root bin
+1 f none /opt/SUNWstuf/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none /opt/SUNWstuf/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none /opt/SUNWstuf/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none /opt/SUNWstuf/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865</programlisting><para>In this example, if the administrator specified an alternate base directory
+during installation, it would be ignored by the <command>pkgadd</command> command.
+This package always installs to <literal>/opt/SUNWstuf</literal> of the target
+system. </para><para>The <option>R</option> argument to the <command>pkgadd</command> command
+works as expected. For example,</para><screen>pkgadd -d . -R /export/opt/client3 SUNWstuf</screen><para>installs the objects in <literal>/export/opt/client3/opt/SUNWstuf</literal>;
+but that is the closest this package comes to being relocatable. </para><para>Notice the use of the question mark (<literal>?</literal>) for the <filename>/opt</filename> directory in the <filename>pkgmap</filename> file. This indicates
+that the existing attributes should not be changed. It does not mean &ldquo;create
+the directory with default attributes,&rdquo; although under certain circumstances
+that may happen. Any directory that is specific to the new package must specify
+all attributes explicitly.  </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-17"><title>Composite Packages</title><para><indexterm><primary>composite</primary></indexterm><indexterm><primary>package</primary><secondary>composite</secondary></indexterm>Any package containing
+relocatable objects is referred to as a relocatable package. This can be misleading
+because a relocatable package may contain absolute paths in its <filename>pkgmap</filename> file.
+Using a root (<filename>/</filename>) entry in a <filename>pkgmap</filename> file
+can enhance the relocatable aspects of the package. Packages that have both
+relocatable and root entries are called <firstterm>composite</firstterm> packages. </para>
+</sect3><sect3 id="ch6advtech-18"><title>Example-A Traditional Solution</title><para><indexterm><primary>composite package</primary><secondary>traditional example</secondary></indexterm><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example, relocatable package</secondary></indexterm>Assume
+that one object in the <literal>SUNWstuf</literal> package is a startup script
+executed at run level 2. The file <literal>/etc/rc2.d/S70dostuf</literal> needs
+to be installed as a part of the package, but it cannot be placed into the
+base directory. Assuming that a relocatable package is the only solution,
+the <filename>pkginfo</filename> and a <filename>pkgmap</filename> might look
+like this.</para><sect4 id="ch6advtech-19"><title>The <filename>pkginfo</filename> File</title><programlisting role="complete"># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none
+PSTAMP=hubert990707141632</programlisting>
+</sect4><sect4 id="ch6advtech-20"><title>The <filename>pkgmap</filename> File</title><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>composite package example</secondary>
+</indexterm><programlisting role="complete">: 1 1758
+1 d none opt/SUNWstuf/EZstuf 0775 root bin
+1 f none opt/SUNWstuf/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none opt/SUNWstuf/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none opt/SUNWstuf/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none opt/SUNWstuf/HRDstuf 0775 root bin
+1 f none opt/SUNWstuf/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none opt/SUNWstuf/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none opt/SUNWstuf/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none opt/SUNWstuf/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none etc	? ? ?
+1 d none etc/rc2.d ? ? ?
+1 f none etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865</programlisting><para>There is not much difference between this approach and that of the absolute
+package. In fact, this would be better off as an absolute package&mdash;if
+the administrator provided an alternate base directory for this package, it
+would not work! </para><para>In fact, only one file in this package needs to be root-relative, the
+rest could be moved anywhere. How to solve this problem through the use of
+a composite package is discussed throughout the remainder of this section.</para>
+</sect4>
+</sect3>
+</sect2><sect2 id="ch6advtech-21"><title>Beyond Tradition</title><para><indexterm><primary>bundled packages</primary></indexterm><indexterm><primary>unbundled packages</primary></indexterm>The approach described in
+this section does not apply to all packages, but it does result in improved
+performance during installation to an heterogeneous environment. Very little
+of this applies to packages that are delivered as part of the Solaris operating
+environment (bundled packages); however, unbundled packages can practice non-traditional
+packaging.</para><para>The reason behind encouraging relocatable packages is to support this
+requirement: </para><para><emphasis>When a package is added or removed, the existing desirable
+behaviors of installed software products will be unchanged.</emphasis> </para><para>Unbundled packages should reside under <filename>/opt</filename> so
+as to assure that the new package does not interfere with existing products. </para><sect3 id="ch6advtech-22"><title>Another Look at Composite Packages</title><para><indexterm><primary>composite package</primary><secondary>rules for constructing</secondary></indexterm>There are two rules to follow when constructing
+a functional composite package: </para><itemizedlist><listitem><para>Establish the base directory based upon where the vast majority
+of the package objects go. </para>
+</listitem><listitem><para>If a package object goes into a common directory that is not
+the base directory (for example, <filename>/etc</filename>), specify it as
+an absolute path name in the <filename>prototype</filename> file. </para>
+</listitem>
+</itemizedlist><para>In other words, since &ldquo;relocatable&rdquo; means the object can
+be installed anywhere and still work, no startup script run by <literal>init</literal> at
+boot time can be considered relocatable! While there is nothing wrong with
+specifying <filename>/etc/passwd</filename> as a relative path in the delivered
+package, there is only one place it can go. </para>
+</sect3><sect3 id="ch6advtech-23"><title>Making Absolute Path Names Look Relocatable</title><para>If you are going to construct a composite package, the absolute paths
+must operate in a manner which does not interfere with existing installed
+software. A package that can be entirely contained in <filename>/opt</filename> gets
+around this problem since there are no existing files in the way. When a file
+in <filename>/etc</filename> is included in the package, you must ensure that
+the absolute path names behave in the same way that is expected from relative
+path names. Consider the following two examples. </para>
+</sect3><sect3 id="ch6advtech-24"><title>Example&mdash;Modifying a File</title><sect4 id="ch6advtech-25"><title>Description</title><para><indexterm><primary>composite package</primary><secondary>example</secondary></indexterm>An entry is being added to a table, or the object is a new table
+which is likely to be modified by other programs or packages. </para>
+</sect4><sect4 id="ch6advtech-26"><title>Implementation</title><para>Define the object as file type <literal>e</literal> and belonging to
+the <literal>build</literal>, <literal>awk</literal>, or <literal>sed</literal> class.
+The script that performs this task must remove itself as effectively as it
+adds itself. </para>
+</sect4><sect4 id="ch6advtech-27"><title>Example</title><para>An entry needs to be added to <filename>/etc/vfstab</filename> in support
+of the new solid state hard disk. </para><para>The entry in the <filename>pkgmap</filename> file might be </para><screen>1 e sed /etc/vfstab ? ? ?</screen><para>The <filename>request</filename> script asks the operator if <filename>/etc/vfstab</filename> should be modified by the package. If the operator answers &ldquo;no&rdquo;
+then the request script will print instructions on how to do the job manually
+and will execute </para><screen>echo "CLASSES=none" &gt;&gt; $1</screen><para>If the operator answers &ldquo;yes&rdquo; then it executes </para><screen>echo "CLASSES=none sed" &gt;&gt; $1</screen><para>which activates the class action script that will make the necessary
+modifications. The <literal>sed</literal> class means that the package file <literal>/etc/vfstab</literal> is a <literal>sed</literal> program which contains both
+the install and remove operations for the same-named file on the target system. </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-28"><title>Example&mdash;Creating a New File</title><sect4 id="ch6advtech-29"><title>Description</title><para><indexterm><primary>composite package</primary><secondary>example</secondary></indexterm>The object is an entirely new file that is unlikely to be edited
+at a later time or, it is replacing a file owned by another package. </para>
+</sect4><sect4 id="ch6advtech-30"><title>Implementation</title><para>Define the package object as file type <literal>f</literal> and install
+it using a class action script capable of undoing the change. </para>
+</sect4><sect4 id="ch6advtech-31"><title>Example</title><para>A brand new file is required in <filename>/etc</filename> to provide
+the necessary information to support the solid state hard disk, named <literal>/etc/shdisk.conf</literal>. The entry in the <filename>pkgmap</filename> file might look like
+this: </para><screen> 
+.
+.
+.
+1 f newetc /etc/shdisk.conf
+.
+.
+.</screen><para>The class action script <literal>i.newetc</literal> is responsible for
+installing this and any other files that need to go into <filename>/etc</filename>.
+It checks to make sure there is not another file there. If there is not, it
+will simply copy the new file into place. If there is already a file in place,
+it will back it up before installing the new file. The script <literal>r.newetc</literal> removes
+these files and restores the originals, if required. Here is the key fragment
+of the install script.</para><programlisting role="complete"># i.newetc
+while read src dst; do
+	  if [ -f $dst ]; then
+	    dstfile=`basename $dst`
+	    cp $dst $PKGSAV/$dstfile
+	  fi
+	  cp $src $dst
+done
+ 
+if [ "${1}" = "ENDOFCLASS" ]; then
+	  cd $PKGSAV
+	  tar cf SAVE.newetc .
+	  $INST_DATADIR/$PKG/install/squish SAVE.newetc
+fi</programlisting><para>Notice that this script uses the <envar>PKGSAV</envar> environment variable
+to store a backup of the file to be replaced. When the argument <literal>ENDOFCLASS</literal> is passed to the script, that is the <command>pkgadd</command> command
+informing the script that these are the last entries in this class, at which
+point the script archives and compresses the files that were saved using a
+private compression program stored in the install directory of the package. </para><para><indexterm><primary><command>pkgrm</command> command</primary></indexterm>While
+the use of the <envar>PKGSAV</envar> environment variable is not reliable
+during a package update; if the package is not updated (through a patch, for
+instance) the backup file is secure. The following remove script includes
+code to deal with the other issue&mdash;the fact that older versions of the <command>pkgrm</command> command do not pass the scripts the correct path to the <envar>PKGSAV</envar> environment variable. </para><para>The removal script might look like this.</para><programlisting role="complete"># r.newetc
+ 
+# make sure we have the correct PKGSAV
+if [ -d $PKG_INSTALL_ROOT$PKGSAV ]; then
+	  PKGSAV="$PKG_INSTALL_ROOT$PKGSAV"
+fi
+ 
+# find the unsquish program
+UNSQUISH_CMD=`dirname $0`/unsquish
+ 
+while read file; do
+	  rm $file
+done
+ 
+if [ "${1}" = ENDOFCLASS ]; then
+	  if [ -f $PKGSAV/SAVE.newetc.sq ]; then
+	     $UNSQUISH_CMD $PKGSAV/SAVE.newetc
+	  fi
+ 
+	  if [ -f $PKGSAV/SAVE.newetc ]; then
+	     targetdir=dirname $file	# get the right directory
+	     cd $targetdir
+		    tar xf $PKGSAV/SAVE.newetc
+		    rm $PKGSAV/SAVE.newetc
+	  fi
+fi</programlisting><para>This script uses a private uninstalled algorithm (<literal>unsquish</literal>)
+which is in the install directory of the package database. This is done automatically
+by the <command>pkgadd</command> command at install time. All scripts not
+specifically recognized as install-only by the <command>pkgadd</command> command
+are left in this directory for use by the <command>pkgrm</command> command.
+You cannot count on where that directory is, but you can depend on the directory
+being flat and containing all appropriate information files and installation
+scripts for the package. This script finds the directory by virtue of the
+fact that the class action script is guaranteed to be executing from the directory
+that contains the <literal>unsquish</literal> program. </para><para>Notice, also, that this script does not just assume the target directory
+is <filename>/etc</filename>. It may actually be <literal>/export/root/client2/etc</literal>. The correct directory could be constructed in one of two ways. </para><itemizedlist><listitem><para>Use the <literal>${PKG_INSTALL_ROOT}/etc</literal> construction,
+or</para>
+</listitem><listitem><para>Take the directory name of a file passed by the <command>pkgadd</command> command
+(which is what this script does). </para>
+</listitem>
+</itemizedlist><para>By using this approach for each absolute object in the package, you
+can be sure that the current desirable behavior is unchanged or at least recoverable.
+ </para>
+</sect4>
+</sect3><sect3 id="ch6advtech-68"><title>Example&mdash;A Composite Package</title><para><indexterm><primary>composite package</primary><secondary>example</secondary></indexterm><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>example, composite package</secondary></indexterm>This is an example
+of the <filename>pkginfo</filename> and <filename>pkgmap</filename> files
+for a composite package. </para><sect4 id="ch6advtech-84"><title>The <filename>pkginfo</filename> File</title><programlisting role="complete">PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none daemon
+PSTAMP=hubert990707141632</programlisting>
+</sect4><sect4 id="ch6advtech-83"><title>The <filename>pkgmap</filename> File</title><programlisting role="complete">: 1 1758
+1 d none SUNWstuf/EZstuf 0775 root bin
+1 f none SUNWstuf/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none SUNWstuf/HRDstuf 0775 root bin
+1 f none SUNWstuf/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none SUNWstuf/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc	? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 e daemon /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i i.daemon 509 39560 752978103
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865
+1 i r.daemon 320 24573 742152591</programlisting><para><indexterm><primary><command>pkgadd</command> command</primary><secondary>and directories</secondary></indexterm><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>composite package example</secondary></indexterm>While <literal>S70dostuf</literal> belongs to the <literal>daemon</literal> class, the directories
+that lead up to it (which are already in place at install time) belong to
+the <literal>none</literal> class. Even if the directories were unique to
+this package, you should leave them in the <literal>none</literal> class.
+The reason for this is that the directories need to be created first and deleted
+last, and this is always true for the <literal>none</literal> class. The <command>pkgadd</command> command creates directories; they are not copied from the
+package and they are not passed to a class action script to be created. Instead,
+they are created by the <command>pkgadd</command> command before it calls
+the install class action script, and the <command>pkgrm</command> command
+deletes directories after completion of the removal class action script. </para><para><indexterm><primary><command>pkgrm</command> command</primary><secondary>and directories</secondary></indexterm>This means that if a directory in a special
+class contains objects in the class <literal>none</literal>, when the <command>pkgrm</command> command attempts to remove the directory, it fails because the
+directory will not be empty in time. If an object of class <literal>none</literal> is
+to be inserted into a directory of some special class, that directory will
+not exist in time to accept the object. The <command>pkgadd</command> command
+will create the directory on-the-fly during installation of the object and
+may not be able to synchronize the attributes of that directory when it finally
+sees the <filename>pkgmap</filename> definition.  </para><note><para>When assigning a directory to a class, always remember the order
+of creation and deletion.</para>
+</note>
+</sect4>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch6advtech-9"><title>Making Packages Remotely Installable</title><para>All packages <emphasis>must</emphasis> be installable remotely. Installable
+remotely means you do not assume the administrator installing your package
+is installing to the root (<filename>/</filename>) file system of the system
+running the <command>pkgadd</command> command. If, in one of your procedure
+scripts, you need to get to the <filename>/etc/vfstab</filename> file of the
+target system, you need to use the <envar>PKG_INSTALL_ROOT</envar> environment
+variable. In other words, the path name <filename>/etc/vfstab</filename> will
+get you to the <filename>/etc/vfstab</filename> file of the system running
+the <command>pkgadd</command> command, but the administrator may be installing
+to a client at <literal>/export/root/client3</literal>. The path <literal>${PKG_INSTALL_ROOT}/etc/vfstab</literal> is guaranteed to get you to the target file system.</para><sect2 id="ch6advtech-67"><title>Example &ndash; Installing to a Client System</title><para><indexterm><primary>installing packages to clients</primary><secondary>example</secondary></indexterm>In this example, the <literal>SUNWstuf</literal> package
+is installed to <literal>client3</literal>, which is configured with <filename>/opt</filename> in its root (<filename>/</filename>) file system.  One other version
+of this package is already installed on <literal>client3</literal>, and the
+base directory is set to <literal>basedir=/opt/$PKGINST</literal> from an
+administration file, <literal>thisadmin</literal>. (For more information on
+administration files, see <olink targetptr="ch6advtech-34" remap="internal">The Administrative
+Defaults File</olink>.) The <command>pkgadd</command> command executed on
+the server is: </para><screen># <userinput>pkgadd -a thisadmin -R /export/root/client3 SUNWstuf</userinput></screen><para>The table below lists the environment variables and their values that
+are passed to the procedure scripts.</para><table frame="topbot" id="ch6advtech-tbl-62"><title>Values Passed to Procedure
+Scripts</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="159*"/><colspec colname="column2" colwidth="237*"/><thead><row rowsep="1"><entry><para>Environment Variable</para>
+</entry><entry><para>Value</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><envar>PKGINST</envar></para>
+</entry><entry><para><literal>SUNWstuf.2</literal></para>
+</entry>
+</row><row><entry><para><envar>PKG_INSTALL_ROOT</envar></para>
+</entry><entry><para><literal>/export/root/client3</literal></para>
+</entry>
+</row><row><entry><para><envar>CLIENT_BASEDIR</envar></para>
+</entry><entry><para><literal>/opt/SUNWstuf.2</literal></para>
+</entry>
+</row><row><entry><para><envar>BASEDIR</envar></para>
+</entry><entry><para><literal>/export/root/client3/opt/SUNWstuf.2</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="ch6advtech-66"><title>Example &ndash; Installing to a Server or
+Standalone System</title><para><indexterm><primary>installing packages on a standalone or server</primary><secondary>example</secondary></indexterm>To install to the server or a standalone
+system under the same circumstances as the previous example, the command is: </para><screen># <userinput>pkgadd -a thisadmin SUNWstuf</userinput></screen><para>The table below lists the environment variables and their values that
+are passed to the procedure scripts.</para><table frame="topbot" id="ch6advtech-tbl-63"><title>Values Passed to Procedure
+Scripts</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="159*"/><colspec colname="column2" colwidth="237*"/><thead><row rowsep="1"><entry><para>Environment Variable</para>
+</entry><entry><para>Value</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><envar>PKGINST</envar></para>
+</entry><entry><para><literal>SUNWstuf.2</literal></para>
+</entry>
+</row><row><entry><para><envar>PKG_INSTALL_ROOT</envar></para>
+</entry><entry><para>Not defined.</para>
+</entry>
+</row><row><entry><para><envar>CLIENT_BASEDIR</envar></para>
+</entry><entry><para><literal>/opt/SUNWstuf.2</literal></para>
+</entry>
+</row><row><entry><para><envar>BASEDIR</envar></para>
+</entry><entry><para><literal>/opt/SUNWstuf.2</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="ch6advtech-65"><title>Example &ndash; Mounting Shared File Systems</title><para><indexterm><primary>mounting shared file systems</primary><secondary>example</secondary></indexterm>Assume that the <literal>SUNWstuf</literal> package
+creates and shares a file system on the server at <filename>/export/SUNWstuf/share</filename>. When the package is installed to the client systems, their <filename>/etc/vfstab</filename> files need to be updated to mount this shared file
+system. This is a situation where you can use the <envar>CLIENT_BASEDIR</envar> variable. </para><para>The entry on the client needs to present the mount point with reference
+to the client's file system. This line should be constructed correctly whether
+the installation is from the server or from the client. Assume that the server's
+system name is <literal>$SERVER</literal>. You can go to <literal>$PKG_INSTALL_ROOT/etc/vfstab</literal> and, using the <command>sed</command> or <command>awk</command> commands,
+construct the following line for the client's <filename>/etc/vfstab</filename> file. </para><screen>$SERVER:/export/SUNWstuf/share - $CLIENT_BASEDIR/usr nfs - yes ro</screen><para>For example, for the server <literal>universe</literal> and the client
+system <literal>client9</literal>, the line in the client system's <filename>/etc/vfstab</filename> file would look like:</para><screen>universe:/export/SUNWstuf/share - /opt/SUNWstuf.2/usr nfs - yes ro</screen><para>Using these parameters correctly, the entry always mounts the client's
+file system, whether it is being constructed locally or from the server. </para>
+</sect2>
+</sect1><sect1 id="ch6advtech-41"><title>Patching Packages</title><para><indexterm><primary><command>pkgadd</command> command</primary><secondary>and patching packages</secondary></indexterm><indexterm><primary>package</primary><secondary>patching</secondary></indexterm><indexterm><primary>patching packages</primary></indexterm>A patch to a package is just a sparse package designed to overwrite
+certain files in the original. There is no real reason for shipping a sparse
+package except to save space on the delivery medium. You could also ship the
+entire original package with a few files changed, or provide access to the
+modified package over a network. As long as only those new files are actually
+different (the other files were not recompiled), the <command>pkgadd</command> command
+installs the differences. Review the following guidelines regarding patching
+packages.</para><itemizedlist><listitem><para>If the system is complex enough, it is wise to establish a
+patch identification system which assures that no two patches replace the
+same file in an attempt to correct different aberrant behaviors. For instance,
+Sun patch base numbers are assigned mutually exclusive sets of files for which
+they are responsible. </para>
+</listitem><listitem><para>It is necessary to be able to back out a patch.</para>
+</listitem>
+</itemizedlist><para>It is crucial that the version number of the patch package be the same
+as that of the original package. You should keep track of the patch status
+of the package using a separate <command>pkginfo</command> file entry of the
+form </para><screen>PATCH=<replaceable>patch_number</replaceable></screen><para>If the package version is changed for a patch, you create another instance
+of the package and it becomes extremely difficult to manage the patched product.
+This method of progressive instance patching carried certain advantages in
+the early releases of the Solaris operating environment, but makes management
+of more complicated systems tedious.</para><para>All of the zone parameters in the patch must match the zone parameters
+in the package</para><para><indexterm><primary><command>removef</command> command</primary></indexterm>As far as the packages that make up the Solaris operating environment
+are concerned, there should be only one copy of the package in the package
+database, although there may be multiple patched instances. In order to remove
+an object from an installed package (using the <command>removef</command> command)
+you need to figure out what instances own that file. </para><para><indexterm><primary><filename>request</filename> script</primary><secondary>patching packages</secondary></indexterm>However, if your package
+(that is not part of the Solaris operating environment) needs to determine
+the patch level of a particular package that <emphasis>is</emphasis> part
+of the Solaris operating environment, this becomes a problem to be resolved
+here. The installation scripts can be quite large without significant impact
+since they are not stored on the target file system. Using class action scripts
+and various other procedure scripts, you can save changed files using the <envar>PKGSAV</envar> environment variable (or to some other, more permanent directory)
+in order to allow backing out installed patches. You can also monitor patch
+history by setting appropriate environment variables through the <filename>request</filename> scripts. The scripts in the next sections assume that there may
+be multiple patches whose numbering scheme carries some meaning when applied
+to a single package. In this case, individual patch numbers represent a subset
+of functionally related files within the package. Two different patch numbers
+cannot change the same file. </para><para>In order to make a regular sparse package into a patch package, the
+scripts described in the following sections can simply be folded into the
+package. All of them are recognizable as standard package components with
+the exception of the last two which are named <literal>patch_checkinstall</literal> and <literal>patch_postinstall</literal>. Those two scripts can be incorporated into the
+backout package, if you want to include the ability to back out the patch.
+The scripts are fairly simple and their various tasks are straightforward. </para><note><para>This method of patching can be used to patch client systems, but
+client root directories on the server must have the correct permissions to
+allow reading by the user <literal>install</literal> or <literal>nobody</literal>.</para>
+</note><sect2 id="ch6advtech-43"><title>The <filename>checkinstall</filename> Script</title><para><indexterm><primary><filename>checkinstall</filename> script</primary><secondary>patching packages</secondary></indexterm><indexterm><primary>patch list</primary></indexterm>The <filename>checkinstall</filename> script verifies
+that the patch is appropriate for this particular package. Once that is confirmed,
+it constructs the <firstterm>patch list</firstterm> and the <firstterm>patch
+info</firstterm> list, and then inserts them into the response file for incorporation
+into the package database.</para><para>A patch list is the list of patches that have affected the current package.
+This list of patches is recorded in the installed package in the <filename>pkginfo</filename> file with a line that might look like this:</para><programlisting role="complete">PATCHLIST=<replaceable>patch_id</replaceable> <replaceable>patch_id</replaceable> ...</programlisting><para>A patch info list is the list of patches on which the current patch
+is dependent. This list of patches is also recorded in the <filename>pkginfo</filename> file
+with a line that might look like this.</para><programlisting width="100" role="complete">PATCH_INFO_103203-01=Installed... Obsoletes:103201-01 Requires: \ Incompatibles: 120134-01</programlisting><note><para>These lines (and their format) are declared as a public interface.
+Any company that ships patches for Solaris packages should update this list
+appropriately. When a patch is delivered, each package within the patch contains
+a <filename>checkinstall</filename> script that performs this task. That same <filename>checkinstall</filename> script also updates some other patch-specific parameters.
+ This is the new patch architecture, which is called Direct Instance Patching.</para>
+</note><para>In this example, both the original packages and their patches exist
+in the same directory. The two original packages are named <literal>SUNWstuf.v1</literal> and <literal>SUNWstuf.v2</literal>, and their patches are named <literal>SUNWstuf.p1</literal> and <literal>SUNWstuf.p2</literal>. What this means is that it could be very difficult
+for a procedure script to figure out what directory these files came from,
+since everything in the package name after the dot (&ldquo;.&rdquo;) is stripped
+for the <envar>PKG</envar> parameter, and the <envar>PKGINST</envar> environment
+variable refers to the installed instance not the source instance. So the
+procedure scripts can find the source directory, the <filename>checkinstall</filename> script
+(which is always executed from the source directory) makes the inquiry and
+passes the location on as the variable <literal>SCRIPTS_DIR</literal>. If
+there had been only one package in the source directory called <literal>SUNWstuf</literal>,
+then the procedure scripts could have found it using <literal>$INSTDIR/$PKG</literal>. </para><programlisting width="100" role="complete"># checkinstall script to control a patch installation.
+# directory format options.
+#
+#       @(#)checkinstall 1.6 96/09/27 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+INFO_DIR=`dirname $0`
+INFO_DIR=`dirname $INFO_DIR`    # one level up
+ 
+NOVERS_MSG="PaTcH_MsG 8 Version $VERSION of $PKG is not installed on this system."
+ALRDY_MSG="PaTcH_MsG 2 Patch number $Patch_label is already applied."
+TEMP_MSG="PaTcH_MsG 23 Patch number $Patch_label cannot be applied until all \
+restricted patches are backed out."
+ 
+# Read the provided environment from what may have been a request script
+. $1
+ 
+# Old systems can't deal with checkinstall scripts anyway
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        exit 0
+fi
+ 
+#
+# Confirm that the intended version is installed on the system.
+#
+if [ "${UPDATE}" != "yes" ]; then
+        echo "$NOVERS_MSG"
+        exit 3
+fi
+ 
+#
+# Confirm that this patch hasn't already been applied and
+# that no other mix-ups have occurred involving patch versions and
+# the like.
+#
+Skip=0
+active_base=`echo $Patch_label | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+active_inst=`echo $Patch_label | nawk '
+        { print substr($0, match($0, "Patchvers_pfx")+Patchvers_pfx_lnth) } '`
+ 
+# Is this a restricted patch?
+if echo $active_base | egrep -s "Patchstrict_str"; then
+        is_restricted="true"
+        # All restricted patches are backoutable
+        echo "PATCH_NO_UNDO=" &gt;&gt; $1
+else
+        is_restricted="false"
+fi
+ 
+for patchappl in ${PATCHLIST}; do
+        # Is this an ordinary patch applying over a restricted patch?
+        if [ $is_restricted = "false" ]; then
+                if echo $patchappl | egrep -s "Patchstrict_str"; then
+                        echo "$TEMP_MSG"
+                        exit 3;
+                fi
+        fi
+ 
+        # Is there a newer version of this patch?
+        appl_base=`echo $patchappl | nawk '
+                { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+        if [ $appl_base = $active_base ]; then
+                appl_inst=`echo $patchappl | nawk '
+                        { print substr($0, match($0, "Patchvers_pfx")\
++Patchvers_pfx_lnth) } '`
+                result=`expr $appl_inst \&gt; $active_inst`
+                if [ $result -eq 1 ]; then
+                        echo "PaTcH_MsG 1 Patch number $Patch_label is \
+superceded by the already applied $patchappl."
+                        exit 3
+                elif [ $appl_inst = $active_inst ]; then
+                        # Not newer, it's the same
+                        if [ "$PATCH_UNCONDITIONAL" = "true" ]; then
+                                if [ -d $PKGSAV/$Patch_label ]; then
+                                        echo "PATCH_NO_UNDO=true" &gt;&gt; $1
+                                fi
+                        else
+                                echo "$ALRDY_MSG"
+                                exit 3;
+                        fi
+                fi
+        fi
+done
+ 
+# Construct a list of applied patches in order
+echo "PATCHLIST=${PATCHLIST} $Patch_label" &gt;&gt; $1
+ 
+#
+# Construct the complete list of patches this one obsoletes
+#
+ACTIVE_OBSOLETES=$Obsoletes_label
+ 
+if [ -n "$Obsoletes_label" ]; then
+        # Merge the two lists
+        echo $Obsoletes_label | sed 'y/\ /\n/' | \
+        nawk -v PatchObsList="$PATCH_OBSOLETES" '
+        BEGIN {
+                printf("PATCH_OBSOLETES=");
+                PatchCount=split(PatchObsList, PatchObsComp, " ");
+ 
+                for(PatchIndex in PatchObsComp) {
+                        Atisat=match(PatchObsComp[PatchIndex], "@");
+                        PatchObs[PatchIndex]=substr(PatchObsComp[PatchIndex], \
+0, Atisat-1);
+                        PatchObsCnt[PatchIndex]=substr(PatchObsComp\
+[PatchIndex], Atisat+1);
+                }
+        }
+        {
+                Inserted=0;
+                for(PatchIndex in PatchObs) {
+                        if (PatchObs[PatchIndex] == $0) {
+                                if (Inserted == 0) {
+                                        PatchObsCnt[PatchIndex]=PatchObsCnt\
+[PatchIndex]+1;
+                                        Inserted=1;
+                                } else {
+                                        PatchObsCnt[PatchIndex]=0;
+                                }
+                        }
+                }
+                if (Inserted == 0) {
+                        printf ("%s@1 ", $0);
+                }
+                next;
+        }        
+        END {
+                for(PatchIndex in PatchObs) {
+                        if ( PatchObsCnt[PatchIndex] != 0) {
+                                printf("%s@%d ", PatchObs[PatchIndex], \
+PatchObsCnt[PatchIndex]);
+                        }
+                }
+                printf("\n");
+        } ' &gt;&gt; $1
+        # Clear the parameter since it has already been used.
+        echo "Obsoletes_label=" &gt;&gt; $1
+ 
+        # Pass it's value on to the preinstall under another name
+        echo "ACTIVE_OBSOLETES=$ACTIVE_OBSOLETES" &gt;&gt; $1
+fi
+ 
+#
+# Construct PATCH_INFO line for this package.
+#                        
+ 
+tmpRequire=`nawk -F= ' $1 ~ /REQUIR/ { print $2 } ' $INFO_DIR/pkginfo `
+tmpIncompat=`nawk -F= ' $1 ~ /INCOMPAT/ { print $2 } ' $INFO_DIR/pkginfo `
+ 
+if [ -n "$tmpRequire" ] &amp;&amp; [ -n "$tmpIncompat" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: $tmpRequire \
+          Incompatibles: $tmpIncompat" &gt;&gt; $1
+elif [ -n "$tmpRequire" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: $tmpRequire \
+Incompatibles: " &gt;&gt; $1
+elif [ -n "$tmpIncompat" ]
+then
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: Incompatibles: \
+$tmpIncompat" &gt;&gt; $1
+else
+        echo "PATCH_INFO_$Patch_label=Installed: `date` From: `uname -n` \
+          Obsoletes: $ACTIVE_OBSOLETES Requires: Incompatibles: " &gt;&gt; $1
+fi
+ 
+#
+# Since this script is called from the delivery medium and we may be using
+# dot extensions to distinguish the different patch packages, this is the
+# only place we can, with certainty, trace that source for our backout
+# scripts. (Usually $INST_DATADIR would get us there).
+#
+echo "SCRIPTS_DIR=`dirname $0`" &gt;&gt; $1
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-44"><title>The <filename>preinstall</filename> Script</title><para><indexterm><primary><filename>preinstall</filename> script</primary></indexterm>The <filename>preinstall</filename> script initializes the <filename>prototype</filename> file, information files, and installation scripts for
+the backout package to be constructed. This script is very simple and the
+remaining scripts in this example only allow a backout package to describe
+regular files.</para><para><indexterm><primary><command>pkgproto</command> command</primary></indexterm>If you wanted to restore symbolic links, hard links, devices,
+and named pipes in a backout package, you could modify the <filename>preinstall</filename> script
+to use the <command>pkgproto</command> command to compare the delivered <filename>pkgmap</filename> file with the installed files, and then create a <filename>prototype</filename> file entry for each non-file to be changed in the backout package.
+The method you should use is similar to the method in the class action script.</para><para>The scripts <literal>patch_checkinstall</literal> and <literal>patch_postinstall</literal> are inserted into the package source tree from the <filename>preinstall</filename> script. These two scripts undo what the patch does. </para><programlisting width="100" role="complete"># This script initializes the backout data for a patch package
+# directory format options.
+#
+#       @(#)preinstall 1.5 96/05/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+recovery="no"
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+# Check to see if this is a patch installation retry.
+if [ "$INTERRUPTION" = "yes" ]; then
+    if [ -d "$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST" ] || [ -d \
+"$PATCH_BUILD_DIR/$Patch_label.$PKGINST" ]; then
+        recovery="yes"
+    fi
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$BUILD_DIR/files/reloc
+ROOT_DIR=$BUILD_DIR/files/root
+PROTO_FILE=$BUILD_DIR/prototype
+PKGINFO_FILE=$BUILD_DIR/pkginfo
+THIS_DIR=`dirname $0`
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        # If this is being used in an old-style patch, insert
+        # the old-style script commands here.
+ 
+        #XXXOld_CommandsXXX#
+ 
+        exit 0
+fi
+ 
+#
+# Unless specifically denied, initialize the backout patch data by
+# creating the build directory and copying over the original pkginfo
+# which pkgadd saved in case it had to be restored.
+#
+if [ "$PATCH_NO_UNDO" != "true" ] &amp;&amp; [ "$recovery" = "no" ]; then
+        if [ -d $BUILD_DIR ]; then
+                rm -r $BUILD_DIR
+        fi
+ 
+        # If this is a retry of the same patch then recovery is set to
+        # yes. Which means there is a build directory already in
+        # place with the correct backout data.
+ 
+        if [ "$recovery" = "no" ]; then
+                mkdir $BUILD_DIR
+                mkdir -p $RELOC_DIR
+                mkdir $ROOT_DIR
+        fi
+ 
+        #
+        # Here we initialize the backout pkginfo file by first
+        # copying over the old pkginfo file and themn adding the
+        # ACTIVE_PATCH parameter so the backout will know what patch
+        # it's backing out.
+        #
+        # NOTE : Within the installation, pkgparam returns the
+        # original data.
+        #
+        pkgparam -v $PKGINST | nawk '
+                $1 ~ /PATCHLIST/        { next; }
+                $1 ~ /PATCH_OBSOLETES/  { next; }
+                $1 ~ /ACTIVE_OBSOLETES/ { next; }
+                $1 ~ /Obsoletes_label/  { next; }
+                $1 ~ /ACTIVE_PATCH/     { next; }
+                $1 ~ /Patch_label/      { next; }
+                $1 ~ /UPDATE/   { next; }
+                $1 ~ /SCRIPTS_DIR/      { next; }
+                $1 ~ /PATCH_NO_UNDO/    { next; }
+                $1 ~ /INSTDATE/ { next; }
+                $1 ~ /PKGINST/  { next; }
+                $1 ~ /OAMBASE/  { next; }
+                $1 ~ /PATH/     { next; }
+                { print; } ' &gt; $PKGINFO_FILE
+        echo "ACTIVE_PATCH=$Patch_label" &gt;&gt; $PKGINFO_FILE
+        echo "ACTIVE_OBSOLETES=$ACTIVE_OBSOLETES" &gt;&gt; $PKGINFO_FILE
+ 
+        # And now initialize the backout prototype file with the
+        # pkginfo file just formulated.
+        echo "i pkginfo" &gt; $PROTO_FILE
+ 
+        # Copy over the backout scripts including the undo class
+        # action scripts
+        for script in $SCRIPTS_DIR/*; do
+                srcscript=`basename $script`
+                targscript=`echo $srcscript | nawk '
+                        { script=$0; }
+                        /u\./ {
+                                sub("u.", "i.", script);
+                                print script;
+                                next;
+                        }
+                        /patch_/ {
+                                sub("patch_", "", script);
+                                print script;
+                                next;
+                        }
+                        { print "dont_use" } '`
+                if [ "$targscript" = "dont_use" ]; then
+                        continue
+                fi
+ 
+                echo "i $targscript=$FILE_DIR/$targscript" &gt;&gt; $PROTO_FILE
+                cp $SCRIPTS_DIR/$srcscript $FILE_DIR/$targscript
+        done
+         #
+        # Now add entries to the prototype file that won't be passed to
+        # class action scripts. If the entry is brand new, add it to the
+        # deletes file for the backout package.
+        #
+        Our_Pkgmap=`dirname $SCRIPTS_DIR`/pkgmap
+        BO_Deletes=$FILE_DIR/deletes
+ 
+        nawk -v basedir=${BASEDIR:-/} '
+                BEGIN { count=0; }
+                {
+                        token = $2;
+                        ftype = $1;
+                }
+                $1 ~ /[#\!:]/ { next; }
+                $1 ~ /[0123456789]/ {
+                        if ( NF &gt;= 3) {
+                                token = $3;
+                                ftype = $2;
+                        } else {
+                                next;
+                        }
+                }
+                { if (ftype == "i" || ftype == "e" || ftype == "f" || ftype == \
+"v" || ftype == "d") { next; } }
+                {
+                        equals=match($4, "=")-1;
+                        if ( equals == -1 ) { print $3, $4; }
+                        else { print $3, substr($4, 0, equals); }
+                }
+                ' &lt; $Our_Pkgmap | while read class path; do
+                        #
+                        # NOTE: If pkgproto is passed a file that is
+                        # actually a hard link to another file, it
+                        # will return ftype "f" because the first link
+                        # in the list (consisting of only one file) is
+                        # viewed by pkgproto as the source and always
+                        # gets ftype "f".
+                        #
+                        # If this isn't replacing something, then it
+                        # just goes to the deletes list.
+                        #
+                        if valpath -l $path; then
+                                Chk_Path="$BASEDIR/$path"
+                                Build_Path="$RELOC_DIR/$path"
+                                Proto_From="$BASEDIR"
+                        else    # It's an absolute path
+                                Chk_Path="$PKG_INSTALL_ROOT$path"
+                                Build_Path="$ROOT_DIR$path"
+                                Proto_From="$PKG_INSTALL_ROOT"
+                        fi
+                         #
+                        # Hard links have to be restored as regular files.
+                        # Unlike the others in this group, an actual
+                        # object will be required for the pkgmk.
+                        #
+                        if [ -f "$Chk_Path" ]; then
+                                mkdir -p `dirname $Build_Path`
+                                cp $Chk_Path $Build_Path
+                                cd $Proto_From
+                                pkgproto -c $class "$Build_Path=$path" 1&gt;&gt; \
+$PROTO_FILE 2&gt; /dev/null
+                                cd $THIS_DIR
+                        elif [ -h "$Chk_Path" -o \
+                             -c "$Chk_Path" -o \
+                             -b "$Chk_Path" -o \
+                             -p "$Chk_Path" ]; then
+                                pkgproto -c $class "$Chk_Path=$path" 1&gt;&gt; \
+$PROTO_FILE 2&gt; /dev/null
+                        else
+                                echo $path &gt;&gt; $BO_Deletes
+                        fi
+                done
+fi
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-45"><title>The Class Action Script</title><para><indexterm><primary>class action script</primary><secondary>example of</secondary></indexterm>The class action script creates a copy of each file
+that replaces an existing file and adds a corresponding line to the <filename>prototype</filename> file for the backout package. This is all done with fairly simple <command>nawk</command> scripts. The class action script receives a list of source/destination
+pairs consisting of ordinary files that do not match the corresponding installed
+files. Symbolic links and other non-files must be dealt with in the <filename>preinstall</filename> script. </para><programlisting width="100" role="complete"># This class action script copies the files being replaced
+# into a package being constructed in $BUILD_DIR. This class
+# action script is only appropriate for regular files that
+# are installed by simply copying them into place.
+#
+# For special package objects such as editable files, the patch
+# producer must supply appropriate class action scripts.
+#
+# directory format options.
+#
+#       @(#)i.script 1.6 96/05/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+ECHO="/usr/bin/echo"
+SED="/usr/bin/sed"
+PKGPROTO="/usr/bin/pkgproto"
+EXPR="/usr/bin/expr"    # used by dirname
+MKDIR="/usr/bin/mkdir"
+CP="/usr/bin/cp"
+RM="/usr/bin/rm"
+MV="/usr/bin/mv"
+ 
+recovery="no"
+Pn=$$
+procIdCtr=0
+ 
+CMDS_USED="$ECHO $SED $PKGPROTO $EXPR $MKDIR $CP $RM $MV"
+LIBS_USED=""
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+# Check to see if this is a patch installation retry.
+if [ "$INTERRUPTION" = "yes" ]; then
+        if [ -d "$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST" ] || 
+\
+[ -d "$PATCH_BUILD_DIR/$Patch_label.$PKGINST" ]; then
+                recovery="yes"
+        fi
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$FILE_DIR/reloc
+ROOT_DIR=$FILE_DIR/root
+BO_Deletes=$FILE_DIR/deletes
+PROGNAME=`basename $0`
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        PATCH_NO_UNDO="true"
+fi
+ 
+# Since this is generic, figure out the class.
+Class=`echo $PROGNAME | nawk ' { print substr($0, 3)  }'`
+ 
+# Since this is an update, $BASEDIR is guaranteed to be correct
+BD=${BASEDIR:-/}
+ 
+cd $BD
+ 
+#
+# First, figure out the dynamic libraries that can trip us up.
+#
+if [ -z "$PKG_INSTALL_ROOT" ]; then
+        if [ -x /usr/bin/ldd ]; then
+                LIB_LIST=`/usr/bin/ldd $CMDS_USED | sort -u | nawk '
+                        $1 ~ /\// { continue; }
+                        { printf "%s ", $3 } '`
+        else
+                LIB_LIST="/usr/lib/libc.so.1 /usr/lib/libdl.so.1 
+\
+/usr/lib/libw.so.1 /usr/lib/libintl.so.1 /usr/lib/libadm.so.1 \
+/usr/lib/libelf.so.1"
+        fi
+fi
+ 
+#
+# Now read the list of files in this class to be replaced. If the file
+# is already in place, then this is a change and we need to copy it
+# over to the build directory if undo is allowed. If it's a new entry
+# (No $dst), then it goes in the deletes file for the backout package.
+#
+procIdCtr=0
+while read src dst; do
+        if [ -z "$PKG_INSTALL_ROOT" ]; then
+                Chk_Path=$dst
+                for library in $LIB_LIST; do
+                        if [ $Chk_Path = $library ]; then
+                                $CP $dst $dst.$Pn
+                                LIBS_USED="$LIBS_USED $dst.$Pn"
+                                LD_PRELOAD="$LIBS_USED"
+                                export LD_PRELOAD
+                        fi
+                done
+        fi
+ 
+        if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+                # If this is being used in an old-style patch, insert
+                # the old-style script commands here.
+ 
+                #XXXOld_CommandsXXX#
+                echo &gt;/dev/null # dummy
+        fi
+ 
+        if [ "${PATCH_NO_UNDO}" != "true" ]; then
+                #
+                # Here we construct the path to the appropriate source
+                # tree for the build. First we try to strip BASEDIR. If
+                # there's no BASEDIR in the path, we presume that it is
+                # absolute and construct the target as an absolute path
+                # by stripping PKG_INSTALL_ROOT. FS_Path is the path to
+                # the file on the file system (for deletion purposes).
+                # Build_Path is the path to the object in the build
+                # environment.
+                #
+                if [ "$BD" = "/" ]; then
+                        FS_Path=`$ECHO $dst | $SED s@"$BD"@@`
+                else
+                        FS_Path=`$ECHO $dst | $SED s@"$BD/"@@`
+                fi
+ 
+                # If it's an absolute path the attempt to strip the
+                # BASEDIR will have failed.
+                if [ $dst = $FS_Path ]; then
+                        if [ -z "$PKG_INSTALL_ROOT" ]; then
+                                FS_Path=$dst
+                                Build_Path="$ROOT_DIR$dst"
+                        else
+                                Build_Path="$ROOT_DIR`echo $dst | \
+                                    sed s@"$PKG_INSTALL_ROOT"@@`"
+                                FS_Path=`echo $dst | \
+                                    sed s@"$PKG_INSTALL_ROOT"@@`
+                        fi
+                else
+                        Build_Path="$RELOC_DIR/$FS_Path"
+                fi
+ 
+                if [ -f $dst ]; then    # If this is replacing something
+                        cd $FILE_DIR
+                        #
+                        # Construct the prototype file entry. We replace
+                        # the pointer to the filesystem object with the
+                        # build directory object.
+                        #
+                        $PKGPROTO -c $Class $dst=$FS_Path | \
+                            $SED -e s@=$dst@=$Build_Path@ &gt;&gt; \
+                            $BUILD_DIR/prototype
+ 
+                        # Now copy over the file
+                        if [ "$recovery" = "no" ]; then
+                                DirName=`dirname $Build_Path`
+                                $MKDIR -p $DirName
+                                $CP -p $dst $Build_Path
+                        else
+                                # If this file is already in the build area skip it
+                                if [ -f "$Build_Path" ]; then
+                                        cd $BD
+                                        continue
+                                else
+                                        DirName=`dirname $Build_Path`
+                                        if [ ! -d "$DirName" ]; then
+                                                $MKDIR -p $DirName
+                                        fi
+                                        $CP -p $dst $Build_Path
+                                fi        
+                        fi
+ 
+                        cd $BD
+                else    # It's brand new
+                        $ECHO $FS_Path &gt;&gt; $BO_Deletes
+                fi
+        fi
+ 
+        # If special processing is required for each src/dst pair,
+        # add that here.
+        #
+        #XXXSpecial_CommandsXXX#
+        #
+ 
+        $CP $src $dst.$$$procIdCtr
+        if [ $? -ne 0 ]; then
+                $RM $dst.$$$procIdCtr 1&gt;/dev/null 2&gt;&amp;1
+        else
+                $MV -f $dst.$$$procIdCtr $dst
+                for library in $LIB_LIST; do
+                        if [ "$library" = "$dst" ]; then
+                                LD_PRELOAD="$dst"
+                                export LD_PRELOAD
+                        fi
+                done
+        fi                       
+        procIdCtr=`expr $procIdCtr + 1`
+done      
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+#
+# Release the dynamic libraries
+#
+for library in $LIBS_USED; do
+        $RM -f $library
+done
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-46"><title>The <filename>postinstall</filename> Script</title><para><indexterm><primary><filename>postinstall</filename> script</primary><secondary>creating patching packages</secondary></indexterm><indexterm><primary><command>pkgmk</command> command</primary><secondary>and the <filename>postinstall</filename> script</secondary></indexterm><indexterm><primary><command>pkgtrans</command> command</primary></indexterm><indexterm><primary><command>pkgparam</command> command</primary></indexterm>The <filename>postinstall</filename> script creates the backout
+package using the information provided by the other scripts. Since the <command>pkgmk</command> and <command>pkgtrans</command> commands do not require the package
+database, they can be executed within a package installation.  </para><para>In the example, undoing the patch is permitted by constructing a stream
+format package in the save directory (using the <envar>PKGSAV</envar> environment
+variable). It is not obvious, but this package must be in stream format, because
+the save directory gets moved around during a <command>pkgadd</command> operation.
+If the <command>pkgadd</command> command is applied to a package in its own
+save directory, assumptions about where the package source is at any given
+time become very unreliable. A stream format package is unpacked into a temporary
+directory and installed from there. (A directory format package would begin
+installing from the save directory and find itself suddenly relocated during
+a <command>pkgadd</command> fail-safe operation.) </para><para>To determine which patches are applied to a package, use this command:</para><screen>$ <userinput>pkgparam SUNWstuf PATCHLIST</userinput></screen><para>With the exception of <envar>PATCHLIST</envar>, which is a Sun public
+interface, there is nothing significant in the parameter names in this example.
+Instead of <literal>PATCH</literal> you could use the traditional <literal>SUNW_PATCHID</literal> and the various other lists such as <literal>PATCH_EXCL</literal> and <literal>PATCH_REQD</literal> could be renamed accordingly. </para><para>If certain patch packages depend upon other patch packages which are
+available from the same medium, the <filename>checkinstall</filename> script
+could determine this and create a script to be executed by the <filename>postinstall</filename> script in the same way that the upgrade example (see <olink targetptr="ch6advtech-49" remap="internal">Upgrading Packages</olink>) does. </para><programlisting width="100" role="complete"># This script creates the backout package for a patch package
+#
+# directory format options.
+#
+# @(#) postinstall 1.6 96/01/29 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+# Description:
+#       Set the TYPE parameter for the remote file
+#
+# Parameters:
+#       none
+#
+# Globals set:
+#       TYPE
+ 
+set_TYPE_parameter () {
+        if [ ${PATCH_UNDO_ARCHIVE:?????} = "/dev" ]; then
+                # handle device specific stuff
+                TYPE="removable"
+        else
+                TYPE="filesystem"
+        fi
+}
+ 
+#
+# Description:
+#       Build the remote file that points to the backout data
+#
+# Parameters:
+#       $1:     the un/compressed undo archive
+#
+# Globals set:
+#       UNDO, STATE
+ 
+build_remote_file () {
+        remote_path=$PKGSAV/$Patch_label/remote
+        set_TYPE_parameter
+        STATE="active"
+ 
+        if [ $1 = "undo" ]; then
+                UNDO="undo"
+        else
+                UNDO="undo.Z"
+        fi
+ 
+        cat &gt; $remote_path &lt;&lt; EOF
+# Backout data stored remotely
+TYPE=$TYPE
+FIND_AT=$ARCHIVE_DIR/$UNDO
+STATE=$STATE
+EOF
+}
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+if [ "$PKG_INSTALL_ROOT" = "/" ]; then
+        PKG_INSTALL_ROOT=""
+fi
+ 
+if [ -n "$PATCH_BUILD_DIR" -a -d "$PATCH_BUILD_DIR" ]; then
+        BUILD_DIR="$PATCH_BUILD_DIR/$Patch_label.$PKGINST"
+else
+        BUILD_DIR="$PKG_INSTALL_ROOT/var/tmp/$Patch_label.$PKGINST"
+fi
+ 
+if [ ! -n "$PATCH_UNDO_ARCHIVE" ]; then
+        PATCH_UNDO_ARCHIVE="none"
+fi
+ 
+FILE_DIR=$BUILD_DIR/files
+RELOC_DIR=$FILE_DIR/reloc
+ROOT_DIR=$FILE_DIR/root
+BO_Deletes=$FILE_DIR/deletes
+THIS_DIR=`dirname $0`
+PROTO_FILE=$BUILD_DIR/prototype
+TEMP_REMOTE=$PKGSAV/$Patch_label/temp
+ 
+if [ "$PATCH_PROGRESSIVE" = "true" ]; then
+        # remove the scripts that are left behind
+        install_scripts=`dirname $0`
+        rm $install_scripts/checkinstall \
+$install_scripts/patch_checkinstall $install_scripts/patch_postinstall
+ 
+        # If this is being used in an old-style patch, insert
+        # the old-style script commands here.
+ 
+        #XXXOld_CommandsXXX#
+ 
+        exit 0
+fi
+#
+# At this point we either have a deletes file or we don't. If we do,
+# we create a prototype entry.
+#
+if [ -f $BO_Deletes ]; then
+        echo "i deletes=$BO_Deletes" &gt;&gt; $BUILD_DIR/prototype
+fi
+ 
+#
+# Now delete everything in the deletes list after transferring
+# the file to the backout package and the entry to the prototype
+# file. Remember that the pkgmap will get the CLIENT_BASEDIR path
+# but we have to actually get at it using the BASEDIR path. Also
+# remember that removef will import our PKG_INSTALL_ROOT
+#
+Our_Deletes=$THIS_DIR/deletes
+if [ -f $Our_Deletes ]; then
+        cd $BASEDIR
+ 
+        cat $Our_Deletes | while read path; do
+                Reg_File=0
+ 
+                if valpath -l $path; then
+                        Client_Path="$CLIENT_BASEDIR/$path"
+                        Build_Path="$RELOC_DIR/$path"
+                        Proto_Path=$BASEDIR/$path
+                else    # It's an absolute path
+                        Client_Path=$path
+                        Build_Path="$ROOT_DIR$path"
+                        Proto_Path=$PKG_INSTALL_ROOT$path
+                fi
+ 
+                # Note: If the file isn't really there, pkgproto
+                # doesn't write anything.
+                LINE=`pkgproto $Proto_Path=$path`
+                ftype=`echo $LINE | nawk '{ print $1 }'`
+                if [ $ftype = "f" ]; then
+                        Reg_File=1
+                fi
+ 
+                if [ $Reg_File = 1 ]; then
+                        # Add source file to the prototype entry
+                        if [ "$Proto_Path" = "$path" ]; then
+                                LINE=`echo $LINE | sed -e s@$Proto_Path@$Build_Path@2`
+                        else
+                                LINE=`echo $LINE | sed -e s@$Proto_Path@$Build_Path@`
+                        fi
+ 
+                        DirName=`dirname $Build_Path`
+                        # make room in the build tree
+                        mkdir -p $DirName
+                        cp -p $Proto_Path $Build_Path
+                fi
+ 
+                # Insert it into the prototype file
+                echo $LINE 1&gt;&gt;$PROTO_FILE 2&gt;/dev/null
+ 
+                # Remove the file only if it's OK'd by removef
+                rm `removef $PKGINST $Client_Path` 1&gt;/dev/null 2&gt;&amp;1
+        done
+        removef -f $PKGINST
+ 
+        rm $Our_Deletes
+fi
+ 
+#
+# Unless specifically denied, make the backout package.
+#
+if [ "$PATCH_NO_UNDO" != "true" ]; then
+        cd $BUILD_DIR   # We have to build from here.
+ 
+        if [ "$PATCH_UNDO_ARCHIVE" != "none" ]; then
+                STAGE_DIR="$PATCH_UNDO_ARCHIVE"
+                ARCHIVE_DIR="$PATCH_UNDO_ARCHIVE/$Patch_label/$PKGINST"
+                mkdir -p $ARCHIVE_DIR
+                mkdir -p $PKGSAV/$Patch_label
+        else
+                if [ -d $PKGSAV/$Patch_label ]; then
+                        rm -r $PKGSAV/$Patch_label
+                fi
+                STAGE_DIR=$PKGSAV
+                ARCHIVE_DIR=$PKGSAV/$Patch_label
+                mkdir $ARCHIVE_DIR
+        fi
+                 
+        pkgmk -o -d $STAGE_DIR 1&gt;/dev/null 2&gt;&amp;1
+        pkgtrans -s $STAGE_DIR $ARCHIVE_DIR/undo $PKG 1&gt;/dev/null 2&gt;&amp;1
+        compress $ARCHIVE_DIR/undo
+        retcode=$?
+        if [ "$PATCH_UNDO_ARCHIVE" != "none" ]; then
+                if [ $retcode != 0 ]; then
+                        build_remote_file "undo"
+                else
+                        build_remote_file "undo.Z"
+                fi
+        fi
+        rm -r $STAGE_DIR/$PKG
+          
+        cd ..
+        rm -r $BUILD_DIR
+        # remove the scripts that are left behind
+        install_scripts=`dirname $0`
+        rm $install_scripts/checkinstall $install_scripts/patch_\
+checkinstall $install_scripts/patch_postinstall
+fi
+ 
+#
+# Since this apparently worked, we'll mark as obsoleted the prior
+# versions of this patch - installpatch deals with explicit obsoletions.
+#                       
+cd ${PKG_INSTALL_ROOT:-/}
+cd var/sadm/pkg
+ 
+active_base=`echo $Patch_label | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+ 
+List=`ls -d $PKGINST/save/${active_base}*`
+if [ $? -ne 0 ]; then
+        List=""
+fi
+ 
+for savedir in $List; do
+        patch=`basename $savedir`
+        if [ $patch = $Patch_label ]; then
+                break
+        fi
+ 
+        # If we get here then the previous patch gets deleted
+        if [ -f $savedir/undo ]; then
+                mv $savedir/undo $savedir/obsolete
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif [ -f $savedir/undo.Z ]; then
+                mv $savedir/undo.Z $savedir/obsolete.Z
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif  [ -f $savedir/remote ]; then
+                `grep . $PKGSAV/$patch/remote | sed 's/STATE=.*/STATE=obsolete/
+' &gt; $TEMP_REMOTE`
+                rm -f $PKGSAV/$patch/remote
+                mv $TEMP_REMOTE $PKGSAV/$patch/remote
+                rm -f $TEMP_REMOTE
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        elif  [ -f $savedir/obsolete -o -f $savedir/obsolete.Z ]; then
+                echo $Patch_label &gt;&gt; $savedir/obsoleted_by
+        fi
+done
+ 
+# If additional operations are required for this package, place
+# those package-specific commands here.
+ 
+#XXXSpecial_CommandsXXX#
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-47"><title>The <literal>patch_checkinstall</literal> Script</title><programlisting width="100" role="complete"># checkinstall script to validate backing out a patch.
+# directory format option.
+#
+#       @(#)patch_checkinstall 1.2 95/10/10 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+ 
+PATH=/usr/sadm/bin:$PATH
+ 
+LATER_MSG="PaTcH_MsG 6 ERROR: A later version of this patch is applied."
+NOPATCH_MSG="PaTcH_MsG 2 ERROR: Patch number $ACTIVE_PATCH is not installed"
+NEW_LIST=""
+ 
+# Get OLDLIST
+. $1
+ 
+#
+# Confirm that the patch that got us here is the latest one installed on
+# the system and remove it from PATCHLIST.
+#
+Is_Inst=0
+Skip=0
+active_base=`echo $ACTIVE_PATCH | nawk '
+        { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+active_inst=`echo $ACTIVE_PATCH | nawk '
+        { print substr($0, match($0, "Patchvers_pfx")+1) } '`
+for patchappl in ${OLDLIST}; do
+        appl_base=`echo $patchappl | nawk '
+                { print substr($0, 1, match($0, "Patchvers_pfx")-1) } '`
+        if [ $appl_base = $active_base ]; then
+                appl_inst=`echo $patchappl | nawk '
+                        { print substr($0, match($0, "Patchvers_pfx")+1) } '`
+                result=`expr $appl_inst \&gt; $active_inst`
+                if [ $result -eq 1 ]; then
+                        puttext "$LATER_MSG"
+                        exit 3
+                elif [ $appl_inst = $active_inst ]; then
+                        Is_Inst=1
+                        Skip=1
+                fi
+        fi
+        if [ $Skip = 1 ]; then
+                Skip=0
+        else
+                NEW_LIST="${NEW_LIST} $patchappl"
+        fi
+done
+ 
+if [ $Is_Inst = 0 ]; then
+        puttext "$NOPATCH_MSG"
+        exit 3
+fi
+ 
+#
+# OK, all's well. Now condition the key variables.
+#
+echo "PATCHLIST=${NEW_LIST}" &gt;&gt; $1
+echo "Patch_label=" &gt;&gt; $1
+echo "PATCH_INFO_$ACTIVE_PATCH=backed out" &gt;&gt; $1
+ 
+# Get the current PATCH_OBSOLETES and condition it
+Old_Obsoletes=$PATCH_OBSOLETES
+ 
+echo $ACTIVE_OBSOLETES | sed 'y/\ /\n/' | \
+nawk -v PatchObsList="$Old_Obsoletes" '
+        BEGIN {  
+                printf("PATCH_OBSOLETES=");
+                PatchCount=split(PatchObsList, PatchObsComp, " ");
+ 
+                for(PatchIndex in PatchObsComp) {
+                        Atisat=match(PatchObsComp[PatchIndex], "@");
+                        PatchObs[PatchIndex]=substr(PatchObsComp[PatchIndex], \
+0, Atisat-1);
+                        PatchObsCnt[PatchIndex]=substr(PatchObsComp\
+[PatchIndex], Atisat+1);
+                }
+        }
+        {
+                for(PatchIndex in PatchObs) {
+                        if (PatchObs[PatchIndex] == $0) {
+                                PatchObsCnt[PatchIndex]=PatchObsCnt[PatchIndex]-1;
+                        }
+                }
+                next;
+        }        
+        END {
+                for(PatchIndex in PatchObs) {
+                        if ( PatchObsCnt[PatchIndex] &gt; 0 ) {
+                                printf("%s@%d ", PatchObs[PatchIndex], PatchObsCnt\
+[PatchIndex]);
+                        }
+                }
+                printf("\n");
+        } ' &gt;&gt; $1
+ 
+        # remove the used parameters
+        echo "ACTIVE_OBSOLETES=" &gt;&gt; $1
+        echo "Obsoletes_label=" &gt;&gt; $1
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-48"><title>The <literal>patch_postinstall</literal> Script</title><programlisting width="100" role="complete"># This script deletes the used backout data for a patch package
+# and removes the deletes file entries.
+#
+# directory format options.
+#
+#       @(#)patch_postinstall 1.2 96/01/29 SMI
+#
+# Copyright (c) 1995 by Sun Microsystems, Inc.
+# All rights reserved
+#
+PATH=/usr/sadm/bin:$PATH
+THIS_DIR=`dirname $0`
+ 
+Our_Deletes=$THIS_DIR/deletes
+ 
+#
+# Delete the used backout data
+#
+if [ -f $Our_Deletes ]; then
+        cat $Our_Deletes | while read path; do
+                if valpath -l $path; then
+                        Client_Path=`echo "$CLIENT_BASEDIR/$path" | sed s@//@/@`
+                else    # It's an absolute path
+                        Client_Path=$path
+                fi
+                rm `removef $PKGINST $Client_Path`
+        done
+        removef -f $PKGINST
+ 
+        rm $Our_Deletes
+fi
+ 
+#
+# Remove the deletes file, checkinstall and the postinstall
+#
+rm -r $PKGSAV/$ACTIVE_PATCH
+rm -f $THIS_DIR/checkinstall $THIS_DIR/postinstall
+ 
+exit 0</programlisting>
+</sect2>
+</sect1><sect1 id="ch6advtech-49"><title>Upgrading Packages</title><para><indexterm><primary>upgrading packages</primary></indexterm><indexterm><primary>package</primary><secondary>upgrading</secondary></indexterm><indexterm><primary><filename>request</filename> script</primary><secondary>upgradable packages</secondary></indexterm><indexterm><primary><filename>postinstall</filename> script</primary><secondary>upgradable packages</secondary></indexterm>The process
+of upgrading a package is very different from that of overwriting a package.
+While there are special tools to support the upgrade of standard packages
+delivered as part of the Solaris operating environment, an unbundled package
+can be designed to support its own upgrade&mdash;several previous examples
+described packages that look ahead and control the precise method of installation
+under the direction of the administrator. You can design the <filename>request</filename> script
+to support direct upgrade of a package as well. If the administrator chooses
+to have one package install so as to completely replace another, leaving no
+residual obsolete files, the package scripts can do this. </para><para>The <filename>request</filename> script and <filename>postinstall</filename> script
+in this example provide a simple upgradable package. The <filename>request</filename> script
+communicates with the administrator and then sets up a simple file in the <filename>/tmp</filename> directory to remove the old package instance. (Although the <filename>request</filename> script creates a file (which is forbidden), it is okay
+because everyone has access to <filename>/tmp</filename>). </para><para><indexterm><primary><command>pkgrm</command> command</primary></indexterm>The <filename>postinstall</filename> script then executes the shell script in <filename>/tmp</filename>,
+which executes the necessary <command>pkgrm</command> command against the
+old package and then deletes itself.</para><para>This example illustrates a basic upgrade. It is less than fifty lines
+of code including some fairly long messages. It could be expanded to backout
+the upgrade or make other major transformations to the package as required
+by the designer. </para><para>The design of the user interface for an upgrade option must be absolutely
+sure that the administrator is fully aware of the process and has actively
+requested upgrade rather than parallel installation. There is nothing wrong
+with performing a well understood complex operation like upgrade as long as
+the user interface makes the operation clear. </para><sect2 id="ch6advtech-50"><title>The <filename>request</filename> Script</title><indexterm><primary><filename>request</filename> script</primary><secondary>example, upgradable packages</secondary>
+</indexterm><programlisting role="complete"># request script
+control an upgrade installation
+ 
+PATH=/usr/sadm/bin:$PATH
+UPGR_SCRIPT=/tmp/upgr.$PKGINST
+ 
+UPGRADE_MSG="Do you want to upgrade the installed version ?"
+ 
+UPGRADE_HLP="If upgrade is desired, the existing version of the \
+	package will be replaced by this version. If it is not \
+	desired, this new version will be installed into a different \
+	base directory and both versions will be usable."
+ 
+UPGRADE_NOTICE="Conflict approval questions may be displayed. The \
+	listed files are the ones that will be upgraded. Please \
+	answer \"y\" to these questions if they are presented."
+ 
+pkginfo -v 1.0 -q SUNWstuf.\*
+ 
+if [ $? -eq 0 ]; then
+	  # See if upgrade is desired here
+	  response=`ckyorn -p "$UPGRADE_MSG" -h "$UPGRADE_HLP"`
+	  if [ $response = "y" ]; then
+		    OldPkg=`pkginfo -v 1.0 -x SUNWstuf.\* | nawk ' \
+		    /SUNW/{print $1} '`
+		    # Initiate upgrade
+		    echo "PATH=/usr/sadm/bin:$PATH" &gt; $UPGR_SCRIPT
+		    echo "sleep 3" &gt;&gt; $UPGR_SCRIPT
+		    echo "echo Now removing old instance of $PKG" &gt;&gt; \
+		    $UPGR_SCRIPT
+		    if [ ${PKG_INSTALL_ROOT} ]; then
+			      echo "pkgrm -n -R $PKG_INSTALL_ROOT $OldPkg" &gt;&gt; \
+			      $UPGR_SCRIPT
+		    else
+			      echo "pkgrm -n $OldPkg" &gt;&gt; $UPGR_SCRIPT
+		    fi
+		    echo "rm $UPGR_SCRIPT" &gt;&gt; $UPGR_SCRIPT
+		    echo "exit $?" &gt;&gt; $UPGR_SCRIPT
+ 
+		    # Get the original package's base directory
+		    OldBD=`pkgparam $OldPkg BASEDIR`
+		    echo "BASEDIR=$OldBD" &gt; $1
+		    puttext -l 5 "$UPGRADE_NOTICE"
+	   else
+		     if [ -f $UPGR_SCRIPT ]; then
+			       rm -r $UPGR_SCRIPT
+		     fi
+	   fi
+fi
+ 
+exit 0</programlisting>
+</sect2><sect2 id="ch6advtech-51"><title>The <filename>postinstall</filename> Script</title><indexterm><primary><filename>postinstall</filename> script</primary><secondary>example for upgradable packages</secondary>
+</indexterm><programlisting role="complete"># postinstall
+to execute a simple upgrade
+ 
+PATH=/usr/sadm/bin:$PATH
+UPGR_SCRIPT=/tmp/upgr.$PKGINST
+ 
+if [ -f $UPGR_SCRIPT ]; then
+	  sh $UPGR_SCRIPT &amp;
+fi
+ 
+exit 0</programlisting>
+</sect2>
+</sect1><sect1 id="ch6advtech-87"><title>Creating Class Archive Packages</title><para>A class archive package, which is an enhancement to the Application
+Binary Interface (ABI), is one in which certain sets of files have been combined
+into single files, or archives, and optionally compressed or encrypted. Class
+archive formats increase initial install speed by up to 30% and improves reliability
+during installation of packages and patches onto potentially active file systems.</para><para><indexterm><primary>archive packages</primary><secondary>creating</secondary></indexterm>The following sections provide information about the archive package
+directory structure, keywords, and <command>faspac</command> utility.</para><sect2 id="ch6advtech-90"><title>Structure of the Archive Package Directory</title><para><indexterm><primary>archive packages</primary><secondary>directory structure</secondary></indexterm>The package entry shown in the figure below represents
+the directory containing the package files. This directory must be the same
+name as the package.</para><figure id="ch6advtech-fig-95"><title>Package Directory Structure</title><mediaobject><imageobject><imagedata entityref="pkgdirectory.epsi" width="100"/>
+</imageobject><textobject><simpara>Diagram shows five subdirectories directly under the
+package directory: pkginfo, pkgmap, reloc, root, and install. Also shows their
+subdirectories.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The following lists the functions of the files and directories contained
+within the package directory.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="6.58in"?><colspec colname="colspec0" colwidth="26.32*"/><colspec colname="colspec1" colwidth="73.68*"/><thead><row rowsep="1"><entry><para>Item</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>pkginfo</filename></para>
+</entry><entry><para>File describing the package as a whole including special environment
+variables and installation directives</para>
+</entry>
+</row><row><entry><para><filename>pkgmap</filename></para>
+</entry><entry><para>File describing each object (file, directory, pipe, etc.) to be installed</para>
+</entry>
+</row><row><entry><para><filename>reloc</filename></para>
+</entry><entry><para>Optional directory containing the files to be installed relative to
+the base directory (the relocatable objects)</para>
+</entry>
+</row><row><entry><para><filename>root</filename></para>
+</entry><entry><para>Optional directory containing the files to be installed relative to
+the <filename>root</filename> directory (the root objects)</para>
+</entry>
+</row><row><entry><para><filename>install</filename></para>
+</entry><entry><para>Optional directory containing scripts and other auxiliary files (except
+for <filename>pkginfo</filename> and <filename>pkgmap</filename>, all <filename>ftype
+i</filename> files to here)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>The class archive format allows the package builder to combine files
+from the <filename>reloc</filename> and <filename>root</filename> directories
+into archives which can be compressed, encrypted, or otherwise processed in
+any desired way in order to increase install speed, reduce package size, or
+increase package security.</para><para>The ABI allows any file within a package to be assigned to a class.
+All files within a specific class may be installed to the disk using a custom
+method defined by a class action script. This custom method may make use of
+programs available on the target system or programs delivered with the package.
+The resulting format looks much like the standard ABI format. As shown in
+the following illustration, another directory is added. Any class of files
+intended for archive is simply combined into a single file and placed into
+the <filename>archive</filename> directory. All archived files are removed
+from the <filename>reloc</filename> and <filename>root</filename> directories
+and an install class action script is placed into the <filename>install</filename> directory.</para><figure id="ch6advtech-fig-96"><title>Archive Package Directory Structure</title><mediaobject><imageobject><imagedata entityref="pkgarchivedirectory.epsi" width="100"/>
+</imageobject><textobject><simpara>Diagram shows the same package directory structure in
+Figure 6-1 with the addition of the archive subdirectory.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="ch6advtech-91"><title>Keywords to Support Class Archive Packages</title><para><indexterm><primary>archive packages</primary><secondary>keywords</secondary></indexterm>In order to support this new class archive format, three new interfaces
+in the form of keywords have special meaning within the <filename>pkginfo</filename> file.
+These keywords are used to designate classes requiring special treatment.
+The format of each keyword statement is: <filename>keyword=class1[class2 class3
+...]</filename>. Each keyword values are defined in the following table.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><?PubTbl tgroup dispwid="5.99in"?><colspec colwidth="37.59*"/><colspec colwidth="62.41*"/><thead><row rowsep="1"><entry><para>Keyword</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>PKG_SRC_NOVERIFY</literal></para>
+</entry><entry><para>This tells <command>pkgadd</command> not to verify the existence and
+properties of the files in the delivered package's <filename>reloc</filename> or <filename>root</filename> directories if they belong to the named class. This is required
+for all archived classes, because those files are no longer in a <filename>reloc</filename> or <filename>root</filename> directory. They are a private format file in the <filename>archive</filename> directory. </para>
+</entry>
+</row><row><entry><para><literal>PKG_DST_QKVERIFY</literal></para>
+</entry><entry><para>The files in these classes are verified after installation using a quick
+algorithm with little to no text output. The quick verify first sets each
+file's attributes correctly and then checks to see if the operation succeeded.
+There is then a test of the file size and modification time against the <filename>pkgmap</filename>. No <command>checksum</command> verification is performed
+and there is        poorer error recovery than that provided by the standard
+verification mechanism. In the event of a power outage or disk failure during
+installation, the contents file may be inconsistent with the installed files.
+This inconsistency can always be resolved with a <command>pkgrm</command>. </para>
+</entry>
+</row><row><entry><para><literal>PKG_CAS_PASSRELATIVE</literal></para>
+</entry><entry><para>Normally the install class action script receives from <filename>stdin</filename> a
+list of source and destination pairs telling it which files to install. The
+classes assigned to <literal>PKG_CAS_PASSRELATIVE</literal> do not get the
+source and destination pairs. Instead they receive a single list, the first
+entry of which is the location of the source package and the rest of which
+are the destination paths. This is specifically for the purpose of simplifying
+extraction from an archive. From the location of the source package, you can
+find the archive in the <filename>archive</filename> directory. The destination
+paths are then passed to the function responsible for extracting the contents
+of the archive. Each destination path provided is either absolute or relative
+to the base directory depending on whether the path was located in <filename>root</filename> or <filename>reloc</filename> originally. If this option is chosen,
+it may be difficult to combine both relative and absolute paths into a single
+class.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>For each archived class a class action script is required. This is a
+file containing Bourne shell commands which is executed by <command>pkgadd</command> to
+actually install the files from the archive. If a class action script is found
+in the <filename>install</filename> directory of the package, <command>pkgadd</command> turns
+all responsibility for installation over to that script. The class action
+script is run with root permissions and can place its files just about anywhere
+on the target system. </para><note><para>The only keyword that is absolutely necessary in order to implement
+a class archive package is <literal>PKG_SRC_NOVERIFY</literal>. The others
+may be used to increase installation speed or conserve code. </para>
+</note>
+</sect2><sect2 id="ch6advtech-93"><title>The <command>faspac</command> Utility</title><para>The <command>faspac</command> utility converts a standard ABI package
+into a class archive format used for bundled packages. This utility archives
+using cpio and compresses using compress. The resulting package has an additional
+directory in the top directory called <filename>archive</filename>. In this
+directory will be all of the archives named by class. The <filename>install</filename> directory
+will contain the class action scripts necessary to unpack each archive. Absolute
+paths are not archived.</para><para><indexterm><primary>faspac utility</primary></indexterm>The <command>faspac</command> utility has the following format:</para><screen>faspac [-m <replaceable>Archive Method</replaceable>] -a -s -q [-d <replaceable>Base Directory</replaceable>] /
+[-x <replaceable>Exclude List</replaceable>] [<replaceable>List of Packages</replaceable>]</screen><para>Each<command> faspac</command> command option is described in the following
+table.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec2" colwidth="50*"/><colspec colname="colspec3" colwidth="50*"/><thead><row rowsep="1"><entry><para>Option</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><option>m</option> <replaceable>Archive Method</replaceable></para><para></para>
+</entry><entry><para>Indicates a method for archive or compression. <filename>bzip2</filename> is
+the default compression utilities used. To switch to zip or unzip method use <option>m</option> <command>zip</command> or for cpio or compress use <option>m</option> <command>cpio</command>.</para>
+</entry>
+</row><row><entry><para><option>a</option></para>
+</entry><entry><para>Fixes attributes (must be root to do this).</para>
+</entry>
+</row><row><entry><para><option>s</option></para>
+</entry><entry><para>Indicates standard ABI-type package translation. This option takes a
+cpio or compresssed packaged and makes it a standard ABI-compliant package
+format.</para>
+</entry>
+</row><row><entry><para><option>q</option></para>
+</entry><entry><para>Indicates quiet mode.</para>
+</entry>
+</row><row><entry><para><option>d</option> <replaceable>Base Directory</replaceable></para>
+</entry><entry><para>Indicates the directory in which all packages present will be acted
+upon as required by the command line. This is mutually exclusive with the <replaceable>List of Packages</replaceable> entry.</para>
+</entry>
+</row><row><entry><para><option>x</option> <replaceable>Exclude List</replaceable></para>
+</entry><entry><para>Indicates a comma-separated or quoted, space-separated list of packages
+to exclude from processing.</para>
+</entry>
+</row><row><entry><para><replaceable>List of Packages</replaceable></para>
+</entry><entry><para>Indicates the list of packages to be processed.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect2>
+</sect1>
+</chapter><?Pub *0000127364 0?>

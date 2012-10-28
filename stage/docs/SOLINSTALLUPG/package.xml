@@ -1,0 +1,321 @@
+<appendix id="package-9"><title>Additional SVR4 Packaging Requirements
+(Reference)</title><highlights><para>This appendix is for system
+administrators who install or remove packages, especially third-party packages.
+Following these packaging requirements enables the following:</para><itemizedlist><listitem><para>Avoids modifying the currently running system so you can upgrade
+with Solaris Live Upgrade and create and maintain non-global zones and diskless
+clients</para>
+</listitem><listitem><para>Prevents a package from being interactive to automate installations
+when using installation programs such as custom JumpStart</para>
+</listitem>
+</itemizedlist><para>This chapter contains the following sections:</para><itemizedlist><listitem><para><olink targetptr="package-12" remap="internal">Preventing Modification of the
+Current OS</olink>.</para>
+</listitem><listitem><para><olink targetptr="package-90" remap="internal">Preventing User Interaction
+When Installing or Upgrading</olink>.</para>
+</listitem><listitem><para><olink targetptr="gcbhp" remap="internal">Setting Package Parameters For Zones</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="package-12"><title>Preventing Modification of the Current OS</title><para>Following the requirements in this section keeps the currently running
+OS unaltered.</para><sect2><title>Using Absolute Paths</title><para>For an installation of an operating system to be successful, packages
+must recognize and correctly respect alternate root (/) file systems, such
+as a Solaris Live Upgrade inactive boot environment. </para><para>Packages can include absolute paths in their <filename>pkgmap</filename> file
+(package map). If these files exist, they are written relative to the <option>R</option> option
+of the <command>pkgadd</command> command. Packages that contain both absolute
+and relative (relocatable) paths can be installed to an alternative root (<filename>/</filename>) file system as well. <envar>$PKG_INSTALL_ROOT</envar> is prepended
+to both absolute and relocatable files so all paths are resolved properly
+when being installed by <command>pkgadd</command>.</para>
+</sect2><sect2><title>Using the <command>pkgadd</command> <option>R</option> Command</title><para>Packages being installed by using the <command>pkgadd</command> <option>R</option> option
+or being removed using the <command>pkgrm</command> <option>R</option> option
+must not alter the currently running system. This feature is used by custom
+JumpStart, Solaris Live Upgrade, non-global zones and diskless client.</para><para>Any procedure scripts that are included in the packages being installed
+with the <command>pkgadd</command> command <option>R</option> option or being
+removed by using the <command>pkgrm</command> command <option>R</option> option
+must not alter the currently running system. Any installation scripts that
+you provide must reference any directory or file that is prefixed with the <envar>$PKG_INSTALL_ROOT</envar> variable. The package must write all directories
+and files with the <envar>$PKG_INSTALL_ROOT</envar> prefix. The package must
+not remove directories without a <envar>$PKG_INSTALL_ROOT</envar> prefix. </para><para><olink targetptr="package-tbl-11" remap="internal">Table B&ndash;1</olink> provides examples
+of script syntax.</para><table frame="topbot" pgwide="1" id="package-tbl-11"><title>Examples of Installation
+Script Syntax</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="26.95*"/><colspec colwidth="61.53*"/><colspec colname="colspec2" colwidth="61.53*"/><thead><row rowsep="1"><entry><para>Script Type</para>
+</entry><entry><para>Correct Syntax</para>
+</entry><entry><para>Incorrect Syntax</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Bourne shell &ldquo;if&rdquo; statement fragments</para>
+</entry><entry><programlisting>if [ -f ${PKG_INSTALL_ROOT}\
+/etc/myproduct.conf ] ; then</programlisting>
+</entry><entry><programlisting>if [ -f /etc/myproduct.conf ] ; \
+ then</programlisting>
+</entry>
+</row><row><entry><para>Removing a file</para>
+</entry><entry><programlisting>/bin/rm -f ${PKG_INSTALL_ROOT}\
+/etc/myproduct.conf</programlisting>
+</entry><entry><programlisting>/bin/rm -f /etc/myproduct.conf </programlisting>
+</entry>
+</row><row><entry><para>Changing a file</para>
+</entry><entry><programlisting>echo "test=no" > ${PKG_INSTALL_ROOT}\
+/etc/myproduct.conf</programlisting>
+</entry><entry><programlisting>echo "test=no" > \
+/etc/myproduct.conf</programlisting>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="package-2"><title>Differences Between <envar>$PKG_INSTALL_ROOT</envar> and <envar>$BASEDIR</envar> Overview</title><para><envar>$PKG_INSTALL_ROOT</envar> is the location of the root (<filename>/</filename>)
+file system of the machine to which you are adding the package. The location
+is set to the <option>R</option> argument of the <command>pkgadd</command> command.
+For example, if the following command is invoked, then <envar>$PKG_INSTALL_ROOT</envar> becomes <filename>/a</filename> during the installation of the package.</para><screen># <userinput>pkgadd -R /a SUNWvxvm</userinput></screen><para><envar>$BASEDIR</envar> points to the <emphasis>relocatable</emphasis> base
+directory into which relocatable package objects are installed. Only relocatable
+objects are installed here. Nonrelocatable objects (those that have <emphasis>absolute</emphasis> paths in the <filename>pkgmap</filename> file) are always installed
+relative to the inactive boot environment,  but not relative to the <envar>$BASEDIR</envar> in effect. If a package has no relocatable objects, then the package
+is said to be an absolute package (or nonrelocatable), and <envar>$BASEDIR</envar> is
+undefined and not available to package procedure scripts.</para><para>For example, suppose a package's <filename>pkgmap</filename> file has
+two entries:</para><screen>1 f none sbin/ls 0555 root sys 3541 12322 1002918510
+1 f none /sbin/ls2 0555 root sys 3541 12322 2342423332</screen><para>The <filename>pkginfo</filename> file has a specification for <envar>$BASEDIR</envar>:</para><screen>BASEDIR=/opt</screen><para>If this package is installed with the following command, then <filename>ls</filename> is
+installed in <filename>/a/opt/sbin/ls</filename>, but <filename>ls2</filename> is
+installed as <filename>/a/sbin/ls2</filename>.</para><screen># <userinput>pkgadd -R /a SUNWtest</userinput></screen>
+</sect2><sect2><title>Guidelines for Writing Scripts</title><para>Your package procedure scripts must be independent of the currently
+running OS to prevent modifying the OS. Procedure scripts define actions that
+occur at particular points during package installation and removal. Four procedure
+scripts can be created with these predefined names: <literal>preinstall</literal>, <literal>postinstall</literal>, <literal>preremove</literal>, and <literal>postremove</literal>. </para><table frame="topbot" pgwide="100" id="eyavz"><title>Guidelines For Creating
+Scripts</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="56.17*"/><colspec colwidth="7.97*"/><colspec colwidth="7.86*"/><thead><row rowsep="1"><entry><para>Guidelines</para>
+</entry><entry><para>Affects Solaris Live Upgrade</para>
+</entry><entry><para>Affects non-global zones</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Scripts must be written in Bourne shell (<filename>/bin/sh</filename>).
+Bourne shell is the interpreter that is used by the <command>pkgadd</command> command
+to execute the procedure scripts. </para>
+</entry><entry><para>X</para>
+</entry><entry><para>X</para>
+</entry>
+</row><row><entry><para>Scripts must not start or stop any processes or depend on the output
+of commands such as <command>ps</command> or <command>truss</command>, which
+are operating system dependent and report information about the currently
+running system. </para>
+</entry><entry><para>X</para>
+</entry><entry><para>X</para>
+</entry>
+</row><row><entry><para>Scripts are free to use other standard UNIX commands such as <command>expr</command>, <command>cp</command>, and <command>ls</command>  and other commands that facilitate
+shell scripting. </para>
+</entry><entry><para>X</para>
+</entry><entry><para>X</para>
+</entry>
+</row><row><entry><para>Any commands that a script invokes must be available in all supported
+releases, since a package must run on all of those releases. Therefore, you
+cannot use commands that were added or removed after the Solaris 8 release. </para><para>To verify that a specific command or option is supported in a Solaris
+8, 9, or 10 release, see the specific version of <citetitle>Solaris Reference
+Manual AnswerBook</citetitle> on <ulink url="http://docs.sun.com" type="text">http://docs.sun.com</ulink>. </para>
+</entry><entry><para>X</para>
+</entry><entry>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2><title>Maintaining Diskless Client Compatibility</title><para>Packages must not execute commands delivered by the package itself.
+This is to maintain diskless client compatibility and avoids running commands
+that might require shared libraries that are not installed yet. </para>
+</sect2><sect2><title>Verifying Packages</title><para>All packages must pass <command>pkgchk</command> validation. After a
+package is created and before it is installed, it must be checked with the
+following command.</para><screen># <userinput>pkgchk -d</userinput> <replaceable>dir_name</replaceable> <replaceable>pkg_name</replaceable></screen><variablelist><varlistentry><term><replaceable>dir_name</replaceable></term><listitem><para>Specifies the name of the directory where the package resides</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>pkg_name</replaceable></term><listitem><para>Specifies the name of the package</para>
+</listitem>
+</varlistentry>
+</variablelist><example><title>Testing a Package</title><para>After a package is created, it must be tested by installing it in an
+alternate root (<filename>/</filename>) file system location by using the <option>R</option> <replaceable>dir_name</replaceable> option to <command>pkgadd</command>.
+After the package is installed, it must be checked for correctness by using <command>pkgchk</command>, as in this example.</para><screen># <userinput>pkgadd -d . -R /a SUNWvxvm</userinput>
+# <userinput>pkgchk -R /a SUNWvxvm</userinput></screen><para>No errors should be displayed.</para>
+</example><example><title>Testing a Package on <filename>/export/SUNWvxvm</filename></title><para>If a package exists at <filename>/export/SUNWvxvm</filename>, then you
+would issue the following command.</para><screen># <userinput>pkgchk -d /export SUNWvxvm</userinput></screen><para>No errors should be displayed.</para>
+</example><para>Other commands can check the package when you are creating, modifying,
+and deleting files. The following commands are some examples.</para><itemizedlist><listitem><para>For example, the <command>dircmp</command> or <command>fssnap</command> commands
+can be used to verify that packages behave properly. </para>
+</listitem><listitem><para>Also, the <command>ps</command> command can be used for testing
+daemon compliance by making sure daemons are not stopped or started by the
+package. </para>
+</listitem><listitem><para>The <command>truss</command>, <command>pkgadd <option>v</option></command>,
+and <command>pkgrm</command> commands can test runtime package installation
+compliance, but might not work in all situations. In the following example,
+the <command>truss</command> command strips out all read-only, non-<envar>$TEMPDIR</envar> access and shows only non-read-only access to paths that do not lie
+within the specified inactive boot environment. </para>
+</listitem>
+</itemizedlist><screen># <userinput>TEMPDIR=/a; export TEMPDIR</userinput>
+# <userinput>truss -t open /usr/sbin/pkgadd -R ${TEMPDIR} SUNWvxvm</userinput> \
+<userinput>2>&amp;1 > /dev/null | grep -v O_RDONLY | grep -v \</userinput>
+<userinput>'open("'${TEMPDIR}</userinput></screen>
+</sect2>
+</sect1><sect1 id="package-90"><title>Preventing User Interaction When Installing
+or Upgrading</title><para>Packages must be added or removed without the user being prompted for
+information when using the following standard Solaris utilities. </para><itemizedlist><listitem><para>The custom JumpStart program</para>
+</listitem><listitem><para>Solaris Live Upgrade</para>
+</listitem><listitem><para>Solaris installation program</para>
+</listitem><listitem><para>Solaris Zones</para>
+</listitem>
+</itemizedlist><para>To test a package to ensure that it will install with no user interaction,
+a new administration file can be set up with the <command>pkgadd</command> command <option>a</option> option. The <option>a</option> option defines an installation administration
+file to be used in place of the default administration file. Using the default
+file might result in the user being prompted for more information. You can
+create an administration file that indicates to <command>pkgadd</command> that
+it should bypass these checks and install the package without user confirmation.
+For details, see the man page <olink targetdoc="refman4" targetptr="admin-4" remap="external"><citerefentry><refentrytitle>admin</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> or <olink targetdoc="refman1m" targetptr="pkgadd-1m" remap="external"><citerefentry><refentrytitle>pkgadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><para>The following examples show how the <command>pkgadd</command> command
+uses the administration file.</para><itemizedlist><listitem><para>If no administration file is provided, <command>pkgadd</command> uses <filename>/var/sadm/install/admin/default</filename>. Using this file might result in
+user interaction.</para><screen># <userinput>pkgadd</userinput> </screen>
+</listitem><listitem><para>If a relative administration file is provided on the command
+line, <command>pkgadd</command> looks in <filename>/var/sadm/install/admin</filename> for
+the file name and uses it. In this example, the relative administration file
+is named <filename>nocheck</filename> and <command>pkgadd</command> looks
+for <filename>/var/sadm/install/admin/nocheck</filename>.  </para><screen># <userinput>pkgadd -a nocheck</userinput> </screen>
+</listitem><listitem><para>If an absolute file is provided <command>pkgadd</command> uses
+it. In this example, <command>pkgadd</command> looks in <filename>/tmp</filename> for
+the <filename>nocheck</filename> administration file.</para><screen># <userinput>pkgadd -a /tmp/nocheck</userinput> </screen>
+</listitem>
+</itemizedlist><example><title>Installation Administration File</title><para>The following is an example of an installation administration file that
+requires very little user interaction with the <command>pkgadd</command> utility.
+Unless the package requires more space than is available on the system, the <command>pkgadd</command> utility uses this file and installs the package without prompting
+the user for more information.</para><programlisting>mail=
+instance=overwrite
+partial=nocheck
+runlevel=nocheck
+idepend=nocheck
+space=ask
+setuid=nocheck
+confiict=nocheck
+action=nocheck
+basedir=default</programlisting>
+</example>
+</sect1><sect1 id="gcbhp"><title>Setting Package Parameters For Zones</title><para>Packages have parameters that control how their content is distributed
+and made visible on a system with non-global zones installed. The <literal>SUNW_PKG_ALLZONES</literal>, <literal>SUNW_PKG_HOLLOW</literal>, and <literal>SUNW_PKG_THISZONE</literal> package
+parameters define the characteristics of packages on a system with zones installed.
+These parameters must be set so that packages can be administered in a system
+with non-global zones.</para><para>The following table lists the four valid combinations for setting package
+parameters. If you choose setting combinations that are not listed in the
+following table, those settings are invalid and result in the package failing
+to install.</para><note><para>Ensure that you have set all three package parameters. You can
+leave all three package parameters blank. The package tools interpret a missing
+zone package parameter as if the setting were &ldquo;false,&rdquo; but not
+setting the parameters is strongly discouraged. By setting all three package
+parameters, you specify the exact behavior the package tools should exhibit
+when installing or removing the package. </para>
+</note><table frame="topbot" id="gcbgl"><title>Valid Package Parameter
+Settings For Zones</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="21.13*"/><colspec colwidth="19.83*"/><colspec colwidth="22.79*"/><colspec colname="colspec0" colwidth="68.26*"/><thead><row rowsep="1"><entry><para><literal>SUNW_PKG_ALLZONES</literal> Setting</para>
+</entry><entry><para><literal>SUNW_PKG_HOLLOW</literal> Setting</para>
+</entry><entry><para><literal>SUNW_PKG_THISZONE</literal> Setting</para>
+</entry><entry><para>Package Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>false</para>
+</entry><entry><para>false</para>
+</entry><entry><para>false</para>
+</entry><entry><para>This is the default setting for packages that do not specify values
+for all the zone package parameters.</para><para>A package with these settings can be installed in either the global
+zone or a non-global zone. </para><itemizedlist><listitem><para>If the <command>pkgadd</command> command is run in the global
+zone, the package is installed in the global zone and in all non-global zones.</para>
+</listitem><listitem><para>If the <command>pkgadd</command> command is run in a non-global
+zone, the package is installed in the non-global zone only. </para>
+</listitem>
+</itemizedlist><para>In both cases, the entire contents of the package is visible in all
+zones where the package is installed.</para>
+</entry>
+</row><row><entry><para>false</para>
+</entry><entry><para>false</para>
+</entry><entry><para>true</para>
+</entry><entry><para>A package with these settings can be installed in either the global
+zone or a non-global zone. If new non-global zones are created after the installation,
+the package is not propagated to these new non-global zones.</para><itemizedlist><listitem><para>If the <command>pkgadd</command> command is run in the global
+zone, the package is installed in the global zone only.</para>
+</listitem><listitem><para>If the <command>pkgadd</command> command is run in a non-global
+zone, the package is installed in the non-global zone only.</para>
+</listitem>
+</itemizedlist><para> In both cases, the entire contents of the package is visible in the
+zone where the package is installed.</para>
+</entry>
+</row><row><entry><para>true</para>
+</entry><entry><para>false</para>
+</entry><entry><para>false</para>
+</entry><entry><para>A package with these settings can be installed in the global zone only.
+When the <command>pkgadd</command> command is run, the package is installed
+in the global zone and in all non-global zones. The entire contents of the
+package is visible in all zones.</para><note><para>Any attempt to install the package in a non-global zone fails.</para>
+</note>
+</entry>
+</row><row><entry><para>true</para>
+</entry><entry><para>true</para>
+</entry><entry><para>false</para>
+</entry><entry><para>A package with these settings can only be installed in the global zone,
+by the global administrator.  When the <command>pkgadd</command> command is
+run, the contents of the package is fully installed in the global zone. If
+a package has the package parameters set to these values, the package content
+itself is not delivered on any non-global zone. Only the package installation
+information necessary to make the package appear to be installed is installed
+on all non-global zones. This enables the installation of other packages to
+be installed that depend on this package. For more information on &ldquo;hollow&rdquo;
+packages, see <olink targetdoc="sysadrm" targetptr="z.pkginst.ov-1" remap="external">Chapter 24, <citetitle remap="chapter">About Packages and Patches on a Solaris System With Zones Installed (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><para>For package dependency checking purposes, the package appears to be
+installed in all zones.</para><itemizedlist><listitem><para>In the global zone, the entire contents of the package is
+visible.</para>
+</listitem><listitem><para>In whole root non-global zones, the entire contents of the
+package is not visible.</para>
+</listitem><listitem><para>When a non-global zone inherits a file system from the global
+zone, a package installed in this file system is visible in a non-global zone.
+All other files delivered by the package are not visible within the non-global
+zone. </para><para>For example, a sparse root non-global zone shares certain
+directories with the global zone. These directories are read-only. Sparse
+root non-global zones share the <filename>/platform</filename> file system
+among others. Another example is packages that deliver files relevant only
+to booting hardware.</para>
+</listitem>
+</itemizedlist><note><para>Any attempt to install the package in a non-global zone fails.</para>
+</note>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para>Description</para>
+</entry><entry><para>For More Information</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>For more details on packages and zones</para>
+</entry><entry><para><olink targetdoc="sysadrm" targetptr="z.pkginst.ov-1" remap="external">Chapter 24, <citetitle remap="chapter">About Packages and Patches on a Solaris System With Zones Installed (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink></para>
+</entry>
+</row><row><entry><para>For an overview of sparse and whole root zones</para>
+</entry><entry><para><olink targetdoc="sysadrm" targetptr="zones.intro-1" remap="external">Chapter 16, <citetitle remap="chapter">Introduction to Solaris Zones,</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink> </para>
+</entry>
+</row><row><entry><para>For information about package characteristics and parameters</para>
+</entry><entry><para><olink targetdoc="refman4" targetptr="pkginfo-4" remap="external"><citerefentry><refentrytitle>pkginfo</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>For information about displaying package parameter values</para>
+</entry><entry><para><olink targetdoc="refman1" targetptr="pkgparam-1" remap="external"><citerefentry><refentrytitle>pkgparam</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="package-1"><title>For Background Information</title><para>The following references provide background information about packaging
+requirements and specific command syntax.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="33.29*"/><colspec colwidth="66.71*"/><tbody><row><entry><para>For more specific information about packaging requirements and definitions
+of terminology</para>
+</entry><entry><para><olink targetdoc="packinstall" targetptr="ch6advtech-96543" remap="external">Chapter 6, <citetitle remap="chapter">Advanced Techniques for Creating Packages,</citetitle> in <citetitle remap="book">Application Packaging Developer&rsquo;s Guide</citetitle></olink></para>
+</entry>
+</row><row><entry><para>For basic information about adding and removing packages and the installation
+administration file</para>
+</entry><entry><para><olink targetdoc="sysadv1" targetptr="swmgrpkgsconcepts-52619" remap="external">Chapter 17, <citetitle remap="chapter">Managing Software (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink></para>
+</entry>
+</row><row><entry><para>For detailed information about specific commands that are referenced
+in this appendix, see these man pages</para>
+</entry><entry><para><olink targetdoc="refman1" targetptr="dircmp-1" remap="external"><citerefentry><refentrytitle>dircmp</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, <olink targetdoc="refman1m" targetptr="fssnap-1m" remap="external"><citerefentry><refentrytitle>fssnap</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="refman1" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, or <olink targetdoc="refman1" targetptr="truss-1" remap="external"><citerefentry><refentrytitle>truss</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> <olink targetdoc="refman1m" targetptr="pkgadd-1m" remap="external"><citerefentry><refentrytitle>pkgadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, <olink targetdoc="refman1m" targetptr="pkgchk-1m" remap="external"><citerefentry><refentrytitle>pkgchk</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>, or <olink targetdoc="refman1m" targetptr="pkgrm-1m" remap="external"><citerefentry><refentrytitle>pkgrm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>For an overview of Solaris Live Upgrade</para>
+</entry><entry><para><olink targetptr="luoverview-1" remap="internal">Chapter&nbsp;2,
+Solaris Live Upgrade (Overview)</olink></para>
+</entry>
+</row><row><entry><para>For an overview of custom JumpStart</para>
+</entry><entry><para><olink targetdoc="solinstalladv" targetptr="jumpstartoverview-4" remap="external">Chapter 2, <citetitle remap="chapter">Custom JumpStart (Overview),</citetitle> in <citetitle remap="book">Solaris Express Installation Guide: Custom JumpStart and Advanced Installations</citetitle></olink></para>
+</entry>
+</row><row><entry><para>For an overview of Solaris Zones</para>
+</entry><entry><para><olink targetdoc="sysadrm" targetptr="zones.intro-1" remap="external">Chapter 16, <citetitle remap="chapter">Introduction to Solaris Zones,</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</appendix>

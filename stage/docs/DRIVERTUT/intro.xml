@@ -1,0 +1,634 @@
+<?Pub UDT _bookmark _target?><?Pub CX solbook(?><chapter id="drivertut1"><?Pub Tag atict:info tracking="on" ref="0"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Introduction to Device Drivers</title><highlights><para>This chapter gives an overview of the Solaris Operating System and kernel.
+This chapter also gives an overview of the driver development environment
+and the development tools available to you.</para>
+</highlights><sect1 id="fcaof"><title>Solaris Operating System Definition</title><para><indexterm><primary>kernel</primary></indexterm><indexterm><primary>kernel mode</primary></indexterm><indexterm><primary>protected mode</primary></indexterm><indexterm><primary>user mode</primary></indexterm><indexterm><primary>restricted mode</primary></indexterm>The Solaris Operating System
+(Solaris OS) is implemented as an executable file that runs at boot time.
+The Solaris OS is referred to as the <emphasis>kernel</emphasis>. The kernel
+contains all of the routines that are necessary for the system to run. Because
+the kernel is essential for the running of the machine, the kernel runs in
+a special, protected mode that is called <emphasis>kernel mode</emphasis>.
+In contrast, user-level applications operate in a restricted mode called <emphasis>user mode</emphasis> that has no access to kernel instructions or to the kernel
+address space. Device drivers run in kernel mode and are prevented from directly
+accessing processes in user mode.</para>
+</sect1><sect1 id="emjjp"><title>Kernel Overview</title><para>The kernel manages the system resources, including file systems, processes,
+and physical devices. The kernel provides applications with system services
+such as I/O management, virtual memory, and scheduling. The kernel coordinates
+interactions of all user processes and system resources.  The kernel assigns
+priorities, services resource requests, and services hardware interrupts and
+exceptions. The kernel schedules and switches threads, pages memory, and swaps
+processes.</para><sect2 id="emjjr"><title>Differences Between Kernel Modules and User Programs</title><para>This section discusses several important differences between kernel
+modules and user programs.</para><sect3 id="emqpr"><title>Execution Differences Between Kernel Modules and
+User Programs</title><itemizedlist><para>The following characteristics of kernel modules highlight important
+differences between the execution of kernel modules and the execution of user
+programs:</para><listitem><para><indexterm><primary>kernel</primary><secondary>address space</secondary></indexterm><emphasis role="strong">Kernel modules have separate address space.</emphasis> A
+module runs in <emphasis>kernel space</emphasis>. An application runs in  <emphasis>user space</emphasis>. System software is protected from user programs. Kernel
+space and user space have their own memory address spaces. See <olink targetptr="eoqob" remap="internal">User and Kernel Address Spaces on x86 and SPARC Machines</olink> for
+important information about address spaces.</para>
+</listitem><listitem><para><indexterm><primary>kernel</primary><secondary>privilege</secondary><seealso>kernel mode</seealso></indexterm><emphasis role="strong">Kernel modules
+have higher execution privilege.</emphasis> Code that runs in kernel space
+has greater privilege than code that runs in user space. Driver modules potentially
+have a much greater impact on the system than user programs. Test and debug
+your driver modules carefully and thoroughly to avoid adverse impact on the
+system. See <olink targetptr="fdlbq" remap="internal">Device Driver Testing Tips</olink>.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules do not execute sequentially.</emphasis> A user program typically executes sequentially and performs a
+single task from beginning to end. A kernel module does not execute sequentially.
+A kernel module registers itself in order to serve future requests.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules can be interrupted.</emphasis> More
+than one process can request your driver at the same time. An interrupt handler
+can request your driver at the same time that your driver is serving a system
+call. In a symmetric multiprocessor (SMP) system, your driver could be executing
+concurrently on more than one CPU.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules must be preemptable.</emphasis> You
+cannot assume that your driver code is safe just because your driver code
+does not block. Design your driver assuming your driver might be preempted.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules can share data.</emphasis> Different
+threads of an application program usually do not share data. By contrast,
+the data structures and routines that constitute a driver are shared by all
+threads that use the driver. Your driver must be able to handle contention
+issues that result from multiple requests. Design your driver data structures
+carefully to  keep multiple threads of execution separate. Driver code must
+access shared data without corrupting the data. See <olink targetdoc="driver" targetptr="mt-17026" remap="external">Chapter 3, <citetitle remap="chapter">Multithreading,</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink> and <olink targetdoc="mtp" remap="external"><citetitle remap="book">Multithreaded Programming Guide</citetitle></olink>.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="emqqh"><title>Structural Differences Between Kernel Modules and
+User Programs</title><itemizedlist><para>The following characteristics of kernel modules highlight important
+differences between the structure of kernel modules and the structure of user
+programs:</para><listitem><para><indexterm><primary>device drivers</primary><secondary>entry points</secondary><seealso>entry points</seealso></indexterm><emphasis role="strong">Kernel modules do not define a main program.</emphasis> Kernel
+modules, including device drivers, have no <function>main</function> routine.
+ Instead, a kernel module is a collection of subroutines and data. A device
+driver is a kernel module that forms a software interface to an input/output
+(I/O) device.  The subroutines in a device driver provide <emphasis>entry
+points</emphasis> to the device. The kernel uses a device number attribute
+to locate the <function>open</function> routine and other routines of the
+correct device driver. See <olink targetptr="emjjs" remap="internal">Device Drivers</olink> for
+more information on entry points. See <olink targetptr="fgove" remap="internal">Device Numbers</olink> for
+a description of device numbers.</para>
+</listitem><listitem><para><indexterm><primary>linking</primary></indexterm><indexterm><primary>commands</primary><secondary><command>ld</command></secondary></indexterm><indexterm><primary><command>ld</command> command</primary></indexterm><emphasis role="strong">Kernel modules are linked only to the
+kernel.</emphasis> Kernel modules do not link in the same libraries that user
+programs link in. The only functions a kernel module can call are functions
+that are exported by the kernel. If your driver references symbols that are
+not defined in the kernel, your driver will compile but will fail to load.
+Solaris OS driver modules should use prescribed DDI/DKI (Device Driver Interface,
+Driver-Kernel Interface) interfaces. When you use these standard interfaces
+you can upgrade to a new Solaris release or migrate to a new platform without
+recompiling your driver. For more information on the DDI, see<olink targetdoc="driver" targetptr="kernelovr-40" remap="external"><citetitle remap="section">DDI/DKI
+Interfaces</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink>.
+Kernel modules can depend on other kernel modules by using the <option>N</option> option
+during link editing. See the <olink targetdoc="group-refman" targetptr="ld-1" remap="external"><citerefentry><refentrytitle>ld</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules use different header
+files.</emphasis> Kernel modules require a different set of header files than
+user programs require. The required header files are listed in the man page
+for each function. See <olink targetdoc="refman9f" remap="external"><citetitle remap="book">man
+pages section 9: DDI and DKI Kernel Functions</citetitle></olink> for DDI/DKI
+functions, <olink targetdoc="refman9e" remap="external"><citetitle remap="book">man pages section
+9: DDI and DKI Driver Entry Points</citetitle></olink> for entry points, and <olink targetdoc="refman9s" remap="external"><citetitle remap="book">man pages section 9: DDI and
+DKI Properties and Data Structures</citetitle></olink> for structures. Kernel
+modules can include header files that are shared by user programs if the user
+and kernel interfaces within such shared header files are defined conditionally
+using the <literal>_KERNEL</literal> macro.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules should avoid global
+variables.</emphasis> Avoiding global variables in kernel modules is even
+more important than avoiding global variables in user programs. As much as
+possible, declare symbols as <literal>static</literal>. When you must use
+global symbols, give them a prefix that is unique within the kernel. Using
+this prefix for private symbols within the module also is a good practice.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules can be customized for
+hardware.</emphasis> Kernel modules can dedicate process registers to specific
+roles. Kernel code can be optimized for a specific processor.</para>
+</listitem><listitem><para><emphasis role="strong">Kernel modules can be dynamically
+loaded.</emphasis> The collection of subroutines and data that constitute
+a device driver can be compiled into a single loadable module of object code.
+This loadable module can then be statically or dynamically linked into the
+kernel and unlinked from the kernel. You can add functionality to the kernel
+while the system is up and running. You can test new versions of your driver
+without rebooting your system.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="emqpt"><title>Data Transfer Differences Between Kernel Modules
+and User Programs</title><para>Data transfer between a device and the system typically is slower than
+data transfer within the CPU. Therefore, a driver typically suspends execution
+of the calling thread until the data transfer is complete. While the thread
+that called the driver is suspended, the CPU is free to execute other threads.
+When the data transfer is complete, the device sends an interrupt. The driver
+handles the interrupt that the driver receives from the device. The driver
+then tells the CPU to resume execution of the calling thread. See <olink targetdoc="driver" targetptr="interrupt-15678" remap="external">Chapter 8, <citetitle remap="chapter">Interrupt Handlers,</citetitle> in <citetitle remap="book">Writing
+Device Drivers</citetitle></olink>.</para><para>Drivers must work with user process (virtual) addresses, system (kernel)
+addresses, and I/O bus addresses. Drivers sometimes copy data from one address
+space to another address space and sometimes just manipulate address-mapping
+tables. See <olink targetdoc="driver" targetptr="hwovr-18" remap="external"><citetitle remap="section">Bus Architectures</citetitle> in <citetitle remap="book">Writing
+Device Drivers</citetitle></olink>.</para>
+</sect3>
+</sect2><sect2 id="eoqob"><title>User and Kernel Address Spaces on x86 and SPARC Machines</title><indexterm><primary>x86</primary><secondary>address space</secondary>
+</indexterm><indexterm><primary>SPARC</primary><secondary>address space</secondary>
+</indexterm><indexterm><primary>kernel</primary><secondary>address space</secondary>
+</indexterm><indexterm><primary><function>ddi_copyin</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyin</function></secondary>
+</indexterm><indexterm><primary><function>ddi_copyout</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyout</function></secondary>
+</indexterm><indexterm><primary><function>devmap</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>devmap</function></secondary>
+</indexterm><indexterm><primary><function>mmap</function> system call</primary>
+</indexterm><indexterm><primary>system calls</primary><secondary><function>mmap</function></secondary>
+</indexterm><para>On SPARC machines, the system panics when a kernel module attempts to
+directly access user address space. You must make sure your driver does not
+attempt to directly access user address space on a SPARC machine.</para><para>On x86 machines, the system does not enter an error state when a kernel
+module attempts to directly access user address space. You still should make
+sure your driver does not attempt to directly access user address space on
+an x86 machine. Drivers should be written to be as portable as possible. Any
+driver that directly accesses user address space is a poorly written driver.</para><caution><para>A driver that works on an x86 machine might not work on a SPARC
+machine because the driver might access an invalid address.</para>
+</caution><para>Do not access user data directly. A driver that directly accesses user
+address space is using poor programming practice. Such a driver is not portable
+and is not supportable. Use the <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routines to transfer data to and from user address
+space. These two routines are the only supported interfaces for accessing
+user memory. <olink targetptr="ffdqq" remap="internal">Modifying Data Stored in Kernel Memory</olink> shows
+an example driver that uses <citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry> and <citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry>.</para><para>The <olink targetdoc="group-refman" targetptr="mmap-2" remap="external"><citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call maps pages of memory between a process's address space and a file or
+shared memory object. In response to an <citerefentry><refentrytitle>mmap</refentrytitle><manvolnum>2</manvolnum></citerefentry> system call, the system calls the <olink targetdoc="group-refman" targetptr="devmap-9e" remap="external"><citerefentry><refentrytitle>devmap</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+to map device memory into user space. This information is then available for
+direct access by user applications.</para>
+</sect2><sect2 id="emjjs"><title>Device Drivers</title><indexterm><primary>device drivers</primary>
+</indexterm><indexterm><primary>drivers</primary><see>device drivers</see>
+</indexterm><indexterm><primary>device drivers</primary><secondary>entry points</secondary><seealso>entry points</seealso>
+</indexterm><indexterm><primary>device drivers</primary><secondary>structures</secondary><see>driver structures</see>
+</indexterm><indexterm><primary><literal>dev_ops</literal> driver structure</primary>
+</indexterm><indexterm><primary>driver structures</primary><secondary><literal>dev_ops</literal></secondary>
+</indexterm><indexterm><primary><literal>cb_ops</literal> driver structure</primary>
+</indexterm><indexterm><primary>driver structures</primary><secondary><literal>cb_ops</literal></secondary>
+</indexterm><para>A device driver is a loadable kernel module that manages data transfers
+between a device and the OS. Loadable modules are loaded at boot time or by
+request and are unloaded by request. A device driver is a collection of C
+routines and data structures that can be accessed by other kernel modules.
+These routines must use standard interfaces called <emphasis>entry points</emphasis>.
+Through the use of entry points, the calling modules are shielded from the
+internal details of the driver. See <olink targetdoc="driver" targetptr="eqbqy" remap="external"><citetitle remap="section">Device Driver Entry Points</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink> for more information on entry points.</para><para>A device driver declares its general entry points in its <olink targetdoc="group-refman" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+A driver declares entry points for routines that are related to character
+or block data in its <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure.
+Some entry points and structures that are common to most drivers are shown
+in the following diagram.</para><figure id="feowi"><title>Typical Device Driver Entry Points</title><mediaobject><imageobject><imagedata entityref="epoints.common"/>
+</imageobject><textobject><simpara>Diagram shows entry points that are common to most drivers
+and how the entry points are used.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><indexterm><primary>device drivers</primary><secondary>entry points</secondary></indexterm>The Solaris OS provides many driver entry points. Different types
+of devices require different entry points in the driver. The following diagram
+shows some of the available entry points, grouped by driver type. No single
+device driver would use all the entry points shown in the diagram.</para><figure id="fevyr"><title>Entry Points for Different Types of Drivers</title><mediaobject><imageobject><imagedata entityref="epoints.block" width="100"/>
+</imageobject><textobject><simpara>Diagram shows subsets of entry points that are used by
+various types of device drivers.</simpara>
+</textobject>
+</mediaobject>
+</figure><para><indexterm><primary>devices</primary><secondary>pseudo</secondary></indexterm><indexterm><primary>devices</primary><secondary>nexus</secondary></indexterm><indexterm><primary>devices</primary><secondary>ramdisk</secondary></indexterm>In the Solaris OS, drivers can manage physical devices, such as
+disk drives, or software (pseudo) devices, such as bus nexus devices or ramdisk
+devices. In the case of hardware devices, the device driver communicates with
+the hardware controller that manages the device. The device driver shields
+the user application layer from the details of a specific device so that application
+level or system calls can be generic or device independent.</para><itemizedlist><para><indexterm><primary>device drivers</primary><secondary>how used</secondary></indexterm>Drivers are accessed in the following situations:</para><listitem><para><emphasis role="strong">System initialization.</emphasis> The
+kernel calls device drivers during system initialization to determine which
+devices are available and to initialize those devices.</para>
+</listitem><listitem><para><emphasis role="strong">System calls from user processes.</emphasis> The
+kernel calls a device driver to perform I/O operations on the device such
+as <citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry>, <citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry>, and <citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>2</manvolnum></citerefentry>.</para>
+</listitem><listitem><para><emphasis role="strong">User-level requests.</emphasis> The
+kernel calls device drivers to service requests from commands such as <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry>.</para>
+</listitem><listitem><para><emphasis role="strong">Device interrupts.</emphasis> The
+kernel calls a device driver to handle interrupts generated by a device.</para>
+</listitem><listitem><para><emphasis role="strong">Bus reset.</emphasis> The kernel calls
+a device driver to re-initialize the driver, the device, or both when the
+bus is reset. The bus is the path from the CPU to the device.</para>
+</listitem>
+</itemizedlist><para>The following diagram illustrates how a device driver interacts with
+the rest of the system.</para><figure id="feowj"><title>Typical Device Driver Interactions</title><mediaobject><imageobject><imagedata entityref="driver.overview"/>
+</imageobject><textobject><simpara>Diagram shows typical interactions between a device driver
+and other elements in the operating system.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="fgomm"><title>Driver Directory Organization</title><indexterm><primary>device drivers</primary><secondary>directories</secondary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>kernel</command></secondary>
+</indexterm><indexterm><primary><command>kernel</command> command</primary>
+</indexterm><indexterm><primary>files</primary><secondary><filename>system</filename></secondary>
+</indexterm><indexterm><primary><filename>system</filename> configuration information file</primary>
+</indexterm><para>Device drivers and other kernel modules are organized into the following
+directories in the Solaris OS. See the <olink targetdoc="group-refman" targetptr="kernel-1m" remap="external"><citerefentry><refentrytitle>kernel</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="system-4" remap="external"><citerefentry><refentrytitle>system</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man pages
+for more information about kernel organization and how to add directories
+to your kernel module search path.</para><variablelist><varlistentry><term><filename>/kernel</filename></term><listitem><para>These modules are common across most platforms. Modules that
+are required for booting or for system initialization belong in this directory.</para>
+</listitem>
+</varlistentry><varlistentry><term><filename>/platform/`uname -i`/kernel</filename></term><listitem><para>These modules are specific to the platform identified by the
+command <literal>uname -i</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><filename>/platform/`uname -m`/kernel</filename></term><listitem><para>These modules are specific to the platform identified by the
+command <literal>uname -m</literal>. These modules are specific to a hardware
+class but more generic than modules in the <literal>uname -i</literal> kernel
+directory.</para>
+</listitem>
+</varlistentry><varlistentry><indexterm><primary><literal>/usr/kernel</literal> directory</primary>
+</indexterm><term><filename>/usr/kernel</filename></term><listitem><para>These are user modules. Modules that are not essential to
+booting belong in this directory. This tutorial instructs you to put all your
+drivers in the <filename>/usr/kernel</filename> directory.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary>device drivers</primary><secondary>loading</secondary></indexterm><indexterm><primary>commands</primary><secondary><command>boot</command></secondary></indexterm><indexterm><primary><command>boot</command> command</primary></indexterm>One benefit of organizing drivers into different directories is
+that you can selectively load different groups of drivers on startup when
+you boot interactively at the boot prompt as shown in the following example.
+See the <olink targetdoc="group-refman" targetptr="boot-1m" remap="external"><citerefentry><refentrytitle>boot</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information.</para><screen>Type    b [file-name] [boot-flags] &lt;ENTER&gt;      to boot with options
+or      i &lt;ENTER&gt;                               to enter boot interpreter
+or      &lt;ENTER&gt;                                 to boot with defaults
+
+                  &lt;&lt;&lt; timeout in 5 seconds &gt;&gt;&gt;
+
+Select (b)oot or (i)nterpreter: <userinput>b -a</userinput>
+bootpath: /pci@0,0/pci8086,2545@3/pci8086,
+Enter default directory for modules [/platform/i86pc/kernel /kernel 
+/usr/kernel]: <userinput>/platform/i86pc/kernel /kernel</userinput></screen><para><indexterm><primary><literal>/usr/kernel</literal> directory</primary></indexterm><indexterm><primary><literal>moddir</literal> kernel variable</primary></indexterm><indexterm><primary>device drivers</primary><secondary>directories</secondary><tertiary>adding</tertiary></indexterm>In this example, the <literal>/usr/kernel</literal> location
+is omitted from the list of directories to search for modules to load. You
+might want to do this if you have a driver in <literal>/usr/kernel</literal> that
+causes the kernel to panic during startup or on attach. Instead of omitting
+all <filename>/usr/kernel</filename> modules, a better method for testing
+drivers is to put them in their own directory. Use the <literal>moddir</literal> kernel
+variable to add this test directory to your kernel modules search path. The <literal>moddir</literal> kernel variable is described in <citerefentry><refentrytitle>kernel</refentrytitle><manvolnum>1M</manvolnum></citerefentry> and <citerefentry><refentrytitle>system</refentrytitle><manvolnum>4</manvolnum></citerefentry>.
+Another method for working with drivers that might have startup problems is
+described in <olink targetptr="fdlbq" remap="internal">Device Driver Testing Tips</olink>.</para>
+</sect2>
+</sect1><sect1 id="fgomr"><title>Devices as Files</title><indexterm><primary>special files</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>special files</secondary>
+</indexterm><indexterm><primary>devices</primary><secondary>block</secondary>
+</indexterm><indexterm><primary>devices</primary><secondary>character</secondary>
+</indexterm><para>In UNIX, almost everything can be treated as a file. UNIX user applications
+access devices as if the devices were files. Files that represent devices
+are called <emphasis>special files</emphasis> or <emphasis>device nodes</emphasis>.
+Device special files are divided into two classes: <emphasis>block</emphasis> devices
+and <emphasis>character</emphasis> devices. See <olink targetptr="fgoue" remap="internal">Character
+and Block Devices</olink> for more information.</para><para><indexterm><primary><function>read</function> system call</primary></indexterm><indexterm><primary>system calls</primary><secondary><function>read</function></secondary></indexterm>Every I/O service request initially refers to a named file. Most
+I/O operations that read or write data perform equally well on ordinary or
+special files. For example, the same <olink targetdoc="group-refman" targetptr="read-2" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call reads bytes from a file created with a
+text editor and reads bytes from a terminal device.</para><para><indexterm><primary><function>ioctl</function> entry point</primary></indexterm><indexterm><primary>entry points</primary><secondary><function>ioctl</function></secondary></indexterm>Control signals also are handled as files. Use the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> function to manipulate control
+signals.</para><sect2 id="emjjv"><title>Devices Directories</title><indexterm><primary>devices</primary><secondary>directories</secondary>
+</indexterm><indexterm><primary><literal>/dev</literal> directory</primary>
+</indexterm><indexterm><primary><literal>/devices</literal> directory</primary>
+</indexterm><para>The Solaris OS includes both <literal>/dev</literal> and <literal>/devices</literal> directories
+for device drivers. Almost all the drivers in the <literal>/dev</literal> directory
+are links to the <literal>/devices</literal> directory. The <literal>/dev</literal> directory
+is UNIX standard. The <literal>/devices</literal> directory is specific to
+the Solaris OS.</para><para><indexterm><primary>commands</primary><secondary><command>prtconf</command></secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary></indexterm>By convention, file names in the <literal>/dev</literal> directory
+are more readable. For example, the <literal>/dev</literal> directory might
+contain files with names such as <literal>kdb</literal> and <literal>mouse</literal> that
+are links to files such as <literal>/devices/pseudo/conskbd@0:kbd</literal> and <literal>/devices/pseudo/consms@0:mouse</literal>. The <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command shows device names
+that are very similar to the file names in the <literal>/devices</literal> directory.
+In the following example, only selected output of the command is shown.</para><screen>% <userinput>prtconf -P</userinput>
+        conskbd, instance #0
+        consms, instance #0</screen><para><indexterm><primary>commands</primary><secondary><command>mknod</command></secondary></indexterm><indexterm><primary><command>mknod</command> command</primary></indexterm><indexterm><primary><function>mknod</function> system call</primary></indexterm><indexterm><primary>system calls</primary><secondary><function>mknod</function></secondary></indexterm><indexterm><primary>devices</primary><secondary>numbers</secondary></indexterm><indexterm><primary>major number</primary></indexterm><indexterm><primary>minor number</primary></indexterm>Entries in the <literal>/dev</literal> directory
+that are not links to the <literal>/devices</literal> directory are device
+nodes or special files created by <olink targetdoc="group-refman" targetptr="mknod-1m" remap="external"><citerefentry><refentrytitle>mknod</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="mknod-2" remap="external"><citerefentry><refentrytitle>mknod</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. These are zero-length files
+that just have a major number and minor number attached to them. Linking to
+the physical name of the device in the <literal>/devices</literal> directory
+is preferred to using <citerefentry><refentrytitle>mknod</refentrytitle><manvolnum>1M</manvolnum></citerefentry>.</para><para><indexterm><primary><literal>/devices</literal> directory</primary></indexterm>Prior to the Solaris 10 OS, <literal>/devices</literal> was an
+on-disk filesystem composed of subdirectories and files.  Beginning with the
+Solaris 10 OS, <literal>/devices</literal> is a virtual filesystem that creates
+these subdirectories and special files on demand.</para><para><indexterm><primary><literal>devfs</literal> devices file system</primary></indexterm><indexterm><primary>devices</primary><secondary>file system</secondary><tertiary><literal>devfs</literal></tertiary></indexterm>For more information
+about the devices file system, see the <olink targetdoc="group-refman" targetptr="devfs-7fs" remap="external"><citerefentry><refentrytitle>devfs</refentrytitle><manvolnum>7FS</manvolnum></citerefentry></olink> man page.</para>
+</sect2><sect2 id="eoqof"><title>Device Tree</title><indexterm><primary>device tree</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>device tree</secondary>
+</indexterm><para>The device files in the <literal>/devices</literal> directory are also
+called the <emphasis>device tree</emphasis>.</para><para><indexterm><primary>nexus device</primary></indexterm><indexterm><primary>devices</primary><secondary>nexus</secondary></indexterm>The device tree shows relationships
+among devices. In the device tree, a directory represents a <emphasis>nexus</emphasis> device.
+A nexus is a device that can be a parent of other devices. In the following
+example, <literal>pci@1f,0</literal> is a nexus device. Only selected output
+from the command is shown.</para><screen># <userinput>ls -l /devices</userinput>
+drwxr-xr-x   4 root     sys          512 <replaceable>date</replaceable> <replaceable>time</replaceable> pci@1f,0/
+crw-------   1 root     sys      111,255 <replaceable>date</replaceable> <replaceable>time</replaceable> pci@1f,0:devctl</screen><para><indexterm><primary><command>prtconf</command> command</primary></indexterm><indexterm><primary>commands</primary><secondary><command>prtconf</command></secondary></indexterm><indexterm><primary><command>prtpicl</command> command</primary></indexterm><indexterm><primary>commands</primary><secondary><command>prtpicl</command></secondary></indexterm>You can use <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> or <olink targetdoc="group-refman" targetptr="prtpicl-1m" remap="external"><citerefentry><refentrytitle>prtpicl</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to see a
+graphic representation of the device tree. See <olink targetdoc="driver" targetptr="kernelovr-64300" remap="external"><citetitle remap="section">Overview of the Device
+Tree</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink> for
+more information about the device tree.</para>
+</sect2><sect2 id="fgoue"><title>Character and Block Devices</title><indexterm><primary>character device</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>character</secondary>
+</indexterm><indexterm><primary>block device</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>block</secondary>
+</indexterm><para>A file in the device tree that is not a directory represents either
+a <emphasis>character</emphasis> device or a <emphasis>block</emphasis> device.</para><para><indexterm><primary><literal>/devices/pseudo</literal> directory</primary></indexterm>A block device can contain addressable, reusable data. An example
+of a block device is a file system. Any device can be a character device.
+Most block devices also have character interfaces. Disks have both block and
+character interfaces. In your <filename>/devices/pseudo</filename> directory,
+you might find devices such as the following:</para><programlisting>brw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,blk
+crw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,raw
+brw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,blk
+crw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,raw
+brw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,blk
+crw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,raw</programlisting><para><indexterm><primary><literal>blk</literal> device</primary></indexterm><indexterm><primary>devices</primary><secondary><literal>blk</literal></secondary></indexterm><indexterm><primary><literal>raw</literal> device</primary></indexterm><indexterm><primary>devices</primary><secondary><literal>raw</literal></secondary></indexterm>Block devices have a <literal>b</literal> as the first character
+of their file mode. Character devices have a <literal>c</literal> as the first
+character of their file mode. In this example, the block devices have <literal>blk</literal> in their names and the character devices have <literal>raw</literal> in
+their names.</para><para><indexterm><primary>metadevice</primary></indexterm><indexterm><primary>devices</primary><secondary><literal>md</literal> metadevice</secondary></indexterm>The <olink targetdoc="group-refman" targetptr="md-7d" remap="external"><citerefentry><refentrytitle>md</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> device is a metadevice that
+provides disk services. The block devices access the disk using the system's
+normal buffering mechanism. The character devices provide for direct transmission
+between the disk and the user's read or write buffer.</para>
+</sect2><sect2 id="fgovo"><title>Device Names</title><indexterm><primary>devices</primary><secondary>names</secondary>
+</indexterm><indexterm><primary>devices</primary><secondary>directories</secondary>
+</indexterm><indexterm><primary><literal>/dev</literal> directory</primary>
+</indexterm><indexterm><primary><command>devfsadmd</command> devices file system administration command</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>file system</secondary><tertiary><command>devfsadmd</command></tertiary>
+</indexterm><para>This section shows a complex device name and explains the meaning of
+each part of the name in <filename>/dev</filename> and also in <filename>/devices</filename>. The following example is the name of a disk slice:</para><screen>/dev/dsk/c0t0d0s7 -&gt; ../../devices/pci@1c,600000/scsi@2/sd@0,0:h</screen><para>First, examine the name of the file in the <filename>/dev</filename> directory.
+These names are managed by the <olink targetdoc="group-refman" targetptr="devfsadmd-1m" remap="external"><citerefentry><refentrytitle>devfsadmd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> daemon.</para><variablelist><varlistentry><term><literal>c0</literal></term><listitem><para>Controller 0</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>t0</literal></term><listitem><para>Target 0. On SCSI controllers, this value is the disk number.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>d0</literal></term><listitem><para>SCSI LUN. This value indicates a virtual partitioning of a
+target or single physical device.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>s7</literal></term><listitem><para>Slice 7 on the target 0 disk.</para>
+</listitem>
+</varlistentry>
+</variablelist><para><indexterm><primary><literal>/devices</literal> directory</primary></indexterm>For the same device, compare the name of the file in the <filename>/devices</filename> directory. These names show the physical structure and real device
+names. Note that some of the components of the device name in the <filename>/devices</filename> directory are subdirectories.</para><variablelist><varlistentry><term><literal>pci@1c,600000</literal></term><listitem><para>PCI bus at address <literal>1c,600000</literal>. These addresses
+are meaningful only to the parent device.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>scsi@2</literal></term><listitem><para>SCSI controller at address <literal>2</literal> on the PCI
+bus at address <literal>1c,600000</literal>. This name corresponds to the <literal>c0</literal> in <filename>/dev/dsk/c0t0d0s7</filename>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>sd@0,0</literal></term><listitem><para>SCSI disk at address <literal>0,0</literal> on the SCSI controller
+at address <literal>2</literal>. This name represents target&nbsp;0, LUN&nbsp;0
+and corresponds to the <literal>t0d0</literal> in <filename>/dev/dsk/c0t0d0s7</filename>.
+The <literal>sd</literal> name and driver can also apply to IDE CD-ROM devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>sd@0,0:h</literal></term><listitem><para>Minor node <literal>h</literal> on the SCSI disk at address <literal>0,0</literal>. This name corresponds to the <literal>s7</literal> in <filename>/dev/dsk/c0t0d0s7</filename>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="fgove"><title>Device Numbers</title><indexterm><primary>device number</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>numbers</secondary>
+</indexterm><para>A <emphasis>device number</emphasis> identifies a particular device
+and minor node in the device tree. The <literal>dev_t</literal> parameter
+that is required in many DDI/DKI routines is this device number.</para><para><indexterm><primary>major number</primary></indexterm><indexterm><primary>minor number</primary></indexterm>Each device has a major number and a minor number.
+A device number is a <replaceable>major</replaceable>,<replaceable>minor</replaceable> pair.
+A long file listing shows the device number in the column where file sizes
+are usually listed. In the following example, the device number is 86,255.
+The device major number is 86, and the device minor number is 255.</para><screen>% <userinput>ls -l /devices/pci@0,0:devctl</userinput>
+crw-------   1 root     sys       86,255 <replaceable>date</replaceable> <replaceable>time</replaceable> /devices/pci@0,0:devctl</screen><para>In the Solaris OS, the major number is chosen for you when you install
+the driver so that it will not conflict with any other major number. The kernel
+uses the major number to associate the I/O request with the correct driver
+code. The kernel uses this association to decide which driver to execute when
+the user reads or writes the device file. All devices and their major numbers
+are listed in the file <filename>/etc/name_to_major</filename>.</para><screen>% <userinput>grep 86 /etc/name_to_major</userinput>
+pci 86</screen><para><indexterm><primary>instance number</primary></indexterm><indexterm><primary>devices</primary><secondary>instances</secondary></indexterm>The
+minor number is assigned in the driver. The minor number must map each driver
+to a specific device instance. Minor numbers usually refer to sub-devices.
+For example, a disk driver might communicate with a hardware controller device
+that has several disk drives attached. Minor nodes do not necessarily have
+a physical representation.</para><para>The following example shows instances 0, 1, and 2 of the <literal>md</literal> device.
+The numbers 0, 1, and 2 are the minor numbers.</para><programlisting>brw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,blk
+crw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,raw
+brw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,blk
+crw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,raw
+brw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,blk
+crw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,raw</programlisting><para>In the name <filename>sd@0,0:h,</filename>, <literal>h</literal> represents
+a minor node. When the driver receives a request for minor node <literal>h</literal>,
+the driver actually receives a corresponding minor number. The driver for
+the <literal>sd</literal> node interprets that minor number to be a particular
+section of disk, such as slice&nbsp;7 mounted on <filename>/export</filename>.</para><para><indexterm><primary><function>ddi_get_instance</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_instance</function></secondary></indexterm><olink targetptr="eoqrt" remap="internal">Chapter&nbsp;2,
+Template Driver Example</olink> shows how to use the <olink targetdoc="group-refman" targetptr="ddi-get-instance-9f" remap="external"><citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> routine in your driver to get an instance number for
+the device you are driving.</para>
+</sect2>
+</sect1><sect1 id="frymm"><title>Development Environment and Tools</title><para>This section summarizes the driver development process and provides
+some pointers to resources. For more information on the development process,
+see <olink targetdoc="driver" targetptr="fcaqh" remap="external"><citetitle remap="section">Driver
+Development Summary</citetitle> in <citetitle remap="book">Writing Device
+Drivers</citetitle></olink>.</para><para>Sun offers training courses in Solaris OS internals, crash dump analysis,
+writing device drivers, DTrace, Sun Studio, and other topics useful to Solaris
+developers. See <ulink url="http://www.sun.com/training/" type="url"></ulink> for
+more information.</para><orderedlist><para>The general steps in writing a device driver are as follows:</para><listitem><para>Write a <literal>.c</literal> source file using the interfaces
+and structures defined in man page sections <literal>9E</literal>, <literal>9F</literal>,
+and <literal>9S</literal>. Most of the include files you need are in <literal>/usr/include/sys</literal>. The function and structure man pages show which include files
+you need.</para>
+</listitem><listitem><para>Write a <literal>.conf</literal> hardware configuration file
+to define property values for your driver.</para>
+</listitem><listitem><para>Compile and link your driver. Always use the <option>D_KERNEL</option> option
+when you compile a driver for the Solaris OS. The default compile result is
+32-bit. To get a 64-bit result on a 64-bit platform, specify the appropriate
+64-bit option as described in <olink targetptr="fgouv" remap="internal">Building a Driver</olink>.</para>
+</listitem><listitem><para>Copy your driver binary file and your driver configuration
+file to the appropriate <filename>[<replaceable>platform</replaceable>]/kernel</filename> directories.
+See <olink targetptr="fgomm" remap="internal">Driver Directory Organization</olink> for descriptions
+of driver directories.</para>
+</listitem><listitem><para>Use the <citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command to load your driver. When
+your driver is loaded, you can see your driver in <filename>/dev</filename> and <filename>/devices</filename>. You can also see an entry for your driver in the <filename>/etc/name_to_major</filename> file.</para>
+</listitem>
+</orderedlist><sect2 id="fsujc"><title>Writing a Driver</title><para>A driver consists of a C source file and a hardware configuration file.</para><sect3 id="ganag"><title>Writing a Driver Module</title><para>The C code for a driver is a collection of data and functions that define
+a kernel module. As noted in <olink targetptr="emqqh" remap="internal">Structural Differences
+Between Kernel Modules and User Programs</olink>, a driver has no <function>main</function> routine.
+Many of the subroutines of a driver are special functions called entry points.
+See <olink targetptr="emjjs" remap="internal">Device Drivers</olink> for information about
+entry points.</para><para>The function man pages provide both the function declaration that you
+need in your driver and the list of header files you need to include. Make
+sure you consult the correct man page. For example, the following command
+displays the <command>ioctl</command>(2) man page. The <command>ioctl</command>(2)
+system call cannot be used in a device driver.</para><screen>% <userinput>man ioctl</userinput></screen><para>Use one of the following commands to display the <command>ioctl</command>(9E)
+man page. The <command>ioctl</command>(9E) subroutine is a device driver entry
+point.</para><screen>% <userinput>man ioctl.9e</userinput>
+% <userinput>man -s 9e ioctl</userinput></screen><para><indexterm><primary>prefixes</primary></indexterm><indexterm><primary>devices</primary><secondary>prefixes</secondary></indexterm>By convention, the names
+of functions and data that are unique to this driver begin with a common prefix.
+The prefix  is the name of this driver or an abbreviation of the name of this
+driver. Use the same prefix for all names that are specific to this driver.
+This practice makes debugging much easier. Instead of seeing an error related
+to an ambiguous <function>attach</function> function, you see an error message
+about <function>mydriver_attach</function> or <function>newdriver_attach</function>.</para><para><indexterm><primary>data model</primary><secondary>converting</secondary></indexterm><indexterm><primary><function>ddi_model_convert_from</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_model_convert_from</function></secondary></indexterm>A
+64-bit system can run both 32-bit user programs and 64-bit user programs.
+A 64-bit system runs 32-bit programs by converting all data needed  between
+the two data models. A 64-bit kernel supports both 64-bit and 32-bit user
+data. Whenever a 64-bit driver copies data between kernel space and user space,
+the driver must use the <olink targetdoc="group-refman" targetptr="ddi-model-convert-from-9f" remap="external"><citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to determine whether the data must be converted between 32-bit and 64-bit
+models. For an example, see <olink targetptr="fgham" remap="internal">Reporting and Setting
+Device Size and Re-initializing the Device</olink>.</para><para>The Sun Studio IDE includes the following three source editors: GVIM,
+XEmacs, and the built-in Source Editor provided by NetBeans. The IDE provides
+online help for these tools. You can also run GVIM and XEmacs from the command
+line. See <command>vim</command>(1) and <command>xemacs</command>(1).</para><itemizedlist><para>For more information, see the following resources:</para><listitem><para>For more information about writing device drivers, see <olink targetptr="fdlbn" remap="internal">Device Driver Coding Tips</olink> and <olink targetdoc="driver" remap="external"><citetitle remap="book">Writing Device Drivers</citetitle></olink>.</para>
+</listitem><listitem><para>For simple example source files, see <olink targetptr="eoqrt" remap="internal">Chapter&nbsp;2,
+Template Driver Example</olink> and <olink targetptr="faatl" remap="internal">Chapter&nbsp;3,
+Reading and Writing Data in Kernel Memory</olink>.</para>
+</listitem><listitem><para>For production driver sources, go to <ulink url="http://www.opensolaris.org/os/" type="url"></ulink> and click &ldquo;Source
+Browser.&rdquo;</para>
+</listitem><listitem><para>For more driver source and documentation, go to the driver
+development OpenSolaris community at <ulink url="http://www.opensolaris.org/os/community/device_drivers/" type="url"></ulink>.</para>
+</listitem><listitem><para>For advice and examples on a wide variety of driver topics,
+see the Driver Development <ulink url="http://developers.sun.com/solaris/developer/support/driver/faqs.html" type="text">FAQ</ulink> (Frequently Asked Questions).</para>
+</listitem><listitem><para>For more help, search the Driver Development Solaris forum
+at <ulink url="http://forum.java.sun.com/forum.jspa?forumID=866" type="url"></ulink> or
+the Kernel forum at <ulink url="http://forum.java.sun.com/forum.jspa?forumID=865" type="url"></ulink>. See all the Solaris forums at <ulink url="http://forum.java.sun.com/index.jspa?tab=solaris" type="url"></ulink>.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="ganar"><title>Writing a Configuration File</title><para><indexterm><primary>configuration files</primary></indexterm><indexterm><primary>devices</primary><secondary>properties</secondary></indexterm><indexterm><primary>devices</primary><secondary>configuration files</secondary></indexterm><indexterm><primary><function>ddi_prop_get_int</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_prop_get_int</function></secondary></indexterm><indexterm><primary><function>ddi_prop_lookup</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_prop_lookup</function></secondary></indexterm><indexterm><primary><literal>driver.conf</literal> file</primary></indexterm><indexterm><primary>files</primary><secondary><literal>driver.conf</literal></secondary></indexterm>A driver that is not self-identifying might need a configuration
+file named <replaceable>node_name</replaceable><literal>.conf</literal>, where <replaceable>node_name</replaceable> is the prefix for the device. A self-identifying driver
+is a driver that can obtain all the property information it needs from the
+DDI property interfaces such as <olink targetdoc="group-refman" targetptr="ddi-prop-get-int-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_get_int</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ddi-prop-lookup-9f" remap="external"><citerefentry><refentrytitle>ddi_prop_lookup</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. The minimum information that a configuration file
+must contain is the name of the device node and the name or type of the device's
+parent.</para><para>On the x86 platform, device information is supplied by the booting system.
+Hardware configuration files should no longer be needed, even
+for non-self-identifying devices.</para><para>For more information about device driver configuration files, see the <olink targetdoc="group-refman" targetptr="driver.conf-4" remap="external"><citerefentry><refentrytitle>driver.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page.
+For an example configuration file, see <olink targetptr="eoxzw" remap="internal">Writing the
+Device Configuration File</olink>.</para>
+</sect3>
+</sect2><sect2 id="fgouv"><title>Building a Driver</title><para><indexterm><primary>device drivers</primary><secondary>compiling</secondary></indexterm><indexterm><primary>compiling</primary></indexterm><indexterm><primary>SPARC</primary><secondary>compiling</secondary></indexterm><indexterm><primary>x86</primary><secondary>compiling</secondary></indexterm><indexterm><primary>device drivers</primary><secondary>linking</secondary></indexterm><indexterm><primary>linking</primary></indexterm>This section tells you how to compile
+and link a driver for different architectures.</para><para>Make sure you have installed the Solaris OS at the Developer level or
+above. Follow the instructions in <olink targetdoc="solarisinstall" targetptr="webstart-91" remap="external">Chapter 2, <citetitle remap="chapter">Installing With
+the Solaris Installation Program (Tasks),</citetitle> in <citetitle remap="book">Solaris Express Installation Guide: Basic Installations</citetitle></olink>.
+Select Custom Install, and select the Developer cluster or above.</para><para>A 64-bit kernel cannot use a 32-bit driver. A 64-bit kernel can use
+only 64-bit drivers. All parts of any particular program must use the same
+data model. A device driver is not a complete program. The kernel is a complete
+program. A driver is a part of the kernel program. If you want your device
+to work with the Solaris OS in 32-bit mode and with the Solaris OS in 64-bit
+mode, then you must provide both a 32-bit driver and a 64-bit driver.</para><para>By default, compilation on the Solaris OS yields a 32-bit result on
+every architecture. To obtain a 64-bit result, use the compilation options
+specified in this section for 64-bit architectures.</para><para><indexterm><primary>commands</primary><secondary><command>prtconf</command></secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary></indexterm>Use the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+with the <option>x</option> option to determine whether the firmware on this
+system is 64-bit ready.</para><sect3 id="gamyf"><title>Compiling with Sun Studio</title><indexterm><primary>Sun Studio</primary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>cc</command></secondary>
+</indexterm><indexterm><primary><command>cc</command> command</primary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>ld</command></secondary>
+</indexterm><indexterm><primary><command>ld</command> command</primary>
+</indexterm><itemizedlist><para>Use the <option>D_KERNEL</option> option to indicate that this code
+defines a kernel module.</para><listitem><para>If you are compiling for a 64-bit SPARC architecture using
+Sun Studio 9, Sun Studio 10, or Sun Studio 11, use the <option>xarch=v9</option> option:</para><screen>% <userinput>cc -D_KERNEL -xarch=v9 -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen><para>If you are compiling for a 64-bit SPARC architecture using Sun Studio
+12, use the <option>m64</option> option:</para><screen>% <userinput>cc -D_KERNEL -m64 -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen>
+</listitem><listitem><para>If you are compiling for a 64-bit x86 architecture using Sun
+Studio 10 or Sun Studio 11, use both the <option>xarch=amd64</option> option
+and the <option>xmodel=kernel</option> option:</para><screen>% <userinput>cc -D_KERNEL -xarch=amd64 -xmodel=kernel -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen><para>If you are compiling for a 64-bit x86 architecture using Sun Studio
+12, use the <option>m64</option> option, the <option>xarch=sse2a</option> option,
+and the <option>xmodel=kernel</option> option:</para><screen>% <userinput>cc -D_KERNEL -m64 -xarch=sse2a -xmodel=kernel -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen>
+</listitem><listitem><para>If you are compiling for a 32-bit architecture, use the following
+build commands:</para><screen>% <userinput>cc -D_KERNEL -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen>
+</listitem>
+</itemizedlist><note><para>Sun Studio 9 does not support 64-bit x86 architectures. Use Sun
+Studio 10, Sun Studio 11, or Sun Studio 12 to compile and debug drivers for
+64-bit x86 architectures.</para>
+</note><para>For more information on compile and link options, see the <olink targetdoc="stdrefman" remap="external"><citetitle remap="book">Sun Studio Man Pages</citetitle></olink> and
+the <olink targetdoc="cug" remap="external"><citetitle remap="book">Sun Studio 12: C User&rsquo;s
+Guide</citetitle></olink>. See the <olink targetdoc="stdinfoctr" remap="external"><citetitle remap="article">Sun Studio Information Center</citetitle></olink> in the <ulink url="http://docs.sun.com/app/docs/coll/771.8" type="text">Sun Studio 12 Collection</ulink> for Sun Studio books about <command>dbx</command>, <command>dmake</command>,
+Performance Analyzer, and other software development topics. To read technical
+articles about Sun Studio, see <ulink url="http://docs.sun.com/app/docs/coll/1787.1" type="text">Sun Studio Technical
+Articles</ulink>. To download Sun Studio, go to <ulink url="http://developers.sun.com/sunstudio/" type="url"></ulink>.</para>
+</sect3><sect3 id="gamzm"><title>Compiling with the GNU C Compiler</title><indexterm><primary>GNU C</primary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>gcc</command></secondary>
+</indexterm><indexterm><primary><command>gcc</command> command</primary>
+</indexterm><para>To get the GNU C compiler, you must install the Solaris OS at the Developer
+level or above. Follow the instructions in <olink targetdoc="solarisinstall" targetptr="webstart-91" remap="external">Chapter 2, <citetitle remap="chapter">Installing With
+the Solaris Installation Program (Tasks),</citetitle> in <citetitle remap="book">Solaris Express Installation Guide: Basic Installations</citetitle></olink>.
+Select Custom Install, and select the Developer cluster or above. The GNU
+C compiler is installed in <filename>/usr/sfw</filename>.</para><itemizedlist><para>Use the <option>D_KERNEL</option> option to indicate that this code
+defines a kernel module. These examples show options that are required for
+correct functionality of the result.</para><listitem><para>If you are compiling for a 64-bit SPARC architecture, use
+the following build commands:</para><screen>% <userinput>gcc -D_KERNEL -m64 -mcpu=v9 -mcmodel=medlow -fno-pic -mno-fpu
+-ffreestanding -nodefaultlibs -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen><para>You might also want to use the <option>mtune=ultrasparc</option> option
+and the <option>O2</option> option.</para>
+</listitem><listitem><para>If you are compiling for a 64-bit x86 architecture, use the
+following build commands:</para><screen>% <userinput>gcc -D_KERNEL -m64 -mcmodel=kernel -mno-red-zone -ffreestanding
+-nodefaultlibs -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen><para>You might also want to use the <option>mtune=opteron</option> option
+and the <option>O2</option> option.</para>
+</listitem><listitem><para>If you are compiling for a 32-bit architecture, use the following
+build commands:</para><screen>% <userinput>gcc -D_KERNEL -ffreestanding -nodefaultlibs -c mydriver.c</userinput>
+% <userinput>ld -r -o mydriver mydriver.o</userinput></screen>
+</listitem>
+</itemizedlist><para>For more information on these and other options, see the <command>gcc</command>(1)
+man page. See also the GCC web site at <ulink url="http://gcc.gnu.org/" type="url"></ulink>. More information about using the <command>gcc</command> compiler
+with the Solaris OS is on the OpenSolaris web site at <ulink url="http://opensolaris.org/os/community/tools/gcc/" type="url"></ulink>.</para>
+</sect3>
+</sect2><sect2 id="fsfqv"><title>Installing a Driver</title><indexterm><primary>device drivers</primary><secondary>installing</secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>_info</function></secondary>
+</indexterm><indexterm><primary><function>_info</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>_init</function></secondary>
+</indexterm><indexterm><primary><function>_init</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function></secondary>
+</indexterm><indexterm><primary><function>attach</function> entry point</primary>
+</indexterm><para>After you write and build your driver, you must install the driver binary.
+To install a driver, copy the driver binary and the configuration file to
+the appropriate <filename>/kernel/drv</filename> directory.</para><para>Make sure you are user <literal>root</literal> when you install a driver.</para><para>Copy the configuration file to the kernel driver area of the system.</para><screen># <userinput>cp mydriver.conf /usr/kernel/drv</userinput></screen><para>Install drivers in the <filename>/tmp</filename> directory until you
+are finished modifying and testing the <function>_info</function>, <function>_init</function>, and <function>attach</function> routines. See <olink targetptr="fdlbq" remap="internal">Device Driver Testing Tips</olink> for more information.</para><para>Copy the driver binary to the <filename>/tmp</filename> directory.</para><screen># <userinput>cp mydriver /tmp</userinput></screen><itemizedlist><para>Link to the driver from the kernel driver directory.</para><listitem><para>On a 64-bit SPARC architecture, link to the <filename>sparcv9</filename> directory:</para><screen># <userinput>ln -s /tmp/mydriver /usr/kernel/drv/sparcv9/mydriver</userinput></screen>
+</listitem><listitem><para>On a 64-bit x86 architecture, link to the <filename>amd64</filename> directory:</para><screen># <userinput>ln -s /tmp/mydriver /usr/kernel/drv/amd64/mydriver</userinput></screen>
+</listitem><listitem><para>On a 32-bit architecture, create the link as follows:</para><screen># <userinput>ln -s /tmp/mydriver /usr/kernel/drv/mydriver</userinput></screen>
+</listitem>
+</itemizedlist><para>When the driver is well tested, copy the driver directly to the appropriate
+kernel driver area of the system.</para><itemizedlist><listitem><para>On a 64-bit SPARC architecture, copy the driver to the <filename>sparcv9</filename> directory:</para><screen># <userinput>cp mydriver /usr/kernel/drv/sparcv9/mydriver</userinput></screen>
+</listitem><listitem><para>On a 64-bit x86 architecture, copy the driver to the <filename>amd64</filename> directory:</para><screen># <userinput>cp mydriver /usr/kernel/drv/amd64/mydriver</userinput></screen>
+</listitem><listitem><para>On a 32-bit architecture, copy the driver to the kernel driver
+area of the system:</para><screen># <userinput>cp mydriver /usr/kernel/drv/mydriver</userinput></screen>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="fsujf"><title>Adding, Updating, and Removing a Driver</title><indexterm><primary>device drivers</primary><secondary>adding</secondary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>add_drv</command></secondary>
+</indexterm><indexterm><primary><command>add_drv</command> command</primary>
+</indexterm><para>Use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to make the installed driver usable. Be sure you are user <literal>root</literal> when
+you use the <citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command.</para><screen># <userinput>add_drv mydriver</userinput></screen><itemizedlist><para>The following events take place when you add a driver:</para><listitem><para>The <citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, and <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points are
+called in that order.</para>
+</listitem><listitem><para><indexterm><primary><literal>/devices</literal> directory</primary></indexterm>The driver is added to the <filename>/devices</filename> directory.</para>
+</listitem><listitem><para><indexterm><primary>commands</primary><secondary><command>modinfo</command></secondary></indexterm><indexterm><primary><command>modinfo</command> command</primary></indexterm>The driver is the most recent module listed by <olink targetdoc="group-refman" targetptr="modinfo-1m" remap="external"><citerefentry><refentrytitle>modinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para><indexterm><primary>files</primary><secondary><filename>/etc/name_to_major</filename></secondary></indexterm><indexterm><primary><filename>/etc/name_to_major</filename> file</primary></indexterm>The driver is the most recent module
+listed in the file <filename>/etc/name_to_major</filename>.</para>
+</listitem>
+</itemizedlist><para><indexterm><primary><literal>/etc/driver_aliases</literal> file</primary></indexterm>The file <filename>/etc/driver_aliases</filename> might be updated.
+The <filename>/etc/driver_aliases</filename> file shows which devices are
+bound to which drivers. If a driver is not listed in the <filename>/etc/driver_aliases</filename> file, then the Solaris OS does not load that driver or attach
+to that driver. Each line of the <filename>/etc/driver_aliases</filename> file
+shows a driver name followed by a device name. You can search this file to
+determine which driver is managing your device.</para><note><para>Do not edit the <filename>/etc/driver_aliases</filename> file
+manually. Use the <citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command to establish a device binding.
+Use the <citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command to change a device binding.</para>
+</note><para><indexterm><primary>PCI ID numbers</primary></indexterm>The example
+drivers shown in this book manage pseudo devices. If your driver manages real
+hardware, then you need to use the <option>c</option> and <option>i</option> options
+on the <citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command or the <option>i</option> option on the <citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command. To specify a device class or device ID, you might
+find the following sites useful. This information also is useful to search
+the <filename>/etc/driver_aliases</filename> file to find out whether a device
+already is supported.</para><itemizedlist><listitem><para>List of devices currently supported by the Solaris OS: <ulink url="http://www.sun.com/bigadmin/hcl/devicelist/" type="url"></ulink></para>
+</listitem><listitem><para>Searchable PCI vendor and device lists: <ulink url="http://www.pcidatabase.com/" type="url"></ulink></para>
+</listitem><listitem><para>Repository of vendor IDs, device IDs, subsystems, and device
+classes used in PCI devices: <ulink url="http://pciids.sourceforge.net/" type="url"></ulink></para>
+</listitem>
+</itemizedlist><para><indexterm><primary>device drivers</primary><secondary>updating</secondary></indexterm><indexterm><primary>commands</primary><secondary><command>update_drv</command></secondary></indexterm><indexterm><primary><command>update_drv</command> command</primary></indexterm><indexterm><primary>commands</primary><secondary><command>prtconf</command></secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary></indexterm>Use the <olink targetdoc="group-refman" targetptr="update-drv-1m" remap="external"><citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to notify the system about attribute changes
+to an installed device driver. By default, the <citerefentry><refentrytitle>update_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command reloads the
+hardware configuration file for the specified driver. Use the <olink targetdoc="group-refman" targetptr="prtconf-1m" remap="external"><citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to
+review the current configuration information for a device and driver. For
+example, the <option>D</option> option shows which driver manages a particular
+device. The <option>P</option> option shows information about pseudo devices.</para><para><indexterm><primary>device drivers</primary><secondary>removing</secondary></indexterm><indexterm><primary>commands</primary><secondary><command>rem_drv</command></secondary></indexterm><indexterm><primary><command>rem_drv</command> command</primary></indexterm>Use the <olink targetdoc="group-refman" targetptr="rem-drv-1m" remap="external"><citerefentry><refentrytitle>rem_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to update the system driver configuration files so that the driver is no longer
+usable. The <citerefentry><refentrytitle>rem_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command does not physically delete driver files. If possible,
+the <citerefentry><refentrytitle>rem_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry> command unloads the driver from memory.</para>
+</sect2><sect2 id="ganoc"><title>Loading and Unloading a Driver</title><indexterm><primary>device drivers</primary><secondary>loading</secondary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>unloading</secondary>
+</indexterm><indexterm><primary>commands</primary><secondary><command>rem_drv</command></secondary>
+</indexterm><indexterm><primary><command>rem_drv</command> command</primary>
+</indexterm><para>A driver is loaded into memory when a device that the driver manages
+is accessed. A driver might be unloaded from memory when the driver is not
+being used. Normally, you do not need to load a driver into memory manually
+or unload a driver from memory manually.</para><para>To manually load a loadable module into memory, use the <olink targetdoc="group-refman" targetptr="modload-1m" remap="external"><citerefentry><refentrytitle>modload</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para><para>While you are developing your driver, you might want to manually unload
+the driver and then update the driver. To manually unload a loadable module
+from memory, use the <olink targetdoc="group-refman" targetptr="modunload-1m" remap="external"><citerefentry><refentrytitle>modunload</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para>
+</sect2><sect2 id="fsujg"><title>Testing a Driver</title><itemizedlist><para><indexterm><primary>device drivers</primary><secondary>test areas</secondary></indexterm>Drivers should be thoroughly tested in the following areas:</para><listitem><para>Configuration</para>
+</listitem><listitem><para>Functionality</para>
+</listitem><listitem><para>Error handling</para>
+</listitem><listitem><para>Loading, unloading, and removing</para><para>All drivers will
+need to be removed eventually. Make sure that your driver can be successfully
+removed.</para>
+</listitem><listitem><para>Stress, performance, and interoperability</para>
+</listitem><listitem><para>DDI/DKI compliance</para>
+</listitem><listitem><para>Installation and packaging</para>
+</listitem>
+</itemizedlist><itemizedlist><para>For detailed information on how to test your driver and how to avoid
+problems during testing, see the following references:</para><listitem><para><olink targetptr="fdlbq" remap="internal">Device Driver Testing Tips</olink></para>
+</listitem><listitem><para><olink targetdoc="driver" targetptr="loading-17" remap="external"><citetitle remap="section">Criteria for Testing Drivers</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink></para>
+</listitem><listitem><para><olink targetdoc="driver" targetptr="debug-60" remap="external">Chapter 23, <citetitle remap="chapter">Debugging, Testing, and Tuning Device Drivers,</citetitle> in <citetitle remap="book">Writing Device Drivers</citetitle></olink></para>
+</listitem>
+</itemizedlist><para>Additional testing is specific to the type of driver.</para>
+</sect2>
+</sect1>
+</chapter><?Pub *0000073676 0?>

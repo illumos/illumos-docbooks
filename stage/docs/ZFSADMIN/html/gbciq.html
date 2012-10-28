@@ -1,0 +1,209 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Overview of ZFS Snapshots - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gavvx.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbcxz.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Overview of ZFS Snapshots</a></p>
+</div>
+<p class="toc level2"><a href="gbcxz.html">Overview of ZFS Clones</a></p>
+<p class="toc level2"><a href="gbchx.html">Saving and Restoring ZFS Data</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbciq"></a><h3>Overview of ZFS Snapshots</h3>
+<p>A <b>snapshot</b> is a read-only copy of a file system or volume. Snapshots
+can be created almost instantly, and initially consume no additional disk space within
+the pool. However, as data within the active dataset changes, the snapshot consumes
+disk space by continuing to reference the old data and so prevents the
+space from being freed.<a name="indexterm-457"></a><a name="indexterm-458"></a></p><p>ZFS snapshots include the following features:</p>
+<ul><li><p>Persist across system reboots.</p></li>
+<li><p>The theoretical maximum number of snapshots is 2<sup>64</sup>.</p></li>
+<li><p>Use no separate backing store. Snapshots consume disk space directly from the same storage pool as the file system from which they were created.</p></li>
+<li><p>Recursive snapshots are created quickly as one atomic operation. The snapshots are created together (all at once) or not created at all. The benefit of atomic snapshots operations is that the snapshot data is always taken at one consistent time, even across descendent file systems.</p></li></ul>
+<p>Snapshots of volumes cannot be accessed directly, but they can be cloned, backed
+up, rolled back to, and so on. For information about backing up
+a ZFS snapshot, see <a href="gbchx.html">Saving and Restoring ZFS Data</a>.</p>
+
+<a name="gbcya"></a><h4>Creating and Destroying ZFS Snapshots</h4>
+<p>Snapshots are created by using the <tt>zfs snapshot</tt> command, which takes as its only
+argument the name of the snapshot to create. The snapshot name is specified
+as follows:</p><pre><i>filesystem@snapname</i>
+<i>volume@snapname</i></pre><p>The snapshot name must satisfy the naming conventions defined in  <a href="gbcpt.html">ZFS Component Naming Requirements</a>.</p><p>In the following example, a snapshot of <tt>tank/home/ahrens</tt> that is named <tt>friday</tt> is
+created.<a name="indexterm-459"></a><a name="indexterm-460"></a><a name="indexterm-461"></a></p><pre># <tt><b>zfs snapshot tank/home/ahrens@friday</b></tt></pre><p>You can create snapshots for all descendent file systems by using the
+<tt>-r</tt> option. For example:</p><pre># <tt><b>zfs snapshot -r tank/home@now</b></tt>
+# <tt><b>zfs list -t snapshot</b></tt>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/home@now             0      -  29.5K  -
+tank/home/ahrens@now      0      -  2.15M  -
+tank/home/anne@now        0      -  1.89M  -
+tank/home/bob@now         0      -  1.89M  -
+tank/home/cindys@now      0      -  2.15M  -</pre><p>Snapshots have no modifiable properties. Nor can dataset properties be applied to a
+snapshot.</p><pre># zfs set compression=on tank/home/ahrens@tuesday
+cannot set compression property for 'tank/home/ahrens@tuesday': snapshot
+properties cannot be modified</pre><p>Snapshots are destroyed by using the <tt>zfs destroy</tt> command. For example:</p><pre># <tt><b>zfs destroy tank/home/ahrens@friday</b></tt></pre><p>A dataset cannot be destroyed if snapshots of the dataset exist. For example:</p><pre># <tt><b>zfs destroy tank/home/ahrens</b></tt>
+cannot destroy 'tank/home/ahrens': filesystem has children
+use '-r' to destroy the following datasets:
+tank/home/ahrens@tuesday
+tank/home/ahrens@wednesday
+tank/home/ahrens@thursday</pre><p>In addition, if clones have been created from a snapshot, then they must
+be destroyed before the snapshot can be destroyed.<a name="indexterm-462"></a><a name="indexterm-463"></a><a name="indexterm-464"></a></p><p>For more information about the <tt>destroy</tt> subcommand, see <a href="gamnq.html#gammq">Destroying a ZFS File System</a>.</p>
+
+<a name="gbion"></a><h5>Renaming ZFS Snapshots</h5>
+<p>You can rename snapshots but they must be renamed within the pool
+and dataset from which they were created. For example:<a name="indexterm-465"></a><a name="indexterm-466"></a><a name="indexterm-467"></a></p><pre># <tt><b>zfs rename tank/home/cindys@083006 tank/home/cindys@today</b></tt></pre><p>In addition, the following shortcut syntax provides equivalent snapshot renaming syntax as the
+example above.</p><pre># <tt><b>zfs rename tank/home/cindys@083006 today</b></tt></pre><p>The following snapshot rename operation is not supported because the target pool and
+file system name are different from the pool and file system where the
+snapshot was created.</p><pre># zfs rename tank/home/cindys@today pool/home/cindys@saturday
+cannot rename to 'pool/home/cindys@today': snapshots must be part of same 
+dataset</pre><p>You can recursively rename snapshots with the <tt>zfs rename</tt> <tt>-r</tt> command. For example:</p><pre># <tt><b>zfs list</b></tt>
+NAME                         USED  AVAIL  REFER  MOUNTPOINT
+users                        270K  16.5G    22K  /users
+users/home                    76K  16.5G    22K  /users/home
+users/home@yesterday            0      -    22K  -
+users/home/markm              18K  16.5G    18K  /users/home/markm
+users/home/markm@yesterday      0      -    18K  -
+users/home/marks              18K  16.5G    18K  /users/home/marks
+users/home/marks@yesterday      0      -    18K  -
+users/home/neil               18K  16.5G    18K  /users/home/neil
+users/home/neil@yesterday       0      -    18K  -
+# <tt><b>zfs rename -r users/home@yesterday @2daysago</b></tt>
+# <tt><b>zfs list -r users/home</b></tt>
+NAME                        USED  AVAIL  REFER  MOUNTPOINT
+users/home                   76K  16.5G    22K  /users/home
+users/home@2daysago            0      -    22K  -
+users/home/markm             18K  16.5G    18K  /users/home/markm
+users/home/markm@2daysago      0      -    18K  -
+users/home/marks             18K  16.5G    18K  /users/home/marks
+users/home/marks@2daysago      0      -    18K  -
+users/home/neil              18K  16.5G    18K  /users/home/neil
+users/home/neil@2daysago       0      -    18K  -</pre>
+
+<a name="gbiqe"></a><h4>Displaying and Accessing ZFS Snapshots</h4>
+<p>Snapshots of file systems are accessible in the <tt>.zfs/snapshot</tt> directory within the root
+of the containing file system. For example, if <tt>tank/home/ahrens</tt> is mounted on
+<tt>/home/ahrens</tt>, then the <tt>tank/home/ahrens@thursday</tt> snapshot data is accessible in the <tt>/home/ahrens/.zfs/snapshot/thursday</tt> directory.<a name="indexterm-468"></a><a name="indexterm-469"></a><a name="indexterm-470"></a></p><pre># <tt><b>ls /tank/home/ahrens/.zfs/snapshot</b></tt>
+tuesday wednesday thursday</pre><p>You can list snapshots as follows:</p><pre># <tt><b>zfs list -t snapshot</b></tt>
+NAME                        USED  AVAIL  REFER  MOUNTPOINT
+pool/home/anne@monday          0      -   780K  -
+pool/home/bob@monday           0      -  1.01M  -
+tank/home/ahrens@tuesday   8.50K      -   780K  -
+tank/home/ahrens@wednesday 8.50K      -  1.01M  -
+tank/home/ahrens@thursday      0      -  1.77M  -
+tank/home/cindys@today     8.50K      -   524K  -</pre><p>You can list snapshots that were created for a particular file system as
+follows:</p><pre># <tt><b>zfs list -r -t snapshot -o name,creation tank/home</b></tt>
+NAME                       CREATION
+tank/home@now               Wed Aug 30 10:53 2006
+tank/home/ahrens@tuesday    Wed Aug 30 10:53 2006
+tank/home/ahrens@wednesday  Wed Aug 30 10:54 2006
+tank/home/ahrens@thursday   Wed Aug 30 10:53 2006
+tank/home/cindys@now        Wed Aug 30 10:57 2006</pre>
+
+<a name="gbcxc"></a><h5>Snapshot Space Accounting</h5>
+<p>When a snapshot is created, its space is initially shared between the snapshot
+and the file system, and possibly with previous snapshots. As the file system
+changes, space that was previously shared becomes unique to the snapshot, and thus
+is counted in the snapshot's <tt>used</tt> property. Additionally, deleting snapshots can increase the
+amount of space unique to (and thus <b>used</b> by) other snapshots.</p><p>A snapshot's space <tt>referenced</tt> property is the same as the file system's was
+when the snapshot was created.<a name="indexterm-471"></a><a name="indexterm-472"></a></p>
+
+<a name="gbcxk"></a><h4>Rolling Back to a ZFS Snapshot</h4>
+<p>The <tt>zfs rollback</tt> command can be used to discard all changes made since a
+specific snapshot. The file system reverts to its state at the time the
+snapshot was taken. By default, the command cannot roll back to a snapshot
+other than the most recent snapshot.</p><p>To roll back to an earlier snapshot, all intermediate snapshots must be destroyed.
+You can destroy earlier snapshots by specifying the <tt>-r</tt> option.</p><p>If clones of any intermediate snapshots exist, the <tt>-R</tt> option must be specified
+to destroy the clones as well. </p>
+<hr><p><b>Note - </b>The file system that you want to roll back must be unmounted
+and remounted, if it is currently mounted. If the file system cannot be
+unmounted, the rollback fails. The <tt>-f</tt> option forces the file system to be unmounted,
+if necessary.</p>
+<hr>
+<p>In the following example, the <tt>tank/home/ahrens</tt> file system is rolled back to the
+<tt>tuesday</tt> snapshot:<a name="indexterm-473"></a><a name="indexterm-474"></a><a name="indexterm-475"></a></p><pre># <tt><b>zfs rollback tank/home/ahrens@tuesday</b></tt>
+cannot rollback to 'tank/home/ahrens@tuesday': more recent snapshots exist
+use '-r' to force deletion of the following snapshots:
+tank/home/ahrens@wednesday
+tank/home/ahrens@thursday
+# <tt><b>zfs rollback -r tank/home/ahrens@tuesday</b></tt></pre><p>In the above example, the <tt>wednesday</tt> and <tt>thursday</tt> snapshots are removed because
+you rolled back to the previous <tt>tuesday</tt> snapshot.</p><pre># <tt><b>zfs list -r -t snapshot -o name,creation tank/home/ahrens</b></tt>
+NAME                      CREATION
+tank/home/ahrens@tuesday  Wed Aug 30 10:53 2006</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gavvx.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbcxz.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

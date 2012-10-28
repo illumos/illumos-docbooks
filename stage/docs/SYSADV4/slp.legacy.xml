@@ -1,0 +1,169 @@
+<chapter id="legacy-7"><title>Incorporating Legacy Services</title><highlights><para>Legacy services are network services that predate the development
+and implementation of SLP. Solaris services such as the line printer daemon
+(<literal>lpsc</literal><command></command><literal>hed</literal>), the
+NFS file service, and NIS/NIS+ name service, for example, do not contain
+internal SAs for SLP. This chapter describes when and how to advertise legacy
+services.</para><itemizedlist><listitem><para><olink targetptr="legacy-8" remap="internal">When to Advertise Legacy Services</olink></para>
+</listitem><listitem><para><olink targetptr="legacy-11" remap="internal">Advertising Legacy Services</olink></para>
+</listitem><listitem><para><olink targetptr="legacy-16" remap="internal">Considerations When Advertising
+Legacy Services</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="legacy-8"><title>When to Advertise Legacy Services</title><para>With legacy service advertising, you can enable the SLP UAs to find
+devices and services such as the following on your networks. You can find
+hardware devices and software services that do that do not contain SLP SAs.
+When applications with SLP UAs need to find printers or databases that do
+not contain SLP SAs, for example, legacy advertising might be required.</para>
+</sect1><sect1 id="legacy-11"><title>Advertising Legacy Services</title><para>You use any of the following methods to advertise legacy services.</para><itemizedlist><listitem><para>Modify the service to incorporate an SLP SA.</para>
+</listitem><listitem><para>Write a small program that advertises on behalf of a service
+that is not SLP enabled.</para>
+</listitem><listitem><para>Use proxy advertising to have <command>slpd</command> advertise
+the service.</para>
+</listitem>
+</itemizedlist><sect2 id="legacy-12"><title>Modifying the Service</title><para>If the source code for the software server is available, you can incorporate
+a SLP SA. The C and Java APIs for SLP are relatively straightforward to
+use. See the man pages for information on the C API and documentation on
+the Java API. If the service is a hardware device, the manufacturer might
+have an updated PROM that incorporates SLP. Contact the device manufacturer
+for more information.</para>
+</sect2><sect2 id="legacy-13"><title>Advertising a Service That Is Not SLP Enabled</title><para>If the source code or an updated PROM that contains SLP is not available,
+you can write a small application that uses the SLP client library to advertise
+the service. This application could function as a small daemon that you
+start or stop from the same shell script you use to start and stop the service.</para>
+</sect2><sect2 id="legacy-14"><title>SLP Proxy Registration</title><para>Solaris <command>slpd</command> supports legacy service advertising
+with a proxy registration file. The proxy registration file is a list of
+service advertisements in a portable format.</para>
+</sect2><task id="slp.setupprproc"><title>How to Enable SLP Proxy Registration</title><procedure><step id="slp.legacy-step-6"><para>Create a proxy registration file on the
+host file system or in any network directory that is accessible by HTTP. </para>
+</step><step id="slp.legacy-step-7"><para>Determine if a service type template
+exists for the service. </para><para>The template is a description of the
+service URL and attributes of a service type. A template is used to define
+the components of an advertisement for a particular service type:</para><itemizedlist><listitem><para>If a service type template exists, use the template to construct
+the proxy registration. See RFC 2609 for more information on service-type
+templates.</para>
+</listitem><listitem><para>If a service type template is not available for the service,
+select a collection of attributes that precisely describe the service. Use
+a naming authority other than the default for the advertisement. The default
+naming authority is allowed only for service types that have been standardized.
+See RFC 2609 for more information on naming authorities.</para><para>For
+example, suppose a company that is called <emphasis>BizApp</emphasis> has
+a local database that is used to track software defects. To advertise the
+database, the company might use a URL with the service type <literal>service:bugdb.bizapp</literal>. The naming authority would then be <literal>bizapp</literal>.</para>
+</listitem>
+</itemizedlist>
+</step><step id="slp.setup-step-pr1"><para>Follow the next steps to configure the <literal>net.slp.serializedRegURL</literal> property in the <literal>/etc/inet/slp.conf</literal> file with the location of the registration file that was created
+in the previous steps.</para>
+</step>&rolestepA;<step id="slp.setup-step-pr2"><para>Stop <command>slpd</command> and all
+SLP activity on the host.</para><screen># <userinput>svcadm disable network/slp</userinput></screen>
+</step><step id="slp.setup-step-pr3"><para>Back
+up the default <filename>/etc/inet/slp.conf</filename> file before you change
+the configuration settings.</para>
+</step><step id="slp.setup-step-pr4"><para>Specify the location of the proxy registration
+file in the <literal>net.slp.serializedRegURL</literal> property of the <literal>/etc/inet/slp.conf</literal> file.</para><screen>net.slp.net.slp.serializedRegURL=<replaceable>proxy registration file URL</replaceable></screen><para>For example, if the serialized registration file is <filename>/net/inet/slp.reg</filename>, you configure the property as shown in the following:</para><screen>net.slp.serializedRegURL=file:/etc/inet/slp.reg</screen>
+</step><step id="slp.setup-step-pr5"><para>Save your changes and close the file.</para>
+</step><step id="slp.setup-step-pr6"><para>Restart <command>slpd</command> to
+activate your changes.</para><screen># <userinput>svcadm enable network/slp</userinput></screen>
+</step>
+</procedure>
+</task><sect2 id="slp.legacy-1"><title>Using SLP Proxy Registration to Advertise</title><para><literal></literal> A
+service advertisement consists of lines that identify the service URL, an
+optional scope, and a series of attribute definitions. The SLP daemon reads,
+registers, and maintains proxy advertisements exactly as an SA client would.
+The following is an example of an advertisement from a proxy registration
+file. </para><para>In the example, a legacy printer that supports LPR protocol and an
+FTP server are advertised. Line numbers have been added for description
+purposes and are not part of the file.</para><screen><lineannotation> (1) </lineannotation>#Advertise legacy printer. 
+<lineannotation> (2) </lineannotation>
+<lineannotation> (3) </lineannotation>service:lpr://bizserver/mainspool,en,65535
+<lineannotation> (4) </lineannotation>scope=eng,corp
+<lineannotation> (5) </lineannotation>make-model=Laserwriter II
+<lineannotation> (6) </lineannotation>location-description=B16-2345
+<lineannotation> (7) </lineannotation>color-supported=monochromatic
+<lineannotation> (8) </lineannotation>fonts-supported=Courier,Times,Helvetica 9 10
+<lineannotation> (9) </lineannotation>
+<lineannotation> (10) </lineannotation>#Advertise FTP server
+<lineannotation> (11) </lineannotation>
+<lineannotation> (12) </lineannotation>ftp://archive/usr/src/public,en,65535,src-server
+<lineannotation> (13) </lineannotation>content=Source code for projects
+<lineannotation> (14) </lineannotation></screen><note><para>The proxy registration file supports the same convention for
+escaping non-ASCII characters as the configuration file does. For more information
+about the format of the proxy registration file, see RFC 2614.</para>
+</note><table frame="topbot" id="slp.legacy-tbl-5"><title>SLP Proxy Registration
+File Description</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec2" colwidth="17*"/><colspec colname="colspec3" colwidth="83*"/><thead><row><entry rowsep="1"><para>Line Numbers</para>
+</entry><entry rowsep="1"><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>1 and 10</para>
+</entry><entry><para>Comment lines begin with a cross-hatch symbol (#) and do not affect
+the file's operation. All characters through the end of a comment line are
+ignored.</para>
+</entry>
+</row><row><entry><para>2, 9, and 14</para>
+</entry><entry><para>Blank lines that delimit the advertisements.</para>
+</entry>
+</row><row><entry><para>3, 12</para>
+</entry><entry><para>Service URLs that each have three required fields and one optional
+field that are separated by commas:</para><itemizedlist><listitem><para>Generic or <literal>service: URL</literal> advertised. See
+RFC 2609 for the specification of how to form a service: URL.</para>
+</listitem><listitem><para>Language of the advertisement. In the previous example,
+the field is designated English, <emphasis>en</emphasis>. Language is an
+RFC 1766 language tag.</para>
+</listitem><listitem><para>Lifetime of the registration, measured in seconds. The lifetime
+is restricted to an unsigned 16 bit-integer. If the lifetime is less than
+the maximum, 65535, <literal>slpd</literal> times out the advertisement.
+If the lifetime is 65535, <literal>slpd</literal> refreshes the advertisement
+periodically, and the lifetime is considered permanent, until <literal>slpd</literal> exits. </para>
+</listitem><listitem><para>(Optional) Service type field &ndash; If used, this field
+defines the service type. If the service URL is defined, you can change
+the service type under which the URL is advertised. In the previous example
+of a proxy registration file, line 12 contains a generic FTP URL. The optional
+type field causes the URL to be advertised under the service type name <emphasis>src-server</emphasis>. The <literal>service</literal> prefix is not added
+by default to the type name.</para>
+</listitem>
+</itemizedlist>
+</entry>
+</row><row><entry><para>4</para>
+</entry><entry><para>Scope designation.</para><para>Optional
+line consists of the token <literal>scope</literal>, followed by an equal
+sign and a comma-separated list of scope names. Scope names are defined
+by the <literal>net.slp.useScopes</literal> configuration property. <literal></literal>Only
+scopes that are configured for the host should be included in the list.
+When a scope line is not added, the registration is made in all scopes with
+which <literal>slpd</literal> is configured. The scope line must appear
+immediately after the URL line. Otherwise, scope names are recognized as
+attributes.</para>
+</entry>
+</row><row><entry><para>5&ndash;8</para>
+</entry><entry><para>Attribute definitions.</para><para>After the optional scope line, the bulk of the service advertisement
+contains attribute/value list pair lines. Each pair consists of the attribute
+tag, followed by an equal sign, and an attribute value or a comma-separated
+list of values. In the previous example of a proxy registration file, line
+8 illustrates an attribute list with multiple values. All other lists have
+single values. The format for the attribute names and values is the same
+as on-the-wire SLP messages.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="legacy-16"><title>Considerations When Advertising Legacy Services</title><para>Generally, modifying the source code to add SLP is preferable to writing
+a SLP-enabled service that uses the SLP API to advertise on behalf of other
+services. Modifying the source code is also preferable to using proxy registration.
+When you modify the source code, you can add service-specific features and
+closely track service availability. If the source code is unavailable, writing
+an SLP-enabled helper service that advertises on behalf of other services
+is preferable to using proxy registration. Ideally, this helper service
+is integrated into the service start/stop procedure that is used to control
+activation and deactivation. Proxy advertising is generally the third choice,
+when no source code is available and writing a standalone SA is impractical. </para><para>Proxy
+advertisements are maintained only if <command>slpd</command> is running
+to read the proxy registration file. No direct connection exists between
+the proxy advertisement and the service. If an advertisement times out or <command>slpd</command> is halted, the proxy advertisement is no longer available.</para><para>If the service is shut down, <command>slpd</command> must be stopped.
+The serialized registration file is edited to comment out or remove the
+proxy advertisement, and <command>slpd</command> is restarted. You must
+follow the same procedure when the service is restarted or reinstalled.
+The lack of connection between the proxy advertisement and the service is
+a major disadvantage of proxy advertisements.</para>
+</sect1>
+</chapter>

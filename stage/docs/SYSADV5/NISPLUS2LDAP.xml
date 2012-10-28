@@ -1,0 +1,1337 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bsol dash hellip gt lt minus?><chapter id="nisplus2ldap-1"><?Pub Tag atict:info tracking="off" ref="0"?><?Pub Tag
+atict:user user="sharonr" fullname="Sharon Veach"?><title>Transitioning From NIS+ to LDAP</title><highlights><para>This chapter describes how to make the transition from using the NIS+
+naming service to LDAP naming services.</para>
+</highlights><sect1 id="nisplus2ldap-2"><title>NIS+ to LDAP Overview</title><para><indexterm><primary>LDAP</primary><secondary>transitioning from NIS+ to</secondary></indexterm>The NIS+ server daemon, <literal>rpc.nisd</literal>,
+stores NIS+ data in proprietary-format files in the <filename>/var/nis/data</filename> directory.
+While it is entirely possible to keep NIS+ data synchronized with LDAP, such
+synchronization has previously required an external agent. However, the NIS+
+daemon now enables you to use an LDAP server as a data repository for NIS+
+data. Since this makes it possible for NIS+ and LDAP clients to share the
+same naming service information, it is easier to transition from using NIS+
+as the main naming service, to using LDAP for the same role.</para><para>By default, the <literal>rpc.nisd</literal> daemon continues to work
+as before, relying only on the<filename>/var/nis/data</filename> NIS+ database.
+If desired, the system administrator can choose to use an LDAP server as the
+authoritative data repository for any subset of the NIS+ database. In this
+case, the <filename>/var/nis/data</filename> files serve as a cache for the <command>rpc.nisd</command> daemon, reducing LDAP lookup traffic, and enabling the <literal>rpc.nisd</literal> to continue working if the LDAP server is temporarily unavailable.
+In addition to continuous synchronization between NIS+ and LDAP, you can also
+perform uploads of NIS+ data to LDAP, or downloads of LDAP data to NIS+.</para><para>Mapping of data to and from LDAP is controlled by a flexible configuration
+file syntax. (All standard NIS+ tables (except for <literal>client_info.org_dir</literal> and <literal>timezone.org_dir</literal>) are covered by a template mapping file, <filename>/var/nis/NIS+LDAPmapping.template</filename>), which should require little or no change for most NIS+ installations.
+(See <olink targetptr="nisplus2ldap-57" remap="internal">client_info and timezone Tables (NIS+
+to LDAP)</olink> for information on <literal>client_info.org_dir</literal> and <literal>timezone.org_dir</literal> .) In addition to locations for NIS+ data in the
+LDAP Directory Information Tree (DIT), the mapping file also allows establishing
+time-to-live (TTL) for NIS+ data sourced from LDAP. While there often is a
+one-to-one mapping between NIS+ column values and LDAP attribute values, the
+mapping file can be used to maintain more complicated relationships as well.</para><para>The <filename>/etc/default/rpc.nisd</filename> file is used to select
+LDAP server and authentication, and controls some general <literal>rpc.nisd</literal> behavior.
+See <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.
+The details of the mapping are specified via the <filename>/var/nis/NIS+LDAPmapping</filename> file. For more information, see  <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. The name of the mapping
+file can be changed by editing the <filename>/lib/svc/method/nisplus</filename> file.
+See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+ to LDAP Tools and the Service
+Management Facility</olink> for more information.</para><para>The following terms are used in this chapter.</para><itemizedlist><listitem><para>Container</para><para>A container is the location in the LDAP
+DIT where all related entries are stored. For example, user account information
+is often stored in the <literal>ou=People</literal> container, while host
+address information can be stored in the <literal>ou=Hosts</literal> container.</para>
+</listitem><listitem><para>Netname</para><para>A netname is an entity in secure RPC (user
+or machine) that can be authenticated.</para>
+</listitem><listitem><para>Mapping</para><para>Mapping is the relationship between an
+NIS+ object and an LDAP entry. For example, data from the <literal>name</literal> column
+in the <literal>passwd.org_dir</literal> NIS+ table (such as the user name
+of an account) corresponds to the LDAP <literal>uid</literal> attribute of
+the <literal>posixAccount</literal> object class in the <literal>ou=People</literal> container.
+The configuration can establish a mapping between the <literal>name</literal> column
+and the <literal>uid</literal> attribute. You can also say that the <literal>name</literal> column is mapped to the <literal>uid</literal> attribute (or vice
+versa).</para>
+</listitem><listitem><para>Principal</para><para>A principal is an entity in NIS+ (user
+or machine) that can be authenticated. Usually, there is a one-to&ndash;one
+correspondence between netnames and principal names.</para>
+</listitem>
+</itemizedlist><sect2 id="nisplus2ldap-3"><title><filename>rpc.nisd</filename> Configuration
+Files</title><para><indexterm><primary><literal>rpc.nisd</literal> configuration files</primary></indexterm>Two configuration files control <literal>rpc.nisd</literal> operation.</para><itemizedlist><listitem><para><filename>/etc/default/rpc.nisd</filename></para><para>This
+file contains information regarding the LDAP server and authentication, the
+NIS+ base domain, the LDAP default search base, exception processing, and
+general <literal>rpc.nisd</literal> configuration, which applies whether or
+not LDAP mapping is in effect.</para>
+</listitem><listitem><para><filename>/var/nis/NIS+LDAPmapping</filename></para><para>This
+file contains information on mapping of NIS+ data to and from LDAP.  The template
+file (<filename>/var/nis/NIS+LDAPmapping.template</filename>) covers all standard
+NIS+ objects, except <literal>client_info.org_dir</literal> and 	<literal>timezone.org_dir</literal>. See <olink targetptr="nisplus2ldap-57" remap="internal">client_info and timezone
+Tables (NIS+ to LDAP)</olink> and <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist><para>Configuration is done by assigning values to pre-defined attributes.
+In addition to the configuration files, the configuration attributes can also
+be read from LDAP (see <olink targetptr="nisplus2ldap-70" remap="internal">Storing Configuration
+Information in LDAP</olink>) or can be specified on the <literal>rpc.nisd</literal> command
+line by way of the <option>x</option> option. If the same attribute is specified
+in more than one place, the priority order is (from higher to lower) as follows.</para><orderedlist><listitem><para><literal>rpc.nisd</literal> <option>x</option><literal></literal> option</para>
+</listitem><listitem><para>Configuration file</para>
+</listitem><listitem><para>LDAP</para>
+</listitem>
+</orderedlist>
+</sect2><sect2 id="nisplus2ldap-66"><title>NIS+ to LDAP Tools and the Service Management
+Facility</title><indexterm><primary>New Features</primary><secondary>Service Management Facility with NIS+ to LDAP</secondary>
+</indexterm><indexterm><primary>Service Management Facility</primary><secondary>and NIS+ to LDAP</secondary>
+</indexterm><indexterm><primary>NIS+ to LDAP</primary><secondary>Service Management Facility</secondary>
+</indexterm><para>Most of the command line administrative tasks associated with the NIS+
+to LDAP transition are managed by the Service Management Facility. For an
+overview of SMF, refer to <olink targetdoc="sysadv1" targetptr="hbrunlevels-25516" remap="external">Chapter 16, <citetitle remap="chapter">Managing Services (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>. Also refer to the <olink targetdoc="group-refman" targetptr="svcadm-1m" remap="external"><citerefentry><refentrytitle>svcadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="svcs-1" remap="external"><citerefentry><refentrytitle>svcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man pages for more details.</para><itemizedlist><listitem><para>Administrative actions on the NIS+ to LDAP transition service,
+such as enabling, disabling, or restarting, can be performed using the <command>svcadm</command> command.</para><tip><para>Temporarily disabling a service by using the <option>t</option> option
+provides some protection for the service configuration. If the service is
+disabled with the <option>t</option> option, the original settings would be
+restored for the service after a reboot. If the service is disabled without <option>t</option>, the service will remain disabled after reboot.</para>
+</tip>
+</listitem><listitem><para>The NIS+ Fault Managed Resource Identifier (FMRI) is <literal>svc:/network/rpc/nisplus:</literal><replaceable>&lt;instance&gt;</replaceable><literal></literal>. The
+FMRI for the LDAP client service is <literal>svc:/network/ldap/client:</literal><replaceable>&lt;instance&gt;</replaceable><literal></literal>.</para>
+</listitem><listitem><para>You can query the status of NIS+ by using the <command>svcs</command> command.</para><itemizedlist><listitem><para>Example of <command>svcs</command> command and output.</para>
+</listitem>
+</itemizedlist><screen># <userinput>svcs \*nisplus\*</userinput>
+STATE        STIME    FMRI
+online       Sep_01   svc:/network/rpc/nisplus:default</screen>
+</listitem><listitem><para>Example of <command>svcs</command> <option>l</option> command
+and output. To get the output shown below, you must use the instance name
+in the FMRI.</para><screen># <userinput>svcs</userinput> <option>l</option> <userinput>network/rpc/nisplus:default</userinput>
+fmri         svc:/network/rpc/nisplus:default
+enabled      false
+state        disabled
+next_state   none
+restarter    svc:/system/svc/restarter:default
+dependency   require_all/none svc:/network/rpc/keyserv (online)</screen>
+</listitem><listitem><para>You can check a daemon's presence by using the <command>ps</command> command.</para><screen># <userinput>ps</userinput> <option>e</option> <userinput>| grep rpc.nisd</userinput>
+  root 23320     1   0   Aug 27 ?        16:30 ./ns-slapd -D \
+  /usr/iplanet/ds5/slapd-lastrev -i /usr/iplanet/ds5/slapd-lastrev/
+  root 25367 25353   0 15:35:19 pts/1     0:00 grep slapd</screen><note><para>Do not use the <option>f</option> option with <command>ps</command> because
+this option attempts to translate user IDs to names, which causes more naming
+service lookups that might not succeed.</para>
+</note>
+</listitem>
+</itemizedlist><sect3 id="nisplus2ldap-150"><title>When Not to Use SMF With NIS+ to LDAP</title><indexterm><primary>Service Management Facility</primary><secondary>and NIS+ to LDAP</secondary><tertiary>when not to use SMF</tertiary>
+</indexterm><indexterm><primary>NIS+ to LDAP</primary><secondary>Service Management Facility</secondary><tertiary>when not to use SMF</tertiary>
+</indexterm><para>In general, the <command>/usr/sbin/rpc.nisd</command> daemon is administered
+using the <command>svcadm</command> command. However, when <command>rpc.nisd</command> is
+invoked with <option>x</option> <option role="nodash">nisplusLDAPinitialUpdateOnly=yes</option>, <command>rpc.nisd</command> performs the specified initial update
+action, then exits. That is, <command>rpc.nisd</command> does not daemonize.
+The Service Management Facility should not be used in conjunction with <option>x</option> <option role="nodash">nisplusLDAPinitialUpdateOnly=yes</option>. SMF can be used any
+other time you want to start, stop, or restart the <command>rpc.nisd</command> daemon.</para><para>The following example shows <command>rpc.nisd</command> used with <option>x</option> <option role="nodash">nisplusLDAPinitialUpdateOnly=yes</option>.</para><screen># <userinput>/usr/sbin/rpc.nisd</userinput> <option>m</option> <userinput><replaceable>mappingfile</replaceable> \</userinput>
+<userinput></userinput><option>x</option> <userinput>nisplusLDAPinitialUpdateAction=from_ldap \</userinput>
+<userinput></userinput><option>x</option> <userinput>nisplusLDAPinitialUpdateOnly=yes</userinput></screen>
+</sect3><sect3 id="nisplus2ldap-160"><title>Modifying the <filename>/lib/svc/method/nisplus</filename> File</title><indexterm><primary><filename>/lib/svc/method/nisplus</filename> file</primary>
+</indexterm><para>If you want to include specific options when you invoke the <command>rpc.nisd</command> daemon with the Service Management Facility, you can use the <command>svcprop</command> command or modify the <filename>/lib/svc/method/nisplus</filename> file.
+See the <olink targetdoc="group-refman" targetptr="svcprop-1" remap="external"><citerefentry><refentrytitle>svcprop</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information about using the <command>svcprop</command> command.
+The following procedure describes how to modify the <filename>/lib/svc/method/nisplus</filename> file.</para><task id="nisplus2ldap-proc-9"><title>How to Modify the <filename>/lib/svc/method/nisplus</filename> File</title><procedure><step><para>Become superuser or assume an equivalent role.</para><para>Roles
+contain authorizations and privileged commands. For more information about
+roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="nisplus2ldap-step-10"><para>Stop the NIS+ service.</para><screen># <userinput>svcadm disable network/rpc/nisplus:default</userinput></screen>
+</step><step id="nisplus2ldap-step-11"><para>Open the <filename>/lib/svc/method/nisplus</filename> file.</para><para>Use the editor of your choice.</para>
+</step><step id="nisplus2ldap-step-12"><para>Edit the file to add the desired options.</para><para>Change:</para><screen>if [ -d /var/nis/data -o -d /var/nis/$hostname ]; then
+                    /usr/sbin/rpc.nisd || exit $</screen><para>To:</para><screen>if [ -d /var/nis/data -o -d /var/nis/$hostname ]; then
+                     /usr/sbin/rpc.nisd -Y -B || exit $?</screen><para>In this example, the <option>Y</option> and <option>B</option> options
+are added to <command>rpc.nisd</command>, so the options are automatically
+implemented at startup.</para>
+</step><step id="nisplus2ldap-step-14"><para>Save and quit the <filename>/lib/svc/method/nisplus</filename> file.</para>
+</step><step id="nisplus2ldap-step-13"><para>Start the NIS+ service.</para><screen># <userinput>svcadm enable network/rpc/nisplus:default</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect3>
+</sect2><sect2 id="nisplus2ldap-4"><title>Creating Attributes and Object Classes</title><para>Depending on how you configure the NIS+/LDAP mapping, you might need
+to create a number of new LDAP attributes and object classes. The examples
+show how to do this by specifying LDIF data that can be used as input to the <command>ldapadd</command> command. Create a file containing the LDIF data, and then
+invoke <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para><screen># <userinput>ldapadd</userinput> <option>D</option> <userinput><replaceable>bind-DN</replaceable></userinput> <option>f</option> <userinput>ldif</userinput> <option>file</option><userinput></userinput></screen><para>This method works with Sun Java System Directory Server, and
+might work with other LDAP servers as well.</para><note><para>Except for the <literal>defaultSearchBase</literal>, <literal>preferredServerList</literal>, and <literal>authenticationMethod</literal> attributes, as well
+as the SYNTAX specifications, the object identifiers (OIDs) used in this chapter
+are intended for illustration only. As no official OIDs have been assigned,
+you are free to use any suitable OIDs.</para>
+</note>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-5"><title>Getting Started With the NIS+ to LDAP Transition</title><para>For an introduction to the configuration needed to start using an LDAP
+repository for NIS+ data, see <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. The remainder of this section goes into more detail
+about the organization of the configuration files.</para><sect2 id="nisplus2ldap-6"><title><filename>/etc/default/rpc.nisd</filename> File</title><para>All assignments in the <filename>/etc/default/rpc.nisd</filename> file
+are of the <literal>attributeName=value</literal> type.</para><sect3 id="nisplus2ldap-7"><title>General Configuration</title><indexterm><primary><literal>rpc.nisd</literal> attributes</primary>
+</indexterm><para>The following attributes control general configuration of the <literal>rpc.nisd</literal>, and are active whether or not LDAP mapping is in effect. They
+should generally be left at their default values. See <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> for more information.</para><itemizedlist><listitem><para><literal>nisplusNumberOfServiceThreads</literal></para>
+</listitem><listitem><para><literal>nisplusThreadCreationErrorAction</literal></para>
+</listitem><listitem><para><literal>nisplusThreadCreationErrorAttempts</literal></para>
+</listitem><listitem><para><literal>nisplusThreadCreationErrorTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusDumpErrorAction</literal></para>
+</listitem><listitem><para><literal>nisplusDumpErrorAttempts</literal></para>
+</listitem><listitem><para><literal>nisplusDumpErrorTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusResyncService</literal></para>
+</listitem><listitem><para><literal>nisplusUpdateBatching</literal></para>
+</listitem><listitem><para><literal>nisplusUpdateBatchingTimeout</literal></para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-8"><title>Configuration Data From LDAP</title><para>The following attributes control the reading of other configuration
+attributes from LDAP. These attributes cannot themselves reside in LDAP. They
+are read only from the command line or the configuration file. See <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> for more information.</para><itemizedlist><listitem><para><literal>nisplusLDAPconfigDN</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigPreferredServerList</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigAuthenticationMethod</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigTLS</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigTLSCertificateDBPath</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigProxyUser</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPconfigProxyPassword</literal></para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-9"><title>Server Selection</title><itemizedlist><listitem><para><literal>preferredServerList</literal></para><para>Specify
+the LDAP server and port number.</para><screen># LDAP server can be found at port 389
+# LDAP server can be found at port 389
+on the local machine
+# preferredServerList=127.0.0.1
+# Could also be written
+# preferredServerList=127.0.0.0.1:389
+LDAP server on the machine at IP
+# address "1.2.3.4", at port 65042
+# preferredServerList=1.2.3.4:65042</screen>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-10"><title>Authentication and Security</title><itemizedlist><listitem><para><literal>authenticationMethod</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPproxyUser</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPproxyPassword</literal></para>
+</listitem>
+</itemizedlist><para>The authentication method and, if appropriate for the method selected,
+the proxy user (bind distinguished name [DN]) and password (key or other shared
+secret) to be used between the <command>rpc.nisd</command> daemon and the
+LDAP server. See <olink targetptr="nisplus2ldap-46" remap="internal">Security and Authentication</olink> for
+more information.</para><itemizedlist><listitem><para><literal>nisplusLDAPTLS</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPTLSCertificateDBPath</literal></para>
+</listitem>
+</itemizedlist><para>Optionally use SSL, and specify the location of the certificate file.
+See <olink targetptr="nisplus2ldap-47" remap="internal">Using SSL</olink> for more information.</para>
+</sect3><sect3 id="nisplus2ldap-11"><title>Default Location in LDAP and NIS+</title><itemizedlist><listitem><para><literal>defaultSearchBase</literal></para><para>The point
+in the LDAP DIT where the containers for RFC 2307- style naming services data
+live. This is the default used when individual container DNs do not specify
+a full search base. See <olink targetptr="nisplus2ldap-18" remap="internal">nisplusLDAPobjectDN
+Attribute</olink> for more information.</para>
+</listitem><listitem><para><literal>nisplusLDAPbaseDomain</literal></para><para>The default
+NIS+ domain name to use when NIS+ object specifications (see <olink targetptr="nisplus2ldap-16" remap="internal">nisplusLDAPdatabaseIdMapping Attribute</olink>)
+are not fully qualified.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-12"><title>Timeout/Size Limits and Referral Action
+for LDAP Communication</title><itemizedlist><listitem><para><literal>nisplusLDAPbindTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPmodifyTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPaddTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPdeleteTimeout</literal></para>
+</listitem>
+</itemizedlist><para>The above parameters are timeouts for the <command>ldap</command> <literal>bind</literal>, <literal>modify</literal>, <literal>add</literal>, and <literal>delete</literal> operations, respectively. They should generally be left at their
+default values.</para><itemizedlist><listitem><para><literal>nisplusLDAPsearchTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPsearchTimeLimit</literal></para>
+</listitem>
+</itemizedlist><para>The above parameters set the timeout for the LDAP search operation,
+and request a server-side search time limit, respectively. Since the <literal>nisplusLDAPsearchTimeLimit</literal> will control how much time the LDAP server spends on the search
+request, make sure that <literal>nisplusLDAPsearchTimeLimit</literal> is not
+smaller than <literal>nisplusLDAPsearchTimeout</literal>.  Depending on the
+performance of the NIS+ server, the LDAP server, and the connection between
+them, you might have to increase the search limits from the default values.
+Watch for timeout syslog messages from <literal>rpc.nisd</literal> as a clue
+to making these values larger.</para><itemizedlist><listitem><para><literal>nisplusLDAPsearchSizeLimit</literal></para><para>The
+above parameter requests a limit on the amount of LDAP data returned for an
+LDAP search request. The default is to ask for no limitation.  This is a server
+side limit. The LDAP server might impose restrictions on the maximum, and
+these restrictions might be tied to the proxy user (bind DN) used. Make sure
+that the LDAP server allows the <literal>rpc.nisd</literal> to transfer enough
+data to account for the largest container (depending on the site, often the
+container used for  <filename>passwd.org_dir</filename>, <filename>mail_aliases.org_dir</filename>, or <filename>netgroup.org_dir</filename>). Consult your LDAP
+server documentation for more information.</para>
+</listitem><listitem><para><literal>nisplusLDAPfollowReferral</literal></para><para>The
+above parameter defines the action to be taken when an LDAP operation results
+in a referral to another LDAP server. The default is to <emphasis>not</emphasis> follow
+referrals. Enable follow referrals if you want or need referrals to be honored.
+Keep in mind that while referrals are convenient, they can also slow down
+operations by making the <literal>rpc.nisd</literal> talk to multiple LDAP
+servers for each request. The <literal>rpc.nisd</literal> should generally
+be pointed directly to an LDAP server that can handle all LDAP requests that
+the <literal>rpc.nisd</literal> might make.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-13"><title>Error Actions</title><para>The following parameters define the actions to take when an error occurs
+during an LDAP operation. You should generally leave these at their defaults.
+See <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> for
+more information.</para><itemizedlist><listitem><para><literal>nisplusLDAPinitialUpdateAction</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPinitialUpdateOnly</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPretrieveErrorAction</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPretrieveErrorAttempts</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPretrieveErrorTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPstoreErrorAction</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPstoreErrorAttempts</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPstoreErrorTimeout</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPrefreshErrorAction</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPrefreshErrorAttempts</literal></para>
+</listitem><listitem><para><literal>nisplusLDAPrefreshErrorTimeout</literal></para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="nisplus2ldap-14"><title>General LDAP Operation Control</title><itemizedlist><listitem><para><literal>nisplusLDAPmatchFetchAction</literal></para><para>The
+above parameter determines whether or not LDAP data should be pre-fetched
+for NIS+ match operations. In most cases, leave this value at the default.
+See <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> for
+more information.</para>
+</listitem>
+</itemizedlist>
+</sect3>
+</sect2><sect2 id="nisplus2ldap-15"><title><filename>/var/nis/NIS+LDAPmapping</filename> File</title><para>The presence of the default <filename>NIS+LDAPmapping</filename> file
+serves as a master switch for NIS+/LDAP mapping.</para><para>If you use a non-default mapping file, you will have to edit the <filename>/lib/svc/method/nisplus</filename> script to specify the mapping file name
+on the <literal>rpc.nisd</literal> line by using the <option>m</option> <replaceable>mappingfile</replaceable> option. See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+
+to LDAP Tools and the Service Management Facility</olink> for more information.</para><para>For each NIS+ object that should be mapped to or from LDAP, the <filename>NIS+LDAPmapping</filename> file specifies two to five attributes, depending on the object
+and whether or not the default values are sufficient.</para><sect3 id="nisplus2ldap-16"><title><literal>nisplusLDAPdatabaseIdMapping</literal> Attribute</title><para>You must establish an alias to be used in the other mapping attributes.
+If the NIS+ object name is not fully qualified (does not end in a dot), the
+value of the <filename>nisplusLDAPbaseDomain</filename> is appended.</para><para>For example,</para><screen>nisplusLDAPdatabaseIdMapping	rpc:rpc.org_dir</screen><para>defines the database id <literal>rpc</literal> as an alias for the NIS+ <literal>rpc.org_dir</literal> table.</para><para>Note that NIS+ table objects might appear twice with two different database
+ids, once for the table object itself (if the object should be mapped to LDAP),
+and once for the table entries. For example,</para><screen>nisplusLDAPdatabaseIdMapping	rpc_table:rpc.org_dir
+nisplusLDAPdatabaseIdMapping	rpc:rpc.org_dir</screen><para>defines the database ids <literal>rpc_table</literal> and <literal>rpc</literal> as
+aliases for the <literal>rpc.org_dir</literal> table. Later definitions will
+make it clear that <literal>rpc_table</literal> is used for the <literal>rpc.org_dir</literal> table object, and <literal>rpc</literal> for the entries in that
+table.</para>
+</sect3><sect3 id="nisplus2ldap-17"><title><literal>nisplusLDAPentryTtl</literal> Attribute</title><para>Since the <filename>rpc.nisd</filename> daemon's local database (in
+memory and on disk) functions as a cache for LDAP data, the <literal>nisplusLDAPentryTtl</literal> attribute allows you to set the time-to-live (TTL) values of entries
+in that cache. There are three TTLs for each database ID. The first two control
+the initial TTL when the <literal>rpc.nisd</literal> first loads the corresponding
+NIS+ object data from disk, and the third TTL is assigned to an object when
+it is read or refreshed from LDAP.</para><para>For example the following results in the <literal>rpc.org_dir</literal> table
+object getting an initial TTL randomly selected in the range 21600 to 43200
+seconds.</para><screen>nisplusLDAPentryTtl	rpc_table:21600:43200:43200</screen><para>When that initial TTL expires and the table object is refreshed from
+LDAP, the TTL will be set to 43200 seconds.</para><para>Similarly the following will assign an initial TTL between 1800 and
+3600 seconds to the entries in the <literal>rpc.org_dir</literal> table when
+it is first loaded.</para><screen>nisplusLDAPentryTtl	rpc:1800:3600:3600</screen><para>Each entry gets its own randomly selected TTL in the range specified.
+When a table entry expires and is refreshed, the TTL is set to 3600 seconds.</para><para>When selecting TTL values, consider the trade-off between performance
+and consistency. If the TTLs used for LDAP data cached by the <literal>rpc.nisd</literal> are
+very long, performance is the same as if <literal>rpc.nisd</literal> was not
+mapping data from LDAP at all. However, if the LDAP data is changed (by some
+entity other than <literal>rpc.nisd</literal>), it can also take a very long
+time before that change is visible in NIS+.</para><para>Conversely, selecting a very short (or even zero) TTL means that changes
+to LDAP data are quickly visible in NIS+, but can also impose a significant
+performance penalty. Typically, an NIS+ operation that also reads data from
+or writes data to LDAP will take at least two to three times longer (plus
+the LDAP lookup overhead) than the same operation without LDAP communication.
+Although performance can vary greatly depending on the hardware resources,
+scanning a large (tens of thousands or hundreds of thousands of entries) LDAP
+container to identify NIS+ entries that should be refreshed can take a long
+time. The <filename>rpc.nisd</filename>daemon performs this scan in the background,
+continuing to serve possibly stale data while it is running, but the background
+scan still consumes CPU and memory on the NIS+ server.</para><para>Carefully consider how critical it is to have NIS+ data in close synchronization
+with LDAP, and select the longest TTL that is acceptable for each NIS+ object.
+The default (when no <literal>nisplusLDAPentryTtl</literal> is specified)
+is 1 hour. The template mapping file <filename>/var/nis/NIS+LDAPmapping.template</filename> changes
+this to 12 hours for objects other than table entries. However, there is no
+auto-recognition of non-entry objects, so if you add mapping for a non-entry
+object, the TTL will default to 1 hour.</para><note><para>There are no TTLs for nonexistent objects. Hence, no matter which
+TTLs are in effect for LDAP-mapped entries in an NIS+ table, a request for
+an entry that does not exist in NIS+ will query LDAP for that entry.</para>
+</note>
+</sect3><sect3 id="nisplus2ldap-18"><title><literal>nisplusLDAPobjectDN</literal> Attribute</title><para>For each mapped NIS+ object, <literal>nisplusLDAPobjectDN</literal> establishes
+the location in the LDAP DIT where the object data resides. It also allows
+specification of the action to take when an LDAP entry is deleted. Each <literal>nisplusLDAPobjectDN</literal> value has three parts. The first specifies where
+LDAP data is read from, the second to where it is written, and the third what
+should happen when LDAP data is deleted. Refer to the following example.</para><screen>nisplusLDAPobjectDN	rpc_table:\
+           cn=rpc,ou=nisPlus,?base?\
+              objectClass=nisplusObjectContainer:\
+           cn=rpc,ou=nisPlus,?base?\
+              objectClass=nisplusObjectContainer,\
+              objectClass=top</screen><para>The above example shows that the <literal>rpc.org_dir</literal> table
+object should be read from the DN <literal>cn=rpc,ou=nisPlus</literal>, (since
+the value ends in a comma, the value of the <literal>defaultSearchBase</literal> attribute
+is appended), with scope <literal>base</literal>, and that entries with a
+value of <literal>nisplusObjectContainer</literal> for the <literal>ObjectClass</literal> attribute
+are selected.</para><para>The table object is written to the same place. The delete specification
+is missing, which implies the default action, which is as follows. If the
+NIS+ table object is deleted, the entire LDAP entry should also be deleted.</para><para>If data should be read from, but not written to LDAP, omit the write
+portion (and the colon separating it from the read part).</para><screen>nisplusLDAPobjectDN	rpc_table:\
+              cn=rpc,ou=nisPlus,?base?\
+              objectClass=nisplusObjectContainer</screen><para>Note that the <literal>nisplusObjectContainer</literal> object class
+is not part of RFC 2307. In order to use it, you must configure your LDAP
+server as detailed in <olink targetptr="nisplus2ldap-49" remap="internal">Mapping NIS+ Objects
+Other Than Table Entries</olink>.</para><para>For the <literal>rpc.org_dir</literal> table entries, you could use
+the following example.</para><screen>nisplusLDAPobjectDN rpc:ou=Rpc,?one?objectClass=oncRpc:\
+              ou=Rpc,?one?objectClass=onRpc,objectClass=top</screen><para>The above shows that the table entries are read from and written to
+the base <literal>ou=Rpc</literal>. Again, the trailing comma appends the <literal>defaultSearchBase</literal> value. Select entries that have an <literal>objectClass</literal> attribute value of <literal>oncRpc</literal>. When creating an
+entry in the <literal>ou=Rpc</literal> container in LDAP, you also must specify <literal>top</literal> as an <literal>objectClass</literal> value.</para><para>As an example showing a non-default delete specification, consider the
+following.</para><screen>nisplusLDAPobjectDN	user_attr:\
+              ou=People,?one?objectClass=SolarisUserAttr,\
+                 solarisAttrKeyValue=*:\
+              ou=People,?one?objectClass=SolarisUserAttr:\
+                 dbid=user_attr_del</screen><para>The <literal>user_attr.org_dir</literal> data resides in the <literal>ou=People</literal> LDAP container, which it shares with account information from other
+sources, such as the <literal>passwd.org_dir</literal> NIS+ table.</para><para>Select entries in that container that have the <literal>solarisAttrKeyValue</literal> attribute, since only those contain <literal>user_attr.org_dir</literal> data.
+The <literal>dbid=user_attr_del</literal> portion of the <literal>nisplusLDAPobjectDN</literal> shows that when an entry in the <literal>user_attr.org_dir</literal> NIS+
+table entry is deleted, deletion of the corresponding LDAP entry (if any)
+should follow the rules in the rule set identified by the <literal>user_attr_del</literal> database
+ID. See <olink targetptr="nisplus2ldap-20" remap="internal">nisplusLDAPcolumnFromAttribute
+Attribute</olink> for more information.</para>
+</sect3><sect3 id="nisplus2ldap-19"><title><literal>nisplusLDAPattributeFromColumn</literal> Attribute</title><para><literal>nisplusLDAPattributeFromColumn</literal> specifies the rules
+used to map NIS+ data to LDAP. Mapping rules for the other direction is controlled
+by <literal>nisplusLDAPcolumnFromAttribute</literal>.</para>
+</sect3><sect3 id="nisplus2ldap-20"><title><literal>nisplusLDAPcolumnFromAttribute</literal> Attribute</title><para><literal>nisplusLDAPcolumnFromAttribute</literal> specifies the rules
+used to map LDAP data to NIS+.</para><para>The full entry mapping syntax can be found on <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>. However, a few examples
+should make things clearer.</para><para>The NIS+ <literal>rpc.org_dir</literal> table contains four columns
+called <literal>cname</literal>, <literal>name</literal>, <literal>numbe</literal>,
+and <literal>comment</literal>. Therefore, the entries for the NIS+ RPC program
+number (100300) with the canonical name <literal>nisd</literal> and the aliases <literal>rpc.nisd</literal> and <literal>nisplusd</literal> could be represented by
+the following NIS+ entries in <literal>rpc.org_dir</literal>.</para><screen>nisd nisd 100300	NIS+ server
+nisd rpc.nisd 100300	NIS+ server
+nisd nisplusd 100300	NIS+ server</screen><para>Assuming the <literal>defaultSearchBase</literal> value is <literal>dc=some,dc=domain</literal>, the corresponding LDAP entry, as listed by <olink targetdoc="group-refman" targetptr="ldapsearch-1" remap="external"><citerefentry><refentrytitle>ldapsearch</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, would be
+the following.</para><screen>dn: cn=nisd,ou=Ppc,dc=some,dc=domain
+cn: nisd
+cn: rpc.nsid
+cn: nisplusd
+oncRpcNumber: 100300
+description: NIS+ server
+objectClass: oncRpc</screen><para>This makes for a simple one-to-one mapping between NIS+ and LDAP data,
+and the corresponding mapping attribute value going from NIS+ to LDAP is the
+following.</para><screen>nisplusLDAPattributeFromColumn \
+rpc:		dn=("cn=%s,", name), \
+				cn=cname, \
+				cn=name, \
+				oncRpcNumber=number, \
+				description=comment</screen><para>This constructs the DN for the entry to be <literal>cn=%s</literal>,
+with the value of the <literal>cname</literal> column substituted for <literal>%s</literal>.</para><screen>cn=nisd,</screen><para>Since the value ends in a comma, the read base value from the <literal>nisplusObjectDN</literal> is appended, and you have the following.</para><screen>cn=nisd,ou=Rpc,dc=some,dc=domain</screen><para>The <literal>oncRpcNumber</literal> and <literal>description</literal> attribute
+values are just simple assignments of the corresponding NIS+ column values.
+The <literal>rpc.nisd</literal> will collect the multiple NIS+ entries into
+one LDAP entry, with multiple <literal>cn</literal> values to represent the
+different <literal>name</literal> column values.</para><para>Similarly, the mapping from LDAP to NIS+ would be as follows.</para><screen>nisplusLDAPcolumnFromAttribute \
+       rpc:      cname=cn, \
+                 (name)=(cn), \
+                 number=oncRpcNumber, \
+                 comment=description</screen><para>The above assigns the <literal>oncRpcNumber</literal> and <literal>description</literal> values to the corresponding NIS+ columns. The multi-valued <literal>cn</literal> (denoted by <literal>(cn)</literal> is mapped to multiple <literal>name</literal> column values (denoted by <literal>(name)</literal>). Since the <literal>name</literal> column cannot be multi-valued, the <literal>rpc.nisd</literal> creates
+one NIS+ entry for each <literal>cn</literal> value.</para><para>Finally, the <literal>nisplusLDAPattributeFromColumn</literal> value
+is an example of rule sets used for deletion.</para><screen>nisplusLDAPattributeFromColumn \
+user_attr_del:	dn=("uid=%s,", name), \
+           SolarisUserQualifier=, \
+           SolarisAttrReserved1=, \
+           SolarisAttrReserved2=, \
+           SolarisAttrKeyValue=</screen><para>Again, the <literal>user_attr.org_dir</literal> data shares the <literal>ou=People</literal> container with other account information (from the <literal>passwd.org_dir</literal> and other tables). If an entry in the <literal>user_attr.org_dir</literal> table
+is deleted, you probably do not want to delete the entire <literal>ou=People</literal> entry.
+Instead, the delete entry above says that when a <literal>user_attr.org_dir</literal> entry
+is deleted, the <literal>SolarisUserQualifier</literal>,  <literal>SolarisAttrReserved1</literal>, <literal>SolarisAttrReserved2</literal>, and <literal>SolarisAttrKeyValue</literal> attributes (if any) are deleted from the <literal>ou=People</literal> entry
+specified by the following rule.</para><screen>dn=("uid=%s,", name)</screen><para>The rest of the LDAP entry is left unchanged.</para>
+</sect3>
+</sect2><sect2 id="nisplus2ldap-21"><title>NIS+ to LDAP Migration Scenarios</title><para>Likely scenarios for a migration from NIS+ to LDAP include the following.</para><itemizedlist><listitem><para><emphasis>Convert all NIS+ clients to LDAP in one operation.</emphasis> You
+can use the <literal>rpc.nisd</literal> daemon to upload any NIS+ data that
+ does not yet exist in LDAP. See <olink targetptr="nisplus2ldap-proc-22" remap="internal">How
+to Convert All NIS+ Data to LDAP in One Operation</olink>.</para>
+</listitem><listitem><para><emphasis>Do a gradual migration from NIS+ to LDAP.</emphasis> Start
+by converting NIS+ data to LDAP (see <olink targetptr="nisplus2ldap-proc-22" remap="internal">How
+to Convert All NIS+ Data to LDAP in One Operation</olink>). 	You could
+have both NIS+ and LDAP clients  sharing the same naming service data, and
+let the <literal>rpc.nisd</literal> automatically keep NIS+ and LDAP data
+synchronized. Initially, perhaps, NIS+ would be authoritative, and the LDAP
+server(s) would maintain a duplicate of the NIS+ data for the benefit of LDAP
+clients. At a convenient time, LDAP can become the authoritative naming service,
+and NIS+ service gradually phased out, until there are no more NIS+ clients.</para>
+</listitem><listitem><para>LDAP is already used as a naming service, so you need to merge
+the NIS+ and LDAP data. There are three possible ways to perform this merge.</para><itemizedlist><listitem><para><emphasis>Add the NIS+ data to LDAP.</emphasis> Entries that
+exist in NIS+, but not in LDAP, are added to LDAP. Entries that appear both
+in NIS+ and LDAP, but with different data, end up with the NIS+ data. See <olink targetptr="nisplus2ldap-proc-22" remap="internal">How to Convert All NIS+ Data to LDAP in One
+Operation</olink>.</para>
+</listitem><listitem><para><emphasis>Overwrite the NIS+ data with the LDAP data.</emphasis> If
+there are entries that exist in NIS+ but not in LDAP, they will disappear
+from NIS+. Entries that exist both in NIS+ and LDAP end up with the LDAP data.
+See <olink targetptr="nisplus2ldap-proc-25" remap="internal">How to Convert All LDAP Data to
+NIS+ in One Operation</olink>.</para>
+</listitem><listitem><para><emphasis>Merge NIS+ and LDAP data, resolving conflicts on
+an individual basis.</emphasis> See <olink targetptr="nisplus2ldap-28" remap="internal">Merging
+NIS+ and LDAP Data</olink>.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><task id="nisplus2ldap-proc-22"><title>How to Convert All NIS+ Data to LDAP
+in One Operation</title><procedure remap="single-step"><step id="nisplus2ldap-step-23"><para>Use the <filename>rpc.nisd</filename> to
+upload any NIS+ data that does not yet exist in LDAP.</para><para>Assuming
+all NIS+/LDAP data mappings have been established in the default location
+(<filename>/var/nis/NIS+LDAPmapping</filename>), use the following command.</para><screen># <userinput>/usr/sbin/rpc.nisd -D \</userinput> 
+ <userinput>-x nisplusLDAPinitialUpdateAction=to_ldap \</userinput>
+ <userinput>-x nisplusLDAPinitialUpdateOnly=yes</userinput></screen><para>The above would make the <literal>rpc.nisd</literal> upload data to
+LDAP, and then exit. The NIS+ data would be unaffected by this operation.</para><para>See the <literal>nisplusLDAPinitialUpdateAction</literal> attribute
+on <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</step>
+</procedure>
+</task><task id="nisplus2ldap-proc-25"><title>How to Convert All LDAP Data to NIS+
+in One Operation</title><procedure remap="single-step"><step id="nisplus2ldap-step-26"><para>Use the <filename>rpc.nisd</filename> to
+download all LDAP data to NIS+, overwriting existing NIS+ data.</para><para>Assuming
+all NIS+/LDAP data mappings have been established in the default location
+(<filename>/var/nis/NIS+LDAPmapping</filename>), use the following command.</para><screen># <userinput>/usr/sbin/rpc.nisd -D \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateAction=from_ldap \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateOnly=yes</userinput></screen><para>The above would make the <literal>rpc.nisd</literal> daemon download
+data from LDAP, and then exit. The LDAP data would be unaffected by this operation.</para><para>See the <literal>nisplusLDAPinitialUpdateAction</literal> attribute
+on <olink targetdoc="group-refman" targetptr="rpc.nisd-4" remap="external"><citerefentry><refentrytitle>rpc.nisd</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para>
+</step>
+</procedure>
+</task>
+</sect2><sect2 id="nisplus2ldap-28"><title>Merging NIS+ and LDAP Data</title><para><olink targetptr="nisplus2ldap-21" remap="internal">NIS+ to LDAP Migration Scenarios</olink> showed
+how to synchronize NIS+ and LDAP data when data conflicts between the two
+should be resolved by letting either the NIS+ or the LDAP data be authoritative.
+Merging data requires a more complicated procedure.</para><para>The example procedure in this section assumes the following.</para><itemizedlist><listitem><para>You are putting a backup of the NIS+ data in the <literal>/nisbackup</literal> directory.</para>
+</listitem><listitem><para>Valid mapping configuration already exists in <literal>/etc/default/rpc.nisd</literal> and <filename>/var/nis/tmpmap</filename> (for tables that should
+be merged).</para>
+</listitem><listitem><para>Flat file representations of the NIS+ data before the merge
+are stored in <literal>/before</literal>, and after-merge representations
+in <literal>/after</literal>.</para>
+</listitem><listitem><para><command>niscat</command> is used to dump flat file representations
+of custom NIS+ tables not supported by <olink targetdoc="group-refman" targetptr="nisaddent-1m" remap="external"><citerefentry><refentrytitle>nisaddent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. You might have your own
+commands or scripts for dumping and loading such custom tables from and to
+NIS+. If so, those commands/scripts should be used in preference to <command>niscat</command> since the latter has no convenient counterpart to load data back
+into NIS+.</para><para>If you are forced to dump data using <olink targetdoc="group-refman" targetptr="niscat-1" remap="external"><citerefentry><refentrytitle>niscat</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>, you can use <olink targetdoc="group-refman" targetptr="nistbladm-1" remap="external"><citerefentry><refentrytitle>nistbladm</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to load entries
+back into NIS+ one by one.</para>
+</listitem><listitem><para>Your command path includes <filename>/usr/lib/nis</filename> (which
+is where <olink targetdoc="group-refman" targetptr="nisaddent-1m" remap="external"><citerefentry><refentrytitle>nisaddent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> resides).</para>
+</listitem>
+</itemizedlist><task id="nisplus2ldap-proc-29"><title>How to Merge NIS+ and LDAP Data</title><tasksummary><caution><para>If the LDAP data should change between the download in Step
+4 and the upload in Step 10, the upload might overwrite those changes. For
+this reason, you should try to prevent modifications to the LDAP data during
+this procedure. Consult your LDAP server documentation for more information.</para>
+</caution>
+</tasksummary><procedure><step id="nisplus2ldap-step-30"><para>Back up all NIS+ data using the <command>nisbackup</command> command.</para><screen># <userinput>nisbackup -a /nisbackup</userinput></screen>
+</step><step id="nisplus2ldap-step-31"><para>Identify the NIS+ tables that have data
+which must be merged with LDAP. Dump the contents of these tables to flat
+files. For example, dump the contents of <literal>group.org_dir</literal> by
+using <command>nisaddent</command> as follows.</para><screen># <userinput>nisaddent -d group | sort &gt; /before/group</userinput></screen><para>Piping the <literal>nisaddent</literal> output to <literal>sort</literal> will
+make for convenient comparison later on.</para>
+</step><step id="nisplus2ldap-step-32"><para>Stop the NIS+
+service.</para><screen># <userinput>svcadm disable network/rpc/nisplus:default</userinput></screen>
+</step><step id="nisplus2ldap-step-33"><para>Download LDAP data to NIS+.</para><screen># <userinput>/usr/sbin/rpc.nisd -D -m tmpmap \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateAction=from_ldap \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateOnly=yes</userinput></screen>
+</step><step id="nisplus2ldap-step-34"><para>Start the NIS+ service.</para><screen># <userinput>svcadm enable network/rpc/nisplus:default</userinput></screen><para>The <filename>rpc.nisd</filename> daemon will now be serving the data
+downloaded from LDAP. If the conflicts to be resolved are such that NIS+ clients
+should not be exposed to them, make sure to perform this and the following
+steps when there are few (preferably no) active NIS+ clients.</para>
+</step><step id="nisplus2ldap-step-35"><para>Dump the NIS+ data for the affected
+tables.</para><para>The following example uses the <literal>group.org_dir</literal> table.</para><screen># <userinput>nisaddent -d group | sort &gt; /after/group</userinput></screen>
+</step><step id="nisplus2ldap-step-36"><para>Create merged versions of the tables.</para><para>Use the file merge procedure of your choice to produce the merged tables.
+If no other tools are available, you can use <olink targetdoc="group-refman" targetptr="diff-1" remap="external"><citerefentry><refentrytitle>diff</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to collect differences between the <literal>/before</literal> and <literal>/after</literal> files, and merge manually with a text editor.</para><para>The following example assumes that the merged results are available
+in <literal>/after</literal>.</para>
+</step><step id="nisplus2ldap-step-37"><para>Load the merged data into NIS+. The
+following example uses the <literal>group</literal> table.</para><screen># <userinput>nisaddent -m -f /after/group group</userinput></screen>
+</step><step id="nisplus2ldap-step-38"><para>Remove LDAP entries that should not
+exist after the merge.</para><para>A. If there are LDAP entries that do not
+exist in the (now merged) NIS+ data, and that should not exist in LDAP after
+the upload, you must remove those LDAP entries.</para><para>Your LDAP server might provide a convenient method for removing multiple
+entries, such as a way to delete all entries in a container. If this is not
+the case, you can use <olink targetdoc="group-refman" targetptr="ldapsearch-1" remap="external"><citerefentry><refentrytitle>ldapsearch</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to
+generate a list of entries for each container. For example, to generate a
+list of all entries in the <literal>ou=Rpc</literal> container, use <olink targetdoc="group-refman" targetptr="ldapsearch-1" remap="external"><citerefentry><refentrytitle>ldapsearch</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> as follows.</para><screen># <userinput>ldapsearch -h <replaceable>server-address</replaceable> -D <replaceable>bind-DN</replaceable> -w <replaceable>password</replaceable> \</userinput>
+ <userinput>-b ou=Rpc,<replaceable>search-base</replaceable> 'objectClass=*' dn | \</userinput>
+<userinput>grep -i ou=Rpc | grep -v -i \^ou=Rpc &gt; /tmp/delete-dn</userinput></screen><para>See <olink targetptr="nisplus2ldap-48" remap="internal">Performance and Indexing</olink> for
+an explanation of the meta-arguments (<replaceable>server-address</replaceable>, <replaceable>bind-DN</replaceable>, for example).</para><para>B. You can now edit the result file (<filename>/tmp/delete-dn</filename>)
+to specify only those entries that should be removed. Alternatively, in order
+to remove all entries in the container, use the file as is, and rely on the
+NIS+ upload to restore the LDAP data. Either way, you should backup the LDAP
+data before performing the <command>ldapdelete</command> operation below.</para><para>C. Use <literal>ldapdelete</literal> to remove LDAP entries, redirecting <literal>stdout</literal> (which usually is one blank line for each entry removed)
+to <filename>/dev/null</filename>.</para><screen># <userinput>ldapdelete</userinput> <option>h</option> <userinput><replaceable>server-address</replaceable></userinput> <option>D</option> <userinput><replaceable>bind-DN</replaceable></userinput> <option>w</option> <userinput><replaceable>password</replaceable> \</userinput>
+<userinput></userinput><filename>/tmp/delete-dn</filename> <userinput>/dev/null</userinput></screen><para>D. Repeat the above procedure for each container that has at least one
+entry which must be removed.</para>
+</step><step id="nisplus2ldap-step-39"><para>Upload the merged
+NIS+ data to LDAP.</para><substeps><step><para>Stop the NIS+ service.</para><screen># <userinput>svcadm disable network/rpc/nisplus:default</userinput></screen>
+</step><step id="nisplus2ldap-step-3"><para>Perform the upload.</para><screen># <userinput>/usr/sbin/rpc.nisd -D -m tmpmap \</userinput> 
+<userinput>-x nisplusLDAPinitialUpdateAction=to_ldap \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateOnly=yes</userinput></screen>
+</step>
+</substeps>
+</step><step id="nisplus2ldap-step-4"><para>(Optional) Modify
+the <filename>/lib/svc/method/nisplus</filename> file as needed.</para><itemizedlist><listitem><para>If the <command>rpc.nisd</command> daemon uses the LDAP repository,
+specify an appropriate mapping file with the <option>m</option> <replaceable>mappingfile</replaceable> option, if the default <filename>/var/yp/NIS+LDAPmapping</filename> file
+is not used.</para>
+</listitem><listitem><para>If the <command>rpc.nisd</command> daemon provides NIS (YP)
+emulation, specify the <option>Y</option> option by using <command>svcprop</command> or
+by modifying the <filename>/lib/svc/method/nisplus</filename> file.</para>
+</listitem>
+</itemizedlist><para>See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+ to LDAP Tools and the Service
+Management Facility</olink> for more information.</para>
+</step><step id="nisplus2ldap-step-40"><para>Start the NIS+ service.</para><screen># <userinput>svcadm enable network/rpc/nisplus:default</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-41"><title>Masters and Replicas (NIS+ to LDAP)</title><para><indexterm><primary>masters</primary></indexterm><indexterm><primary>replicas</primary></indexterm>Only NIS+ masters are allowed to write data to LDAP.
+NIS+ replicas can obtain updates either from the NIS+ master (which might
+or might not have obtained it from LDAP), or they can read data directly from
+an LDAP server. A combination of the two is also possible. Therefore, there
+are two principal ways to arrange for NIS+ replication.</para><itemizedlist><listitem><para><emphasis>Leave NIS+ replicas unchanged, and let them obtain
+their data updates from the NIS+ master.</emphasis></para><para>This arrangement
+has the advantage of configurational simplicity (only the NIS+ master need
+have a connection to an LDAP server), and also maintains the old replication
+relationship (master knows about new data first, replicas later). It is probably
+the most convenient solution while NIS+ remains authoritative for naming service
+data. However, it also lengthens the path between LDAP and NIS+ replica servers.</para>
+</listitem><listitem><para><emphasis>Let NIS+ replicas obtain their data directly from
+LDAP instead of from the NIS+ master.</emphasis></para><para>In this case,
+replicas could have updated data before or after the NIS+ master, depending
+on lookup traffic and TTLs for data derived from LDAP. This arrangement is
+more complicated, but can be convenient when LDAP is the authoritative naming
+services repository, and few or no updates are made directly to NIS+ data.</para>
+</listitem>
+</itemizedlist><sect2 id="nisplus2ldap-42"><title>Replication Timestamps</title><para>When an NIS+ replica is obtaining data for at least one object in a
+particular NIS+ directory from LDAP, the update timestamps printed by <olink targetdoc="group-refman" targetptr="nisping-1m" remap="external"><citerefentry><refentrytitle>nisping</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> do not necessarily
+indicate the degree of data consistency between the NIS+ master and the replica.
+For example, assume that the NIS+ directory <literal>dir1</literal> contains
+the tables <literal>table1</literal> and <literal>table2</literal>. When the
+replica is obtaining data for both <literal>table1</literal> and <literal>table2</literal> from
+the NIS+ master, you might see an output like the following.</para><screen># <userinput>nisping dir1</userinput></screen><screen>Master server is <replaceable>"master.some.domain."</replaceable>
+Last update occurred at Mon Aug  5 22:11:09 2002
+
+Replica server is <replaceable>"replica.some.domain."</replaceable>
+	Last Update seen was Mon Aug  5 22:11:09 2002</screen><para>The above indicates that the master and replica have exactly the same
+data. However, if the replica is getting data for either or both of <literal>table1</literal> and <literal>table2</literal> from LDAP, the output only shows
+that the replica has received an NIS_PING from the master, and updated its
+resynchronization time stamp for housekeeping purposes. The data in the table
+or tables mapped from LDAP might differ from that on the NIS+ master if either
+of the following are true.</para><itemizedlist><listitem><para>The LDAP data differs from that on the NIS+ master.</para>
+</listitem><listitem><para>The replica has data in its cache (its local version of the
+NIS+ database) that has not expired, but that is not up to date with LDAP.</para>
+</listitem>
+</itemizedlist><para>If you cannot accept this type of data inconsistency, let all NIS+ replicas
+obtain their data from the NIS+ master only. Once you have configured the
+NIS+ master to get data from LDAP, you do not need to make modifications to
+the replicas. </para>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-43"><title>The Directory Server (NIS+ to LDAP)</title><para><indexterm><primary>directory server</primary></indexterm>The LDAP mapping
+portion of the <literal>rpc.nisd</literal> daemon uses LDAP protocol version
+3 to talk to the LDAP server. The default mapping configuration (<filename>/var/nis/NIS+LDAPmapping.template</filename>) expects that the LDAP server supports an extended version of
+RFC 2307. RFCs can be retrieved from <literal>http://www.ietf.org/rfc.html</literal>.
+While the mapping between NIS+ and LDAP data can be modified using <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>, there is a basic assumption
+that the LDAP data is organized along the principles laid out in RFC 2307.</para><para>For example, in order to share account information between direct LDAP
+clients and NIS+ clients, the LDAP server must support storing account (user)
+passwords in the UNIX <literal>crypt</literal> format. If the LDAP server
+cannot be configured to do so, you can still store NIS+ data, including accounts,
+in LDAP. However, you will not be able to fully share account information
+between NIS+ users and LDAP <literal>bindDN</literal>s.</para><sect2 id="nisplus2ldap-44"><title>Configuring the Sun Java System Directory Server</title><para>Refer to the Sun Java System Directory Server Collection for detailed instructions on the
+installation, setup and administration of Sun Java System Directory Server.</para><para>You can use <olink targetdoc="group-refman" targetptr="idsconfig-1m" remap="external"><citerefentry><refentrytitle>idsconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> to
+configure Sun Java System Directory Server for LDAP clients using LDAP as a naming service. The
+setup provided by <olink targetdoc="group-refman" targetptr="idsconfig-1m" remap="external"><citerefentry><refentrytitle>idsconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> is
+also appropriate when using NIS+ with an LDAP data repository.</para><note><para>If you are using an LDAP server other than Sun Java System Directory Server, you must
+manually configure the server to support the RFC 2307 schemas.</para>
+</note>
+</sect2><sect2 id="nisplus2ldap-45"><title>Assigning Server Address and Port Number</title><para>The <filename>/etc/default/rpc.nisd</filename> file is set up to use
+a local LDAP server at port <literal>389</literal>. If this is not correct
+in your configuration, establish a new value for the <literal>preferredServerList</literal> attribute. For example, to use an LDAP server at IP address <literal>192.0.0.1</literal> and port <literal>65535</literal>, you specify the following.</para><screen>preferredServerList=192.0.0.1:65535</screen>
+</sect2><sect2 id="nisplus2ldap-46"><title>Security and Authentication</title><para>Authentication between NIS+ clients and the NIS+ server is not affected
+when the NIS+ server is obtaining data from LDAP. However, in order to maintain
+the integrity of the NIS+ data when it is stored in LDAP, consider configuring
+authentication between the <filename>rpc.nisd</filename> daemon and the LDAP
+server. Several different types of authentication are available, depending
+on the capabilities of the LDAP server.</para><para>The LDAP authentication supported by the <literal>rpc.nisd</literal> daemon
+includes the following.</para><itemizedlist><listitem><para><literal>none</literal></para><para>The <literal>none</literal> authentication
+method is the default. While using <literal>none</literal> requires no setup,
+it also provides no security. It is only suitable for use in environments
+that have no security requirements at all.</para><para>To use the <literal>none</literal> authentication, make sure that the <literal>authenticationMethod</literal> attribute has the following value.</para><screen>authenticationMethod=none</screen>
+</listitem>
+</itemizedlist><para>The authentication methods that actually provide at least some security
+typically require that you associate a shared secret (a password or key) with
+a DN in LDAP. The DN you select for use by the <literal>rpc.nisd</literal> daemon
+can be unique, or can also be used for other purposes. It should have appropriate
+capabilities to support the expected LDAP traffic. For example, if the <literal>rpc.nisd</literal> daemon should be able to write data to LDAP, the selected DN must
+have the right to add/update/delete LDAP data in the containers used for the
+NIS+ data. Also, the LDAP server might, by default, impose limitations on
+resource usage (such as search time limits or search result size limitations).
+If this is the case, the selected DN must have sufficient capabilities to
+support enumeration of the NIS+ data containers.</para><itemizedlist><listitem><para><literal>simple</literal></para><para>The <literal>simple</literal> authentication
+method provides authentication by unencrypted exchange of a password string.
+Since the password is sent in the clear between the LDAP client (the <filename>rpc.nisd</filename> daemon) and LDAP server, the <literal>simple</literal> method
+is suitable only when information exchange between the NIS+ and LDAP servers
+is protected by some other method.</para><para>For instance, transport layer encryption of LDAP traffic, or the special
+case where the NIS+ and LDAP server is one and the same system, and the NIS+/LDAP
+traffic stays in the kernel, protected from the eyes of unauthorized users.</para><para>Modify the configuration of the <literal>rpc.nisd</literal> daemon with
+the DN and password to use for the <literal>simple</literal> authentication.
+For example, if the DN is <literal>cn=nisplusAdmin,ou=People,dc=some,dc=domain</literal>,
+and the password <literal>aword</literal>, establish the following.</para><screen>authenticationMethod=simple
+nisplusLDAPproxyUser=cn=nisplusAdmin,ou=People,dc=some,dc=domain
+nisplusLDAPproxyPassword=aword</screen><para>Be sure to protect the place where the password is stored from unauthorized
+access. Remember that if the password is specified on the <literal>rpc.nisd</literal> command
+line, it might be visible to any user on the system via commands such as <olink targetdoc="group-refman" targetptr="ps-1" remap="external"><citerefentry><refentrytitle>ps</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para><literal>sasl/digest-md5</literal></para><para>The <literal>sasl/digest-md5</literal> authentication method provides authentication using the <literal>digest/md5</literal> algorithm.</para><para>Consult your LDAP server documentation for information on how to set
+up an authorization identity for use with <literal>digest-md5</literal>, and
+modify the <filename>/etc/default/rpc.nisd</filename> file to specify this
+identity and its associated password.</para><screen>authenticationMethod=sasl/digest-md5
+nisplusLDAPproxyUser=cn=nisplusAdmin,ou=People,dc=some,dc=domain
+nisplusLDAPproxyPassword=aword</screen><para>Be sure to protect the file where the password is stored from unauthorized
+access.</para>
+</listitem><listitem><para><literal>sasl/cram-md5</literal></para><para>Authentication
+using the <literal>cram/md5</literal> algorithm. Probably only supported by
+the obsolete SunDS LDAP server.</para><para>Consult your LDAP server documentation for information on how to set
+up a bind DN for use with <literal>cram-md5</literal>, and modify the <filename>/etc/default/rpc.nisd</filename> file to specify this DN and its associated password.</para><screen>authenticationMethod=sasl/cram-md5
+nisplusLDAPproxyUser=cn=nisplusAdmin,ou=People,dc=some,dc=domain
+nisplusLDAPproxyPassword=aword</screen><para>Be sure to protect the file where the password is stored from unauthorized
+access.</para>
+</listitem>
+</itemizedlist><sect3 id="nisplus2ldap-47"><title>Using SSL</title><para>The <literal>rpc.nisd</literal> daemon also supports transport layer
+encryption of LDAP traffic using SSL. Consult your LDAP server documentation
+to generate an SSL certificate for LDAP server authentication. Store the certificate
+in a file on the NIS+ server (<filename>/var/nis/cert7.db</filename>, for
+example) and modify <filename>/etc/default/rpc.nisd</filename> as follows.</para><screen>nisplusLDAPTLS=ssl
+nisplusLDAPTLSCertificateDBPath=/var/nis/cert7.db</screen><para>Be sure to protect the certificate file from unauthorized access.  Note
+that the above provides session encryption and authentication of the LDAP
+server to the <literal>rpc.nisd</literal>. It does not provide authentication
+of the <literal>rpc.nisd</literal> to the LDAP server, since the certificate
+does not	contain anything that identifies the LDAP client (<filename>rpc.nisd</filename>).
+However, you can combine SSL with another authentication method (<literal>simple</literal>, <literal>sasl/digest-md5</literal> ) in order to achieve mutual authentication.</para>
+</sect3>
+</sect2><sect2 id="nisplus2ldap-48"><title>Performance and Indexing</title><para>When the <literal>rpc.nisd</literal> daemon is asked to enumerate an
+NIS+ table (using <olink targetdoc="group-refman" targetptr="niscat-1" remap="external"><citerefentry><refentrytitle>niscat</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> for
+example) that is mapped from LDAP, it will enumerate the corresponding LDAP
+container if at least one entry in the table has an expired TTL. Although
+this container enumeration is done in the background, so that LDAP performance
+is of limited importance, it can nevertheless be beneficial to establish LDAP
+indices to speed up container enumeration for large containers.</para><para>To obtain an estimate of the amount of time required for enumeration
+of a particular container, you can use a command like the following.</para><para>% <userinput>/bin/time ldapsearch</userinput> <option>h</option> <userinput><replaceable>server-address</replaceable></userinput> <option>D</option> <userinput><replaceable>bind-DN</replaceable></userinput> <option>w</option> <userinput><replaceable>password</replaceable> \</userinput></para><para><userinput></userinput><option>b</option> <userinput><replaceable>container</replaceable>, <replaceable>search-base 'cn=*'</replaceable> /dev/null</userinput></para><para>where</para><itemizedlist><listitem><para><replaceable>server-address</replaceable></para><para>IP address
+portion of <literal>preferredServerList</literal> value from <filename>/etc/default/rpc.nisd</filename></para>
+</listitem><listitem><para><replaceable>bind-DN</replaceable></para><para><literal>nisplusLDAPproxyUser</literal> value from <filename>/etc/default/rpc.nisd</filename></para>
+</listitem><listitem><para><replaceable>password</replaceable></para><para><literal>nisplusLDAPproxyPassword</literal> value from <filename>/etc/default/rpc.nisd</filename></para>
+</listitem><listitem><para><replaceable>container</replaceable></para><para>One of the
+RFC 2307 container names (<literal>ou=Services</literal>, <literal>ou=Rpc</literal>,
+and so on)</para>
+</listitem><listitem><para><replaceable>search-base</replaceable></para><para><literal>defaultSearchBase</literal> value from <filename>/etc/default/rpc.nisd</filename></para>
+</listitem>
+</itemizedlist><para>The &ldquo;real&rdquo; value printed by <filename>/bin/time</filename> is
+the elapsed (wall-clock) time. If this value exceeds a significant fraction
+(25 percent or more) of the TTL for the corresponding table entries (see <olink targetptr="nisplus2ldap-10" remap="internal">Authentication and Security</olink>),  it might
+be beneficial to index the LDAP container.</para><para>The <literal>rpc.nisd</literal> supports the <literal>simple page</literal> and
+VLV indexing methods. Refer to your LDAP server documentation to find out
+which indexing methods it supports, and how to create such indices.</para>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-49"><title>Mapping NIS+ Objects Other Than Table Entries</title><para>You can store NIS+ objects other than table entries in LDAP. However,
+doing so has no particular value unless you also have NIS+ replicas that obtain
+those NIS+ objects from LDAP. The recommended choices are the following.</para><itemizedlist><listitem><para><emphasis>There are no replicas, or the replicas obtain their
+data from the NIS+ master only.</emphasis></para><para>Edit the mapping configuration
+file (see <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>) to remove the following attribute values for all
+non-table-entry objects.</para><screen>nisplusLDAPdatabaseIdMapping
+nisplusLDAPentryTtl
+nisplusLDAPobjectDN</screen><para>For example, if you started out from the <filename>/var/nis/NIS+LDAPmapping.template</filename> file, the sections you need to remove (or disable by commenting)
+are as follows.</para><screen># Standard NIS+ directories
+nisplusLDAPdatabaseIdMapping    basedir:
+.
+.
+.</screen><screen>nisplusLDAPdatabaseIdMapping    user_attr_table:user_attr.org_dir</screen><screen>nisplusLDAPdatabaseIdMapping	 audit_user_table:audit_user.org_dir
+
+# Standard NIS+ directories
+nisplusLDAPentryTtl             basedir:21600:43200:43200
+.
+.
+.</screen><screen>nisplusLDAPentryTtl	user_attr_table:21600:43200:43200
+nisplusLDAPentryTtl	audit_user_table:21600:43200:43200
+
+# Standard NIS+ directories
+nisplusLDAPobjectDN	basedir:cn=basedir,ou=nisPlus,?base?\</screen><screen>       objectClass=nisplusObjectContainer:\
+       cn=basedir,ou=nisPlus,?base?\
+       objectClass=nisplusObjectContainer,\
+       objectClass=top
+.
+.
+.</screen><screen>nisplusLDAPobjectDN	audit_user_table:cn=audit_user,ou=nisPlus,?base?\
+       objectClass=nisplusObjectContainer:\
+       cn=audit_user,ou=nisPlus,?base?\
+       objectClass=nisplusObjectContainer,\
+       objectClass=top</screen>
+</listitem><listitem><para><emphasis>NIS+ replicas obtain their data from LDAP server.</emphasis></para><para>Create the <literal>nisplusObject</literal> attribute and <literal>nisplusObjectContainer</literal> object class as shown in the following example (LDIF data is suitable
+for <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.
+Attribute and object class OIDs are for illustration only.)</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.1.0 NAME 'nisplusObject'
+       DESC 'An opaque representation of an NIS+ object'
+       SYNTAX 1.3.6.1.4.1.1466.115.121.1.5 SINGLE-VALUE )</screen><screen>dn: cn=schema
+changetype: modify
+add: objectclasses</screen><screen>objectclasses: (1.3.6.1.4.1.42.2.27.5.42.42.2.0 NAME'nisplusObjectContainer'</screen><screen>SUP top STRUCTURAL DESC 'Abstraction of an NIS+ object'
+MUST ( cn $ nisplusObject ) )</screen><para>You also need to create a container for the NIS+ objects. The following
+LDIF syntax shows how to create the <literal>ou=nisPlus,dc=some,dc=domain</literal> container,
+and can be used as input to <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para><screen>dn: ou=nisPlus,dc=some,dc=domain
+ou: nisPlus
+objectClass: top
+objectClass: organizationalUnit</screen>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="nisplus2ldap-50"><title>NIS+ Entry Owner, Group, Access, and TTL</title><para>When NIS+ table entries are created from LDAP data, the default behavior
+is to initialize the entry object owner, group, access rights, and TTL using
+the corresponding values from the table object in which the entry object lives.
+This is normally sufficient, but there might be cases where these NIS+ entry
+attributes must be established individually. An example of this would be a
+site that did not use the <olink targetdoc="group-refman" targetptr="rpc.nispasswdd-1m" remap="external"><citerefentry><refentrytitle>rpc.nispasswdd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> daemon. In order to allow
+individual users to change their NIS+ passwords (and re-encrypt their Diffie-Hellman
+keys stored in the <literal>cred.org_dir</literal> table), <literal>passwd.org_dir</literal> and <literal>cred.org_dir</literal> entries for the user should
+be owned by the user, and have modify rights for the entry owner.</para><para>If you need to store table entry owner, group, access, or TTL in LDAP
+for one or more NIS+ tables, you need to do the following.</para><task id="nisplus2ldap-proc-51"><title>How to Store Additional Entry Attributes
+in LDAP</title><procedure><step id="nisplus2ldap-step-52"><para>Consult your LDAP server documentation,
+and create the following new attributes and object class. (LDIF data is suitable
+for <command>ldapadd</command>. Attribute and object class OIDs are for illustration
+only.)</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes: ( 1.3.6.1.4.1.42.2.27.5.42.42.4.0 NAME 'nisplusEntryOwner' \
+                DESC 'Opaque representation of NIS+ entry owner' \
+                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.4.1 NAME 'nisplusEntryGroup' \
+                DESC 'Opaque representation of NIS+ entry group' \
+                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.4.2 NAME 'nisplusEntryAccess' \
+                DESC 'Opaque representation of NIS+ entry access' \
+                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.4.3 NAME 'nisplusEntryTtl' \
+                DESC 'Opaque representation of NIS+ entry TTL' \
+                SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )</screen><screen>dn: cn=schema
+changetype: modify
+add: objectclasses</screen><screen>objectclasses:(1.3.6.1.4.1.42.2.27.5.42.42.5.0 NAME 'nisplusEntryData'\
+SUP top STRUCTURAL DESC 'NIS+ entry object non-column data'\</screen><screen>MUST ( cn ) MAY ( nisplusEntryOwner $ nisplusEntryGroup $\
+nisplusEntryAccess $ nisplusEntryTtl ) )</screen>
+</step><step id="nisplus2ldap-step-53"><para>Modify the <literal>nisplusLDAPobjectDN</literal> attribute
+value for the relevant table(s) so that the write portion includes the newly
+created <literal>nisplusEntryData</literal> object class.</para><para>For
+example, for the <literal>passwd.org_dir</literal> table, assuming that you
+are using a mapping file based on <filename>/var/nis/NIS+LDAPmapping.template</filename>,
+edit as follows.</para><screen>nisplusLDAPobjectDN	passwd:ou=People,?one?objectClass=shadowAccount,\
+
+                objectClass=posixAccount:\
+                ou=People,?one?objectClass=shadowAccount,\
+                objectClass=posixAccount,\
+                objectClass=account,objectClass=top</screen><para>Edit the attribute value as follows.</para><screen>nisplusLDAPobjectDN	passwd:ou=People,?one?objectClass=shadowAccount,\
+
+                objectClass=posixAccount:\
+                ou=People,?one?objectClass=shadowAccount,\
+                objectClass=posixAccount,\
+                objectClass=nisplusEntryData,\
+                objectClass=account,objectClass=top</screen>
+</step><step id="nisplus2ldap-step-54"><para>Edit the <literal>nisplusLDAPattributeFromColumn</literal> and <literal>nisplusLDAPcolumnFromAttribute</literal> attribute
+values to specify any desired subset of owner, group, access, or TTL.</para><para>In Step 2, you created the LDAP attributes used to store these values.
+For NIS+, there are predefined pseudo-column names called <literal>zo_owner</literal>, <literal>zo_group</literal>, <literal>zo_access</literal>, and <literal>zo_ttl</literal>,
+respectively. For example, in order to store owner, group, and access for <literal>passwd.org_dir</literal> entries in LDAP, modify the <literal>nisplusLDAPattributeFromColumn</literal> value from the following.</para><screen>nisplusLDAPattributeFromColumn \
+		passwd:		dn=("uid=%s,", name), \
+				cn=name, \
+				uid=name, \
+				userPassword=("{crypt$}%s", passwd), \
+				uidNumber=uid, \
+				gidNumber=gid, \
+				gecos=gcos, \
+				homeDirectory=home, \
+				loginShell=shell, \
+				(shadowLastChange,shadowMin,shadowMax, \
+				 shadowWarning, shadowInactive,shadowExpire)=\
+					(shadow, ":")</screen><para>Edit to read as follows.</para><screen>nisplusLDAPattributeFromColumn \
+		passwd:		dn=("uid=%s,", name), \
+				cn=name, \
+				uid=name, \
+				userPassword=("{crypt$}%s", passwd), \
+				uidNumber=uid, \
+				gidNumber=gid, \
+				gecos=gcos, \
+				homeDirectory=home, \
+				loginShell=shell, \
+				(shadowLastChange,shadowMin,shadowMax, \
+				 shadowWarning, shadowInactive,shadowExpire)=\
+					(shadow, ":"), \
+				nisplusEntryOwner=zo_owner, \
+				nisplusEntryGroup=zo_group, \
+				nisplusEntryAccess=zo_access</screen><para>Similarly, to set NIS+ entry owner, group, and access from LDAP data
+for the <literal>passwd.org_dir</literal> table, modify the following.</para><screen>nisplusLDAPcolumnFromAttribute \
+		passwd:		name=uid, \
+				("{crypt$}%s", passwd)=userPassword, \
+				uid=uidNumber, \
+				gid=gidNumber, \
+				gcos=gecos, \
+				home=homeDirectory, \
+				shell=loginShell, \
+				shadow=("%s:%s:%s:%s:%s:%s", \
+					shadowLastChange, \
+					shadowMin, \
+					shadowMax, \
+					shadowWarning, \
+					shadowInactive, \
+					shadowExpire)</screen><para>Edit to read as follows.</para><screen>nisplusLDAPcolumnFromAttribute \
+		passwd:		name=uid, \
+				("crypt$%s", passwd)=authPassword, \
+				uid=uidNumber, \
+				gid=gidNumber, \
+				gcos=gecos, \
+				home=homeDirectory, \
+				shell=loginShell, \
+				shadow=("%s:%s:%s:%s:%s:%s", \
+					shadowLastChange, \
+					shadowMin, \
+					shadowMax, \
+					shadowWarning, \
+					shadowInactive, \
+					shadowExpire), \
+				zo_owner=nisplusEntryOwner, \
+				zo_group=nisplusEntryGroup, \
+				zo_access=nisplusEntryAccess</screen>
+</step><step id="nisplus2ldap-step-5"><para>Upload owner, group, access, and/or TTL
+entry data to LDAP.</para><para>See <olink targetptr="nisplus2ldap-proc-22" remap="internal">How
+to Convert All NIS+ Data to LDAP in One Operation</olink> for more information.</para>
+</step><step id="nisplus2ldap-step-55"><para>Restart the NIS+ service in order to
+make the mapping change take effect.</para><screen># <userinput>svcadm restart network/rpc/nisplus:default</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="nisplus2ldap-56"><title>Principal Names and Netnames (NIS+ to LDAP)</title><para><indexterm><primary>principal names</primary></indexterm><indexterm><primary>netnames</primary></indexterm>NIS+ authentication relies on principal
+names (a user or host name, qualified by the domain name) and netnames (the
+secure RPC equivalent of principal names) to uniquely identify an entity (principal)
+that can be authenticated. While RFC 2307 provides for storing the Diffie-Hellman
+keys used for NIS+ authentication, there is no specified place for the principal
+names or netnames.</para><para>The <filename>/var/nis/NIS+LDAPmapping.template</filename> file works
+around this problem by deriving the domain portion of principal and netnames
+from the owner name (itself a principal name) of the <literal>cred.org_dir</literal> table.
+Hence, if the NIS+ domain is <literal>x.y.z.</literal>, and the owner of the <literal>cred.org_dir</literal> table is <literal>aaa.x.y.z.</literal>, all principal
+names for NIS+ entries created from LDAP data will be of the following form.</para><screen><userinput><replaceable>user or system</replaceable>.x.y.z.</userinput></screen><para>Netnames are of the following form.</para><screen><userinput>unix.<replaceable>uid</replaceable>@x.y.z.</userinput></screen><screen><userinput>unix.<replaceable>nodename</replaceable>@x.y.z.</userinput></screen><para>While this method of constructing principal and netnames probably is
+sufficient for most NIS+ installations, there are also some cases in which
+it fails, as shown in the following.</para><itemizedlist><listitem><para>The owner name of the <literal>cred.org_dir</literal> table
+belongs to a different domain than the one shared by the principal and netnames
+in the <literal>cred.org_dir</literal> table. This could be the case for a <literal>cred.org_dir</literal> table in a subdomain, if the owner is a principal from
+the parent domain.  You can fix this problem in one of the following ways.</para><itemizedlist><listitem><para><emphasis>Change the owner of the</emphasis> <literal>cred.org_dir</literal> <emphasis>table to match the domain of the entries in the table.</emphasis></para>
+</listitem><listitem><para><emphasis>Change the mapping rules for the</emphasis> <filename>cred.org_dir</filename> <emphasis>database IDs to use the owner of some other NIS+ object
+(which could be created especially for that purpose, if no suitable object
+already exists).</emphasis></para><para>For example, if the <filename>cred.org_dir</filename> table in the domain <literal>sub.dom.ain.</literal> is owned by <literal>master.dom.ain.</literal>, but principal and netnames in <literal>cred.org_dir.sub.dom.ain.</literal> should belong to <literal>sub.dom.ain</literal>, you could create
+a link object as follows.</para><screen># <userinput>nisln cred.org_dir.sub.dom.ain. \</userinput>
+<userinput>credname.sub.dom.ain.</userinput></screen><para>Set the owner of the link object to an appropriate principal in the <literal>sub.dom.ain.</literal> as follows.</para><screen># <userinput>nischown trusted.sub.dom.ain. credname.sub.dom.ain.</userinput></screen><para>Edit the mapping file. Change</para><screen>(nis+:zo_owner[]cred.org_dir, "*.%s")), \</screen><para>to</para><screen>(nis+:zo_owner[]credname.sub.dom.ain., "*.%s")), \</screen><para>Note that the use of a link object called <literal>credname</literal> is
+an example. Any valid object type (except an entry object) and object name
+will do. The important point is to set the owner of the object to have the
+correct domain name.</para>
+</listitem><listitem><para>If you do not want to give ownership even of a special purpose
+object to a principal from the domain used for the principal and netnames,
+create <literal>nisplusPrincipalName</literal> and <literal>nisplusNetname</literal> attributes
+as detailed below.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><emphasis>The</emphasis> <literal>cred.org_dir</literal> <emphasis>table contains principal and netnames belonging to more than one domain.</emphasis></para><para>Consult the documentation for your LDAP server, and create the <literal>nisplusPrincipalName</literal> and <literal>nisplusNetname</literal> attributes, as well as the <literal>nisplusAuthName</literal> object class. (The following is LDIF data for <command>ldapadd</command>. Attribute and object class OIDs are for illustration only.)</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.7.0 NAME 'nisplusPrincipalName' \
+		  DESC 'NIS+ principal name' \
+		  SINGLE-VALUE \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )</screen><screen>attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.9.0 NAME 'nisplusNetname' \
+		  DESC 'Secure RPC netname' \
+		  SINGLE-VALUE \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:	( 1.3.6.1.4.1.42.2.27.5.42.42.10.0 NAME 'nisplusAuthName' \
+		  SUP top AUXILLIARY DESC 'NIS+ authentication identifiers' \
+		  MAY ( nisplusPrincipalName $ nisplusNetname ) )</screen><para>You now need to enable the <filename>cred.org_dir</filename> mapping
+to use the newly created <literal>nisplusNetname</literal> and <literal>nisplusPrincipalName</literal> attributes. The template mapping file, <filename>/var/nis/NIS+LDAPmapping.template</filename>, contains commented-out lines for this purpose. See the <literal>nisplusObjectDN</literal> and <literal>nisplusLDAPattributeFromColumn</literal>/ 	<literal>nisplusLDAPcolumnFromAttribute</literal> attribute values for the  <literal>credlocal</literal>, <literal>creduser</literal>, and <literal>crednode</literal> database IDs. Once you have edited
+your mapping file to this effect, restart the NIS+ service. Do
+not forget to edit the <filename>/lib/svc/method/nisplus</filename> file to
+include the <option>m</option> and <option>Y</option> options, or use the <command>svcprop</command> command, as appropriate. See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+ to LDAP Tools and the Service Management Facility</olink> for more information.Do
+not forget to add the <option>m</option> option if your mapping file is not
+the default, and the <option>Y</option> option if the <literal>rpc.nisd</literal> daemon
+should provide NIS (YP) emulation.</para><screen># <userinput>svcadm restart network/rpc/nisplus:default</userinput></screen><screen># <userinput>pkill rpc.nisd</userinput></screen>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="nisplus2ldap-57"><title><literal>client_info</literal> and <literal>timezone</literal> Tables (NIS+ to LDAP)</title><para>Because RFC 2307 does not provide schemas for the information kept in
+the NIS+ <literal>client_info.org_dir</literal> and <literal>timezone.org_dir</literal> tables,
+mapping of these tables is not enabled by default in the template mapping
+file (<filename>/var/nis/NIS+LDAPmapping.template</filename>). If you want
+to keep the <literal>client_info</literal> and<literal>timezone</literal> information
+in LDAP, consult your LDAP server documentation, and create the new attributes
+and object classes discussed in the following sections.</para><sect2 id="nisplus2ldap-58"><title><literal>client_info</literal> Attributes
+and Object Class</title><para>Create attributes and object class as below, and then create the 	container
+for the client_info data. The suggested container name is <literal>ou=ClientInfo</literal>.
+LDIF data is for <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.
+The attribute and object class OIDs used in the following are examples only.</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.12.0 \
+    NAME 'nisplusClientInfoAttr' \
+    DESC 'NIS+ client_info table client column' \
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.12.1 \
+    NAME 'nisplusClientInfoInfo' \
+    DESC 'NIS+ client_info table info column' \
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.12.2 \
+    NAME 'nisplusClientInfoFlags' \
+    DESC 'NIS+ client_info table flags column' \
+    SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:	( 1.3.6.1.4.1.42.2.27.5.42.42.13.0 \
+    NAME 'nisplusClientInfoData' \
+    DESC 'NIS+ client_info table data' \
+    SUP top STRUCTURAL MUST ( cn ) \
+    MAY ( nisplusClientInfoAttr $ nisplusClientInfoInfo $ nisplusClientInfoFlags ) )</screen><para>To create the container, put the following LDIF data in a file. Substitute
+your actual search base for <replaceable>searchBase</replaceable>.</para><screen>dn: ou=ClientInfo, <replaceable>searchBase</replaceable></screen><screen>objectClass: organizationalUnit</screen><screen>ou: ClientInfo</screen><screen>objectClass: top</screen><para>Use the above file as input to the <command>ldapadd</command> command
+in order to create the <literal>ou=ClientInfo</literal> container. For example,
+if your LDAP administrator DN is <literal>cn=directory manager</literal>,
+and the file with the LDIF data is called <literal>cifile</literal>, do the
+following.</para><screen># <userinput>ldapadd</userinput> <option>D</option> <userinput><replaceable>cn="directory manager"</replaceable></userinput> <option>f</option> <userinput>cifile</userinput></screen><para>Depending on the authentication required, the <command>ldapadd</command> command
+might prompt for a password.</para><para>The <filename>/var/nis/NIS+LDAPmapping.template</filename> file contains
+commented-out definitions for the <literal>client_info.org_dir</literal> table.
+Copy these to the actual mapping file, enable by removing the comment character
+'#', and restart the <filename>rpc.nisd</filename> daemon.</para><screen># <userinput>svcadm restart network/rpc/nisplus:default</userinput></screen><para>If necessary, synchronize NIS+ and LDAP data as described in <olink targetptr="nisplus2ldap-21" remap="internal">NIS+ to LDAP Migration Scenarios</olink>.</para>
+</sect2><sect2 id="nisplus2ldap-59"><title><literal>timezone</literal> Attributes
+and Object Class</title><para>Create attributes and object class as below, and then create the container
+for the timezone data. The suggested container name is <literal>ou=Timezone</literal>.
+(The LDIF data is suitable for <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>. Attribute and object class
+OIDs are examples only.)</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.15.0 NAME 'nisplusTimeZone' \
+		  DESC 'tzone column from NIS+ timezone table' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:	( 1.3.6.1.4.1.42.2.27.5.42.42.16.0 NAME 'nisplusTimeZoneData' \
+		  DESC 'NIS+ timezone table data' \
+		  SUP top STRUCTURAL MUST ( cn ) \
+		  MAY ( nisplusTimeZone $ description ) )</screen><para>To create the <literal>ou=Timezone</literal> container, put the following
+LDIF data in a file. Substitute your actual search base for <replaceable>searchBase</replaceable>.</para><para><filename>dn: ou=Timezone,<replaceable>searchBase</replaceable></filename> <filename>ou: Timezone</filename> <filename>objectClass: top</filename></para><para><filename>objectClass: organizationalUnit</filename></para><para>Use the above file as input to <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> in order to create the <literal>ou=Timezone</literal> container. For example, if your LDAP administrator DN is <literal>cn=directory
+manager</literal>, and the file with the LDIF data is called <literal>tzfile</literal>.</para><screen># <userinput>ldapadd -D <replaceable>cn="directory manager"</replaceable> -f tzfile</userinput></screen><para>Depending on the authentication required, the <command>ldapadd</command> command
+might prompt for a password.</para><para>The <filename>/var/nis/NIS+LDAPmapping.template</filename> file contains
+commented-out definitions for the <literal>timezone.org_dir</literal> table.
+Copy these to the actual mapping file, enable by removing the comment character
+'#', and restart the <filename>rpc.nisd</filename> daemon.</para><screen># <userinput>svcadm restart network/rpc/nisplus:default</userinput></screen><para>If necessary, synchronize NIS+ and LDAP data as described in <olink targetptr="nisplus2ldap-21" remap="internal">NIS+ to LDAP Migration Scenarios</olink>.</para>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-60"><title>Adding New Object Mappings (NIS+ to LDAP)</title><para><indexterm><primary>object mappings</primary><secondary>adding new</secondary></indexterm>The template mapping file, <filename>/var/nis/NIS+LDAPmapping.template</filename>, contains mapping information for all standard NIS+ objects. In
+order to support mapping of site or application specific objects, you will
+need to add new mapping entries. This is a simple task for non-entry (that
+is, directory, group, link, or table) objects, but can become complex for
+entry objects, if the LDAP organization of the corresponding entry data differs
+greatly from that used by NIS+. The following example shows the simple case.</para><task id="nisplus2ldap-proc-61"><title>How to Map Non-Entry Objects</title><procedure><step id="nisplus2ldap-step-62"><para>Find the fully qualified name of the
+object to be mapped.</para><para>If this name resides under the domain name
+specified by the <literal>nisplusLDAPbaseDomain</literal> attribute, you can
+omit the portion that equals the <literal>nisplusLDAPbaseDomain</literal> value.</para><para>For example, if <literal>nisplusLDAPbaseDomain</literal> has the value <literal>some.domain.</literal>, and the object to be mapped is a table called <literal>nodeinfo.some.domain.</literal>, the object name can be shortened to <literal>nodeinfo</literal>.</para>
+</step><step id="nisplus2ldap-step-63"><para>Invent a database id to identify the
+object.</para><para>The database id must be unique for the mapping configuration
+used, but is not otherwise interpreted. It does not show up in the LDAP data.
+In order to reduce confusion with entry object mappings, create a database
+id identifying the table object proper (not the table entries) using an explanatory
+string like <literal>_table</literal> at the end.</para><para>For this example, use the database id <literal>nodeinfo_table</literal>,
+and establish the connection between the database id and the object in the
+standard mapping file location (<filename>/var/nis/NIS+LDAPmapping</filename>)
+by adding the following.</para><screen>nisplusLDAPdatabaseIdMapping	nodeinfo_table:nodeinfo.some.domain.</screen><para>Assuming that <literal>nisplusLDAPbaseDomain</literal> is <literal>some.domain.</literal>, the following would also work.</para><screen>nisplusLDAPdatabaseIdMapping	nodeinfo_table:nodeinfo</screen>
+</step><step id="nisplus2ldap-step-64"><para>Decide on a TTL for the object.</para><para>This is the time during which the <command>rpc.nisd</command> daemon
+regards its local copy of the object as valid. When the TTL expires, the next
+reference to the object will initiate an LDAP lookup to refresh the object.</para><para>There are two different TTL values. The first is set when the <command>rpc.nisd</command> daemon first loads the object from disk (after a reboot or restart),
+and the second pertains to all refreshes from LDAP. The first TTL is selected
+randomly from a configured range. For example, if <literal>nodeinfo_table</literal> should
+be valid for a period of between one and three hours following initial load,
+and for twelve hours thereafter, specify the following.</para><screen>nisplusLDAPentryTtl		nodeinfo_table:3600:10800:43200</screen>
+</step><step id="nisplus2ldap-step-65"><para>Decide where the object data should
+be stored in LDAP.</para><para>The template mapping file suggests putting
+non-entry object data in the <literal>ou=nisPlus</literal> container.</para><para>If you use this scheme, and have not yet created the appropriate attribute,
+object class, and container, see <olink targetptr="nisplus2ldap-49" remap="internal">Mapping
+NIS+ Objects Other Than Table Entries</olink>.</para><para>For example, assume you want to store the <literal>nodeinfo</literal> object
+in the <literal>ou=nisPlus,dc=some,dc=domain</literal> container, and that
+the LDAP entry should have the <literal>cn nodeinfo</literal>. Create the
+following <literal>nisplusLDAPobjectDN</literal>.</para><screen>nisplusLDAPobjectDN	nodeinfo_table:\
+				cn=nodeinfo,ou=nisPlus,dc=some,dc=domain?base?\
+				objectClass=nisplusObjectContainer:\
+				cn=nodeinfo,ou=nisPlus,dc=some,dc=domain?base?\
+					objectClass=nisplusObjectContainer,\
+					objectClass=top</screen><para>Since NIS+ replicas do not write data to LDAP, you can use the <literal>nisplusLDAPobjectDN</literal> above for both master and replicas.</para>
+</step><step id="nisplus2ldap-step-66"><para>(Skip this step if the NIS+ object to
+be mapped has not yet been created in NIS+.) Store the object data in LDAP.
+You could use the <literal>rpc.nisd</literal> daemon for this purpose, but
+it is easier to use the <olink targetdoc="group-refman" targetptr="nisldapmaptest-1m" remap="external"><citerefentry><refentrytitle>nisldapmaptest</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> utility, as you can leave
+the <literal>rpc.nisd</literal> daemon running.</para><screen># <userinput>nisldapmaptest</userinput> <option>m</option> <userinput>/var/nis/NIS+LDAPmapping</userinput> <option>o</option> <userinput></userinput><option>t</option> <userinput>nodeinfo</userinput> <option>r</option><userinput></userinput></screen><para>The <option>o</option> option specifies the table object itself, not
+the table entries.</para>
+</step><step id="nisplus2ldap-step-67"><para>Verify that the object data is stored
+in LDAP. (This example assumes the LDAP server is running on the local machine
+at port <literal>389</literal>.)</para><screen># <userinput>ldapsearch</userinput> <option>b</option> <userinput>ou=nisPlus,dc=some,dc=domain cn=nodeinfo</userinput></screen><para>The output would appear similar to the following.</para><screen>dn: cn=nodeinfo,ou=nisPlus,dc=some,dc=domain
+objectclass: nisplusObjectContainer
+objectclass: top
+cn: nodeinfo
+nisplusobject=&lt;<replaceable>base 64 encoded data</replaceable>&gt;</screen>
+</step><step id="nisplus2ldap-step-68"><para>Restart the NIS+
+service.</para><para>The service will start by using the new mapping information.
+Do not forget to edit the <filename>/lib/svc/method/nisplus</filename> file
+to add the <option>m</option> and <option>Y</option> options, or use the <command>svcprop</command> command, as appropriate. See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+ to LDAP Tools and the Service Management Facility</olink> for more information.</para><screen># <userinput>svcadm restart network/rpc/nisplus:default</userinput></screen>
+</step>
+</procedure>
+</task><sect2 id="nisplus2ldap-69"><title>Adding Entry Objects</title><para><olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> specifies the syntax and semantics of table entry
+mapping in detail, and also provides examples that show how to use each syntactic
+element. However, the simplest and least error-prone approach is usually to
+identify an already existing mapping that is similar to what you want to do,
+and then copy and modify that existing mapping.</para><para>For example, assume that you have an NIS+ table called <literal>nodeinfo</literal>,
+which is used to store inventory and owner information for nodes. Assume that
+the NIS+ table was created by the following command.</para><screen># <userinput>nistbladm</userinput> <option>c</option> <userinput></userinput><option>D</option> <userinput>access=og=rmcd,nw=r</userinput> <option>s</option> <userinput>: nodeinfo_tbl \</userinput>
+<userinput>cname=S inventory=S owner= nodeinfo.`domainname`.</userinput></screen><para>The <literal>cname</literal> column is expected to contain the canonical
+name of the node. In other words, the same value as that of the <literal>cname</literal> column
+in the <literal>hosts.org_dir</literal> table for the node.</para><para>Also assume that the corresponding information is kept in the <literal>ou=Hosts</literal> container in LDAP, and that the <literal>nodeInfo</literal> object
+class (which is an invention for this example, and is not defined in any RFC)
+has <literal>cn</literal> as a MUST attribute, and that <literal>nodeInventory</literal> and <literal>nodeOwner</literal> are MAY attributes.</para><para>In order to upload existing <literal>nodeinfo</literal> data to LDAP,
+it will be convenient to create the new mapping attributes in a separate file.
+You could, for example, use <filename>/var/nis/tmpmapping</filename>.</para><orderedlist><listitem><para>Create a database id that identifies the NIS+ table to be
+mapped.</para><screen>nisplusLDAPdatabaseIdMapping	nodeinfo:nodeinfo</screen>
+</listitem><listitem><para>Set the TTL for entries in the <literal>nodeinfo</literal> table.
+Since the information is expected to change only rarely, use a twelve hour
+TTL. When the <literal>rpc.nisd</literal> daemon first loads the <literal>nodeinfo</literal> table from disk, the TTLs for entries in the table are randomly
+selected to be between six and twelve hours.</para><screen>nisplusLDAPentryTtl		nodeinfo:21600:43200:43200</screen>
+</listitem><listitem><para>Identify an existing mapping that has similar properties to
+the one you want to create. In this example, mapping the attribute values
+is trivial (straight assignment). Instead, the complication is that you store
+the LDAP data in an existing container, so that you have to be careful during
+removal of the <literal>nodeinfo</literal> data. You do not want to remove
+the entire <literal>ou=Hosts</literal> entry, just the <literal>nodeInventory</literal> and <literal>nodeOwner</literal> attributes. You will need a special deletion rule set
+for this purpose.</para><para>To summarize, you are looking for a mapping
+that shares a container, and has a delete rule set. One possible candidate
+is the <literal>netmasks</literal> mapping, which shares the <literal>ou=Networks</literal> container, and does have a delete rule set.</para>
+</listitem><listitem><para>The template <literal>netmasks</literal> mapping has the default
+mapping (from <filename>/var/nis/NIS+LDAPmapping.template</filename>) as follows.</para><screen>nisplusLDAPobjectDN	netmasks:ou=Networks,?one?objectClass=ipNetwork,\
+           ipNetMaskNumber=*:\
+              ou=Networks,?one?objectClass=ipNetwork:
+              dbid=netmasks_del</screen><para>Transferred to the new mapping for <literal>nodeinfo</literal>, the
+database id should be <literal>nodeinfo</literal>, the container <literal>ou=Hosts</literal>, and the object class <literal>nodeInfo</literal>. Thus, the first
+line of the <literal>nodeinfo</literal> mapping becomes the following.</para><screen>nisplusLDAPobjectDN	nodeinfo:ou=Hosts,?one?objectClass=nodeInfo,\</screen><para>The second line in the <literal>netmasks</literal> mapping is the part
+of the search filter that selects only those <literal>ou=Networks</literal> entries
+that contain the <literal>ipNetMaskNumber</literal> attribute. In this example,
+select the <literal>ou=Hosts</literal> entries that have the following <literal>nodeInventory</literal> attribute.</para><screen>nodeInventory=*:\</screen><para>The third and fourth lines are the write portion of the <literal>nisplusLDAPobjectDN</literal>, and they specify where in LDAP <literal>nodeinfo</literal> data
+is written, as well as the rule set that is used when <literal>nodeinfo</literal> data
+is deleted. In this case, create a delete rule set identified by the database
+id <literal>nodeinfo_del</literal>. Because you are always writing to an existing
+entry in <literal>ou=Hosts</literal>, you only need to specify the object
+class for the  <literal>nodeinfo</literal> data proper as follows.</para><screen>ou=Hosts,?one?objectClass=nodeInfo:\
+	              dbid=nodeinfo_del
+	</screen><para>Putting it all together, our <literal>nisplusLDAPobjectDN</literal> is
+the following.</para><screen>nisplusLDAPobjectDN	nodeinfo:ou=Hosts,?one?objectClass=nodeInfo,\
+              nodeInventory=*:\
+                  ou=Hosts,?one?objectClass=nodeInfo:\
+                  dbid=nodeinfo_del</screen>
+</listitem><listitem><para>Create the rule set that maps <literal>nodeinfo</literal> data
+from NIS+ to LDAP. The template (from <literal>netmasks</literal>) is the
+following.</para><screen>nisplusLDAPattributeFromColumn \
+		netmasks:	dn=("ipNetworkNumber=%s,", addr), \
+						ipNetworkNumber=addr, \
+						ipNetmaskNumber=mask, \
+						description=comment</screen><para>The <literal>ou=Hosts</literal> container has an additional complication
+in this case, as RFC 2307 specifies the <literal>dn</literal> should contain
+the IP address. However, the IP address is not stored in the <literal>nodeinfo</literal> table,
+so you must obtain it in another manner. Fortunately, the <literal>crednode</literal> mapping
+in the template file shows how to obtain the IP address.</para><screen>nisplusLDAPattributeFromColumn \
+   crednode:	dn=("cn=%s+ipHostNumber=%s,", \
+								(cname, "%s.*"), \
+   ldap:ipHostNumber:?one?("cn=%s", (cname, "%s.*"))), \</screen><para>Thus, you can copy that portion of the <literal>crednode</literal> mapping.
+In this case, however, the <literal>cname</literal> column value is the actual
+host name (not the principal name), so you do not need to extract just a portion
+of the <literal>cname</literal>. Making the obvious substitutions of attribute
+and column names, the <literal>nodeinfo</literal> mapping becomes the following.</para><screen>nisplusLDAPattributeFromColumn \
+   nodeinfo:	dn=("cn=%s+ipHostNumber=%s,", cname, \
+   ldap:ipHostNumber:?one?("cn=%s", cname)), \
+	       nodeInventory=inventory, \
+	       nodeOwner=owner</screen>
+</listitem><listitem><para>When mapping data from LDAP to NIS+, the template <literal>netmasks</literal> entry is as follows.</para><screen>nisplusLDAPcolumnFromAttribute \
+		netmasks:	addr=ipNetworkNumber, \
+				mask=ipNetmaskNumber, \
+				comment=description</screen><para>After substituting attribute and column names, this result is the following.</para><screen>nisplusLDAPcolumnFromAttribute \
+		nodeinfo:	cname=cn, \
+				inventory=nodeInventory, \
+				owner=nodeOwner</screen>
+</listitem><listitem><para>The delete rule set for <literal>netmasks</literal> is as
+follows.</para><screen>nisplusLDAPattributeFromColumn \
+		netmasks_del:	dn=("ipNetworkNumber=%s,", addr), \
+				ipNetmaskNumber=</screen><para>The above specifies that when a <literal>netmasks</literal> entry is
+deleted in NIS+, the <literal>ipNetmaskNumber</literal> attribute in the corresponding <literal>ou=Networks</literal> LDAP entry is deleted. In this case, delete the <literal>nodeInventory</literal> and <literal>nodeOwner</literal> attributes. Therefore, using the <literal>dn</literal> specification from item (5) above, results in the following.</para><screen>nisplusLDAPattributeFromColumn \
+		nodeinfo_del:	dn=("cn=%s+ipHostNumber=%s,", cname, \
+			ldap:ipHostNumber:?one?("cn=%s", cname)), \
+				nodeInventory=, \
+				nodeOwner=</screen><para>The mapping information is complete.</para>
+</listitem><listitem><para>The mapping information is complete.
+In order to begin using it, stop and later start the <filename>rpc.nisd</filename> daemon.</para><screen># <userinput>pkill rpc.nisd</userinput></screen>
+</listitem><listitem><para>Stop, and later start, the NIS+
+service, to begin using the mapping file.</para><screen># <userinput>svcadm disable network/rpc/nisplus:default</userinput></screen>
+</listitem><listitem><para>If data is already in the NIS+ <literal>nodeinfo</literal> table,
+upload that data to LDAP. Put the new <literal>nodeinfo</literal> mapping
+information into a separate file, <filename>/var/nis/tmpmapping</filename>.</para><screen># <userinput>/usr/sbin/rpc.nisd -D -m /var/nis/tmpmapping \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateAction=to_ldap \</userinput>
+<userinput>-x nisplusLDAPinitialUpdateOnly=yes</userinput></screen>
+</listitem><listitem><para>Add the mapping information from the temporary file, <filename>/var/nis/tmpmapping</filename>, to the actual mapping file. Use an editor to do this, or append
+the data (assuming the actual mapping file is <filename>/var/nis/NIS+LDAPmapping</filename>)
+as follows.</para><screen># <userinput>cp -p /var/nis/NIS+LDAPmapping \</userinput>
+<userinput>/var/nis/NIS+LDAPmapping.backup</userinput></screen><screen># <userinput>cat /var/nis/tmpmapping &gt;&gt; /var/nis/NIS+LDAPmapping</userinput></screen><caution><para>Note the double arrow redirection, &ldquo;&gt;&gt;&rdquo;. A single
+arrow, &ldquo;&gt;&rdquo;, would overwrite the target file.</para>
+</caution>
+</listitem><listitem><para>Add the <option>m</option> option
+to the <filename>/lib/svc/method/nisplus</filename> file. Also add the <option>Y</option> or <option>B</option> options as needed. See <olink targetptr="nisplus2ldap-66" remap="internal">NIS+
+to LDAP Tools and the Service Management Facility</olink> for more information.</para>
+</listitem><listitem><para>Start the NIS+ service.</para><screen># <userinput>svcadm enable network/rpc/nisplus:default</userinput></screen>
+</listitem><listitem><para>Restart the <filename>rpc.nisd</filename> daemon.
+Add the <option>Y</option> option if the <filename>rpc.nisd</filename> daemon
+also serves NIS (YP) data as follows.</para><screen># <userinput>/usr/sbin/rpc.nisd -m /var/nis/NIS+LDAPmapping</userinput></screen>
+</listitem>
+</orderedlist>
+</sect2>
+</sect1><sect1 id="nisplus2ldap-70"><title>Storing Configuration Information in LDAP</title><para>In addition to keeping NIS+/LDAP configuration information in the configuration
+files and on the command line, configuration attributes can also be stored
+in LDAP. This is useful if the configuration information is shared by many
+NIS+ servers, and is expected to change on a regular basis.</para><para>To enable storing of configuration attributes in LDAP, consult your
+LDAP server documentation and create the following new attributes and object
+class. The configuration information is expected to reside at the location
+specified by the <literal>nisplusLDAPconfigDN</literal> value (from the <filename>rpc.nisd</filename> command line, or from <filename>/lib/svc/method/nisplus</filename>),
+with a <literal>cn</literal> equal to the <literal>nisplusLDAPbaseDomain</literal> value
+(as it is known to the <filename>rpc.nisd</filename> daemon before reading
+any configuration information from LDAP).</para><para>LDIF data is suitable for <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> (attribute and object class
+OIDs are examples only).</para><para>The <literal>defaultSearchBase</literal>, <literal>preferredServerList</literal>,
+and <literal>authenticationMethod</literal> attributes derive from a draft &ldquo;DUA
+config&rdquo; schema, which is intended to become an IETF standard. In any
+case, the following definitions are sufficient for the purposes of <olink targetdoc="group-refman" targetptr="nis-plus-ldapmapping-4" remap="external"><citerefentry><refentrytitle>NIS+LDAPmapping</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>.</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes:	( 1.3.6.1.4.1.11.1.3.1.1.1 NAME 'defaultSearchBase' \
+		  DESC 'Default LDAP base DN used by a DUA' \
+		  EQUALITY distinguishedNameMatch \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.12 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.11.1.3.1.1.2 NAME 'preferredServerList' \
+		  DESC 'Preferred LDAP server host addresses to be used by a DUA' \
+		  EQUALITY caseIgnoreMatch \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.11.1.3.1.1.6 NAME 'authenticationMethod' \
+		  DESC 'Identifies the authentication method used to connect to the DSA'\
+		  EQUALITY caseIgnoreMatch \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.15 SINGLE-VALUE )</screen><para>NIS+/LDAP configuration attributes are as follows.</para><screen>dn: cn=schema
+changetype: modify
+add: attributetypes
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.0 \
+		  NAME 'nisplusLDAPTLS' \
+		  DESC 'Transport Layer Security' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.1 \
+		  NAME 'nisplusLDAPTLSCertificateDBPath' \
+		  DESC 'Certificate file' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.2 \
+		  NAME 'nisplusLDAPproxyUser' \
+		  DESC 'Proxy user for data store/retrieval' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.3 \
+		  NAME 'nisplusLDAPproxyPassword' \
+		  DESC 'Password/key/shared secret for proxy user' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.4 \
+		  NAME 'nisplusLDAPinitialUpdateAction' \
+		  DESC 'Type of initial update' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.5 \
+		  NAME 'nisplusLDAPinitialUpdateOnly' \
+		  DESC 'Exit after update ?' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.6 \
+		  NAME 'nisplusLDAPretrieveErrorAction' \
+		  DESC 'Action following an LDAP search error' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.7 \
+		  NAME 'nisplusLDAPretrieveErrorAttempts' \
+		  DESC 'Number of times to retry an LDAP search' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.8 \
+		  NAME 'nisplusLDAPretrieveErrorTimeout' \
+		  DESC 'Timeout between each search attempt' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.9 \
+		  NAME 'nisplusLDAPstoreErrorAction' \
+		  DESC 'Action following an LDAP store error' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.10 \
+		  NAME 'nisplusLDAPstoreErrorAttempts' \
+		  DESC 'Number of times to retry an LDAP store' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.11 \
+		  NAME 'nisplusLDAPstoreErrorTimeout' \
+		  DESC 'Timeout between each store attempt' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.12 \
+		  NAME 'nisplusLDAPrefreshErrorAction' \
+		  DESC 'Action when refresh of NIS+ data from LDAP fails' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.13 \
+		  NAME 'nisplusLDAPrefreshErrorAttempts' \
+		  DESC 'Number of times to retry an LDAP refresh' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.14 \
+		  NAME 'nisplusLDAPrefreshErrorTimeout' \
+		  DESC 'Timeout between each refresh attempt' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.15 \
+		  NAME 'nisplusNumberOfServiceThreads' \
+		  DESC 'Max number of RPC service threads' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.16 \
+		  NAME 'nisplusThreadCreationErrorAction' \
+		  DESC 'Action when a non-RPC-service thread creation fails' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.17 \
+		  NAME 'nisplusThreadCreationErrorAttempts' \
+		  DESC 'Number of times to retry thread creation' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.18 \
+		  NAME 'nisplusThreadCreationErrorTimeout' \
+		  DESC 'Timeout between each thread creation attempt' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.19 \
+		  NAME 'nisplusDumpErrorAction' \
+		  DESC 'Action when an NIS+ dump fails' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.20 \
+		  NAME 'nisplusDumpErrorAttempts' \
+		  DESC 'Number of times to retry a failed dump' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.21 \
+		  NAME 'nisplusDumpErrorTimeout' \
+		  DESC 'Timeout between each dump attempt' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.22 \
+		  NAME 'nisplusResyncService' \
+		  DESC 'Service provided during a resync' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.23 \
+		  NAME 'nisplusUpdateBatching' \
+		  DESC 'Method for batching updates on master' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.24 \
+		  NAME 'nisplusUpdateBatchingTimeout' \
+		  DESC 'Minimum time to wait before pinging replicas' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.25 \
+		  NAME 'nisplusLDAPmatchFetchAction' \
+		  DESC 'Should pre-fetch be done ?' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.26 \
+		  NAME 'nisplusLDAPbaseDomain' \
+		  DESC 'Default domain name used in NIS+/LDAP mapping' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 SINGLE-VALUE )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.27 \
+		  NAME 'nisplusLDAPdatabaseIdMapping' \
+		  DESC 'Defines a database id for an NIS+ object' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.28 \
+		  NAME 'nisplusLDAPentryTtl' \
+		  DESC 'TTL for cached objects derived from LDAP' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.29 \
+		  NAME 'nisplusLDAPobjectDN' \
+		  DESC 'Location in LDAP tree where NIS+ data is stored' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.30 \
+		  NAME 'nisplusLDAPcolumnFromAttribute' \
+		  DESC 'Rules for mapping LDAP attributes to NIS+ columns' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+attributetypes:	( 1.3.6.1.4.1.42.2.27.5.42.42.18.31 \
+		  NAME 'nisplusLDAPattributeFromColumn' \
+		  DESC 'Rules for mapping NIS+ columns to LDAP attributes' \
+		  SYNTAX 1.3.6.1.4.1.1466.115.121.1.26 )
+
+dn: cn=schema
+changetype: modify
+add: objectclasses
+objectclasses:	( 1.3.6.1.4.1.42.2.27.5.42.42.19.0 NAME 'nisplusLDAPconfig' \
+		  DESC 'NIS+/LDAP mapping configuration' \
+		  SUP top STRUCTURAL MUST ( cn ) \
+		  MAY ( preferredServerList $ defaultSearchBase $
+authenticationMethod $ nisplusLDAPTLS $ nisplusLDAPTLSCertificateDBPate
+$ nisplusLDAPproxyUser $ nisplusLDAPproxyPassword $ nisplusLDAPinitialUpdateAction
+$ nisplusLDAPinitialUpdateOnly $ nisplusLDAPretrieveErrorAction
+$ nisplusLDAPretrieveErrorAttempts $ nisplusLDAPretrieveErrorTimeout
+$ nisplusLDAPstoreErrorAction $ nisplusLDAPstoreErrorAttempts
+$ nisplusLDAPstoreErrorTimeout $ nisplusLDAPrefreshErrorAction
+$ nisplusLDAPrefreshErrorAttempts $ nisplusLDAPrefreshErrorTimeout
+$ nisplusNumberOfServiceThreads $nisplusThreadCreationErrorAction
+$ nisplusThreadCreationErrorAttempts $ nisplusThreadCreationErrorTimeout
+$ nisplusDumpErrorAction $ nisplusDumpErrorAttempts
+$ nisplusDumpErrorTimeout $ nisplusResyncService $ nisplusUpdateBatching
+$ nisplusUpdateBatchingTimeout $ nisplusLDAPmatchFetchAction
+$ nisplusLDAPbaseDomain $ nisplusLDAPdatabaseIdMapping $ nisplusLDAPentryTtl 
+$ nisplusLDAPobjectDN $ nisplusLDAPcolumnFromAttribute !
+$ nisplusLDAPattributeFromColumn ) )</screen><para>Create a file containing the following LDIF data (substitute your actual
+search base for <replaceable>searchBase</replaceable>, and the fully qualified
+domain name for <replaceable>domain</replaceable>.)</para><para><filename>dn: cn=<replaceable>domain</replaceable>,<replaceable>searchBase</replaceable></filename></para><para><filename>cn: <replaceable>domain</replaceable></filename></para><para><filename>objectClass: top objectClass: nisplusLDAPconfig</filename></para><para>Use the above file as input to <olink targetdoc="group-refman" targetptr="ldapadd-1" remap="external"><citerefentry><refentrytitle>ldapadd</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to create the NIS+/LDAP configuration
+entry. Initially, the entry is empty. Use <olink targetdoc="group-refman" targetptr="ldapmodify-1" remap="external"><citerefentry><refentrytitle>ldapmodify</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> to add configuration attributes.
+For example, to set the <literal>nisplusNumberOfServiceThreads</literal> 
+attribute to &ldquo;32&rdquo;, create the following file (for input to <olink targetdoc="group-refman" targetptr="ldapmodify-1" remap="external"><citerefentry><refentrytitle>ldapmodify</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>).</para><screen><userinput>dn: cn=<replaceable>domain</replaceable>, <replaceable>searchBase</replaceable> nisplusNumberOfServiceThreads: 32</userinput></screen>
+</sect1>
+</chapter><?Pub *0000129147 0?>

@@ -1,0 +1,976 @@
+<chapter id="fscachefs-70682"><title>Using The CacheFS File System
+(Tasks)</title><highlights><para>This chapter describes how to set up and maintain <trademark>CacheFS</trademark> file
+systems.</para><para>This is a list of task maps in this chapter.</para><itemizedlist><listitem><para><olink targetptr="fscachefs-16" remap="internal">High-Level View of Using the
+CacheFS File System (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="fscachefs-80158" remap="internal">Creating and Mounting a
+CacheFS File System (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="fscachefs-23" remap="internal">Maintaining a CacheFS File
+System (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="fscachefs-15" remap="internal">Packing a Cached File System
+(Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="fscachefsref-26610" remap="internal">Collecting CacheFS Statistics
+(Task Map)</olink></para>
+</listitem>
+</itemizedlist><para>For information on troubleshooting CacheFS errors, see <olink targetptr="fscachefs-13" remap="internal">Troubleshooting cachefspack Errors</olink>.</para>
+</highlights><sect1 id="fscachefs-16"><title>High-Level View of Using the CacheFS File
+System (Task Map)</title><para>Use this task map to identify all the tasks for using CacheFS file systems.
+Each task points to a series of additional tasks such as creating and mounting
+CacheFS file systems, and packing and maintaining the cache.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="33*"/><colspec colname="colspec1" colwidth="33*"/><colspec colname="colspec2" colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>1. Create and mount a CacheFS file system.</para>
+</entry><entry><para>Create the cache and mount the file system in the cache.</para>
+</entry><entry><para><olink targetptr="fscachefs-80158" remap="internal">Creating and Mounting a CacheFS File
+System (Task Map)</olink></para>
+</entry>
+</row><row><entry><para>2. Maintain a CacheFS file system.</para>
+</entry><entry><para>Display and modify a CacheFS file system by unmounting, removing, or
+re-creating the cache.</para>
+</entry><entry><para><olink targetptr="fscachefs-23" remap="internal">Maintaining a CacheFS File System (Task
+Map)</olink></para>
+</entry>
+</row><row><entry><para>3. (Optional) Pack and unpack a CacheFS file system.</para>
+</entry><entry><para>Determine whether you want to pack the cache and use packing lists.
+Packing the cache ensures that certain files and directories are always updated
+in the cache.</para>
+</entry><entry><para><olink targetptr="fscachefs-15" remap="internal">Packing a Cached File System (Task Map)</olink></para>
+</entry>
+</row><row><entry><para>4. Collect CacheFS statistics.</para>
+</entry><entry><para>Determine cache performance and appropriate cache size.</para>
+</entry><entry><para><olink targetptr="fscachefsref-26610" remap="internal">Collecting CacheFS Statistics
+(Task Map)</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="fscachefs-14"><title>Overview of the CacheFS File System</title><para>The CacheFS file system is a general purpose caching mechanism that
+improves NFS server performance and scalability by reducing server and network
+load. Designed as a layered file system, the CacheFS file system provides
+the ability to cache one file system on another file system. In an NFS environment,
+the CacheFS file system increases the client per server ratio, reduces server
+and network loads, and improves performance for clients on slow links, such
+as Point-to-Point Protocol (PPP).</para><sect2 id="fscachefs-14634"><title>How a CacheFS File System Works</title><para>You create a CacheFS file system on a client system so that file systems
+you cache can be accessed by the client locally instead of across the network.
+The following figure shows the relationship of the components that are involved
+in using CacheFS file systems.</para><figure id="fscachefs-fig-1"><title id="fscachefs-18911">How a CacheFS File
+System Works</title><mediaobject><imageobject><imagedata entityref="fig2929.epsi"/>
+</imageobject><textobject><simpara>Graphic of CacheFS components. Identifies the relationship
+between the back file system from the server and the cached file system on
+the client.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The <emphasis>back</emphasis> file system is the file system that you
+specify to be mounted in the cache. A back file system can be either NFS or
+HSFS (High Sierra File System). When the user attempts to access files that
+are part of the back file system, those files are placed in the cache. The <emphasis>front</emphasis> file system is the file system that is mounted in the cache
+and is accessed from the local mount point. The front file system type must
+be UFS.</para><para>To the user, the initial request to access a file in a CacheFS
+file system might seem slow. However, subsequent uses of the same file are
+faster.</para>
+</sect2><sect2 id="fscachefsref-59635"><title>CacheFS File System Structure and Behavior</title><para>Each cache has a set of parameters
+that determines the cache structure and how it behaves. The parameters are
+set to the default values listed in the following table. The default values
+specify that the entire front file system is used for caching, which is the
+recommended method of caching file systems. </para><table frame="topbot" id="fscachefsref-51665"><title>CacheFS File System Parameters
+and Their Default Values</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="column1" colwidth="88*"/><colspec colname="column2" colwidth="88*"/><colspec colname="column3" colwidth="220*"/><thead><row rowsep="1"><entry><para>CacheFS File System Parameter</para>
+</entry><entry><para>Default Value</para>
+</entry><entry><para>Definition</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>maxblocks</literal></para>
+</entry><entry><para>90 %</para>
+</entry><entry><para>Sets the maximum number of blocks that a CacheFS file system is allowed
+to claim within the front file system.</para>
+</entry>
+</row><row><entry><para><literal>minblocks</literal></para>
+</entry><entry><para>0 %</para>
+</entry><entry><para>Sets the minimum number of blocks that a CacheFS file system is allowed
+to claim within the front file system.</para>
+</entry>
+</row><row><entry><para><literal>threshblocks</literal></para>
+</entry><entry><para>85 %</para>
+</entry><entry><para>Sets the number of blocks that must be available in the front file system
+before a CacheFS file system can claim more than the blocks specified by <literal>minblocks</literal>.</para>
+</entry>
+</row><row><entry><para><literal>maxfiles</literal></para>
+</entry><entry><para>90 %</para>
+</entry><entry><para>Sets the maximum number of available inodes (number of files) that a
+CacheFS file system is allowed to claim within the front file system.</para>
+</entry>
+</row><row><entry><para><literal>minfiles</literal></para>
+</entry><entry><para>0 %</para>
+</entry><entry><para>Sets the minimum number of available inodes that a CacheFS file system
+is allowed to claim within the front file system.</para>
+</entry>
+</row><row><entry><para><literal>threshfiles</literal></para>
+</entry><entry><para>85 %</para>
+</entry><entry><para>Sets the number of inodes that must be available in the front file system
+before a CacheFS file system can claim more files than is specified in <literal>minfiles</literal>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Typically, you should not change any of these parameter values. They
+are set to default values to achieve optimal cache behavior. However, you
+might want to modify the <literal>maxblocks</literal> and <literal>maxfiles</literal> values
+if you have some room in the front file system that is not used by the cache,
+and you want to use it for some other file system. You do so by using the <command>cfsadmin</command> command. For example: </para><screen>$ <userinput>cfsadmin -o maxblocks=60</userinput></screen>
+</sect2>
+</sect1><sect1 id="fscachefs-80158"><title>Creating and Mounting a CacheFS File System
+(Task Map)</title><para>Use the procedures in this task map to create and mount a CacheFS file
+system.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="33*"/><colspec colname="colspec1" colwidth="33*"/><colspec colname="colspec2" colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>1. Share the file system to be cached.</para>
+</entry><entry><para>Verify that the file system you want to cache is shared.</para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="share-1m" remap="external"><citerefentry><refentrytitle>share</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para>2. Create the cache.</para>
+</entry><entry><para>Use the <command>cfsadmin</command> command to create the cache.</para>
+</entry><entry><para><olink targetptr="fscachefs-15053" remap="internal">How to Create the Cache</olink></para>
+</entry>
+</row><row><entry><para>3. Mount a file system in the cache.</para>
+</entry><entry><para>Mount a file system in a cache by using one of the following methods:</para>
+</entry><entry><para></para>
+</entry>
+</row><row><entry rowsep="0"><para></para>
+</entry><entry rowsep="0"><para>Mount a CacheFS file system by using the <command>mount</command> command.</para>
+</entry><entry rowsep="0"><para><olink targetptr="fscachefs-77212" remap="internal">How to Mount a CacheFS File System
+(mount)</olink></para>
+</entry>
+</row><row><entry rowsep="0"><para></para>
+</entry><entry rowsep="0"><para>Mount a CacheFS file system by editing the <filename>/etc/vfstab</filename> file.</para>
+</entry><entry rowsep="0"><para><olink targetptr="fscachefs-23416" remap="internal">How to Mount a CacheFS File System
+(/etc/vfstab)</olink></para>
+</entry>
+</row><row><entry rowsep="0"><para></para>
+</entry><entry rowsep="0"><para>Mount a cached file system by using AutoFS.</para>
+</entry><entry rowsep="0"><para><olink targetptr="fscachefs-54948" remap="internal">How to Mount a CacheFS File System
+(AutoFS)</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><task id="fscachefs-15053"><title>How to Create the Cache</title><procedure><step id="fscachefs-step-3"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-4"><para>Create the cache. </para><screen># <userinput>cfsadmin -c</userinput> <replaceable>/cache-directory</replaceable></screen><para>where <replaceable>cache-directory</replaceable> indicates the name
+of the directory where the cache resides.</para><para>For more information,
+see <olink targetdoc="refman1m" targetptr="cfsadmin-1m" remap="external"><citerefentry><refentrytitle>cfsadmin</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><note><para>After you have created the cache, do not perform any operations
+within the cache directory itself. Doing so could cause conflicts within the
+CacheFS software.</para>
+</note>
+</step>
+</procedure><example id="fncqw"><title>Creating the Cache</title><para>The following example shows how to create a cache in the <filename>/local/mycache</filename> directory by using the default cache parameter values. </para><screen># <userinput>mkdir /local</userinput>
+# <userinput>cfsadmin -c /local/mycache</userinput></screen>
+</example>
+</task><sect2 id="fscachefs-11834"><title>Mounting a File System in the Cache</title><para>You specify a file system to be mounted in the cache so that users can
+locally access files in that file system. The files do not actually get placed
+in the cache until the user accesses the files.</para><para>The following table describes three ways to mount a CacheFS file system.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para>Mount Type for CacheFS File System</para>
+</entry><entry><para>Frequency of CacheFS Mount Type</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Using the <command>mount</command> command</para>
+</entry><entry><para>Every time the system reboots in order to access the same file system.</para>
+</entry>
+</row><row><entry><para>Editing the <filename>/etc/vfstab</filename> file</para>
+</entry><entry><para>Only once. The <filename>/etc/vfstab</filename> file remains unchanged
+after the system reboots.</para>
+</entry>
+</row><row><entry><para>Using AutoFS</para>
+</entry><entry><para>Only once. AutoFS maps remain unchanged after the system reboots. </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Choose the method of mounting file systems that best suits your environment.</para><para>You can mount only file systems that are shared. For information on
+sharing file systems, see <olink targetdoc="refman1m" targetptr="share-1m" remap="external"><citerefentry><refentrytitle>share</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><note><para>The caching of the root (<filename>/</filename>) and <filename>/usr</filename> file
+systems is not supported in a CacheFS file system.</para>
+</note>
+</sect2><task id="fscachefs-77212"><title>How to Mount a CacheFS File System (<command>mount</command>)</title><procedure><step id="fscachefs-step-8"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-9"><para>Create the mount point, if necessary.</para><screen># <userinput>mkdir</userinput> <replaceable>/mount-point</replaceable></screen><para>You can create the mount point from anywhere, but it must be a UFS file
+system. The CacheFS options used with the <command>mount</command> command,
+as shown in the next step, determine that the mount point you create is cached
+in the cache directory you specify.</para>
+</step><step id="fscachefs-step-10"><para>Mount a file system in the cache.</para><screen># <userinput>mount -F cachefs -o backfstype=</userinput><replaceable>fstype</replaceable><userinput>,cachedir=</userinput><replaceable>/cache-directory</replaceable>[<userinput>,</userinput><replaceable>options</replaceable>]
+<replaceable>/back-filesystem</replaceable> <replaceable>/mount-point</replaceable></screen><variablelist><varlistentry><term><replaceable>fstype</replaceable></term><listitem><para>Indicates the file system
+type of the back file system, which can be either <literal>NFS</literal> or <literal>HSFS</literal>.  </para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/cache-directory</replaceable></term><listitem><para>Indicates the name of the UFS directory where the cache resides.
+This name is the same name you specified when you created the cache in <olink targetptr="fscachefs-15053" remap="internal">How to Create the Cache</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>options</replaceable></term><listitem><para>Specifies other mount options that you can include when you
+mount a file system in a cache.  For a list of CacheFS mount options, see <olink targetdoc="refman1m" targetptr="mount-cachefs-1m" remap="external"><citerefentry><refentrytitle>mount_cachefs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/back-filesystem</replaceable></term><listitem><para>Specifies the mount point of the back file system to cache.
+If the back file system is an NFS file system, you must specify the host name
+of the server from which you are mounting the file system and the name of
+the file system to cache, separated by a colon. For example, <replaceable>merlin:
+/data/abc</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/mount-point</replaceable></term><listitem><para>Indicates the directory where the file system is mounted.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="fscachefs-step-12"><para>Verify that the cache you created was actually
+mounted.</para><screen># <userinput>cachefsstat</userinput> <replaceable>/mount-point</replaceable></screen><para>The <replaceable>/mount-point</replaceable> is the CacheFS file system
+that you created. </para><para>For example:</para><screen># <userinput>cachefsstat /docs</userinput>
+/docs
+	         cache hit rate:   100% (0 hits, 0 misses)
+	     consistency checks:      1 (1 pass, 0 fail)
+	               modifies:      0
+	     garbage collection:      0</screen><para>If the file system was not mounted in the cache, an error message similar
+to the following is displayed:</para><screen># <userinput>cachefsstat</userinput> <replaceable>/mount-point</replaceable>
+cachefsstat: <replaceable>mount-point</replaceable>: not a cachefs mountpoint</screen><para>For more information about the <command>cachefsstat</command> command,
+see <olink targetptr="fscachefsref-38278" remap="internal">Collecting CacheFS Statistics</olink>.</para>
+</step>
+</procedure><example id="fncrj"><title>Mounting a CacheFS File System (<command>mount</command>)</title><para>The following example shows how to mount the NFS file system <filename>merlin:/docs</filename> as a CacheFS file system named <filename>/docs</filename> in the
+cache named <filename>/local/mycache</filename>.</para><screen width="100"># <userinput>mkdir /docs</userinput>
+# <userinput>mount -F cachefs -o backfstype=nfs,cachedir=/local/mycache merlin:/docs /docs</userinput></screen><para>The following example shows how to make a Solaris 9 <trademark>SPARC</trademark> CD
+(HSFS file system) available as a CacheFS file system named <filename>/cfssrc</filename>.
+Because you cannot write to the CD, the <literal>ro</literal> argument is
+specified to make the CacheFS file system read-only. This example assumes
+that the removable media services are not running.</para><screen width="100"># <userinput>mount -F hsfs -o ro /dev/dsk/c0t6d0s0 /sol9</userinput>
+# <userinput>mount -F cachefs -o backfstype=hsfs,cachedir=/cfs/cache,ro,noconst,</userinput>
+<userinput>backpath=/sol9 /dev/dsk/c0t6d0s0 /cfssrc</userinput>
+# <userinput>ls /cfssrc</userinput>
+Copyright  Solaris_9</screen><para>The following example shows how to mount a Solaris 9 SPARC CD as a CacheFS
+file system with <command>vold</command> running.</para><screen width="100"># <userinput>mount -F cachefs -o backfstype=hsfs,cachedir=/cfs/cache,ro,noconst,</userinput>
+<userinput>backpath=/cdrom/sol_9_sparc/s0 /vol/dev/dsk/c0t2d0/sol_9_sparc/s0 /cfssrc</userinput></screen><para>The following example shows how to mount a CD as a CacheFS file system
+with <command>vold</command> running.</para><screen width="100"># <userinput>mount -F cachefs -o backfstype=hsfs,cachedir=/cfs/cache,ro,noconst,</userinput>
+<userinput>backpath=/cdrom/epson /vol/dev/dsk/c0t2d0/epson /drvrs</userinput></screen><para>The following example uses the <literal>demandconst</literal> option
+to specify consistency checking on demand for the NFS CacheFS file system <filename>/docs</filename>, whose back file system is <filename>merlin:/docs</filename>.
+For more information, see <olink targetptr="fscachefsref-65406" remap="internal">Consistency
+Checking of a CacheFS File System</olink>.</para><screen width="100"># <userinput>mount -F cachefs -o backfstype=nfs,cachedir=/local/mycache,demandconst merlin:/docs /docs</userinput></screen>
+</example>
+</task><task id="fscachefs-23416"><title>How to Mount a CacheFS File System (<filename>/etc/vfstab</filename>)</title><procedure><step id="fscachefs-step-14"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-15"><para>Using an editor, specify the file systems
+to be mounted in the <filename>/etc/vfstab</filename> file.</para><para>See
+the example that follows.</para><para>For more information on the <filename>/etc/vfstab</filename> file, see <olink targetptr="fsmount-81772" remap="internal">Field Descriptions
+for the /etc/vfstab File</olink>.</para>
+</step><step id="fscachefs-step-16"><para>Mount the CacheFS file system.</para><screen># <userinput>mount</userinput> <replaceable>/mount-point</replaceable></screen><para>Or, reboot the system.</para>
+</step>
+</procedure><example id="fncri"><title>Mounting a CacheFS File System (<filename>/etc/vfstab</filename>)</title><para>The following example shows the <filename>/etc/vfstab</filename> entry
+for the <filename>/data/abc</filename> directory from the remote system <literal>starbug</literal> that is mounted in the cached directory, <filename>/opt/cache</filename>.</para><screen width="100"> 
+#device           device             mount      FS     fsck  mount   mount
+#to mount         to fsck            point      type   pass  at boot options
+#
+starbug:/data/abc /local/abc         /opt/cache cachefs 7    yes     local-access,bg,
+nosuid,demandconst,backfstype=nfs,cachedir=/opt/cache</screen>
+</example>
+</task><task id="fscachefs-54948"><title>How to Mount a CacheFS File System (AutoFS)</title><tasksummary><para>You can mount a file system in a cache with AutoFS by specifying the <option>fstype=cachefs</option> mount option in your automount map. Note that the
+CacheFS mount options, for example, <literal>backfstype</literal> and <literal>cachedir</literal>, are also specified in the automount map.</para><para>For details on automount maps, see <olink targetdoc="sysadv4" targetptr="rfsadmin-127" remap="external"><citetitle remap="section">Task Overview for Autofs Administration</citetitle> in <citetitle remap="book">System Administration Guide: Network Services</citetitle></olink> or <olink targetdoc="refman1m" targetptr="automount-1m" remap="external"><citerefentry><refentrytitle>automount</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</tasksummary><procedure><step id="fscachefs-step-18"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-19"><para>Using an editor, add the following line
+to the <filename>auto_direct</filename> map:</para><screen>/<replaceable>mount-point</replaceable> -fstype=cachefs,cachedir=/<replaceable>directory</replaceable>,backfstype=nfs 
+<replaceable>server:/file-system</replaceable></screen>
+</step><step id="fscachefs-step-20"><para>Using an editor, add the following line
+to the <filename>auto_master</filename> map:</para><screen>/-</screen><para>The <literal>/-</literal> entry is a pointer to check the <filename>auto_direct</filename> map.</para>
+</step><step id="fscachefs-step-21"><para>Reboot the system.</para>
+</step><step id="fscachefs-step-13"><para>Verify that the entry was made correctly
+by changing to the file system you mounted in the cache, and then list the
+contents.</para><screen># <userinput>cd</userinput> <replaceable>/filesystem</replaceable>
+# <userinput>ls</userinput></screen>
+</step>
+</procedure><example id="fncrg"><title>Mounting a CacheFS File System (AutoFS)</title><para>The following <filename>auto_direct</filename> entry automatically mounts
+the CacheFS file system in the <filename>/docs</filename> directory.</para><screen>/docs -fstype=cachefs,cachedir=/local/mycache,backfstype=nfs merlin:/docs</screen>
+</example>
+</task>
+</sect1><sect1 id="fscachefs-23"><title>Maintaining a CacheFS File System (Task Map)</title><para>After a CacheFS file system is set up, it requires little maintenance.
+Use the optional procedures in this task map if you need to perform maintenance
+tasks on your CacheFS file systems.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec3" colwidth="33*"/><colspec colname="colspec4" colwidth="33*"/><colspec colname="colspec5" colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Modify a CacheFS file system.</para>
+</entry><entry><para>Modify CacheFS file system behavior by unmounting, deleting, or re-creating
+the cache.</para>
+</entry><entry><para><olink targetptr="fscachefs-76686" remap="internal">Modifying a CacheFS File System</olink></para>
+</entry>
+</row><row><entry><para>Display CacheFS file system information.</para>
+</entry><entry><para>Display information about CacheFS file systems by using the <command>cfsadmin</command> command.   </para>
+</entry><entry><para><olink targetptr="fscachefs-58683" remap="internal">How to Display Information About
+a CacheFS File System</olink></para>
+</entry>
+</row><row><entry><para>Perform  consistency checking.</para>
+</entry><entry><para>Perform consistency checking on demand by using the <command>cfsadmin</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-87412" remap="internal">How to Specify Cache Consistency
+Checking on Demand</olink></para>
+</entry>
+</row><row><entry><para>Delete a CacheFS file system.</para>
+</entry><entry><para>Delete a CacheFS file system by using the <command>umount</command> command
+and the <command>cfsadmin</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-10353" remap="internal">How to Delete a CacheFS File System</olink></para>
+</entry>
+</row><row><entry><para>Check the integrity of a CacheFS file system.</para>
+</entry><entry><para>Check the integrity of a CacheFS file system by using the <command>fsck_cachefs</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-17439" remap="internal">How to Check the Integrity of a CacheFS
+File System</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="fscachefs-24"><title>Maintaining a CacheFS File System</title><para>This section describes how to maintain a CacheFS file system.</para><para>If you are using the <filename>/etc/vfstab</filename> file to mount
+file systems, you modify the cache by editing the file system options in the <filename>/etc/vfstab</filename> file. If you are using AutoFS, you modify the cache
+by editing the file system options in the AutoFS maps.</para><sect2 id="fscachefs-76686"><title>Modifying a CacheFS File System</title><para>When you modify a file system in the cache, you need to delete the cache
+and then re-create it. You might also need to reboot your machine in single-user
+mode, depending on how your file systems are shared and accessed.</para><para>In the following example, the cache is deleted, re-created, and then
+mounted again by using <command>demandconst</command> option specified for
+the <filename>/docs</filename> file system.</para><screen># <userinput>shutdown -g30 -y</userinput>
+.
+.
+.
+Root password for system maintenance (control-d to bypass):
+single-user privilege assigned to /dev/console. 
+
+.
+.
+.
+<emphasis>Here is where you might be prompted to run fsck on the</emphasis>
+<emphasis>file system where the cache is located.</emphasis>
+
+# <userinput>fsck /local</userinput>
+# <userinput>mount /local</userinput>
+# <userinput>cfsadmin -d all /local/mycache</userinput>
+# <userinput>cfsadmin -c /local/mycache</userinput>
+# <userinput>init 6</userinput>
+.
+.
+.
+console login:
+password:
+# <userinput>mount -F cachefs -o backfstype=nfs,cachedir=/local/cache1,demandconst</userinput>
+<userinput>merlin:/docs /docs</userinput>
+#</screen>
+</sect2><task id="fscachefs-58683"><title>How to Display Information About a CacheFS
+File System</title><procedure><step id="fscachefs-step-28"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-29"><para>Display information about all file systems cached under a specified
+cache. </para><screen># <userinput>cfsadmin -l</userinput> <replaceable>/cache-directory</replaceable></screen><para>where <replaceable>/cache-directory</replaceable> is the name of the
+directory where the cache resides.</para>
+</step>
+</procedure><example id="fncre"><title>Displaying Information About CacheFS File Systems</title><para>The following example shows information about the <filename>/local/mycache</filename> cache
+directory. In this example, the <filename>/docs</filename> file system is
+cached in <filename>/local/mycache</filename>. The last line displays the
+name of the CacheFS file system.</para><screen># <userinput>cfsadmin -l /local/mycache</userinput>
+cfsadmin: list cache FS information
+   maxblocks     90%
+   minblocks      0%
+   threshblocks  85%
+   maxfiles      90%
+   minfiles       0%
+   threshfiles   85%
+   maxfilesize    3MB
+merlin:_docs:_docs
+#</screen>
+</example>
+</task><sect2 id="fscachefsref-65406"><title>Consistency Checking of a CacheFS File
+System</title><para>To ensure that the cached directories and files remain current, the
+CacheFS software periodically checks the consistency of files stored in the
+cache. To check consistency, the CacheFS software compares the current modification
+time to the previous modification time. If the modification times are different,
+all data and attributes for the directory or file are purged from the cache.
+Then, new data and attributes are retrieved from the back file system.</para><sect3 id="fscachefsref-41458"><title>Consistency Checking on Demand</title><para>Consistency checks can be performed only when you explicitly request
+checks for file systems that are mounted by using the <option>o demandconst</option> option.
+If you mount a file system in a cache with this option, then use the <command>cfsadmin</command> command with the <option>s</option> option to request a consistency
+check. By default, consistency checking is performed file by file as the files
+are accessed. If no files are accessed, no checks are performed. Using the <option>o demandconst</option> option avoids the situation where the network is flooded
+with consistency checks. </para><para>For more information, see <olink targetdoc="refman1m" targetptr="mount-cachefs-1m" remap="external"><citerefentry><refentrytitle>mount_cachefs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect3>
+</sect2><task id="fscachefs-87412"><title>How to Specify Cache Consistency Checking
+on Demand</title><procedure><step id="fscachefs-step-32"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-33"><para>Mount the file system in the cache and
+specify cache consistency checking.</para><screen># <userinput>mount -F cachefs -o backfstype=nfs,cachedir=</userinput><replaceable>/directory</replaceable><userinput>,demandconst</userinput>
+<replaceable>server:/file-system</replaceable> <replaceable>/mount-point</replaceable></screen>
+</step><step id="fscachefs-step-34"><para>Initiate consistency checking on a specific
+CacheFS file system.</para><screen># <userinput>cfsadmin -s</userinput> <replaceable>/mount-point</replaceable></screen>
+</step>
+</procedure>
+</task><task id="fscachefs-10353"><title>How to Delete a CacheFS File System</title><procedure><step id="fscachefs-step-37"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-38"><para>Unmount the CacheFS file system.</para><screen># <userinput>umount</userinput> <replaceable>/mount-point</replaceable></screen><para>where <replaceable>/mount-point</replaceable> specifies the CacheFS
+file system that you want to delete.</para>
+</step><step id="fscachefs-step-39"><para>Determine the name of the CacheFS file
+system (cache ID).</para><screen># <userinput>cfsadmin -l</userinput> <replaceable>/cache-directory</replaceable>
+cfsadmin: list cache FS information
+   maxblocks     90%
+   minblocks      0%
+   threshblocks  85%
+   maxfiles      90%
+   minfiles       0%
+   threshfiles   85%
+   maxfilesize    3MB
+<replaceable>cache-ID</replaceable>
+#</screen>
+</step><step id="fscachefs-step-40"><para>Delete the CacheFS file system
+from the specified cache.   </para><screen># <userinput>cfsadmin -d</userinput> <replaceable>cache-ID</replaceable> <replaceable>/cache-directory</replaceable></screen><variablelist><varlistentry><term><replaceable>cache-ID</replaceable></term><listitem><para>Indicates the name of the CacheFS file system, which is the
+last line of the <command>cfsadmin -l</command>  output.  For more information,
+see <olink targetptr="fscachefs-58683" remap="internal">How to Display Information About a
+CacheFS File System</olink>. You can delete all the CacheFS file systems in
+a particular cache by specifying <command>all</command> for <replaceable>cache-ID</replaceable>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/cache-directory</replaceable></term><listitem><para>Specifies the directory where the cache resides.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="fscachefs-step-41"><para>Verify that the CacheFS file system has
+been deleted.</para><para>The cache ID of the file system you just deleted
+should be missing from the <command>cfsadmin</command> <option>l</option> output.</para><screen># <userinput>cfsadmin -l</userinput> <replaceable>/cache-directory</replaceable>
+cfsadmin: list cache FS information
+   maxblocks     90%
+   minblocks      0%
+   threshblocks  85%
+   maxfiles      90%
+   minfiles       0%
+   threshfiles   85%
+   maxfilesize    3MB
+# </screen><para>For more information about the fields that are specified in the command
+output, refer to <olink targetdoc="refman1m" targetptr="cfsadmin-1m" remap="external"><citerefentry><refentrytitle>cfsadmin</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</step><step id="fscachefs-step-17"><para>Update the resource counts for the cache.</para><screen># <userinput>fsck -F cachefs</userinput> <replaceable>/cache-directory</replaceable></screen><para>For more information, see <olink targetptr="fscachefs-17439" remap="internal">How to
+Check the Integrity of a CacheFS File System</olink>.</para>
+</step>
+</procedure><example id="fncrc"><title>Deleting a CacheFS File System</title><para>The following example shows how to delete the file systems from the
+cache.</para><screen># <userinput>umount /cfssrc</userinput>
+# <userinput>cfsadmin -l /cfssrc</userinput>
+# <userinput>cfsadmin -d _dev_dsk_c0t6d0s0:_cfssrc</userinput>
+# <userinput>cfsadmin -l</userinput>
+# <userinput>fsck -F cachefs</userinput> <replaceable>/cache-directory</replaceable></screen>
+</example>
+</task><task id="fscachefs-17439"><title>How to Check the Integrity of a CacheFS
+File System</title><tasksummary><para>Use the <command>fsck</command> command to check the integrity of CacheFS
+file systems. The CacheFS version of the <command>fsck</command> command automatically
+corrects problems without requiring user interaction. You should not need
+to run the <command>fsck</command> command manually for CacheFS file systems
+because the <command>fsck</command> command is run automatically at boot time
+or when the file system is mounted. If you want to manually check the integrity,
+you can use the following procedure. </para><para>For more information, see <olink targetdoc="refman1m" targetptr="fsck-cachefs-1m" remap="external"><citerefentry><refentrytitle>fsck_cachefs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</tasksummary><procedure><step id="fscachefs-step-44"><para>Become superuser on the client system.</para>
+</step><step id="fscachefs-step-45"><para>Check the file systems in the specified
+cache.</para><screen># <userinput>fsck -F cachefs</userinput> [<userinput>-m -o noclean</userinput>] <replaceable>/cache-directory</replaceable></screen><variablelist><varlistentry><term><option>m</option></term><listitem><para>Causes the <command>fsck</command> command to check a CacheFS
+file system without making any repairs. </para>
+</listitem>
+</varlistentry><varlistentry><term><option>o noclean</option></term><listitem><para>Forces a check on the CacheFS file systems only. Does not
+make any repairs.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/cache-directory</replaceable></term><listitem><para>Indicates the name of the directory where the cache resides.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step>
+</procedure><example id="fncrh"><title>Checking the Integrity of CacheFS File Systems</title><para>The following example shows how to check the file systems cached
+in the <filename>/local/mycache</filename> cache.</para><screen># <userinput>fsck -F cachefs /local/mycache</userinput>
+#</screen>
+</example>
+</task>
+</sect1><sect1 id="fscachefs-15"><title>Packing a Cached File System (Task Map)</title><para>The following task map describes the procedures that are associated
+with packing a CacheFS file system. All of these procedures are optional.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec3" colwidth="33*"/><colspec colname="colspec4" colwidth="33*"/><colspec colname="colspec5" colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Pack files in the cache.</para>
+</entry><entry><para>Identify files and directories to be loaded in the cache and pack them.
+Packing ensures that current copies of these files are available in the cache.</para>
+</entry><entry><para><olink targetptr="fscachepack-80613" remap="internal">How to Pack Files in the Cache</olink></para>
+</entry>
+</row><row><entry><para>Create a packing list.</para>
+</entry><entry><para>Create a packing list if you do not want to specify each individual
+file that you want packed in the cache.</para>
+</entry><entry><para><olink targetptr="fscachepack-17738" remap="internal">How to Create a Packing List</olink></para>
+</entry>
+</row><row><entry><para>Pack files in the cache with a packing list.</para>
+</entry><entry><para>Specify the name of the packing list of the files to be packed in the
+cache.</para>
+</entry><entry><para><olink targetptr="fscachepack-5" remap="internal">How to Pack Files in the Cache With
+a Packing List</olink></para>
+</entry>
+</row><row><entry><para>Unpack files or packing lists from the cache.</para>
+</entry><entry><para>Remove a file from the cache that is no longer needed.</para>
+</entry><entry><para><olink targetptr="fscachepack-18" remap="internal">How to Unpack Files or Packing Lists
+From the Cache</olink><olink targetptr="fscachepack-18" remap="internal">How to Unpack Files
+or Packing Lists From the Cache</olink></para>
+</entry>
+</row><row><entry><para>Display packed files information.</para>
+</entry><entry><para>View information about the files that you've packed, including their
+packing status.</para>
+</entry><entry><para><olink targetptr="fscachepack-21" remap="internal">How to Display Packed Files Information</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="fscachepack-80612"><title>Packing a CacheFS File System</title><para>For general use, the CacheFS software operates automatically after it
+is set up, without requiring any action from the user. Files are cached on
+a most recently used basis. With the <emphasis>packing</emphasis> feature,
+you can take a more active role in managing your cache by ensuring that certain
+files or directories are always updated in the cache.</para><para>You can specify files and directories to be loaded in the cache
+by using the <command>cachefspack</command> command. This command ensures
+that current copies of these files are available in the cache.</para><para>The <emphasis>packing list</emphasis> contains the names of specific
+files and directories. The packing list can also contain other packing lists.
+This feature saves you from having to specify individual files and directories
+when you have many items to pack in your cache.</para><para>You can print out a brief help summary of all the <command>cachefspack</command> options
+by using the <option>h</option> option as follows:</para><screen>$ <userinput>cachefspack -h</userinput>
+Must select 1 and only 1 of the following 5 options
+-d Display selected filenames
+-i Display selected filenames packing status
+-p Pack selected filenames
+-u Unpack selected filenames
+-U Unpack all files in directory 'dir'
+-f Specify input file containing rules
+-h Print usage information
+-r Interpret strings in LIST rules as regular expressions
+-s Strip './' from the beginning of a pattern name
+-v Verbose option
+files - a list of filenames to be packed/unpacked</screen><task id="fscachepack-80613"><title>How to Pack Files in the Cache</title><procedure remap="single-step"><step><para>Pack files in the cache.</para><screen>$ <userinput>cachefspack -p</userinput> <replaceable>filename</replaceable></screen><variablelist><varlistentry><term><option>p</option></term><listitem><para>Specifies that you want the file or files to be packed. This
+option is also the default.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>filename</replaceable></term><listitem><para>Specifies the name of the file or directory you want packed
+in the cache. When you specify a directory, all of its subdirectories are
+also packed. For more information, see <olink targetdoc="refman1m" targetptr="cachefspack-1m" remap="external"><citerefentry><refentrytitle>cachefspack</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step>
+</procedure><example id="fscachepack-2"><title>Examples&mdash;Packing Files in the Cache</title><para>The following example shows the <filename>projects</filename> file being
+packed in the cache.</para><screen>$ <userinput>cachefspack -p projects</userinput></screen><para>The following example shows three files being packed in the cache.</para><screen>$ <userinput>cachefspack -p projects updates master_plan</userinput></screen><para>The following example shows a directory being packed in the cache. </para><screen>$ <userinput>cachefspack -p /data/abc/bin</userinput></screen>
+</example>
+</task><task id="fscachepack-21"><title>How to Display Packed Files Information</title><procedure remap="single-step"><step><para>Display packed files information.</para><screen>$ <userinput>cachefspack -i[v]</userinput> <replaceable>cached-filename-or-directory</replaceable></screen><variablelist><varlistentry><term><option>i</option></term><listitem><para>Specifies that you want to view information about your packed
+files.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>v</option></term><listitem><para>Is the verbose option.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>cached-filename-or-directory</replaceable></term><listitem><para>Specifies the name of the file or directory for which to display
+information.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step>
+</procedure><example id="fscachepack-22"><title>Displaying Packed Files Information</title><para>The following
+example shows that the <filename>doc_file</filename> file has been successfully
+packed.</para><screen>$ <userinput>cachefspack -i doc_file</userinput>
+cachefspack: file doc_file marked packed YES, packed YES</screen><para>In the following example, the  <filename>/data/abc</filename> directory
+contains the <filename>bin</filename> subdirectory. The <filename>bin</filename> subdirectory
+has three files: <filename>big</filename>, <filename>medium</filename>, and <filename>small</filename>. Although the <filename>big</filename> and <filename>small</filename> files
+are specified to be packed, they are not. The <filename>medium</filename> file
+is successfully packed.</para><screen>$ <userinput>cd /data/abc</userinput>
+$ <userinput>cachefspack -i bin</userinput>
+.
+.
+.
+cachefspack: file /bin/big marked packed YES, packed NO
+cachefspack: file /bin/medium marked packed YES,
+packed YES
+cachefspack: file /bin/small marked packed YES,
+packed NO
+.
+.
+.</screen><para>If you use the <option>iv</option> options together, you get additional
+information as to whether the file or directory specified has been flushed
+from the cache. For example: </para><screen>$ <userinput>cd /data/bin</userinput>
+FSCACHEPACK-4$ <userinput>cachefspack -iv bin</userinput>
+.
+.
+.
+cachefspack: file /bin/big marked packed YES, packed NO,
+nocache YES
+cachefspack: file /bin/medium marked packed YES,
+packed YES, nocache NO
+cachefspack: file /bin/small marked packed YES,
+packed NO
+nocache NO
+.
+.
+.</screen><para>The last line of this example shows that the directory contents have
+not been flushed from the cache.</para>
+</example>
+</task><sect2 id="fscachepack-3"><title>Using Packing Lists</title><para>One feature of the <command>cachefspack</command> command is the ability
+to create packing lists.</para><para>A <emphasis>packing list</emphasis> contains files or directories to
+be packed in the cache. If a directory is in the packing list, all of its
+subdirectories and files will also be packed.</para><para>This feature saves the time of having to specify each individual file
+that you want packed in the cache.</para>
+</sect2><task id="fscachepack-17738"><title>How to Create a Packing List</title><procedure remap="single-step"><step><para>Create a packing list file by using <command>vi</command>.</para><para>The packing list file format uses the same format as the <command>filesync</command> command.
+ For more information, see <olink targetdoc="refman1" targetptr="filesync-1" remap="external"><citerefentry><refentrytitle>filesync</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para><para>Two
+packing list features are the following:</para><itemizedlist><listitem><para>You can identify files in the packing list as regular expressions
+rather than literal file names so that you don't have to specify each individual
+file name.</para>
+</listitem><listitem><para>You can pack files from a shared directory by ensuring that
+you pack only those files that you own.</para>
+</listitem>
+</itemizedlist><para>For more information on using these features, see <olink targetdoc="refman1m" targetptr="cachefspack-1m" remap="external"><citerefentry><refentrytitle>cachefspack</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</step>
+</procedure><example id="fscachepack-4"><title>Creating a Packing List</title><para>The following example shows the contents of a packing list file. </para><screen>BASE /home/ignatz
+LIST plans
+LIST docs
+IGNORE *.ps</screen><itemizedlist><listitem><para>The path identified with the <literal>BASE</literal> statement
+is the directory where you have items you want to pack. </para>
+</listitem><listitem><para>The two <literal>LIST</literal> statements identify specific
+files within that directory to pack.</para>
+</listitem><listitem><para>The <literal>IGNORE</literal> statement identifies the file
+type of <filename>.ps</filename>, which you do not want to pack.</para>
+</listitem>
+</itemizedlist>
+</example>
+</task><task id="fscachepack-5"><title>How to Pack Files in the Cache With a Packing
+List</title><procedure remap="single-step"><step><para>Pack files in the packing list.</para><screen>$ <userinput>cachefspack -f</userinput> <replaceable>packing-list</replaceable></screen><variablelist><varlistentry><term><option>f</option></term><listitem><para>Specifies that you want to use a packing list.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>packing-list</replaceable></term><listitem><para>Specifies the name of the packing list.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step>
+</procedure><example id="fscachepack-6"><title>Packing Files in the Cache With a Packing List</title><para>This example uses the <filename>list.pkg</filename> file as the packing
+list for the <command>cachefspack</command> command.</para><screen>$ <userinput>cachefspack -f list.pkg</userinput></screen>
+</example>
+</task><sect2 id="fscachepack-94287"><title>Unpacking Files or Packing Lists From
+the Cache</title><para>You might need to remove, or <emphasis>unpack</emphasis>, a file from
+the cache. Perhaps you have some files or directories that have a higher priority
+than others, so you need to unpack the less critical files. For example, you
+finished up a project and have archived the files that are associated with
+that project. You are now working on a new project, and therefore, a new set
+of files.</para>
+</sect2><task id="fscachepack-18"><title>How to Unpack Files or Packing Lists From
+the Cache</title><procedure remap="single-step"><step><para>Unpack files or packing lists from the cache.</para><screen>$ <userinput>cachefspack -u</userinput> <replaceable>filename</replaceable> | <userinput>-U</userinput> <replaceable>cache-directory</replaceable></screen><variablelist><varlistentry><term><option>u</option></term><listitem><para>Specifies that you want the file or files unpacked. You must
+specify a file name with this option.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>filename</replaceable></term><listitem><para>Specifies the name of the file or packing list that you want
+unpacked in the cache. </para>
+</listitem>
+</varlistentry><varlistentry><term><option>U</option></term><listitem><para>Specifies that you want to unpack all files in the cache.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For more information, see <olink targetdoc="refman1m" targetptr="cachefspack-1m" remap="external"><citerefentry><refentrytitle>cachefspack</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</step>
+</procedure><example id="fscachepack-19"><title>Unpacking Files or Packing Lists From the Cache</title><para>The following example shows the file <filename>/data/abc/bin/big</filename> being
+unpacked from the cache.</para><screen>$ <userinput>cachefspack -u /data/abc/bin/big</userinput></screen><para>The following example shows three files being unpacked from the cache.</para><screen>$ <userinput>cd /data/abc/bin/big</userinput>
+$ <userinput>cachefspack -u big small medium</userinput></screen><para>The following example shows how to unpack a packing list. A packing
+list is a file that contains the path to a directory of files:</para><screen>$ <userinput>cachefspack -uf list.pkg</userinput></screen><para>The following example uses the <command>-U</command> option to specify
+that all files in a cache directory being unpacked.</para><screen>$ <userinput>cachefspack -U /local/mycache</userinput></screen><para>You cannot unpack a cache that does not have at least one file system
+mounted. With the <option>U</option> option, if you specify a cache that does
+not contain mounted file systems, output similar to the following is displayed:</para><screen>$ <userinput>cachefspack -U /local/mycache</userinput>
+cachefspack: Could not unpack cache /local/mycache, no mounted
+filesystems in the cache.</screen>
+</example>
+</task><sect2 id="fscachefs-13"><title>Troubleshooting <command>cachefspack</command> Errors</title><para>You might see the following error messages when you use the <command>cachefspack</command> command.</para><screen>cachefspack: <replaceable>pathname</replaceable> - can't open directory: permission denied</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have the correct permissions to access the file
+or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Set the correct permissions.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>pathname</replaceable> - can't open directory: no such file or
+directory</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have specified the correct file or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check for a possible typo.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>pathname</replaceable> - can't open directory: stale NFS file handle</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>The file or directory might have been moved or deleted from
+the server at the time you attempted to access it.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Verify that the file or directory on the server is still accessible.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>pathname</replaceable> - can't open directory: interrupted system
+call</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have inadvertently pressed Control-C while issuing
+the command.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Reissue the command.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>pathname</replaceable> - can't open directory: I/O error</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have a hardware problem.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check your hardware connections.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: error opening dir</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have specified the correct file or directory.
+The path identified after the <command>BASE</command> command in the file
+format could be a file and not a directory. The path specified must be a directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check for a possible typo. Check the path identified after
+the <command>BASE</command> command in your file format. Ensure that the path
+identifies a directory, not a file.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: unable to get shared objects</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>The executable might be corrupt or in a format that is not
+recognizable.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Replace the executable.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable> - can't pack file: permission denied</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have the correct permissions to access the file
+or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Set the correct permissions.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable> - can't pack file: no such file or directory</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have specified the correct file or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check for a possible typo.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't pack file: stale NFS file handle</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>The file or directory might have been moved or deleted from
+the server at the time you attempted to access it.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Verify that the file or directory on the server is still accessible.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't pack file: interrupted system call</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have inadvertently pressed Control-C while issuing
+the command.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Reissue the command.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't pack file: I/O error</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have a hardware problem.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check your hardware connections.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't pack file: no space left on device.</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>The cache is out of disk space.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>You need to increase the size of the cache by increasing disk
+space.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable> - can't unpack file: permission denied</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have the correct permissions to access the file
+or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Set the correct permissions.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable> - can't unpack file: no such file or directory</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might not have specified the correct file or directory.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check for a possible typo.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't unpack file: stale NFS file handle</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>The file or directory might have been moved or deleted from
+the server at the time you attempted to access it.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Verify that the file or directory on the server is still accessible.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't unpack file: interrupted system call</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have inadvertently pressed Control-C while issuing
+the command.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Reissue the command.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: <replaceable>filename</replaceable>- can't unpack file I/O error</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You might have a hardware problem.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Check your hardware connections.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: only one `d', `i', `p', or `u' option allowed</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You specified more than one of these options in a command
+session.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Select one option for the command session.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: can't find environment variable.</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>You forgot to set a corresponding environment variable to
+match the <literal>$</literal> in your configuration file.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Define the environment variable in the proper location.</para>
+</listitem>
+</varlistentry>
+</variablelist><screen>cachefspack: skipping LIST command - no active base</screen><variablelist termlength="wholeline"><varlistentry><term>Cause</term><listitem><para>A <command>LIST</command> command is present in your configuration
+file but has no corresponding <command>BASE</command> command.</para>
+</listitem>
+</varlistentry><varlistentry><term>Action</term><listitem><para>Define the <command>BASE</command> command.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="fscachefsref-26610"><title>Collecting CacheFS Statistics (Task
+Map)</title><para>The following task map shows the steps involved in collecting CacheFS
+statistics. All these procedures are optional.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="33*"/><colspec colname="colspec1" colwidth="33*"/><colspec colname="colspec2" colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Set up logging.</para>
+</entry><entry><para>Set up logging on a CacheFS file system by using the <command>cachefslog</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-5" remap="internal">How to Set Up CacheFS Logging</olink></para>
+</entry>
+</row><row><entry><para>Locate the log file.</para>
+</entry><entry><para>Locate the log file by using the <command>cachefslog</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-8" remap="internal">How to Locate the CacheFS Log File</olink></para>
+</entry>
+</row><row><entry><para>Stop logging.</para>
+</entry><entry><para>Stop logging by using the <command>cachefslog</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefs-10" remap="internal">How to Stop CacheFS Logging</olink></para>
+</entry>
+</row><row><entry><para>View the cache size.</para>
+</entry><entry><para>View the cache size by using the <command>cachefswssize</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefsref-71516" remap="internal">How to View the Working Set (Cache)
+Size</olink></para>
+</entry>
+</row><row><entry><para>View the cache statistics.</para>
+</entry><entry><para>View the statistics by using the <command>cachefsstat</command> command. </para>
+</entry><entry><para><olink targetptr="fscachefsref-35885" remap="internal">How to View CacheFS Statistics</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="fscachefsref-38278"><title>Collecting CacheFS Statistics</title><para>Collecting CacheFS statistics enables you to do the following:</para><itemizedlist><listitem><para>Determine an appropriate cache size.</para>
+</listitem><listitem><para>Observe the performance of the cache.</para>
+</listitem>
+</itemizedlist><para>These
+statistics help you determine the trade-off between your cache size and the
+desired performance of the cache.</para><para>The following table describes the CacheFS statistics commands.</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec3" colwidth="22.87*"/><colspec colname="colspec10" colwidth="40.57*"/><colspec colname="colspec4" colwidth="35.56*"/><thead><row rowsep="1"><entry><para>Command</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Man Page</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><command>cachefslog</command></para>
+</entry><entry><para>Specifies the location of the log file. This command also displays where
+the statistics are currently being logged, and enables you to stop logging. </para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="cachefslog-1m" remap="external"><citerefentry><refentrytitle>cachefslog</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>cachefswssize</command></para>
+</entry><entry><para>Interprets the log file to give a recommended cache size. </para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="cachefswssize-1m" remap="external"><citerefentry><refentrytitle>cachefswssize</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>cachefsstat</command></para>
+</entry><entry><para>Displays statistical information about a specific CacheFS file system
+or all CacheFS file systems. The information provided in the command output
+is taken directly from the cache. </para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="cachefsstat-1m" remap="external"><citerefentry><refentrytitle>cachefsstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><note><para>You can issue the CacheFS statistics commands from any directory.
+You must be superuser to issue the <command>cachefswssize</command> command.</para>
+</note><para>The CacheFS statistics begin accumulating when you create the log file.
+When the work session is over, stop the logging by using the <command>cachefslog</command> <option>h</option> command, as described in <olink targetptr="fscachefs-10" remap="internal">How to
+Stop CacheFS Logging</olink>.</para><para>Before using the CacheFS statistics commands, you must do the following:</para><itemizedlist><listitem><para>Set up your cache by using the <command>cfsadmin</command> command.</para>
+</listitem><listitem><para>Decide on an appropriate length of time to allow statistical
+information to collect in the log file you create. The length of time should
+equal a typical work session. For example, a day, a week, or a month.</para>
+</listitem><listitem><para>Select a location or path for the log file. Ensure that sufficient
+space to allows for the growth of the log file. The longer you intend to allow
+statistical information to collect in the log file, the more space you need.</para>
+</listitem>
+</itemizedlist><note><para>The following procedures are presented in a recommended order.
+This order is not required.</para>
+</note><task id="fscachefs-5"><title>How to Set Up CacheFS Logging</title><procedure><step id="fscachefs-step-22"><para>Set
+up logging.</para><screen>$ <userinput>cachefslog -f</userinput> <replaceable>log-file-path /mount-point</replaceable></screen><variablelist><varlistentry><term><option>f</option></term><listitem><para>Sets up logging.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>log-file-path</replaceable></term><listitem><para>Specifies the location of the log file. The log file is a
+standard file you create with an editor, such as vi.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>/mount-point</replaceable></term><listitem><para>Designates the mount point (CacheFS file system) for which
+statistics are being collected. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</step><step id="fscachefs-step-6"><para>Verify that you correctly set up the log
+file.</para><screen>$ <userinput>cachefslog</userinput> <replaceable>/mount-point</replaceable></screen>
+</step>
+</procedure><example id="fncrf"><title>Setting Up CacheFS Logging</title><para>The following example shows how to set up the <filename>/var/tmp/samlog</filename> log
+file to collect statistics about the <filename>/home/sam</filename> directory.</para><screen>$ <userinput>cachefslog -f /var/tmp/samlog /home/sam</userinput>
+  /var/tmp/samlog: /home/sam</screen>
+</example>
+</task><task id="fscachefs-8"><title>How to Locate the CacheFS Log File</title><procedure remap="single-step"><step><para>Display where CacheFS statistics are being logged.</para><screen>$ <userinput>cachefslog</userinput> <replaceable>/mount-point</replaceable></screen><para>where <replaceable>/mount-point</replaceable> specifies the CacheFS
+file system for which you want to view the statistics.</para><para>You can also use the <command>cachefslog</command> command with
+no options to locate a log file for a particular mount point.</para>
+</step>
+</procedure><example id="fapeq"><title>Locating the CacheFS Log File</title><para>The following example shows what you would see if a log file has been
+set up. The location of the log file is <filename>/var/tmp/stufflog</filename>. </para><screen>$ <userinput>cachefslog /home/stuff</userinput>
+	 /var/tmp/stufflog: /home/stuff</screen><para>The following example shows that no log file has been set up for the
+specified file system.</para><screen>$ <userinput>cachefslog /home/zap</userinput>
+	not logged: /home/zap </screen>
+</example>
+</task><sect2 id="fscachefs-10"><title>How to Stop CacheFS Logging</title><para>Use the <command>cachefslog</command> <option>h</option> option to stop logging.</para><screen>$ <userinput>cachefslog -h</userinput> <replaceable>/mount-point</replaceable></screen><para>The following example shows how to stop logging on <filename>/home/stuff</filename>. </para><screen>$ <userinput>cachefslog -h /home/stuff</userinput>
+not logged: /home/stuff</screen><para>If you get a system response other than the response specified here,
+you did not successfully stop logging. Determine if you are using the correct
+log file name and mount point. </para>
+</sect2><task id="fscachefsref-71516"><title>How to View the Working Set (Cache) Size</title><tasksummary><para>You might want to check if you need to increase the size of the cache.
+ Or, you might want to determine the ideal cache size based on your activity
+since you last used the <command>cachefslog</command> command for a particular
+mount point. </para>
+</tasksummary><procedure><step id="fscachefsref-step-9"><para>Become superuser on the client system.</para>
+</step><step id="fscachefsref-step-10"><para>View the current cache size and highest
+logged cache size.</para><screen># <userinput>cachefswssize</userinput> <replaceable>log-file-path</replaceable></screen><para>For more information, see <olink targetdoc="refman1m" targetptr="cachefswssize-1m" remap="external"><citerefentry><refentrytitle>cachefswssize</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</step>
+</procedure><example id="fncrd"><title>Viewing the Working Set (Cache) Size</title><para>In the following example, the <literal>end size</literal> is the size
+of the cache at the time you issued the <command>cachefswssize</command> command.
+The <literal>high water size</literal> is the largest size of the cache during
+the timeframe in which logging occurred. </para><screen># <userinput>cachefswssize /var/tmp/samlog</userinput>
+ 
+    /home/sam
+	       end size:  10688k
+	high water size:  10704k
+ 
+    /
+	       end size:   1736k
+	high water size:   1736k
+ 
+    /opt
+	       end size:    128k
+	high water size:    128k
+ 
+    /nfs/saturn.dist
+	       end size:   1472k
+	high water size:   1472k
+ 
+    /data/abc
+	       end size:   7168k
+	high water size:   7168k
+ 
+    /nfs/venus.svr4
+	       end size:   4688k
+	high water size:   5000k
+ 
+    /data
+	       end size:   4992k
+	high water size:   4992k
+ 
+    total for cache
+	   initial size: 110960k
+	       end size:  30872k
+	high water size:  30872k</screen>
+</example>
+</task><sect2 id="fscachefsref-29413"><title>Viewing CacheFS Statistics</title><para>The following table explains the terminology that is displayed in the
+statistics output for CacheFS file systems.</para><table frame="topbot" id="fscachefsref-tbl-12"><title>CacheFS Statistics Terminology</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="88*"/><colspec colname="column2" colwidth="308*"/><thead><row rowsep="1"><entry><para>Output Term</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>cache hit rate</literal></para>
+</entry><entry><para>The rate of cache hits compared to cache misses, followed
+by the actual number of hits and misses. A <emphasis>cache hit</emphasis> occurs
+when the user wants to perform an operation on a file or files, and the file
+or files are actually in the cache. A <emphasis>cache miss</emphasis> occurs
+when the file is not in the cache. The load on the server is the sum of cache
+misses, consistency checks, and modifications (modifies).</para>
+</entry>
+</row><row><entry><para><literal>consistency checks</literal></para>
+</entry><entry><para>The number of consistency checks performed, followed by the number that
+passed, and the number that failed.</para>
+</entry>
+</row><row><entry><para><literal>modifies</literal></para>
+</entry><entry><para>The number of modify operations. For example, writes or creates.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><task id="fscachefsref-35885"><title>How to View CacheFS Statistics</title><tasksummary><para>View the statistics with
+the <command>cachefsstat</command> command. You can view the statistics at
+any time. For example, you do not have to set up logging in order to view
+the statistics.</para>
+</tasksummary><procedure remap="single-step"><step><para>View CacheFS statistics.</para><screen>$ <userinput>cachefsstat</userinput> <replaceable>/mount-point</replaceable></screen><para>where <replaceable>/mount-point</replaceable> specifies the CacheFS
+file system for which you want to view the statistics.</para><para>If you
+do not specify the mount point, statistics for all mounted CacheFS file systems
+will be displayed.</para>
+</step>
+</procedure><example id="fapfu"><title>Viewing CacheFS Statistics</title><para>This example shows how to view statistics on the cached file system, <filename>/home/sam</filename>.</para><screen>$ <userinput>cachefsstat /home/sam</userinput>
+	    cache hit rate: 73% (1234 hits, 450 misses)
+	consistency checks: 700 (650 pass, 50 fail)
+	          modifies: 321
+garbage collection:  0</screen>
+</example>
+</task>
+</sect1>
+</chapter>

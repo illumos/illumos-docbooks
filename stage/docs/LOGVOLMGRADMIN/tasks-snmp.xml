@@ -1,0 +1,206 @@
+<chapter id="tasks-snmp-1"><title>Monitoring and Error Reporting (Tasks)</title><highlights><para>Sometimes Solaris Volume Manager encounters a problem, such as being unable to write
+to a volume due to physical errors at the slice level. When problems occur, Solaris Volume Manager changes
+the status of the volume so that system administrators can stay informed. However,
+unless you regularly check the status in the Solaris Volume Manager GUI through the Solaris
+Management Console, or by running the <command>metastat</command> command, you might
+not see these status changes promptly.</para><para>This chapter provides information about various monitoring tools that are available
+for Solaris Volume Manager One tool is the Solaris Volume Manager SNMP agent, which is a subagent
+of the <trademark>Solstice Enterprise Agents</trademark> monitoring software. In addition
+to configuring the this tool to report SNMP traps, you can create a shell script to
+actively monitor many Solaris Volume Manager functions. This shell script could run as a <command>cron</command> job and be valuable in identifying issues before they become problems.</para><para>This is a list of the information in this chapter:</para><itemizedlist><listitem><para><olink targetptr="tscrashdumps-26694" remap="internal">Solaris Volume Manager Monitoring
+and Reporting (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-snmp-10" remap="internal">Configuring the mdmonitord Command
+for Periodic Error Checking</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-snmp-7" remap="internal">Solaris Volume Manager SNMP Agents
+Overview</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-snmp-8" remap="internal">Configuring the Solaris Volume Manager
+SNMP Agents</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-snmp-9" remap="internal">Limitations of the Solaris Volume
+Manager SNMP Agent</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-basics-3" remap="internal">Monitoring Solaris Volume Manager
+With a cron Job</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="tscrashdumps-26694"><title>Solaris Volume Manager Monitoring and Reporting (Task
+Map)</title><para>The following task map identifies the procedures that are needed to manage error
+reporting for Solaris Volume Manager.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="110.00*"/><colspec colname="colspec1" colwidth="167.00*"/><colspec colname="colspec2" colwidth="119.00*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Configure the <command>mdmonitord</command> daemon to periodically check for
+errors</para>
+</entry><entry><para>Configure the error-checking interval used by the <command>mdmonitord</command> daemon
+by editing the <filename>/lib/svc/method/svc-mdmonitor</filename> script.</para>
+</entry><entry><para><olink targetptr="tasks-snmp-10" remap="internal">Configuring the mdmonitord Command for Periodic
+Error Checking</olink></para>
+</entry>
+</row><row><entry><para>Configure the Solaris Volume Manager SNMP agent</para>
+</entry><entry><para>Edit the configuration files in the  <filename>/etc/snmp/conf</filename> directory
+so that Solaris Volume Manager will throw traps appropriately, to the correct system.</para>
+</entry><entry><para><olink targetptr="tasks-snmp-8" remap="internal">Configuring the Solaris Volume Manager SNMP
+Agents</olink></para>
+</entry>
+</row><row><entry><para>Monitor Solaris Volume Manager with scripts run by the <command>cron</command> command</para>
+</entry><entry><para>Create or adapt a script to check for errors, then run the script from the <command>cron</command> command. </para>
+</entry><entry><para><olink targetptr="tasks-basics-3" remap="internal">Monitoring Solaris Volume Manager With a cron
+Job</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="tasks-snmp-10"><title>Configuring the <command>mdmonitord</command> Command
+for Periodic Error Checking</title><para>Solaris Volume Manager includes the <command>/usr/sbin/mdmonitord</command> daemon.
+When a disk fails, Solaris Volume Manager detects the failure and generates an error. This
+error event triggers the <filename>mdmonitord</filename> daemon to perform a check
+of RAID-1 (mirror) volumes, RAID-5 volumes, and hot spares. However, you can also
+configure this program to actively check for errors at an interval that you specify.</para><task id="tasks-snmp-proc-11"><title>How to Configure the <command>mdmonitord</command> Command
+for Periodic Error Checking</title><tasksummary><para>Edit the <filename>/lib/svc/method/svc-mdmonitor</filename> script to add a
+time interval for periodic checking.</para>
+</tasksummary><procedure><step id="tasks-snmp-step-14"><para>Become superuser.</para>
+</step><step><para>Open the <filename>/lib/svc/method/svc-mdmonitor</filename> script in
+the editor of your choice. Locate the following section in the script:</para><screen>$MDMONITORD
+error=$?
+case $error in
+0)      exit 0
+        ;;
+
+*)      echo "Could not start $MDMONITORD. Error $error."
+        exit 0</screen>
+</step><step id="tasks-snmp-step-12"><para>Change the line that starts the <command>mdmonitord</command> command by adding a <command>-t</command> flag and the number of seconds
+between checks.</para><screen></screen><screen>$MDMONITORD -t 3600
+error=$?
+case $error in
+0)      exit 0
+        ;;
+
+*)      echo "Could not start $MDMONITORD. Error $error."
+        exit 0
+        ;;
+esac</screen>
+</step><step id="tasks-snmp-step-13"><para>Restart the <command>mdmonitord</command> command
+to activate your changes.</para><screen># <userinput>svcadm restart system/mdmonitor</userinput></screen><para>For more information, see the <olink targetdoc="refman1m" targetptr="mdmonitord-1m" remap="external"><citerefentry><refentrytitle>mdmonitord</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="tasks-snmp-7"><title>Solaris Volume Manager SNMP Agents Overview</title><para>The Solaris Volume Manager SNMP trap agents requires the core packages <filename>SUNWlvmr</filename>, and the packages for the <filename>SUNWlvma</filename> and the Solstice
+Enterprise Agents. These core packages include the following: </para><itemizedlist><listitem><para><filename>SUNWmibii</filename></para>
+</listitem><listitem><para><filename>SUNWsacom</filename></para>
+</listitem><listitem><para><filename>SUNWsadmi</filename></para>
+</listitem><listitem><para><filename>SUNWsasnm</filename></para>
+</listitem>
+</itemizedlist><para>These packages are part of the Solaris operating system. They are normally installed
+by default unless the package selection was modified at install time or a minimal
+set of packages was installed. To confirm that these packages are available, use the <command>pkginfo <replaceable>pkgname</replaceable></command> command, as in <command>pkginfo
+SUNWsasnm</command>. After you confirm that all five packages are available, you need
+to configure the Solaris Volume Manager SNMP agent, as described in the following section.</para>
+</sect1><sect1 id="tasks-snmp-8"><title>Configuring the Solaris Volume Manager SNMP Agents</title><para>The Solaris Volume Manager SNMP agents is not enabled by default. Use the following
+procedure to enable SNMP traps. </para><para>Whenever you upgrade your Solaris operating system, you will probably need to
+edit the<filename>/etc/snmp/conf/enterprises.oid</filename> file and append the line
+in <olink targetptr="tasks-snmp-step-5" remap="internal">Step&nbsp;6</olink> again, then restart the
+Solaris Enterprise Agents server.</para><para>After you have completed this procedure, your system will issue SNMP traps to
+the host or hosts that you specified. You will need to use an appropriate SNMP monitor,
+such as Solstice Enterprise Agents software, to view the traps as they are issued. </para><para>Set the <command>mdmonitord</command> command to probe your system regularly
+to help ensure that you receive traps if problems arise. See <olink targetptr="tasks-snmp-10" remap="internal">Configuring the mdmonitord Command for Periodic Error Checking</olink>. Also, refer
+to <olink targetptr="tasks-basics-3" remap="internal">Monitoring Solaris Volume Manager With a cron
+Job</olink> for additional error-checking options.</para><task id="tasks-snmp-proc-1"><title>How to Configure the Solaris Volume Manager SNMP Agents</title><procedure><step id="tasks-snmp-step-15"><para>Become superuser.</para>
+</step><step id="tasks-snmp-step-2"><para>Move the <filename>/etc/snmp/conf/mdlogd.rsrc&ndash;</filename> configuration file to <filename>/etc/snmp/conf/mdlogd.rsrc</filename>.</para><screen># <userinput>mv /etc/snmp/conf/mdlogd.rsrc- /etc/snmp/conf/mdlogd.rsrc</userinput></screen>
+</step><step id="tasks-snmp-step-16"><para>Edit the <filename>/etc/snmp/conf/mdlogd.acl</filename> file
+to specify which hosts should receive SNMP traps.  Look in the file for the following:</para><screen>        trap = {
+             {
+                trap-community = SNMP-trap
+                hosts = corsair
+                {
+                    enterprise = "Solaris Volume Manager"
+                    trap-num = 1, 2, 3
+                }</screen><para>Change the line that contains <literal>hosts = corsair</literal> to specify
+the host name that you want to receive Solaris Volume Manager SNMP traps. For example, to
+send SNMP traps to <literal>lexicon</literal>, you would change the line to <literal>hosts = lexicon</literal>. If you want to include multiple hosts, provide a comma-delimited
+list of host names, as in <literal>hosts = lexicon, idiom</literal>. </para>
+</step><step id="tasks-snmp-step-3"><para>Also edit the <filename>/etc/snmp/conf/snmpdx.acl</filename> file to specify which hosts should receive the SNMP traps.  </para><para>Find the block that begins with <command>trap =</command> and add the same list of
+hosts that you added in the previous step.  This section might be commented out with
+#'s. If so, you must remove the # at the beginning of the required lines in this section.
+Additional lines in the trap section are also commented out. However, you can leave
+those lines alone or delete them for clarity. After uncommenting the required lines
+and updating the hosts line, this section could look similar to the following:</para><screen>###################
+# trap parameters #
+###################
+
+trap = {
+  {
+        trap-community = SNMP-trap
+        hosts =lexicon
+        {
+          enterprise = "sun"
+          trap-num = 0, 1, 2-5, 6-16
+        }
+#       {
+#         enterprise = "3Com"
+#         trap-num = 4
+#       }
+#       {
+#         enterprise = "snmp"
+#         trap-num = 0, 2, 5
+#       }
+#  }
+#  {
+#       trap-community = jerry-trap
+#       hosts = jerry, nanak, hubble
+#       {
+#         enterprise = "sun"
+#         trap-num = 1, 3
+#       }
+#       {
+#         enterprise = "snmp"
+#         trap-num = 1-3
+#       }
+  }
+}</screen><note><para>Make sure that you have the same number of opening and closing brackets
+in the <filename>/etc/snmp/conf/snmpdx.acl</filename> file.</para>
+</note>
+</step><step id="tasks-snmp-step-4"><para>Add a new Solaris Volume Manager section to the <filename>/etc/snmp/conf/snmpdx.acl</filename> file, inside the section you that uncommented
+in the previous step. </para><screen>        trap-community = SNMP-trap
+        hosts = lexicon
+        {
+          enterprise = "sun"
+          trap-num = 0, 1, 2-5, 6-16
+        }
+       <userinput> {
+            enterprise = "Solaris Volume Manager"
+            trap-num = 1, 2, 3
+        }</userinput></screen><para>Note that the added four lines are placed immediately after the <command>enterprise
+= &ldquo;sun&rdquo;</command> block.</para>
+</step><step id="tasks-snmp-step-5"><para>Append the following line to the <filename>/etc/snmp/conf/enterprises.oid</filename> file:</para><screen>"Solaris Volume Manager"                           "1.3.6.1.4.1.42.104"</screen>
+</step><step id="tasks-snmp-step-6"><para>Stop and restart the Solstice Enterprise Agents
+server.</para><screen># <userinput>/etc/init.d/init.snmpdx stop</userinput>
+# <userinput>/etc/init.d/init.snmpdx start</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="tasks-snmp-9"><title>Limitations of the Solaris Volume Manager SNMP Agent</title><para>The Solaris Volume Manager SNMP agent does not issue traps for all of the Solaris Volume Manager problems
+that system administrators need to be aware oft. Specifically, the agent issues traps <emphasis>only</emphasis> in the following instances:</para><itemizedlist><listitem><para>A RAID-1 or RAID-5 subcomponent goes into a &ldquo;Needs Maintenance&rdquo;
+state</para>
+</listitem><listitem><para>A hot spare is swapped into service</para>
+</listitem><listitem><para>A hot spare starts to resynchronize</para>
+</listitem><listitem><para>A hot spare completes resynchronization</para>
+</listitem><listitem><para>A mirror is taken offline</para>
+</listitem><listitem><para>A disk set is taken by another host and the current host panics</para>
+</listitem>
+</itemizedlist><para>Many problems, such as an unavailable disk with RAID-0 volumes or soft partitions
+on it, do not result in SNMP traps, even when reads and writes to the device are attempted.
+SCSI or IDE errors are generally reported in these cases. However, other SNMP agents
+must issue traps for those errors to be reported to a monitoring console. </para>
+</sect1><sect1 id="tasks-basics-3"><title>Monitoring Solaris Volume Manager With a <command>cron</command> Job</title><task id="tasks-basics-4"><title>How to Automate Checking for Errors in Volumes</title><procedure remap="single-step"><step id="tasks-basics-step-6"><para>To automatically check your Solaris Volume Manager configuration
+for errors, create a script that the <command>cron</command> utility can periodically
+run.</para><para>The following example shows a script that you can adapt and modify
+for your needs.</para><note><para>This script serves as a starting point for automating error checking for Solaris Volume Manager.
+You probably need to modify this script for your own configuration.</para>
+</note><programlisting width="100" role="complete">&sample-cron;</programlisting><para>For information on invoking scripts by using the <literal>cron</literal> utility,
+see the <olink targetdoc="refman1m" targetptr="cron-1m" remap="external"><citerefentry><refentrytitle>cron</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page. </para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

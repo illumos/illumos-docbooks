@@ -1,0 +1,198 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Devices as Files - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="emjjp.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="frymm.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level2"><a href="fcaof.html">Solaris Operating System Definition</a></p>
+<p class="toc level2"><a href="emjjp.html">Kernel Overview</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Devices as Files</a></p>
+</div>
+<p class="toc level2"><a href="frymm.html">Development Environment and Tools</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="fgomr"></a><h3>Devices as Files</h3>
+<a name="indexterm-48"></a><a name="indexterm-49"></a><a name="indexterm-50"></a><a name="indexterm-51"></a><p>In UNIX, almost everything can be treated as a file. UNIX user
+applications access devices as if the devices were files. Files that represent devices are
+called <b>special files</b> or <b>device nodes</b>. Device special files are divided into two classes: <b>block</b>
+devices and <b>character</b> devices. See <a href="#fgoue">Character and Block Devices</a> for more information.</p><p><a name="indexterm-52"></a><a name="indexterm-53"></a>Every I/O service request initially refers to a named file. Most I/O operations
+that read or write data perform equally well on ordinary or special files.
+For example, the same <a href="http://docs.sun.com/doc/819-2241/read-2?a=view"><tt>read</tt>(2)</a> system call reads bytes from a file
+created with a text editor and reads bytes from a terminal device.</p><p><a name="indexterm-54"></a><a name="indexterm-55"></a>Control signals also are handled as files. Use the <a href="http://docs.sun.com/doc/819-2255/ioctl-9e?a=view"><tt>ioctl</tt>(9E)</a> function to
+manipulate control signals.</p>
+
+<a name="emjjv"></a><h4>Devices Directories</h4>
+<a name="indexterm-56"></a><a name="indexterm-57"></a><a name="indexterm-58"></a><p>The Solaris OS includes both <tt>/dev</tt> and <tt>/devices</tt> directories for device drivers. Almost
+all the drivers in the <tt>/dev</tt> directory are links to the <tt>/devices</tt> directory.
+The <tt>/dev</tt> directory is UNIX standard. The <tt>/devices</tt> directory is specific to the Solaris
+OS.</p><p><a name="indexterm-59"></a><a name="indexterm-60"></a>By convention, file names in the <tt>/dev</tt> directory are more readable. For example,
+the <tt>/dev</tt> directory might contain files with names such as <tt>kdb</tt> and <tt>mouse</tt>
+that are links to files such as <tt>/devices/pseudo/conskbd@0:kbd</tt> and <tt>/devices/pseudo/consms@0:mouse</tt>. The <a href="http://docs.sun.com/doc/819-2240/prtconf-1m?a=view"><tt>prtconf</tt>(1M)</a> command
+shows device names that are very similar to the file names in the
+<tt>/devices</tt> directory. In the following example, only selected output of the command is
+shown.</p><pre>% <tt><b>prtconf -P</b></tt>
+        conskbd, instance #0
+        consms, instance #0</pre><p><a name="indexterm-61"></a><a name="indexterm-62"></a><a name="indexterm-63"></a><a name="indexterm-64"></a><a name="indexterm-65"></a><a name="indexterm-66"></a><a name="indexterm-67"></a>Entries in the <tt>/dev</tt> directory that are not links to the <tt>/devices</tt> directory
+are device nodes or special files created by <a href="http://docs.sun.com/doc/819-2240/mknod-1m?a=view"><tt>mknod</tt>(1M)</a> or <a href="http://docs.sun.com/doc/819-2241/mknod-2?a=view"><tt>mknod</tt>(2)</a>. These are
+zero-length files that just have a major number and minor number attached to
+them. Linking to the physical name of the device in the <tt>/devices</tt> directory is
+preferred to using <tt>mknod</tt>(1M).</p><p><a name="indexterm-68"></a>Prior to the Solaris 10 OS, <tt>/devices</tt> was an on-disk filesystem composed of
+subdirectories and files.  Beginning with the Solaris 10 OS, <tt>/devices</tt> is a
+virtual filesystem that creates these subdirectories and special files on demand.</p><p><a name="indexterm-69"></a><a name="indexterm-70"></a>For more information about the devices file system, see the <a href="http://docs.sun.com/doc/819-2254/devfs-7fs?a=view"><tt>devfs</tt>(7FS)</a> man page.</p>
+
+<a name="eoqof"></a><h4>Device Tree</h4>
+<a name="indexterm-71"></a><a name="indexterm-72"></a><p>The device files in the <tt>/devices</tt> directory are also called the <b>device tree</b>.</p><p><a name="indexterm-73"></a><a name="indexterm-74"></a>The device tree shows relationships among devices. In the device tree, a directory
+represents a <b>nexus</b> device. A nexus is a device that can be a
+parent of other devices. In the following example, <tt>pci@1f,0</tt> is a nexus device.
+Only selected output from the command is shown.</p><pre># <tt><b>ls -l /devices</b></tt>
+drwxr-xr-x   4 root     sys          512 <i>date</i> <i>time</i> pci@1f,0/
+crw-------   1 root     sys      111,255 <i>date</i> <i>time</i> pci@1f,0:devctl</pre><p><a name="indexterm-75"></a><a name="indexterm-76"></a><a name="indexterm-77"></a><a name="indexterm-78"></a>You can use <a href="http://docs.sun.com/doc/819-2240/prtconf-1m?a=view"><tt>prtconf</tt>(1M)</a> or <a href="http://docs.sun.com/doc/819-2240/prtpicl-1m?a=view"><tt>prtpicl</tt>(1M)</a> to see a graphic representation of the
+device tree. See <a href="http://docs.sun.com/doc/819-3196/kernelovr-64300?a=view">Overview of the Device Tree in <i>Writing Device Drivers</i></a> for more information about the device tree.</p>
+
+<a name="fgoue"></a><h4>Character and Block Devices</h4>
+<a name="indexterm-79"></a><a name="indexterm-80"></a><a name="indexterm-81"></a><a name="indexterm-82"></a><p>A file in the device tree that is not a directory represents
+either a <b>character</b> device or a <b>block</b> device.</p><p><a name="indexterm-83"></a>A block device can contain addressable, reusable data. An example of a block
+device is a file system. Any device can be a character device. Most
+block devices also have character interfaces. Disks have both block and character interfaces.
+In your <tt>/devices/pseudo</tt> directory, you might find devices such as the following:</p><pre>brw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,blk
+crw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,raw
+brw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,blk
+crw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,raw
+brw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,blk
+crw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,raw</pre><p><a name="indexterm-84"></a><a name="indexterm-85"></a><a name="indexterm-86"></a><a name="indexterm-87"></a>Block devices have a <tt>b</tt> as the first character of their file mode.
+Character devices have a <tt>c</tt> as the first character of their file mode.
+In this example, the block devices have <tt>blk</tt> in their names and
+the character devices have <tt>raw</tt> in their names.</p><p><a name="indexterm-88"></a><a name="indexterm-89"></a>The <a href="http://docs.sun.com/doc/819-2254/md-7d?a=view"><tt>md</tt>(7D)</a> device is a metadevice that provides disk services. The block devices
+access the disk using the system's normal buffering mechanism. The character devices provide
+for direct transmission between the disk and the user's read or write buffer.</p>
+
+<a name="fgovo"></a><h4>Device Names</h4>
+<a name="indexterm-90"></a><a name="indexterm-91"></a><a name="indexterm-92"></a><a name="indexterm-93"></a><a name="indexterm-94"></a><p>This section shows a complex device name and explains the meaning of each
+part of the name in <tt>/dev</tt> and also in <tt>/devices</tt>. The following
+example is the name of a disk slice:</p><pre>/dev/dsk/c0t0d0s7 -&gt; ../../devices/pci@1c,600000/scsi@2/sd@0,0:h</pre><p>First, examine the name of the file in the <tt>/dev</tt> directory. These names
+are managed by the <a href="http://docs.sun.com/doc/819-2240/devfsadmd-1m?a=view"><tt>devfsadmd</tt>(1M)</a> daemon.</p><dl><dt><tt>c0</tt></dt>
+<dd><p>Controller 0</p></dd>
+<dt><tt>t0</tt></dt>
+<dd><p>Target 0. On SCSI controllers, this value is the disk number.</p></dd>
+<dt><tt>d0</tt></dt>
+<dd><p>SCSI LUN. This value indicates a virtual partitioning of a target or single physical device.</p></dd>
+<dt><tt>s7</tt></dt>
+<dd><p>Slice 7 on the target 0 disk.</p></dd>
+</dl>
+<p><a name="indexterm-95"></a>For the same device, compare the name of the file in the
+<tt>/devices</tt> directory. These names show the physical structure and real device names. Note
+that some of the components of the device name in the <tt>/devices</tt>
+directory are subdirectories.</p><dl><dt><tt>pci@1c,600000</tt></dt>
+<dd><p>PCI bus at address <tt>1c,600000</tt>. These addresses are meaningful only to the parent device.</p></dd>
+<dt><tt>scsi@2</tt></dt>
+<dd><p>SCSI controller at address <tt>2</tt> on the PCI bus at address <tt>1c,600000</tt>. This name corresponds to the <tt>c0</tt> in <tt>/dev/dsk/c0t0d0s7</tt>.</p></dd>
+<dt><tt>sd@0,0</tt></dt>
+<dd><p>SCSI disk at address <tt>0,0</tt> on the SCSI controller at address <tt>2</tt>. This name represents target&nbsp;0, LUN&nbsp;0 and corresponds to the <tt>t0d0</tt> in <tt>/dev/dsk/c0t0d0s7</tt>. The <tt>sd</tt> name and driver can also apply to IDE CD-ROM devices.</p></dd>
+<dt><tt>sd@0,0:h</tt></dt>
+<dd><p>Minor node <tt>h</tt> on the SCSI disk at address <tt>0,0</tt>. This name corresponds to the <tt>s7</tt> in <tt>/dev/dsk/c0t0d0s7</tt>.</p></dd>
+</dl>
+
+
+<a name="fgove"></a><h4>Device Numbers</h4>
+<a name="indexterm-96"></a><a name="indexterm-97"></a><p>A <b>device number</b> identifies a particular device and minor node in the device tree.
+The <tt>dev_t</tt> parameter that is required in many DDI/DKI routines is this device
+number.</p><p><a name="indexterm-98"></a><a name="indexterm-99"></a>Each device has a major number and a minor number. A device number
+is a <i>major</i>,<i>minor</i> pair. A long file listing shows the device number in
+the column where file sizes are usually listed. In the following example, the
+device number is 86,255. The device major number is 86, and the device
+minor number is 255.</p><pre>% <tt><b>ls -l /devices/pci@0,0:devctl</b></tt>
+crw-------   1 root     sys       86,255 <i>date</i> <i>time</i> /devices/pci@0,0:devctl</pre><p>In the Solaris OS, the major number is chosen for you when
+you install the driver so that it will not conflict with any other
+major number. The kernel uses the major number to associate the I/O request
+with the correct driver code. The kernel uses this association to decide which
+driver to execute when the user reads or writes the device file. All
+devices and their major numbers are listed in the file <tt>/etc/name_to_major</tt>.</p><pre>% <tt><b>grep 86 /etc/name_to_major</b></tt>
+pci 86</pre><p><a name="indexterm-100"></a><a name="indexterm-101"></a>The minor number is assigned in the driver. The minor number must map
+each driver to a specific device instance. Minor numbers usually refer to sub-devices. For
+example, a disk driver might communicate with a hardware controller device that has
+several disk drives attached. Minor nodes do not necessarily have a physical representation.</p><p>The following example shows instances 0, 1, and 2 of the <tt>md</tt>
+device. The numbers 0, 1, and 2 are the minor numbers.</p><pre>brw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,blk
+crw-r-----   1 root     sys       85,  0 Nov  3 09:43 md@0:0,0,raw
+brw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,blk
+crw-r-----   1 root     sys       85,  1 Nov  3 09:43 md@0:0,1,raw
+brw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,blk
+crw-r-----   1 root     sys       85,  2 Nov  3 09:43 md@0:0,2,raw</pre><p>In the name <tt>sd@0,0:h,</tt>, <tt>h</tt> represents a minor node. When the driver receives
+a request for minor node <tt>h</tt>, the driver actually receives a corresponding minor
+number. The driver for the <tt>sd</tt> node interprets that minor number to be
+a particular section of disk, such as slice&nbsp;7 mounted on <tt>/export</tt>.</p><p><a name="indexterm-102"></a><a name="indexterm-103"></a><a href="eoqrt.html">Chapter&nbsp;2, Template Driver Example</a> shows how to use the <a href="http://docs.sun.com/doc/819-2256/ddi-get-instance-9f?a=view"><tt>ddi_get_instance</tt>(9F)</a> routine in your driver to
+get an instance number for the device you are driving.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="emjjp.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="frymm.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

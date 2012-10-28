@@ -1,0 +1,164 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Setting ACLs on ZFS Files - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbacb.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbabw.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level2"><a href="gbacb.html">New Solaris ACL Model</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Setting ACLs on ZFS Files</a></p>
+</div>
+<p class="toc level2"><a href="gbabw.html">Setting and Displaying ACLs on ZFS Files in Verbose Format</a></p>
+<p class="toc level2"><a href="gbchf.html">Setting and Displaying ACLs on ZFS Files in Compact Format</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbace"></a><h3>Setting ACLs on ZFS Files</h3>
+<p>As implemented with ZFS, ACLs are composed of an array of ACL
+entries.  ZFS provides a <b>pure</b> ACL model, where all files have an ACL.
+Typically, the ACL is <b>trivial</b> in that it only represents the traditional UNIX
+<tt>owner/group/other</tt> entries.<a name="indexterm-519"></a><a name="indexterm-520"></a><a name="indexterm-521"></a></p><p>ZFS files still have permission bits and a mode, but these values
+are more of a cache of what the ACL represents. As such, if
+you change the permissions of the file, the file's ACL is updated accordingly.
+In addition, if you remove an non-trivial ACL that granted a user access
+to a file or directory, that user could still have access to the
+file or directory because of the file or directory's permission bits that grant
+access to group or everyone. All access control decisions are governed by the
+permissions represented in a file or directory's ACL.</p><p>The primary rules of ACL access on a ZFS file are as
+follows:</p>
+<ul><li><p>ZFS processes ACL entries in the order they are listed in the ACL, from the top down.</p></li>
+<li><p>Only ACL entries that have a &ldquo;who&rdquo; that matches the requester of the access are processed.</p></li>
+<li><p>Once an allow permission has been granted, it cannot be denied by a subsequent ACL deny entry in the same ACL permission set.</p></li>
+<li><p>The owner of the file is granted the <tt>write_acl</tt> permission unconditionally, even if the permission is explicitly denied. Otherwise, any permission left unspecified is denied.</p><p>In the cases of deny permissions or when an access permission is missing, the privilege subsystem determines what access request is granted for the owner of the file or for superuser. This mechanism prevents owners of files from getting locked out of their files and enables superuser to modify files for recovery purposes.</p></li></ul>
+<p>If you set an non-trivial ACL on a directory, the ACL is
+not automatically inherited by the directory's children. If you set an non-trivial ACL
+and you want it inherited to the directory's children, you have to use
+the ACL inheritance flags. For more information, see <a href="gbacb.html#gbbhx">Table&nbsp;7-3</a> and <a href="gbabw.html#gbabx">Setting ACL Inheritance on ZFS Files in Verbose Format</a>.</p><p>When you create a new file and depending on the <tt>umask</tt> value, a
+default trivial ACL, similar to the following, is applied:</p><pre>$ <tt><b>ls -v file.1</b></tt>
+-r--r--r--   1 root     root      206663 May  4 11:52 file.1
+     0:owner@:write_data/append_data/execute:deny
+     1:owner@:read_data/write_xattr/write_attributes/write_acl/write_owner
+         :allow
+     2:group@:write_data/append_data/execute:deny
+     3:group@:read_data:allow
+     4:everyone@:write_data/append_data/write_xattr/execute/write_attributes
+         /write_acl/write_owner:deny
+     5:everyone@:read_data/read_xattr/read_attributes/read_acl/synchronize
+         :allow</pre><p>Note that each user category (<tt>owner@</tt>, <tt>group@</tt>, <tt>everyone@</tt>) in this example has
+two ACL entries. One entry for <tt>deny</tt> permissions, and one entry is
+for <tt>allow</tt> permissions.<a name="indexterm-522"></a><a name="indexterm-523"></a></p><p>A description of this file ACL is as follows:</p><dl><dt><tt>0:owner@</tt></dt>
+<dd><p>The owner is denied execute permissions to the file (<tt>execute:deny</tt>).</p></dd>
+<dt><tt>1:owner@</tt></dt>
+<dd><p>The owner can read and modify the contents of the file (<tt>read_data/write_data/append_data</tt>). The owner can also modify the file's attributes such as timestamps, extended attributes, and ACLs (<tt>write_xattr/write_attributes /write_acl</tt>). In addition, the owner can modify the ownership of the file (<tt>write_owner:allow</tt>)</p></dd>
+<dt><tt>2:group@</tt></dt>
+<dd><p>The group is denied modify and execute permissions to the file (<tt>write_data/append_data/execute:deny</tt>).</p></dd>
+<dt><tt>3:group@</tt></dt>
+<dd><p>The group is granted read permissions to the file (<tt>read_data:allow</tt>).</p></dd>
+<dt><tt>4:everyone@</tt></dt>
+<dd><p>Everyone who is not user or group is denied permission to execute or modify the contents of the file and to modify any attributes of the file (<tt>write_data/append_data/write_xattr/execute/write_attributes/write_acl/write_owner:deny</tt>).</p></dd>
+<dt><tt>5:everyone@</tt></dt>
+<dd><p>Everyone who is not user or group is granted read permissions to the file, and the file's attributes (<tt>read_data/read_xattr/read_attributes/read_acl/synchronize:allow</tt>). The <tt>synchronize</tt> access permission is not currently implemented.</p></dd>
+</dl>
+<p>When a new directory is created and depending on the <tt>umask</tt> value, a
+default directory ACL is similar to the following:</p><pre>$ <tt><b>ls -dv dir.1</b></tt>
+drwxr-xr-x   2 root     root           2 Feb 23 10:37 dir.1
+     0:owner@::deny
+     1:owner@:list_directory/read_data/add_file/write_data/add_subdirectory
+         /append_data/write_xattr/execute/write_attributes/write_acl
+         /write_owner:allow
+     2:group@:add_file/write_data/add_subdirectory/append_data:deny
+     3:group@:list_directory/read_data/execute:allow
+     4:everyone@:add_file/write_data/add_subdirectory/append_data/write_xattr
+         /write_attributes/write_acl/write_owner:deny
+     5:everyone@:list_directory/read_data/read_xattr/execute/read_attributes
+         /read_acl/synchronize:allow</pre><p>A description of this directory ACL is as follows:<a name="indexterm-524"></a><a name="indexterm-525"></a></p><dl><dt><tt>0:owner@</tt></dt>
+<dd><p>The owner deny list is empty for the directory (<tt>::deny</tt>).</p></dd>
+<dt><tt>1:owner@</tt></dt>
+<dd><p>The owner can read and modify the directory contents (<tt>list_directory/read_data/add_file/write_data/add_subdirectory/append_data</tt>), search the contents (<tt>execute</tt>), and modify the file's attributes such as timestamps, extended attributes, and ACLs (<tt>write_xattr/write_attributes/write_acl</tt>). In addition, the owner can modify the ownership of the directory (<tt>write_owner:allow</tt>).</p></dd>
+<dt><tt>2:group@</tt></dt>
+<dd><p>The group cannot add to or modify the directory contents (<tt>add_file/write_data/add_subdirectory/append_data:deny</tt>).</p></dd>
+<dt><tt>3:group@</tt></dt>
+<dd><p>The group can list and read the directory contents. In addition, the group has execute permission to search the directory contents (<tt>list_directory/read_data/execute:allow</tt>).</p></dd>
+<dt><tt>4:everyone@</tt></dt>
+<dd><p>Everyone who is not user or group is denied permission to add to or modify the contents of the directory (<tt>add_file/write_data/add_subdirectory/append_data</tt>). In addition, the permission to modify any attributes of the directory is denied. (<tt>write_xattr /write_attributes/write_acl/write_owner:deny</tt>).</p></dd>
+<dt><tt>5:everyone@</tt></dt>
+<dd><p>Everyone who is not user or group is granted read and execute permissions to the directory contents and the directory's attributes (<tt>list_directory/read_data/read_xattr/execute/read_attributes/read_acl/synchronize:allow</tt>). The <tt>synchronize</tt> access permission is not currently implemented.</p></dd>
+</dl>
+
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbacb.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbabw.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

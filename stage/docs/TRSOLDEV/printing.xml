@@ -1,0 +1,147 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bsol dash hellip gt lt minus?><?Pub CX solbook(book(title()bookinfo()chapter()?><chapter id="labelprint-1"><title>Printing and the Label APIs</title><highlights><para>Printing is one type of service that needs to be label-aware. This chapter introduces the Solaris Trusted Extensions label APIs by using as an example the multilevel printing service that was developed for Trusted Extensions.</para><itemizedlist><para>This chapter covers the following topics:</para><listitem><para><olink targetptr="labelprint-2" remap="internal">Printing Labeled Output</olink></para>
+</listitem><listitem><para><olink targetptr="labelprint-3" remap="internal">Designing a Label-Aware Application</olink></para>
+</listitem><listitem><para><olink targetptr="labelprint-4" remap="internal">Understanding the Multilevel Printing Service</olink></para>
+</listitem><listitem><para><olink targetptr="labelprint-5" remap="internal">get_peer_label() Label-Aware Function</olink></para>
+</listitem><listitem><para><olink targetptr="labelprint-15" remap="internal">Validating the Label Request Against the Printer's Label Range</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="labelprint-2"><title>Printing Labeled Output</title><indexterm><primary>printing</primary><secondary>labeled output</secondary>
+</indexterm><indexterm><primary>printing</primary><secondary>multilevel</secondary>
+</indexterm><indexterm><primary>printing</primary><secondary>label API and</secondary>
+</indexterm><para>Typically, printers are shared resources. Multilevel printing allows users who are operating at different security levels to share a printer, subject to the restrictions of the security policy. The printing service is also label-aware so that labels can be clearly marked on printed documents.</para><para><indexterm><primary>printing</primary><secondary>banner page</secondary></indexterm>You can assume the System Administrator role in role-based access control (RBAC) to configure a printer so that the output is labeled. The session label at which the print job is initiated is printed on the banner and trailer pages. The label of the session is also added to the header and footer of every printed page. The labels can be printed because of a printing adapter. The Trusted Extensions printing adapter determines the host label or the zone label at which the print request was initiated. The adapter passes along this label information with the print job to enable the printed output to be labeled.</para>
+</sect1><sect1 id="labelprint-3"><title>Designing a Label-Aware Application</title><para>Most applications do not need to be label-aware. Therefore, most Solaris software applications run under Trusted Extensions without modification. The Trusted Extensions label-based access restriction is designed to operate in a way that is consistent with Solaris OS standards. Generally, any process that you bind to a multilevel port needs to be label-aware because it receives data at multiple labels and is trusted to enforce the security policy.</para><para>For example, an application might not be able to access a resource because the application is running at a label that is lower than the required resource. However, an attempt to access that resource does not result in a special error condition. Instead, the application might issue a <literal>File not found</literal> error. Or, an application might attempt to access information that has a higher label than the application is allowed to access. However, the security policy dictates that without sufficient privileges, an application cannot be aware of the existence of a resource with a higher label. Therefore, if an application attempts to access a resource with a label that is higher than the application's label, the resulting error condition is not label-specific. The error message is the same as the error message that is returned to an application that tries to access a resource that does not exist. The lack of &ldquo;special error conditions&rdquo; helps to enforce security principles.</para><para>In Trusted Extensions, the operating system, <emphasis>not</emphasis> the application, enforces the security policy. This security policy is called the the <firstterm>mandatory access control (MAC) policy</firstterm>. For example, an application does not determine if a protected resource is accessible. Ultimately, the operating system enforces the MAC policy. If an application does not have sufficient privileges to access a resource, the resource is not available to the application. Thus, an application does not need to know anything about labels to access labeled resources.</para><para>Similarly, most label-aware applications must be designed so that they can operate in a consistent manner with applications that are not label-aware. Label-aware applications must behave in essentially the same way in environments that involve only a single label, in environments that are unlabeled, and in environments that involve multiple labels. An example of a single-label environment is when a user session with a given label mounts a device at the same label. In an <firstterm>unlabeled environment</firstterm>, a label is not explicitly set, but a default label is specified in the <filename>tnrhdb</filename> database. See the <olink targetdoc="refman" targetptr="smtnrhdb-1m" remap="external"><citerefentry><refentrytitle>smtnrhdb</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</sect1><sect1 id="labelprint-4"><title>Understanding the Multilevel Printing Service</title><para>Because the printing service accepts requests from processes that operate at different labels, printing must be label-aware. Ordinarily, MAC allows access only to resources that are at the same labels at which the user is operating. Even when print requests are issued only at the same label, printing should be label-aware to enable the printed output to display labels on the printed page.</para><itemizedlist><para>To handle labels, the printing service must perform these essential functions:</para><listitem><para>Determine if the host on which the print process is running is labeled or unlabeled</para>
+</listitem><listitem><para>If the printing process is running in a labeled environment, obtain the credential of the network connection from which the print request originates (the credential contains the label for that process)</para>
+</listitem><listitem><para>Extract the label from the network credential</para>
+</listitem><listitem><para>Obtain the printer's label range, that is, the range of labels for which the printer can accept requests</para>
+</listitem><listitem><para>Determine if the user's label falls within the acceptable range of labels for the specified printer</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="labelprint-5"><title><function>get_peer_label</function> Label-Aware Function</title><indexterm><primary>remote host</primary><secondary>credential</secondary>
+</indexterm><indexterm><primary>printing</primary><secondary><function>get_peer_label</function> function</secondary>
+</indexterm><indexterm><primary><function>get_peer_label</function> function</primary>
+</indexterm><indexterm><primary><structname>ucred_t</structname> data structure</primary>
+</indexterm><para>The <function>get_peer_label</function> function in the <filename>lp/lib/lp/tx.c</filename> file implements the logic of multilevel printing in Trusted Extensions. The following sections describe this function and step you through its implementation.</para><para>In Trusted Extensions software, much of the logic for handling labels in the printing service is in the <function>get_peer_label</function> function. This function obtains the credential of the remote process in a <structname>ucred_t</structname> data structure and extracts the label from the credential.</para><para>The following shows the <function>get_peer_label</function> code.</para><programlisting>int
+get_peer_label(int fd, char **slabel)
+{
+	if (is_system_labeled()) {
+		ucred_t *uc = NULL;
+		m_label_t *sl;
+		char *pslabel = NULL; /* peer's slabel */
+
+		if ((fd &lt; 0) || (slabel == NULL)) {
+			errno = EINVAL;
+			return (-1);
+		}
+	
+		if (getpeerucred(fd, &amp;uc) == -1)
+			return (-1);
+	
+		sl = ucred_getlabel(uc);
+		if (label_to_str(sl, &amp;pslabel, M_INTERNAL, DEF_NAMES) != 0)
+			syslog(LOG_WARNING, "label_to_str(): %m");
+		ucred_free(uc);
+	
+		if (pslabel != NULL) {
+			syslog(LOG_DEBUG, "get_peer_label(%d, %s): becomes %s",
+				fd, (*slabel ? *slabel : "NULL"), pslabel);
+			if (*slabel != NULL)
+				free(*slabel);
+			*slabel = strdup(pslabel);
+		}
+	}
+	
+	return (0);
+}</programlisting><sect2 id="labelprint-7"><title>Determining Whether the Printing Service Is Running in a Labeled Environment</title><indexterm><primary><function>is_system_labeled</function> routine</primary><secondary>example</secondary>
+</indexterm><para>The printing service is designed to work in labeled and unlabeled environments. Therefore, the printing application must determine when the label of a remote host should be requested and whether the label should be applied. The printing process first checks its own environment. Is the process running in a label-aware environment?</para><para>Note that the application does not first determine whether the remote request is labeled. Instead, the printing application determines if its own environment is labeled. If the application is not running on a labeled host, the MAC policy prevents the printing application from receiving labeled requests.</para><para>The printing service uses the <function>is_system_labeled</function> function to determine whether the process is running in a labeled environment. For information about this function, see the <olink targetdoc="refman" targetptr="is-system-labeled-3c" remap="external"><citerefentry><refentrytitle>is_system_labeled</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> man page.</para><para>This code excerpt shows how to determine whether the application is running in a labeled environment:</para><programlisting>if (is_system_labeled()) {
+	ucred_t *uc = NULL;
+	m_label_t *sl;
+	char *pslabel = NULL; /* peer's slabel */
+
+	if ((fd &lt; 0) || (slabel == NULL)) {
+		errno = EINVAL;
+		return (-1);
+	}</programlisting><para><indexterm><primary><structname>ucred_t</structname> data structure</primary></indexterm>If the printing adapter process is running on a system configured with Trusted Extensions, the <function>is_system_labeled</function> function obtains the <structname>ucred_t</structname> credential abstraction from the remote process. The <structname>ucred_t</structname> data structure for the remote process and the peer's label are then set to <systemitem>NULL</systemitem>. The functions that return values for the credential and the peer's label fill the data structures. These data structures are discussed in the following sections.</para><para>See <olink targetptr="labelprint-5" remap="internal">get_peer_label() Label-Aware Function</olink> to view the source of the entire <function>get_peer_label</function> routine.</para>
+</sect2><sect2 id="labelprint-8"><title>Understanding the Remote Host Credential</title><para><indexterm><primary>remote host</primary><secondary>credential</secondary></indexterm>The Solaris OS network API provides an abstraction of a process's credentials. This credentials data is available through a network connection. The credentials are represented by the <structname>ucred_t</structname> data structure that was introduced in the Solaris 10 release. This structure can include the label of a process.</para><para>The <literal>ucred</literal> API provides functions for obtaining the <structname>ucred_t</structname> data structure from a remote process. This API also provides functions for extracting the label from the <structname>ucred_t</structname> data structure.</para>
+</sect2><sect2 id="labelprint-9"><title>Obtaining the Credential and Remote Host Label</title><para><indexterm><primary>remote host</primary><secondary>label</secondary></indexterm>Obtaining the label of a remote process is a two-step procedure. First, you must obtain the credential. Then, you must obtain the label from this credential.</para><para>The credential is in the <structname>ucred_t</structname> data structure of the remote process. The label is in the <structname>m_label_t</structname> data structure in the credential. After obtaining the credential of the remote process, you extract the label information from that credential.</para><para>The <function>getpeerucred</function> function obtains the <structname>ucred_t</structname> credential data structure from the remote process. The <function>ucred_getlabel</function> function extracts the label from the <structname>ucred_t</structname> data structure. In the <function>get_peer_label</function> function, the two-step procedure is coded as follows:</para><programlisting>if (getpeerucred(fd, &amp;uc) == -1)
+	return (-1);
+
+sl = ucred_getlabel(uc);</programlisting><para>See <olink targetptr="labelprint-5" remap="internal">get_peer_label() Label-Aware Function</olink> to view the source of the entire <function>get_peer_label</function> routine.</para><para>For information about the two functions, see the <olink targetdoc="refman" targetptr="getpeerucred-3c" remap="external"><citerefentry><refentrytitle>getpeerucred</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> and <olink targetdoc="refman" targetptr="ucred-getlabel-3c" remap="external"><citerefentry><refentrytitle>ucred_getlabel</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> man pages.</para><para>In addition to obtaining a remote host's label, you can obtain a remote host's type. To obtain the remote host type, use the <function>tsol_getrhtype</function> routine. See <olink targetptr="accessingnetworkdbentries" remap="internal">Obtaining the Remote Host Type</olink>.</para>
+</sect2><sect2 id="labelprint-10"><title>Using the <function>label_to_str</function> Function</title><para>After obtaining the credential and remote host label, an application can call <function>label_to_str</function> to convert the label data structure into a string. The string form of the label data structure can be used by the application.</para><para>Note that in the Trusted Extensions printing service, the label is returned as a string. The <function>get_peer_label</function> function returns the string that is obtained by calling <function>label_to_str</function> on the <structname>m_label_t</structname> data structure. This string value is returned in the <literal>slabel</literal> parameter of the <function>get_peer_label</function> function, <varname>char** slabel</varname>.</para><para>The following code excerpt shows how the <function>label_to_str</function> function is used:</para><programlisting>sl = ucred_getlabel(uc);
+if (label_to_str(sl, &amp;pslabel, M_INTERNAL, DEF_NAMES) != 0)
+	syslog(LOG_WARNING, "label_to_str(): %m");
+ucred_free(uc);
+
+if (pslabel != NULL) {
+	syslog(LOG_DEBUG, "get_peer_label(%d, %s): becomes %s",
+		fd, (*slabel ? *slabel : "NULL"), pslabel);
+	if (*slabel != NULL)
+		free(*slabel);
+	*slabel = strdup(pslabel);
+}</programlisting><para>See <olink targetptr="labelprint-5" remap="internal">get_peer_label() Label-Aware Function</olink> to view the source of the entire <function>get_peer_label</function> routine.</para>
+</sect2><sect2 id="labelprint-12"><title>Handling Memory Management</title><itemizedlist><para>As shown in <olink targetptr="labelprint-5" remap="internal">get_peer_label() Label-Aware Function</olink>, labels are often dynamically allocated. The functions <function>str_to_label</function>, <function>label_to_str</function>, <function>getdevicerange</function>, and other functions allocate memory that must be freed by the caller. The following man pages for these functions describe the memory allocation requirements:</para><listitem><para><olink targetdoc="refman" targetptr="getdevicerange-3tsol" remap="external"><citerefentry><refentrytitle>getdevicerange</refentrytitle><manvolnum>3TSOL</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman" targetptr="label-to-str-3tsol" remap="external"><citerefentry><refentrytitle>label_to_str</refentrytitle><manvolnum>3TSOL</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman" targetptr="m-label-3tsol" remap="external"><citerefentry><refentrytitle>m_label</refentrytitle><manvolnum>3TSOL</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman" targetptr="str-to-label-3tsol" remap="external"><citerefentry><refentrytitle>str_to_label</refentrytitle><manvolnum>3TSOL</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="labelprint-14"><title>Using the Returned Label String</title><itemizedlist><para>The <function>get_peer_label</function> function extracts the label from a remote host and returns that label as a string. The printing application, as is typical of label-aware applications, uses the label for the following purposes:</para><listitem><para>To make sure that information associated with a label is clearly marked with the correct label. The banner and trailer pages, as well as the header and footer, are marked with the label of the document being printed.</para>
+</listitem><listitem><para>To validate that the label of a resource permits a given operation to be performed by another labeled resource. That is, the label of the requesting process permits this printer to accept a request from that requesting process. This permission is based on the range of labels that this printer is assigned.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="labelprint-15"><title>Validating the Label Request Against the Printer's Label Range</title><para>In the printing application, the code for validating the label is contained in the <filename>lp/cmd/lpsched/validate.c</filename> file.</para><para>Some types of applications need to compare two given labels. For example, an application might need to determine if one label strictly dominates another label. These applications use API functions that compare one label to another label.</para><para>The printing application, however, is based on a range of labels. A printer is configured to accept printing requests from a range of different labels. Therefore, the printing application uses API functions that check a label against a range.  The application checks that the label from the remote host falls within the range of labels that the printer allows.</para><para>In the <filename>validate.c</filename> file, the printing application uses the <function>blinrange</function> function to check the remote host's label against the label range of the printer. This check is made within the <function>tsol_check_printer_label_range</function> function, as shown here:</para><programlisting>static int
+tsol_check_printer_label_range(char *slabel, const char *printer)
+{
+	int			in_range = 0;
+	int			err = 0;
+	blrange_t		*range;
+	m_label_t	*sl = NULL;
+
+	if (slabel == NULL)
+		return (0);
+
+	if ((err =
+	    (str_to_label(slabel, &amp;sl, USER_CLEAR, L_NO_CORRECTION, &amp;in_range)))
+	    == -1) {
+		/* str_to_label error on printer max label */
+		return (0);
+	}
+	if ((range = getdevicerange(printer)) == NULL) {
+		m_label_free(sl);
+		return (0);
+	}
+
+	/* blinrange returns true (1) if in range, false (0) if not */
+	in_range = blinrange(sl, range);
+
+	m_label_free(sl);
+	m_label_free(range-&gt;lower_bound);
+	m_label_free(range-&gt;upper_bound);
+	free(range);
+
+	return (in_range);
+}</programlisting><para>The <function>tsol_check_printer_label_range</function> function takes as parameters the label returned by the <function>get_peer_label</function> function and the name of the printer.</para><para>Before comparing the labels, <function>tsol_check_printer_label_range</function> converts the string into a label by using the <function>str_to_label</function> function.</para><para>The label type is set to <type>USER_CLEAR</type>, which produces the clearance label of the associated object. The clearance label ensures that the appropriate level of label is used in the range check that the <function>blinrange</function> function performs.</para><para>The <literal>sl</literal> label that is obtained from <function>str_to_label</function> is checked to determine whether the remote host's label, <literal>slabel</literal>, is within the range of the requested device, that is, the printer. This label is tested against the printer's label. The printer's range is obtained by calling the <function>getdevicerange</function> function for the selected printer. The range is returned as a <structname>blrange_t</structname> data structure.</para><para>The printer's label range in the <structname>blrange_t</structname> data structure is passed into the <function>blinrange</function> function, along with the clearance label of the requester. See the <olink targetdoc="refman" targetptr="blinrange-3tsol" remap="external"><citerefentry><refentrytitle>blinrange</refentrytitle><manvolnum>3TSOL</manvolnum></citerefentry></olink> man page.</para><para>The following code excerpt shows the <function>_validate</function> function in the <filename>validate.c</filename> file. This function is used to find a printer to handle a printing request. This code compares the user ID and the label associated with the request against the set of allowed users and the label range that is associated with each printer.</para><programlisting>/*
+ * If a single printer was named, check the request against it.
+ * Do the accept/reject check late so that we give the most
+ * useful information to the user.
+ */
+if (pps) {
+	(pc = &amp;single)-&gt;pps = pps;
+
+	/* Does the printer allow access to the user? */
+	if (!CHKU(prs, pps)) {
+		ret = MDENYDEST;
+		goto Return;
+	}
+
+	/* Check printer label range */
+	if (is_system_labeled() &amp;&amp; prs-&gt;secure-&gt;slabel != NULL) {
+		if (tsol_check_printer_label_range(prs-&gt;secure-&gt;slabel,
+			pps-&gt;printer-&gt;name) == 0) {
+			ret = MDENYDEST;
+			goto Return;
+		}
+	}</programlisting>
+</sect1>
+</chapter>

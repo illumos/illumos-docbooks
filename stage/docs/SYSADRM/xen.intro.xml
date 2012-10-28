@@ -1,0 +1,147 @@
+<chapter id="gefwo"><title>Booting and Running the Sun xVM Hypervisor</title><highlights><para>This chapter discusses booting and running the hypervisor.</para>
+</highlights><sect1><title>x86 Boot Architecture</title><para>The open source GNU GRand Unified Bootloader (GRUB) is implemented
+on x86 based systems that are running the Solaris Operating System. GRUB is
+the boot loader that is responsible for loading a boot archive into a system's
+memory. The boot archive contains the kernel modules and configuration files
+that are required to boot the system.</para><para>The GRUB main menu is based on the <filename>/boot/grub/menu.lst</filename> configuration
+file. For more information on GRUB, see <olink targetdoc="sysadv1" targetptr="grubtasks-1" remap="external">Chapter 11, <citetitle remap="chapter">Modifying Solaris Boot Behavior (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink> and <olink targetdoc="group-refman" targetptr="grub-5" remap="external"><citerefentry><refentrytitle>grub</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink>.</para>
+</sect1><sect1 id="gfwrk"><title>About Booting the Solaris Control Domain</title><para>Whether to run Solaris as a virtualized
+control domain or as a standalone operating system is a boot-time decision.
+To run the Solaris operating system as a standalone system, continue to use
+the same GRUB menu entries that you use currently.</para><para>To run the Solaris system as a control domain with the Sun xVM hypervisor,
+you must do one of the following:</para><itemizedlist><listitem><para>Set <literal>Solaris xVM</literal> as the default entry to
+be booted.</para>
+</listitem><listitem><para>Select the number of the <literal>Solaris xVM</literal> entry
+in <filename>/boot/grub/menu.lst</filename> during the boot process.</para>
+</listitem>
+</itemizedlist><para>This boots the hypervisor, which in turn boots the control domain. </para><para>In the Solaris xVM entry for booting Solaris as a control domain with
+the hypervisor, the <literal>kernel$</literal> line refers to the hypervisor,
+and there are two <literal>module$</literal> lines. The first <literal>module$</literal> line
+must list the path to <literal>unix</literal> twice, with any arguments. Arguments
+are represented by <literal>*</literal> at the end of a line in the example.
+The second <literal>module$</literal> line lists the path to the boot archive.</para><task id="ggdmn"><title>How to Boot the Solaris Control Domain</title><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Locate the Solaris xVM entry in the <filename>/boot/grub/menu.lst</filename> file:</para><screen># <userinput>bootadm list-menu</userinput>
+The location for the active GRUB menu is: /dev/dsk/c2t0d0s0 (not mounted)
+The filesystem type of the menu device is &lt;ufs>
+default 3
+timeout -1
+0 Solaris Express Community Edition snv_79 X86
+1 Solaris xVM
+2 Solaris failsafe
+3 bfu ABE: xVM 64-bit
+4 bfu ABE: metal 64-bit</screen>
+</step><step><para>Select the Solaris xVM entry, option <literal>1</literal> in this
+procedure, from the list.</para>
+</step>
+</procedure><taskrelated role="troubleshooting"><para>In some situations, the GRUB <literal>menu.lst</literal> file might
+not reside in <filename>/boot/grub</filename>. To determine the location of
+the active GRUB <filename>menu.lst</filename> file, use the <command>bootadm</command> command
+with the <literal>list-menu</literal> subcommand.</para>
+</taskrelated>
+</task><task id="gfwro"><title>Setting the Solaris xVM Entry To Boot by Default</title><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Find the number of the xVM entry in <filename>/boot/grub/menu.lst</filename>:</para><screen># <userinput>bootadm list-menu</userinput>
+The location for the active GRUB menu is: /dev/dsk/c2t0d0s0 (not mounted)
+The filesystem type of the menu device is &lt;ufs>
+default 3
+timeout -1
+0 Solaris Express Community Edition snv_79 X86
+1 Solaris xVM
+2 Solaris failsafe
+3 bfu ABE: xVM 64-bit
+4 bfu ABE: metal 64-bit</screen>
+</step><step><para>Set the default using the number of the entry:</para><screen># <userinput>bootadm set-menu default=1</userinput></screen>
+</step>
+</procedure>
+</task><task id="gfwqz"><title>How to View Domains on the System</title><tasksummary><para>Run the <command>virsh</command> <literal>list --all</literal>, <command>xm</command> <literal>list</literal> or the <command>xm</command> <literal>top</literal> commands
+to view the domains on the system. These commands provide details of running
+domains. The display from any of these commands should show the single control
+domain, called <literal>Domain-0</literal>.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Run <command>virsh</command> <literal> list --all </literal>.</para><screen># <userinput>virsh list --all</userinput> Id Name                 State
+----------------------------------
+  0 Domain-0             running</screen>
+</step>
+</procedure><taskrelated role="see-also"><para>See the <olink targetdoc="group-refman" targetptr="xentop-1m" remap="external"><citerefentry><refentrytitle>xentop</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>man
+pages.</para>
+</taskrelated>
+</task>
+</sect1><sect1 id="ggdzk"><title>How to Run 32&ndash;bit PAE Guest Domains</title><para>By default, physical address extensions (PAE) mode is used on 32-bit
+systems, aiding compatibility with other domain 0 implementations. Solaris
+can boot under either PAE or non-PAE, if the hypervisor version has bi-modal
+support.</para><task id="gfwrv"><title>How to Boot Solaris Control Domain in 32&ndash;bit
+Mode</title><tasksummary><para>To boot Solaris on xVM in 32-bit mode on a 64-bit
+capable system, the entry must be manually edited to remove all instances
+of <literal>$ISADIR</literal>:</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para> Remove all instances of <literal>$ISADIR</literal> in the <literal>menu.lst</literal> file so that it looks like this:</para><screen>#---------- ADDED BY BOOTADM - DO NOT EDIT ----------
+title 32-bit Solaris xVM
+kernel /boot/xen.gz
+module /platform/i86xpv/kernel/unix /platform/i86xpv/kernel/unix [*]
+module /platform/i86pc/boot_archive
+#---------------------END BOOTADM--------------------</screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="ggcel"><title>Creating Guest Domain Environments Using File Systems</title><para>Prior to installing guest domains (domain Us), you must decide how to
+create the guest domain environment. The following methods using file systems
+are available:</para><variablelist><varlistentry><term>Solaris ZFS</term><listitem><para>Uses the Solaris ZFS file system and volume datasets to enable
+the rapid provisioning of guest domains.</para>
+</listitem>
+</varlistentry><varlistentry><term></term><listitem><para>Uses normal files to store guest domain disk images. Live
+migrations are done using Network File System (NFS).</para>
+</listitem>
+</varlistentry>
+</variablelist><task id="ggcdl"><title>How to Configure ZFS for Use With Solaris xVM</title><tasksummary><para>First, create a new storage pool using the <command>zpool</command> command
+described in <olink targetdoc="group-refman" targetptr="zpool-1m" remap="external"><citerefentry><refentrytitle>zpool</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.
+The name of the disk can be specified as a full device path, such as <literal>/dev/dsk/c0t0d0s0</literal> , or as a disk name, such as <literal>c1t0d0</literal>. Multiple
+disks can be specified by using disk names separated by a space, to use disk
+striping.</para><para>Then, create a Solaris ZFS volume to store the guest domain master image.
+Note that the Solaris ZFS volume is a dataset, however, it represents a block
+device and can be used like traditional UNIX block devices.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Create a new storage pool named <literal>xpool</literal> that
+includes the disk <literal>c1t0d0</literal>.</para><screen># <userinput>zpool create xpool c1t0d0</userinput></screen><para>The <option>f</option> option can be used to force the action.</para>
+</step><step><para>Verify that the storage pool is created:</para><screen># zpool list
+NAME    SIZE USED  AVAIL CAP HEALTH ALTROOT
+xpool   34G  156K  34.0G 0%  ONLINE -L</screen><para>You can use the <command>zpool</command> <literal>iostat</literal> command
+to view information about the I/O throughput of the newly created storage
+pool.</para>
+</step><step><para>Create an 8&ndash;Gbyte Solaris ZFS volume to store the guest
+domain master image.</para><screen># <userinput>zfs create -V 8gb xpool/domU-master</userinput></screen>
+</step><step><para>List the Solaris ZFS volume block device nodes, which are identified
+as devices in the <literal>/dev/zvol/dsk</literal> and <literal>/dev/zvol/rdsk</literal> directories.</para><screen># <userinput>ls -l /dev/zvol/dsk/xpool</userinput>
+total 2
+lrwxrwxrwx 1 root 35 Apr 19 10:24 domu.master ->../../ll/ll/devices/pseudo/zfs@0:1c</screen>
+</step>
+</procedure>
+</task><task id="ggcnf"><title>How to Use Files to Store Guest Domain Disk Images</title><tasksummary><para>A files based approach uses normal files to store guest domain disk
+images, and enables live migrations through NFS. A guest domain disk image
+is created using the <command>mkfile</command> command described in <olink targetdoc="group-refman" targetptr="mkfile-1m" remap="external"><citerefentry><refentrytitle>mkfile</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. The following
+example creates a 10&ndash;Gbyte file for use by the Solaris Operating System
+guest domain disk image. Note that disk blocks are not allocated until data
+is written even though a size is specified.</para><para>If executing the <command>mkfile</command> command as a non-root user,
+be sure to manually set the sticky bit with the <command>chmod</command> command.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para>
+</step><step><para>Create the disk image.</para><screen>$ <userinput>mkfile -n 10g solaris-pv.img</userinput></screen>
+</step><step><para>Check the size of the disk image using the <command>ls</command> command.</para><screen>$ <userinput>ls -l solaris-pv.img</userinput>
+-rw------T 1 root root 10737418240 May 17 13:43 solaris-pv.imgo</screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="gextr"><title>Starting xVM</title><task id="geyvp"><title>(Optional) How to Configure the Network</title><tasksummary><para>This is an optional procedure. If you have more than one physical NIC
+configured, you might want to configure the <literal>default-nic</literal> property
+of the <literal>xvm/xend</literal> SMF service. The NIC must support GLDv3.
+Supported NICs include <literal>bge</literal>, <literal>e1000g</literal>, <literal>xge</literal>, <literal>nge</literal>, and <literal>rge</literal>.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the appropriate role.</para>
+</step><step><para>Configure <literal>default-nic</literal> property of the <literal>xvm/xend</literal> SMF service.</para>
+</step>
+</procedure>
+</task><task id="gfzgv"><title>How to Enable Migration to This Machine</title><tasksummary><para>This procedure is used to allow migration to this machine from another
+control domain.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the appropriate role.</para>
+</step><step><para>Edit the <literal>xend-relocation-address</literal>, <literal>xend-relocation-hosts-allow</literal>, and <literal>xend-relocation-server</literal> properties of <literal>xvm/xend</literal>.</para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

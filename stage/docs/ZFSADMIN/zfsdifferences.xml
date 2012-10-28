@@ -1,0 +1,84 @@
+<chapter id="gbcik"><title>ZFS and Traditional File System Differences</title><highlights><para>This chapter discusses some significant differences between ZFS and
+traditional file systems. Understanding these key differences can help reduce
+confusion when using traditional tools to interact with ZFS.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gbcby" remap="internal">ZFS File System Granularity</olink></para>
+</listitem><listitem><para><olink targetptr="gbchp" remap="internal">ZFS Space Accounting</olink></para>
+</listitem><listitem><para><olink targetptr="gayra" remap="internal">Out of Space Behavior</olink></para>
+</listitem><listitem><para><olink targetptr="gayql" remap="internal">Mounting ZFS File Systems</olink></para>
+</listitem><listitem><para><olink targetptr="gazcc" remap="internal">Traditional Volume Management</olink></para>
+</listitem><listitem><para><olink targetptr="gbcaq" remap="internal">New Solaris ACL Model</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gbcby"><title>ZFS File System Granularity</title><para>Historically, file systems have been constrained to one device so that
+the file systems themselves have been constrained to the size of the device.
+Creating and re-creating traditional file systems because of size constraints
+are time-consuming and sometimes difficult. Traditional volume management
+products helped manage this process.</para><para>Because ZFS file systems are not constrained to specific devices, they
+can be created easily and quickly, similar to the way directories are created.
+ZFS file systems grow automatically within the space allocated to the storage
+pool.</para><para>Instead of creating one file system, such as <filename>/export/home</filename>,
+to manage many user subdirectories, you can create one file system per user.
+In addition, ZFS provides a file system hierarchy so that you can easily set
+up and manage many file systems by applying properties that can be inherited
+by file systems contained within the hierarchy.</para><para>For an example of creating a file system hierarchy, see <olink targetptr="gaypa" remap="internal">Creating a ZFS File System Hierarchy</olink>.</para>
+</sect1><sect1 id="gbchp"><title>ZFS Space Accounting</title><para>ZFS is based on a concept of pooled storage. Unlike typical file systems,
+which are mapped to physical storage, all ZFS file systems in a pool share
+the available storage in the pool. So, the available space reported by utilities
+such as <command>df</command> might change even when the file system is inactive,
+as other file systems in the pool consume or release space. Note that the
+maximum file system size can be limited by using quotas. For information about
+quotas, see <olink targetptr="gazud" remap="internal">Setting Quotas on ZFS File Systems</olink>.
+Space can be guaranteed to a file system by using reservations. For information
+about reservations, see <olink targetptr="gbdbb" remap="internal">Setting Reservations on ZFS
+File Systems</olink>. This model is very similar to the NFS model, where multiple
+directories are mounted from the same file system (consider <filename>/home</filename>).</para><para>All metadata in ZFS is allocated dynamically. Most other file systems
+pre-allocate much of their metadata. As a result, an immediate space cost
+at file system creation for this metadata is required. This behavior also
+means that the total number of files supported by the file systems is predetermined.
+Because ZFS allocates its metadata as it needs it, no initial space cost is
+required, and the number of files is limited only by the available space.
+The output from the <command>df -g</command> command must be interpreted differently
+for ZFS than other file systems. The <computeroutput>total files</computeroutput> reported
+is only an estimate based on the amount of storage that is available in the
+pool.</para><para>ZFS is a transactional file system. Most file system modifications are
+bundled into transaction groups and committed to disk asynchronously. Until
+these modifications are committed to disk, they are termed <emphasis>pending
+changes</emphasis>. The amount of space used, available, and referenced by
+a file or file system does not consider pending changes. Pending changes are
+generally accounted for within a few seconds. Even committing a change to
+disk by using <command>fsync(3c)</command> or <literal>O_SYNC</literal> does
+not necessarily guarantee that the space usage information is updated immediately.</para><sect2 id="gayra"><title>Out of Space Behavior</title><para>File system snapshots are inexpensive and easy to create in ZFS. Most
+likely, snapshots will be common in most ZFS environments. For information
+about ZFS snapshots, see <olink targetptr="gavvx" remap="internal">Chapter&nbsp;6, Working With ZFS Snapshots and Clones</olink>.</para><para>The presence of snapshots can cause some unexpected behavior when you
+attempt to free space. Typically, given appropriate permissions, you can remove
+a file from a full file system, and this action results in more space becoming
+available in the file system. However, if the file to be removed exists in
+a snapshot of the file system, then no space is gained from the file deletion.
+The blocks used by the file continue to be referenced from the snapshot.</para><para>As a result, the file deletion can consume more disk space, because
+a new version of the directory needs to be created to reflect the new state
+of the namespace. This behavior means that you can get an unexpected <errorname>ENOSPC</errorname> or <errorname>EDQUOT</errorname> when attempting to remove a
+file.</para>
+</sect2>
+</sect1><sect1 id="gayql"><title>Mounting ZFS File Systems</title><para>ZFS is designed to reduce complexity and ease administration. For example,
+with existing file systems you must edit the <filename>/etc/vfstab</filename> file
+every time you add a new file system. ZFS has eliminated this requirement
+by automatically mounting and unmounting file systems according to the properties
+of the dataset. You do not need to manage ZFS entries in the <filename>/etc/vfstab</filename> file.</para><para>For more information about mounting and sharing ZFS file systems, see <olink targetptr="gaynd" remap="internal">Mounting and Sharing ZFS File Systems</olink>.</para>
+</sect1><sect1 id="gazcc"><title>Traditional Volume Management</title><para>As described in <olink targetptr="gaypk" remap="internal">ZFS Pooled Storage</olink>,
+ZFS eliminates the need for a separate volume manager. ZFS operates on raw
+devices, so it is possible to create a storage pool comprised of logical volumes,
+either software or hardware. This configuration is not recommended, as ZFS
+works best when it uses raw physical devices. Using logical volumes might
+sacrifice performance, reliability, or both, and should be avoided.</para>
+</sect1><sect1 id="gbcaq"><title>New Solaris ACL Model</title><para>Previous versions of the Solaris OS supported an ACL implementation
+that was primarily based on the POSIX ACL draft specification. The POSIX-draft
+based ACLs are used to protect UFS files. A new ACL model that is based on
+the NFSv4 specification is used to protect ZFS files.</para><para>The main differences of the new Solaris ACL model are as follows:</para><itemizedlist><listitem><para>Based on the NFSv4 specification and are similar to NT-style
+ACLs.</para>
+</listitem><listitem><para>Much more granular set of access privileges.</para>
+</listitem><listitem><para>Set and displayed with the <command>chmod</command> and <command>ls</command> commands rather than the <command>setfacl</command> and <command>getfacl</command> commands.</para>
+</listitem><listitem><para>Richer inheritance semantics for designating how access privileges
+are applied from directory to subdirectories, and so on.</para>
+</listitem>
+</itemizedlist><para>For more information about using ACLs with ZFS files, see <olink targetptr="ftyxi" remap="internal">Chapter&nbsp;7, Using ACLs to Protect ZFS Files</olink>.</para>
+</sect1>
+</chapter>

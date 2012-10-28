@@ -1,0 +1,213 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>C Code Examples for Accessing <tt>exacct</tt> Files - Solaris Containers: Resource Management and Solaris Zones Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-05-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris Containers: Resource Management and Solaris Zones Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ext-acctg-16.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ext-acctg-1.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="concepts-2.html">1.&nbsp;&nbsp;Resource Management in the Solaris Operating System</a></p>
+<p class="toc level1 tocsp"><a href="tasks-3.html">2.&nbsp;&nbsp;Projects and Tasks</a></p>
+<p class="toc level1 tocsp"><a href="ext-acctg-11.html">3.&nbsp;&nbsp;Using the C Interface to Extended Accounting</a></p>
+<p class="toc level2"><a href="ext-acctg-12.html">Overview of the C Interface to Extended Accounting</a></p>
+<p class="toc level2"><a href="ext-acctg-16.html">Extended Accounting API Functions</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">C Code Examples for Accessing <tt>exacct</tt> Files</a></p>
+</div>
+<p class="toc level2"><a href="ext-acctg-1.html">Programming Issues With <tt>exacct</tt> Files</a></p>
+<p class="toc level1 tocsp"><a href="extacctg-perl-1.html">4.&nbsp;&nbsp;Using the Perl Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="resource-ctrls-8.html">5.&nbsp;&nbsp;Resource Controls</a></p>
+<p class="toc level1 tocsp"><a href="resource-pools-5.html">6.&nbsp;&nbsp;Resource Pools</a></p>
+<p class="toc level1 tocsp"><a href="fquzd.html">7.&nbsp;&nbsp;Design Considerations for Resource Management Applications in Solaris Zones</a></p>
+<p class="toc level1 tocsp"><a href="faate.html">8.&nbsp;&nbsp;Configuration Examples</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="ext-acctg-15"></a><h3>C Code Examples for Accessing <tt>exacct</tt> Files</h3>
+<p>This section provides code examples for accessing <tt>exacct</tt> files.</p>Example&nbsp;3-1 Displaying <tt>exacct</tt> Data for a Designated <tt>pid</tt><p><a name="indexterm-15"></a>This example displays a specific <tt>pid</tt>'s <tt>exacct</tt> data snapshot from the kernel.</p><pre>...
+  ea_object_t *scratch;
+  int unpk_flag = EUP_ALLOC;  /* use the same allocation flag */
+                              /* for unpack and free */
+
+  /* Omit return value checking, to keep code samples short */
+
+  bsize = getacct(P_PID, pid, NULL, 0);
+  buf = malloc(bsize);
+
+  /* Retrieve exacct object and unpack */
+  getacct(P_PID, pid, buf, bsize);
+  ea_unpack_object(&amp;scratch, unpk_flag, buf, bsize);
+
+  /* Display the exacct record */
+  disp_obj(scratch);
+  if (scratch->eo_type == EO_GROUP) {
+         disp_group(scratch);
+  }
+  ea_free_object(scratch, unpk_flag);
+        ...    </pre>Example&nbsp;3-2 Identifying Individual Tasks During a Kernel Build<p><a name="indexterm-16"></a>This example evaluates kernel builds and displays a string that describes the portion
+of the source tree being built by this task make. Display the portion
+of the source being built to aid in the per-source-directory analysis.</p><p>The key points for this example include the following:</p>
+<ul><li><p>To aggregate the time for a <tt>make</tt>, which could include many processes, each <tt>make</tt> is initiated as a task. Child <tt>make</tt> processes are created as different tasks. To aggregate across the makefile tree, the parent-child task relationship must be identified.</p></li>
+<li><p>Add a tag with this information to the task's <tt>exacct</tt> file. Add a current working directory string that describes the portion of the source tree being built by this task make.</p><pre>ea_set_item(&amp;cwd, EXT_STRING | EXC_LOCAL | MY_CWD, 
+                               cwdbuf, strlen(cwdbuf));</pre></li></ul>
+<pre>  ...
+/* Omit return value checking and error processing */
+/* to keep code sample short */
+ptid = gettaskid();    /* Save "parent" task-id */
+tid = settaskid(getprojid(), TASK_NORMAL);    /* Create new task */
+
+/* Set data for item objects ptskid and cwd */
+ea_set_item(&amp;ptskid, EXT_UINT32 | EXC_LOCAL | MY_PTID, &amp;ptid, 0);
+ea_set_item(&amp;cwd, EXT_STRING | EXC_LOCAL | MY_CWD, cwdbuf, strlen(cwdbuf));
+
+/* Set grp object and attach ptskid and cwd to grp */
+ea_set_group(&amp;grp, EXT_GROUP | EXC_LOCAL |  EXD_GROUP_HEADER);
+ea_attach_to_group(&amp;grp, &amp;ptskid);
+ea_attach_to_group(&amp;grp, &amp;cwd);
+
+/* Pack the object and put it back into the accounting stream */
+ea_buflen = ea_pack_object(&amp;grp, ea_buf, sizeof(ea_buf));
+putacct(P_TASKID, tid, ea_buf, ea_buflen, EP_EXACCT_OBJECT);
+
+/* Memory management: free memory allocate in ea_set_item */
+ea_free_item(&amp;cwd, EUP_ALLOC);
+  ...</pre>Example&nbsp;3-3 Reading and Displaying the Contents of a System <tt>exacct</tt> File<p><a name="indexterm-17"></a>This example shows how to read and display a system <tt>exacct</tt> file for
+a process or a task. </p><p>The key points for this example include the following:</p>
+<ul><li><p>Call <tt>ea_get_object()</tt> to get the next object in the file. Call <tt>ea_get_object()</tt> in a loop until EOF enables a complete traversal of the <tt>exacct</tt> file.</p></li>
+<li><p><tt>catalog_name()</tt> uses the <tt>catalog_item</tt> structure to convert a Solaris catalog's type ID to a meaningful string that describes the content of the object's data. The type ID is obtained by masking the lowest 24 bits, or 3 bytes.</p><pre>switch(o->eo_catalog &amp; EXT_TYPE_MASK) {
+  case EXT_UINT8:
+      printf(" 8: %u", o->eo_item.ei_uint8);
+      break;
+  case EXT_UINT16:
+  ...
+}</pre></li>
+<li><p>The upper 4 bits of <tt>TYPE_MASK</tt> are used to find out the data type to print the object's actual data.</p></li>
+<li><p><tt>disp_group()</tt> takes a pointer to a group object and the number of objects in the group. For each object in the group, <tt>disp_group()</tt> calls <tt>disp_obj()</tt> and recursively calls <tt>disp_group()</tt> if the object is a group object.</p></li></ul>
+<pre>/* Omit return value checking and error processing */
+/* to keep code sample short */
+main(int argc, char *argv)
+{
+  ea_file_t ef;
+  ea_object_t scratch;
+  char *fname;
+        
+  fname = argv[1];
+  ea_open(&amp;ef, fname, NULL,  EO_NO_VALID_HDR, O_RDONLY, 0);
+  bzero(&amp;scratch, sizeof (ea_object_t));
+  while (ea_get_object(&amp;ef, &amp;scratch)  != -1) {
+         disp_obj(&amp;scratch);
+         if (scratch.eo_type == EO_GROUP)
+             disp_group(&amp;ef, scratch.eo_group.eg_nobjs);
+         bzero(&amp;scratch, sizeof (ea_object_t));
+  }
+  ea_close(&amp;ef);
+}
+
+struct catalog_item {   /* convert Solaris catalog's type ID */
+                        /* to a meaningful string */
+     int    type;
+     char *name;
+ } catalog[] = {
+     { EXD_VERSION,     "version\t" },
+     ...
+     { EXD_PROC_PID,    "  pid\t" },
+     ...
+   };
+
+ static char *
+ catalog_name(int type)
+ {
+     int i = 0;
+     while (catalog[i].type != EXD_NONE) {
+         if (catalog[i].type == type)
+             return (catalog[i].name);    
+         else
+             i++;
+     }
+     return ("unknown\t");
+ }
+
+ static void disp_obj(ea_object_t *o)
+ {
+     printf("%s\t", catalog_name(o->eo_catalog &amp; 0xffffff));
+     switch(o->eo_catalog &amp; EXT_TYPE_MASK) {
+     case EXT_UINT8:
+         printf(" 8: %u", o->eo_item.ei_uint8);
+         break;
+     case EXT_UINT16:
+     ...
+ }
+ static void disp_group(ea_file_t *ef, uint_t nobjs)
+ {
+     for (i = 0; i &lt; nobjs; i++) {
+         ea_get_object(ef, &amp;scratch));
+                  disp_obj(&amp;scratch);
+         if (scratch.eo_type == EO_GROUP)
+                disp_group(ef, scratch.eo_group.eg_nobjs);
+        }
+ }</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ext-acctg-16.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ext-acctg-1.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

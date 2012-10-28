@@ -1,0 +1,156 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Locality Group Hierarchy - Memory and Thread Placement Optimization Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-06-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Memory and Thread Placement Optimization Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-4.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="lgroups-30.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="geshf.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="lgroups-1.html">1.&nbsp;&nbsp;Locality Group APIs</a></p>
+<p class="toc level2"><a href="lgroups-2.html">Locality Groups Overview</a></p>
+<p class="toc level2"><a href="lgroups-27.html">Verifying the Interface Version</a></p>
+<p class="toc level2"><a href="lgroups-4.html">Initializing the Locality Group Interface</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Locality Group Hierarchy</a></p>
+</div>
+<p class="toc level2"><a href="lgroups-30.html">Locality Group Contents</a></p>
+<p class="toc level2"><a href="lgroups-31.html">Locality Group Characteristics</a></p>
+<p class="toc level2"><a href="lgroups-32.html">Locality Groups and Thread and Memory Placement</a></p>
+<p class="toc level2"><a href="lgroups-33.html">Examples of API Usage</a></p>
+<p class="toc level1 tocsp"><a href="gevrx.html">2.&nbsp;&nbsp;MPO Observability Tools</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="lgroups-29"></a><h3>Locality Group Hierarchy</h3>
+<p>The APIs that are described in this section enable the calling thread to
+navigate the lgroup hierarchy. The lgroup hierarchy is a directed acyclic graph that
+is similar to a tree, except that a node might have more
+than one parent. The root lgroup represents the whole machine and contains all
+of that machine's resources. The root lgroup is the lgroup with the highest
+latency value in the system. Each of the child lgroups contains a subset
+of the hardware that is in the root lgroup. Each child lgroup is
+bounded by a lower latency value. Locality groups that are closer to the
+root have more resources and a higher latency. Locality groups that are closer
+to the leaves have fewer resources and a lower latency. An lgroup can
+contain resources directly within its latency boundary. An lgroup can also contain leaf
+lgroups that contain their own sets of resources. The resources of leaf lgroups
+are available to the lgroup that encapsulates those leaf lgroups.</p>
+
+<a name="lgroups-8"></a><h4>Using <tt>lgrp_cookie_stale()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-cookie-stale-3lgrp?a=view"><tt>lgrp_cookie_stale</tt>(3LGRP)</a> function determines whether the snapshot of the lgroup hierarchy represented by
+the given cookie is current.</p><pre>#include &lt;sys/lgrp_user.h>
+int lgrp_cookie_stale(lgrp_cookie_t cookie);</pre><p>The cookie returned by the <tt>lgrp_init()</tt> function can become stale due to several
+reasons that depend on the view that the snapshot represents. A cookie that
+is returned by calling the <tt>lgrp_init()</tt> function with the view set to <tt>LGRP_VIEW_OS</tt>
+can become stale due to changes in the lgroup hierarchy such as dynamic
+reconfiguration or a change in a CPU's online status. A cookie that is
+returned by calling the <tt>lgrp_init()</tt> function with the view set to <tt>LGRP_VIEW_CALLER</tt>
+can become stale due to changes in the calling thread's processor set or
+changes in the lgroup hierarchy. A stale cookie is refreshed by calling the
+<tt>lgrp_fini()</tt> function with the old cookie, followed by calling <tt>lgrp_init()</tt> to generate
+a new cookie.</p><p>The <tt>lgrp_cookie_stale()</tt> function returns <tt>EINVAL</tt> when the given cookie is invalid.</p>
+
+<a name="lgroups-9"></a><h4>Using <tt>lgrp_view()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-view-3lgrp?a=view"><tt>lgrp_view</tt>(3LGRP)</a> function determines the view with which a given lgroup hierarchy snapshot
+was taken.</p><pre>#include &lt;sys/lgrp_user.h>
+lgrp_view_t lgrp_view(lgrp_cookie_t cookie);</pre><p>The <tt>lgrp_view()</tt> function takes a cookie that represents a snapshot of the lgroup
+hierarchy and returns the snapshot's view of the lgroup hierarchy. Snapshots that are
+taken with the view <tt>LGRP_VIEW_CALLER</tt> contain only the resources that are available
+to the calling thread. Snapshots that are taken with the view <tt>LGRP_VIEW_OS</tt> contain all
+the resources that are available to the operating system.</p><p>The <tt>lgrp_view()</tt> function returns <tt>EINVAL</tt> when the given cookie is invalid.</p>
+
+<a name="lgroups-10"></a><h4>Using <tt>lgrp_nlgrps()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-nlgrps-3lgrp?a=view"><tt>lgrp_nlgrps</tt>(3LGRP)</a> function returns the number of locality groups in the system. If
+a system has only one locality group, memory placement optimizations have no effect.</p><pre>#include &lt;sys/lgrp_user.h>
+int lgrp_nlgrps(lgrp_cookie_t cookie);</pre><p>The <tt>lgrp_nlgrps()</tt> function takes a cookie that represents a snapshot of the lgroup
+hierarchy and returns the number of lgroups available in the hierarchy.</p><p>The <tt>lgrp_nlgrps()</tt> function returns <tt>EINVAL</tt> when the cookie is invalid.</p>
+
+<a name="lgroups-35"></a><h4>Using <tt>lgrp_root()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-root-3lgrp?a=view"><tt>lgrp_root</tt>(3LGRP)</a> function returns the root lgroup ID.</p><pre>#include &lt;sys/lgrp_user.h>
+lgrp_id_t lgrp_root(lgrp_cookie_t cookie);</pre><p>The <tt>lgrp_root()</tt> function takes a cookie that represents a snapshot of the lgroup
+hierarchy and returns the root lgroup ID.</p>
+
+<a name="lgroups-36"></a><h4>Using <tt>lgrp_parents()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-parents-3lgrp?a=view"><tt>lgrp_parents</tt>(3LGRP)</a> function takes a cookie that represents a snapshot of the lgroup
+hierarchy and returns the number of parent lgroups for the specified lgroup.</p><pre>#include &lt;sys/lgrp_user.h>
+int lgrp_parents(lgrp_cookie_t cookie, lgrp_id_t child,
+                 lgrp_id_t *lgrp_array, uint_t lgrp_array_size);</pre><p>If <tt>lgrp_array</tt> is not <tt>NULL</tt> and the value of <tt>lgrp_array_size</tt> is not zero,
+the <tt>lgrp_parents()</tt> function fills the array with parent lgroup IDs until the
+array is full or all parent lgroup IDs are in the array. The
+root lgroup has zero parents. When the <tt>lgrp_parents()</tt> function is called for the root
+lgroup, <tt>lgrp_array</tt> is not filled in.</p><p>The <tt>lgrp_parents()</tt> function returns <tt>EINVAL</tt> when the cookie is invalid. The <tt>lgrp_parents()</tt> function
+returns <tt>ESRCH</tt> when the specified lgroup ID is not found.</p>
+
+<a name="lgroups-37"></a><h4>Using <tt>lgrp_children()</tt></h4>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-children-3lgrp?a=view"><tt>lgrp_children</tt>(3LGRP)</a> function takes a cookie that represents the calling thread's snapshot of
+the lgroup hierarchy and returns the number of child lgroups for the specified
+lgroup.</p><pre>#include &lt;sys/lgrp_user.h>
+int lgrp_children(lgrp_cookie_t cookie, lgrp_id_t parent,
+                  lgrp_id_t *lgrp_array, uint_t lgrp_array_size);</pre><p>If <tt>lgrp_array</tt> is not <tt>NULL</tt> and the value of <tt>lgrp_array_size</tt> is not zero,
+the <tt>lgrp_children()</tt> function fills the array with child lgroup IDs until the
+array is full or all child lgroup IDs are in the array.</p><p>The <tt>lgrp_children()</tt> function returns <tt>EINVAL</tt> when the cookie is invalid. The <tt>lgrp_children()</tt> function
+returns <tt>ESRCH</tt> when the specified lgroup ID is not found.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-4.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="lgroups-30.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

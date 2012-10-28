@@ -1,0 +1,579 @@
+<chapter id="resource-pools-5"><title>Resource Pools</title><highlights><para>This chapter describes resource pools and their properties.</para><itemizedlist><listitem><para><olink targetptr="resource-pools-6" remap="internal">Overview of Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="resource-pools-12" remap="internal">Dynamic Resource Pool
+Constraints and Objectives</olink></para>
+</listitem><listitem><para><olink targetptr="resource-pools-1" remap="internal">Resource Pools API Functions</olink></para>
+</listitem><listitem><para><olink targetptr="resource-pools-14" remap="internal">Resource Pool Code Examples</olink></para>
+</listitem><listitem><para><olink targetptr="resource-pools-35" remap="internal">Programming Issues Associated
+With Resource Pools</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="resource-pools-6"><title>Overview of Resource Pools</title><para>Resource pools provide a framework for managing processor sets
+and thread scheduling classes. Resource pools are used for partitioning machine
+resources. Resource pools enable you to separate workloads so that workload
+consumption of certain resources does not overlap. The resource reservation
+helps to achieve predictable performance on systems with mixed workloads.</para><para>For an overview of resource pools and example commands for administering
+resource pools, see <olink targetdoc="sysadrm" targetptr="rmpool-1" remap="external">Chapter 12, <citetitle remap="chapter">Resource Pools (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink> and <olink targetdoc="sysadrm" targetptr="rmpool.task-1" remap="external">Chapter 13, <citetitle remap="chapter">Creating and Administering Resource Pools (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><para>A processor set groups the CPUs on a system into a bounded entity, on
+which a process or processes can run exclusively. Processes cannot extend
+beyond the processor set, nor can other processes extend into the processor
+set. A processor set enables tasks of similar characteristics to be grouped
+together and a hard upper boundary for CPU use to be set.</para><para>The resource pool framework allows the definition of a soft processor
+set with a maximum and minimum CPU count requirement. Additionally, the framework
+provides a hard-defined scheduling class for that processor set.</para><para>A zone can be bound to a resource pool through the <literal>pool</literal> property
+of the zone configuration. The zone is bound to the specified pool upon creation
+of the zone. The pool configuration can be changed only from the global zone.
+Zones cannot span multiple pools. All processes in a zone run in the same
+pool. However, multiple zones can bind to the same resource pool.</para><para>A resource pool defines:</para><itemizedlist><listitem><para>Processor set groups</para>
+</listitem><listitem><para>Scheduling class</para>
+</listitem>
+</itemizedlist><sect2 id="resource-pools-37"><title>Scheduling Class</title><para>Scheduling classes provide different CPU access characteristics
+to threads that are based on algorithmic logic. The scheduling classes include:</para><itemizedlist><listitem><para>Realtime scheduling class</para>
+</listitem><listitem><para>Interactive scheduling class</para>
+</listitem><listitem><para>Fixed priority scheduling class</para>
+</listitem><listitem><para>Timesharing scheduling class</para>
+</listitem><listitem><para>Fair share scheduling class</para>
+</listitem>
+</itemizedlist><para>For an overview of fair share scheduler and example commands for administering
+the fair share scheduler, see <olink targetdoc="sysadrm" targetptr="rmfss-1" remap="external">Chapter 8, <citetitle remap="chapter">Fair Share Scheduler (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink> and <olink targetdoc="sysadrm" targetptr="rmfss.task-1" remap="external">Chapter 9, <citetitle remap="chapter">Administering the Fair Share Scheduler (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><para>Do not mix scheduling classes in a set of CPUs. If scheduling classes
+are mixed in a CPU set, system performance might become erratic and unpredictable.
+Use processor sets to segregate applications by their characteristics. Assign
+scheduling classes under which the application best performs. For more information
+about the characteristics of an individual scheduling class, see <literal>priocntl</literal>(1).</para><para>For an overview of resource pools and a discussion of when to use pools,
+see <olink targetptr="resource-pools-5" remap="internal">Chapter&nbsp;6, Resource Pools</olink>.</para>
+</sect2>
+</sect1><sect1 id="resource-pools-12"><title>Dynamic Resource Pool Constraints and
+Objectives</title><para>The <literal>libpool</literal> library defines properties that
+are available to the various entities that are managed within the pools facility.
+Each property falls into the following categories:</para><variablelist termlength="wholeline"><varlistentry><term><userinput>Configuration constraints</userinput></term><listitem><para>A constraint defines boundaries of a property. Typical constraints
+are the maximum and minimum allocations specified in the <literal>libpool</literal> configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><userinput>Objective</userinput></term><listitem><para>An objective changes the resource assignments of the current
+configuration to generate new candidate configurations that observe the established
+constraints. An objective has the following categories:</para><variablelist><varlistentry><term><userinput>Workload dependent</userinput></term><listitem><para>A workload-dependent objective varies according to the conditions
+imposed by the workload. An example of the workload dependent objective is
+the <literal>utilization</literal> objective.</para>
+</listitem>
+</varlistentry><varlistentry><term><userinput>Workload independent</userinput></term><listitem><para>A workload-independent objective does not vary according to
+the conditions imposed by the workload. An example of the workload independent
+objective is the <literal>cpu locality</literal> objective.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>An objective can take an optional prefix to indicate the importance
+of the objective. The objective is multiplied by this prefix, which is an
+integer from 0 to INT64_MAX,, to determine the significance of the objective.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For usage examples, see <olink targetdoc="sysadrm" targetptr="gcvwh" remap="external"><citetitle remap="section">How to Set Configuration Constraints</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink> and <olink targetdoc="sysadrm" targetptr="rmpool.task-108" remap="external"><citetitle remap="section">How to Define Configuration Objectives</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><sect2 id="resource-pools-2"><title>System Properties</title><variablelist termlength="wholeline"><varlistentry><term><literal>system.bind-default</literal> (<userinput>writable
+boolean</userinput>)</term><listitem><para>If the specified pool is not found in &lt;<filename>filename</filename>><filename>/etc/project</filename>&lt;<filename>/filename</filename>>, bind to pool with
+the <literal>pool.default</literal> property set to TRUE.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>system.comment</literal> (<userinput>writable
+string</userinput>)</term><listitem><para>User description of system. <literal>system.comment</literal> is
+not used by the default pools commands, except when a configuration is initiated
+by the <literal>poolcfg</literal> utility. In this case, the system puts an
+informative message in the <literal>system.comment</literal> property for
+that configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>system.name</literal> (<userinput>writable string</userinput>)</term><listitem><para>User name for the configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>system.version</literal> (read-only integer)</term><listitem><para><literal>libpool</literal> version required to manipulate
+this configuration.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="resource-pools-3"><title>Pools Properties</title><para>All pools properties except <literal>pool.default</literal> and <literal>pool.sys_id</literal> are writable.</para><variablelist termlength="wholeline"><varlistentry><term><literal>pool.active</literal> (<userinput>writable boolean</userinput>)</term><listitem><para>If TRUE, mark this pool as active.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.comment</literal> (<userinput>writable string</userinput>)</term><listitem><para>User description of pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.default</literal> (<userinput>read-only
+boolean</userinput>)</term><listitem><para>If TRUE, mark this pool as the default pool. See the <literal>system.bind-default</literal> property.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.importance</literal> (<userinput>writable
+integer</userinput>)</term><listitem><para>Relative importance of this pool. Used for possible resource
+dispute resolution.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.name</literal> (<userinput>writable string</userinput>)</term><listitem><para>User name for pool. <literal>setproject</literal>(3PROJECT)
+uses <literal>pool.name</literal> as the value for the <literal>project.pool</literal> project
+attribute in the <literal>project</literal>(4) database.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.scheduler</literal> (<userinput>writable
+string</userinput>)</term><listitem><para>Scheduler class to which consumers of  this pool are bound.
+This property is optional and if not specified, the scheduler bindings for
+consumers of this pool are not affected. For more information about the characteristics
+of an individual scheduling class, see <literal>priocntl</literal>(1). Scheduler
+classes include:</para><itemizedlist><listitem><para>RT for realtime scheduler</para>
+</listitem><listitem><para>TS for timesharing scheduler</para>
+</listitem><listitem><para>IA for interactive scheduler</para>
+</listitem><listitem><para>FSS for fair share scheduler</para>
+</listitem><listitem><para>FX for fixed priority scheduler</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</varlistentry><varlistentry><term><literal>pool.sys_id</literal> (<userinput>read-only integer</userinput>)</term><listitem><para>This is the system-assigned pool ID.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="resource-pools-4"><title>Processor Set Properties</title><variablelist termlength="wholeline"><varlistentry><term><literal>pset.comment</literal> (<userinput>writable string</userinput>)</term><listitem><para>User description of resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.default</literal> (read-only boolean)</term><listitem><para>Identifies the default processor set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.escapable</literal> (<userinput>writable
+boolean</userinput>)</term><listitem><para>Represents whether PSET_NOESCAPE is set for this pset. See
+the <literal>pset_setattr</literal>(2) man page.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.load</literal> (read-only unsigned integer)</term><listitem><para>The load for this processor set. The lowest value is 0. The
+value increases in a linear fashion with the load on the set, as measured
+by the number of jobs in the system run queue.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.max</literal> (<userinput>writable unsigned
+integer</userinput>)</term><listitem><para>Maximum number of CPUs that are permitted in this processor
+set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.min</literal> (<userinput>writable unsigned
+integer</userinput>)</term><listitem><para>Minimum number of CPUs that are permitted in this processor
+set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.name</literal> (<userinput>writable string</userinput>)</term><listitem><para>User name for the resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.size</literal> (read-only unsigned integer)</term><listitem><para>Current number of  CPUs in this processor set.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.sys_id</literal> (read-only integer)</term><listitem><para>System-assigned processor set ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.type</literal> (read-only string)</term><listitem><para>Names the resource type. Value for all processor sets is <literal>pset</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pset.units</literal> (read-only string)</term><listitem><para>Identifies the meaning of size-related properties. The value
+for all processor sets is <literal>population</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>cpu.comment</literal> (<userinput>writable string</userinput>)</term><listitem><para>User description of CPU</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="resource-pools-40"><title>Using <literal>libpool</literal> to Manipulate
+Pool Configurations</title><para>The <literal>libpool</literal>(3LIB) pool configuration library defines
+the interface for reading and writing pools configuration files. The library
+also defines the interface for committing an existing configuration to becoming
+the running operating system configuration. The &lt;<filename>pool.h</filename>>
+header provides type and function declarations for all library services.</para><para>The resource pools facility brings together process-bindable resources
+into a common abstraction that is called a pool. Processor sets and other
+entities can be configured, grouped, and labelled in a persistent fashion.
+Workload components can be associated with a subset of a system's total resources.
+The <literal>libpool</literal>(3LIB) library provides a C language API for
+accessing the resource pools facility. The <literal>pooladm</literal>(1M), <literal>poolbind</literal>(1M), and <literal>poolcfg</literal>(1M) make the resource
+pools facility available through command invocations from a shell.</para><sect2 id="resource-pools-42"><title>Manipulate <literal>psets</literal></title><para>The following list contains the functions associated with creating or
+destroying psets and manipulating <literal>psets</literal>.</para><variablelist><varlistentry><term><olink targetdoc="refman2" targetptr="processor-bind-2" remap="external"><citerefentry><refentrytitle>processor_bind</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Bind an LWP (lightweight process) or set of LWPs to a specified
+processor.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman2" targetptr="pset-assign-2" remap="external"><citerefentry><refentrytitle>pset_assign</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Assign a processor to a processor set.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman2" targetptr="pset-bind-2" remap="external"><citerefentry><refentrytitle>pset_bind</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Bind one or more LWPs (lightweight processes) to a processor
+set.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman2" targetptr="pset-create-2" remap="external"><citerefentry><refentrytitle>pset_create</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Create an empty processor set that contains no processors.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman2" targetptr="pset-destroy-2" remap="external"><citerefentry><refentrytitle>pset_destroy</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Destroy a processor set and release the associated constituent
+processors and processes.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman2" targetptr="pset-setattr-2" remap="external"><citerefentry><refentrytitle>pset_setattr</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink>, <olink targetdoc="refman2" targetptr="pset-getattr-2" remap="external"><citerefentry><refentrytitle>pset_getattr</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></term><listitem><para>Set or get processor set attributes.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="resource-pools-1"><title>Resource Pools API Functions</title><para>This section lists all of the resource pool functions. Each function
+has a link to the man page and a short description of the function's purpose.
+The functions are divided into two groups, depending on whether the function
+performs an action or a query:</para><itemizedlist><listitem><para><olink targetptr="frjko" remap="internal">Functions for Operating on Resource
+Pools and Associated Elements</olink></para>
+</listitem><listitem><para><olink targetptr="frjkx" remap="internal">Functions for Querying Resource Pools
+and Associated Elements</olink></para>
+</listitem>
+</itemizedlist><para>The imported interfaces for libpool for swap sets is identical to the
+ones defined in this document.</para><sect2 id="frjko"><title>Functions for Operating on Resource Pools and Associated
+Elements</title><para>The interfaces listed in this section are for performing actions related
+to pools and the associated elements.</para><variablelist><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-associate-3pool" remap="external"><citerefentry><refentrytitle>pool_associate</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Associate a resource with a specified pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-component-to-elem-3pool" remap="external"><citerefentry><refentrytitle>pool_component_to_elem</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Convert specified component to the pool element type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-alloc-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_alloc</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Create a pool configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-close-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_close</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Close the specified pool configuration and release the associated
+resources.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-commit-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_commit</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Commit changes made to the specified pool configuration to
+permanent storage.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-export-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_export</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Save the given configuration to the specified location.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-free-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_free</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Release a pool configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-open-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_open</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Create a pool configuration at the specified location.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-remove-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_remove</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Removes the permanent storage for the configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-rollback-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_rollback</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Restore the configuration state to the state that is held
+in the pool configuration's permanent storage.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-to-elem-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_to_elem</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Convert specified pool configuration to the pool element type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-update-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_update</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Update the library snapshot of kernel state.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-create-3pool" remap="external"><citerefentry><refentrytitle>pool_create</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Create a new pool with the default properties and with default
+resources for each type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-destroy-3pool" remap="external"><citerefentry><refentrytitle>pool_destroy</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Destroy the specified pool. The associated resources are not
+modified.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-dissociate-3pool" remap="external"><citerefentry><refentrytitle>pool_dissociate</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Remove the association between the given resource and pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-put-property-3pool" remap="external"><citerefentry><refentrytitle>pool_put_property</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set the named property on the element to the specified value.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-create-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_create</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Create a new resource with the specified name and type for
+the provided configuration. </para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-destroy-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_destroy</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Remove the specified resource from the configuration file.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-to-elem-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_to_elem</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Convert specified pool resource to the pool element type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-transfer-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_transfer</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Transfer basic units from the source resource to the target
+resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-xtransfer-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_xtransfer</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Transfer the specified components from the source resource
+to the target resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-rm-property-3pool" remap="external"><citerefentry><refentrytitle>pool_rm_property</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Remove the named property from the element.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-set-binding-3pool" remap="external"><citerefentry><refentrytitle>pool_set_binding</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Bind the specified processes to the resources that are associated
+with pool on the running system.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-set-status-3pool" remap="external"><citerefentry><refentrytitle>pool_set_status</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Modify the current state of the pools facility.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-to-elem-3pool" remap="external"><citerefentry><refentrytitle>pool_to_elem</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Convert specified pool to the pool element type.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-alloc-3pool" remap="external"><citerefentry><refentrytitle>pool_value_alloc</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Allocate and return an opaque container for a pool property
+value.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-free-3pool" remap="external"><citerefentry><refentrytitle>pool_value_free</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Release an allocated property values.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-bool-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_bool</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set a property value of type <literal>boolean</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-double-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_double</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set a property value of type <literal>double</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-int64-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_int64</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set a property value of type <literal>int64</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-name-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_name</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set a <literal>name=value</literal> pair for a pool property.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-string-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_string</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Copy the string that was passed in.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-set-uint64-3pool" remap="external"><citerefentry><refentrytitle>pool_value_set_uint64</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Set a property value of type <literal>uint64</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="frjkx"><title>Functions for Querying Resource Pools and Associated
+Elements</title><para>The interfaces listed in this section are for performing queries related
+to pools and the associated elements.</para><variablelist><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-component-info-3pool" remap="external"><citerefentry><refentrytitle>pool_component_info</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a string that describes the given component.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-info-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_info</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a string describing the entire configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-location-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_location</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the location string that was provided to <function>pool_conf_open</function> for the given specified configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-status-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_status</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the validity status for a pool configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-conf-validate-3pool" remap="external"><citerefentry><refentrytitle>pool_conf_validate</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Check the validity of the contents of the given configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-dynamic-location-3pool" remap="external"><citerefentry><refentrytitle>pool_dynamic_location</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the location that was used by the pools framework to
+store the dynamic configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-error-3pool" remap="external"><citerefentry><refentrytitle>pool_error</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the error value of the last failure that was recorded
+by calling a resource pool configuration library function.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-binding-3pool" remap="external"><citerefentry><refentrytitle>pool_get_binding</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the name of the pool on the running system that contains
+the set of resources to which the specified process is bound.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-owning-resource-3pool" remap="external"><citerefentry><refentrytitle>pool_get_owning_resource</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the resource that currently contains the specified
+component.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-pool-3pool" remap="external"><citerefentry><refentrytitle>pool_get_pool</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the pool with the specified name from the provided
+configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-property-3pool" remap="external"><citerefentry><refentrytitle>pool_get_property</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the value of the named property from the element.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-resource-3pool" remap="external"><citerefentry><refentrytitle>pool_get_resource</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the resource with the given name and type from the
+provided configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-resource-binding-3pool" remap="external"><citerefentry><refentrytitle>pool_get_resource_binding</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the name of the pool on the running system that contains
+the set of resources to which the given process is bound.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-get-status-3pool" remap="external"><citerefentry><refentrytitle>pool_get_status</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve the current state of the pools facility.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-info-3pool" remap="external"><citerefentry><refentrytitle>pool_info</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a description of the specified pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-query-components-3pool" remap="external"><citerefentry><refentrytitle>pool_query_components</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Retrieve all resource components that match the specified
+list of properties.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-query-pool-resources-3pool" remap="external"><citerefentry><refentrytitle>pool_query_pool_resources</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a null-terminated array of resources currently associated
+with the pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-query-pools-3pool" remap="external"><citerefentry><refentrytitle>pool_query_pools</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the list of pools that match the specified list of
+properties.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-query-resource-components-3pool" remap="external"><citerefentry><refentrytitle>pool_query_resource_components</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a null-terminated array of the components that make
+up the specified resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-query-resources-3pool" remap="external"><citerefentry><refentrytitle>pool_query_resources</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the list of resources that match the specified list
+of properties.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-info-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_info</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a description of the specified resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-resource-type-list-3pool" remap="external"><citerefentry><refentrytitle>pool_resource_type_list</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Enumerate the resource types that are supported by the pools
+framework on this platform.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-static-location-3pool" remap="external"><citerefentry><refentrytitle>pool_static_location</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the location that was used by the pools framework to
+store the default configuration for pools framework instantiation.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-strerror-3pool" remap="external"><citerefentry><refentrytitle>pool_strerror</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return a description of each valid pool error code.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-bool-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_bool</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a property value of type <literal>boolean</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-double-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_double</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a property value of type <literal>double</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-int64-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_int64</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a property value of type <literal>int64</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-name-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_name</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the name that was assigned to the specified pool property.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-string-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_string</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a property value of type <literal>string</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-type-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_type</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Return the type of the data that is contained by the specified
+pool value.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-value-get-uint64-3pool" remap="external"><citerefentry><refentrytitle>pool_value_get_uint64</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get a property value of type <literal>uint64</literal>.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-version-3pool" remap="external"><citerefentry><refentrytitle>pool_version</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Get the version number of the pool library.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-walk-components-3pool" remap="external"><citerefentry><refentrytitle>pool_walk_components</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Invoke callback on all components that are contained in the
+resource.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-walk-pools-3pool" remap="external"><citerefentry><refentrytitle>pool_walk_pools</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Invoke callback on all pools that are defined in the configuration.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-walk-properties-3pool" remap="external"><citerefentry><refentrytitle>pool_walk_properties</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Invoke callback on all properties defined for the given element.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="pool-walk-resources-3pool" remap="external"><citerefentry><refentrytitle>pool_walk_resources</refentrytitle><manvolnum>3POOL</manvolnum>
+</citerefentry></olink></term><listitem><para>Invoke callback on all resources that are associated with
+the pool.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2>
+</sect1><sect1 id="resource-pools-14"><title>Resource Pool Code Examples</title><para>This section contains code examples of the resource pools interface.</para><sect2 id="resource-pools-30"><title>Ascertain the Number of CPUs in the Resource
+Pool</title><para><literal>sysconf</literal>(3C) provides information about the
+number of CPUs on an entire system. The following example provides the granularity
+of ascertaining the number of CPUs that are defined in a particular application's
+pools <literal>pset</literal>.</para><para>The key points for this example include the following:</para><itemizedlist><listitem><para><literal>pvals[]</literal> should be a NULL terminated array.</para>
+</listitem><listitem><para><function>pool_query_pool_resources</function> returns a list
+of all resources that match the <literal>pvals</literal> array type <literal>pset</literal> from the application's pool <literal>my_pool</literal>. Because
+a pool can have only one instance of the <literal>pset</literal> resource,
+each instance is always returned in <literal>nelem</literal>. <literal>reslist[]</literal> contains
+only one element, the <literal>pset</literal> resource.</para>
+</listitem>
+</itemizedlist><programlisting>pool_value_t *pvals[2] = {NULL};  /* pvals[] should be NULL terminated */
+
+/* NOTE: Return value checking/error processing omitted */
+/* in all examples for brevity */
+
+conf_loc = pool_dynamic_location();
+conf = pool_conf_alloc();
+pool_conf_open(conf, conf_loc, PO_RDONLY);
+my_pool_name = pool_get_binding(getpid());
+my_pool = pool_get_pool(conf, my_pool_name);
+pvals[0] = pool_value_alloc();
+pvals2[2] = { NULL, NULL };
+pool_value_set_name(pvals[0], "type");
+pool_value_set_string(pvals[0], "pset");
+
+reslist = pool_query_pool_resources(conf, my_pool, &amp;nelem, pvals);
+pool_value_free(pvals[0]);
+pool_query_resource_components(conf, reslist[0], &amp;nelem, NULL);
+printf("pool %s: %u cpu", my_pool_ name, nelem);
+pool_conf_close(conf);</programlisting>
+</sect2><sect2 id="resource-pools-31"><title>List All Resource Pools</title><para>The following example lists all resource pools defined in an application's
+pools <literal>pset</literal>.</para><para>The key points of the example include the following:</para><itemizedlist><listitem><para>Open the dynamic <filename>conf</filename> file read-only,
+PO_RDONLY. <function>pool_query_pools</function> returns the list of pools
+in <literal>pl</literal> and the number of pools in <literal>nelem</literal>.
+For each pool, call <function>pool_get_property</function> to get the <literal>pool.name</literal> property  from the element into the <literal>pval</literal> value. </para>
+</listitem><listitem><para><function>pool_get_property</function> calls <function>pool_to_elem</function> to convert the <literal>libpool</literal> entity to an opaque
+value. <function>pool_value_get_string</function> gets the string from the
+opaque pool value.</para>
+</listitem>
+</itemizedlist><programlisting>conf	= pool_conf_alloc();
+pool_conf_open(conf, pool_dynamic_location(), PO_RDONLY);
+pl = pool_query_pools(conf, &amp;nelem, NULL);
+pval = pool_value_alloc();
+for (i = 0; i &lt; nelem; i++) {
+    pool_get_property(conf, pool_to_elem(conf, pl[i]), "pool.name", pval);
+    pool_value_get_string(pval, &amp;fname);
+    printf("%s\n", name);
+}
+pool_value_free(pval);
+free(pl);
+pool_conf_close(conf);</programlisting>
+</sect2><sect2 id="resource-pools-32"><title>Report Pool Statistics for a Given Pool</title><para>The following example reports statistics for the designated pool.</para><para>The key points for the example include the following:</para><itemizedlist><listitem><para><function>pool_query_pool_resources</function> gets a list
+of all resources in <literal>rl</literal>. Because the last argument to <function>pool_query_pool_resources</function> is NULL, all resources are returned.
+For each resource, the <literal>name</literal>, <literal>load</literal> and <literal>size</literal> properties are read, and printed.</para>
+</listitem><listitem><para>The call to <function>strdup</function> allocates local memory
+and copies the string returned by <function>get_string</function>. The call
+to <function>get_string</function> returns a pointer that is freed by the
+next call to <function>get_property</function>. If the call to <function>strdup</function> is
+not included, subsequent references to the string(s) could cause the application
+to fail with a segmentation fault.</para>
+</listitem>
+</itemizedlist><programlisting>printf("pool %s\n:" pool_name);
+pool = pool_get_pool(conf, pool_name);
+rl = pool_query_pool_resources(conf, pool, &amp;nelem, NULL);
+for (i = 0; i &lt; nelem; i++) {
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), "type", pval);
+  pool_value_get_string(pval, &amp;type);
+  type = strdup(type);
+  snprintf(prop_name, 32, "%s.%s", type, "name");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_string(val, &amp;res_name);
+  res_name = strdup(res_name);
+  snprintf(prop_name, 32, "%s.%s", type, "load");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_uint64(val, &amp;load);
+  snprintf(prop_name, 32, "%s.%s", type, "size");
+  pool_get_property(conf, pool_resource_to_elem(conf, rl[i]), 
+        prop_name, pval);
+  pool_value_get_uint64(val, &amp;size);
+  printf("resource %s: size %llu load %llu\n", res_name, size, load);
+  free(type);
+  free(res_name);
+}
+free(rl);</programlisting>
+</sect2><sect2 id="resource-pools-33"><title>Set <literal>pool.comment</literal> Property
+and Add New Property</title><para>The following example sets the <literal>pool.comment</literal> property
+for the <literal>pset</literal>. The example also creates a new property in <literal>pool.newprop</literal>. </para><para>The key point for the example includes the following:</para><itemizedlist><listitem><para>In the call to <function>pool_conf_open</function>, using
+PO_RDWR on a static configuration file, requires the caller to be root. </para>
+</listitem><listitem><para>To commit these changes to the <literal>pset</literal> after
+running this utility, issue a <literal>pooladm -c</literal> command. To have
+the utility commit the changes, call <function>pool_conf_commit</function> with
+a nonzero second argument.</para>
+</listitem>
+</itemizedlist><programlisting>pool_set_comment(const char *pool_name, const char *comment)
+{
+  pool_t *pool;
+  pool_elem_t *pool_elem;
+  pool_value_t *pval = pool_value_alloc(); 
+  pool_conf_t  *conf = pool_conf_alloc();
+  /* NOTE: need to be root to use PO_RDWR on static configuration file */
+  pool_conf_open(conf, pool_static_location(), PO_RDWR);
+  pool = pool_get_pool(conf,  pool_name);
+  pool_value_set_string(pval, comment);
+  pool_elem = pool_to_elem(conf, pool);
+  pool_put_property(conf, pool_elem, "pool.comment", pval);
+  printf("pool %s: pool.comment set to %s\n:" pool_name, comment);
+  /* Now, create a new property, customized to installation site */
+  pool_value_set_string(pval, "New String Property");
+  pool_put_property(conf, pool_elem, "pool.newprop", pval);
+  pool_conf_commit(conf, 0); /* NOTE: use 0 to ensure only */
+                             /* static file gets updated */
+  pool_value_free(pval);
+  pool_conf_close(conf);
+  pool_conf_free(conf);
+  /* NOTE: Use "pooladm -c" later, or pool_conf_commit(conf, 1) */
+  /* above for changes to the running system */
+}</programlisting><para>An alternative way of modifying a pool's comment and adding a new pool
+property is to use <literal>poolcfg</literal>(1M).</para><programlisting>poolcfg -c 'modify pool pool-name (string pool.comment = "cmt-string")'
+poolcfg -c 'modify pool pool-name (string pool.newprop = 
+                                   "New String Property")'</programlisting>
+</sect2>
+</sect1><sect1 id="resource-pools-35"><title>Programming Issues Associated With Resource
+Pools</title><para>Consider the following issues when writing your application.</para><itemizedlist><listitem><para>Each site can add its own list of properties to the pools
+configuration.</para><para>Multiple configurations can be maintained in multiple
+configuration files. The system administrator can commit different files to
+reflect changes to the resource consumption at different time slots. These
+time slots can include different times of the day, week, month, or seasons
+depending on load conditions.</para>
+</listitem><listitem><para>Resource sets can be shared between pools, but a pool has
+only one resource set of a given type. So, the <literal>pset_default</literal> can
+be shared between the default and a particular application's database pools. </para>
+</listitem><listitem><para>Use <function>pool_value_*</function> interfaces carefully.
+Keep in mind the memory allocation issues for string pool values. See <olink targetptr="resource-pools-32" remap="internal">Report Pool Statistics for a Given Pool</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1>
+</chapter>

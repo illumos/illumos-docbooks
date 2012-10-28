@@ -1,0 +1,175 @@
+<chapter id="fquzd"><title>Design Considerations for Resource Management
+Applications in Solaris Zones</title><highlights><para>This chapter provides a brief overview of Solaris Zones technology and
+discusses potential problems that may be encountered by developers who are
+writing resource management applications. For more information on zones, see <olink targetdoc="sysadrm" targetptr="zone" remap="external">Part&nbsp;II, <citetitle remap="chapter">Zones,</citetitle> in <citetitle remap="book">System Administration Guide: Solaris
+Containers-Resource Management and Solaris Zones</citetitle></olink>.</para>
+</highlights><sect1><title>Zones Overview</title><para>A <emphasis>zone</emphasis> is a virtualized operating system
+environment that is created within a single instance of the Solaris Operating
+System. Zones are a partitioning technology that provides an isolated, secure
+environment for applications. When you create a zone, you produce an application
+execution environment in which processes are isolated from the rest of the
+system. This isolation prevents a process that is running in one zone from
+monitoring or affecting processes that are running in other zones. Even a
+process running with superuser credentials cannot view or affect activity
+in other zones. A zone also provides an abstract layer that separates applications
+from the physical attributes of the machine on which the zone is deployed.
+Examples of these attributes include physical device paths and network interface
+names.</para><para>By default, all systems have a <emphasis>global zone</emphasis>. The
+global zone has a global view of the Solaris environment in similar fashion
+to the superuser model. All other zones are referred to as <emphasis>non-global
+zones</emphasis>. A non-global zone is analogous to an unprivileged user in
+the superuser model. Processes in non-global zones can control only the processes
+and files within that zone. Typically, system administration work is mainly
+performed in the global zone. In rare cases where a system administrator needs
+to be isolated, privileged applications can be used in a non-global zone.
+In general, though, resource management activities take place in the global
+zone.</para>
+</sect1><sect1 id="gercp"><title>IP Networking in Zones</title><para>IP networking in a zone can be configured in two different ways,
+depending on whether the non-global zone is given its own exclusive IP instance
+or shares the IP layer configuration and state with the global zone. The shared-IP
+type is the default.</para><para>Exclusive-IP zones are assigned zero or more network interface names,
+and for those network interfaces they can send and receive any packets, snoop,
+and change the IP configuration, including IP addresses and the routing table.
+Note that those changes do not affect any of the other IP instances on the
+system.</para>
+</sect1><sect1 id="gacve"><title>Design Considerations for Resource Management Applications
+in Zones</title><para>All applications are fully functional in the global
+zone as they would be in a conventional Solaris environment. Most applications
+should run without problem in a non-global environment as long as the application
+does not need any privileges. If an application does require privileges, then
+the developer needs to take a close look at which privileges are needed and
+how a particular privilege is used. If a privilege is required, then a system
+administrator can assign the needed privilege to the zone. See <olink targetdoc="sysadrm" targetptr="gcnwa" remap="external"><citetitle remap="section">Configurable
+Privileges</citetitle> in <citetitle remap="book">System Administration Guide:
+Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><sect2 id="gerbr"><title>General Considerations When Writing Applications
+for Non-Global Zones</title><para>The known situations that a developer needs to investigate are as follows:</para><itemizedlist><listitem><para>System calls that change the system time require the PRIV_SYS_TIME
+privilege. These system calls include <olink targetdoc="refman2" targetptr="adjtime-2" remap="external"><citerefentry><refentrytitle>adjtime</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="ntp-adjtime-2" remap="external"><citerefentry><refentrytitle>ntp_adjtime</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="stime-2" remap="external"><citerefentry><refentrytitle>stime</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>System calls that need to operate on files that have the sticky
+bit set require the PRIV_SYS_CONFIG privilege. These system calls include <olink targetdoc="refman2" targetptr="chmod-2" remap="external"><citerefentry><refentrytitle>chmod</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="creat-2" remap="external"><citerefentry><refentrytitle>creat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="open-2" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="ioctl-2" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call requires the PRIV_SYS_NET_CONFIG privilege to be able to unlock an anchor
+on a STREAMS module. .</para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="link-2" remap="external"><citerefentry><refentrytitle>link</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> and <olink targetdoc="refman2" targetptr="unlink-2" remap="external"><citerefentry><refentrytitle>unlink</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls require the PRIV_SYS_LINKDIR
+privilege to create a link or unlink a directory in a non-global zone. Applications
+that install or configure software or that create temporary directories could
+be affected by this limitation.</para>
+</listitem><listitem><para>The PRIV_PROC_LOCK_MEMORY privilege is required for the <olink targetdoc="refman3a" targetptr="mlock-3c" remap="external"><citerefentry><refentrytitle>mlock</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="munlock-3c" remap="external"><citerefentry><refentrytitle>munlock</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="mlockall-3c" remap="external"><citerefentry><refentrytitle>mlockall</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, <olink targetdoc="refman3a" targetptr="munlockall-3c" remap="external"><citerefentry><refentrytitle>munlockall</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink>, and <olink targetdoc="refman3a" targetptr="plock-3c" remap="external"><citerefentry><refentrytitle>plock</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> functions and the MC_LOCK,
+MC_LOCKAS, MC_UNLOCK, and MC_UNLOCKAS flags for the <olink targetdoc="refman2" targetptr="memcntl-2" remap="external"><citerefentry><refentrytitle>memcntl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system. This privilege is
+a default privilege in a non-global zone. See <olink targetdoc="sysadrm" targetptr="z.admin.ov-18" remap="external"><citetitle remap="section">Privileges in a Non-Global
+Zone</citetitle> in <citetitle remap="book">System Administration Guide: Solaris
+Containers-Resource Management and Solaris Zones</citetitle></olink> for more
+information.</para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="mknod-2" remap="external"><citerefentry><refentrytitle>mknod</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call requires the PRIV_SYS_DEVICES privilege to create a block (S_IFBLK) or
+character (S_IFCHAR) special file. This limitation affects applications that
+need to create device nodes on the fly.</para>
+</listitem><listitem><para>The IPC_SET flag in the <olink targetdoc="refman2" targetptr="msgctl-2" remap="external"><citerefentry><refentrytitle>msgctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call requires the PRIV_SYS_IPC_CONFIG
+privilege to increase the number of message queue bytes. This limitation affects
+any applications that need to resize the message queue dynamically.</para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="nice-2" remap="external"><citerefentry><refentrytitle>nice</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call requires the PRIV_PROC_PRIOCNTL privilege to change the priority of a
+process. This privilege is available by default in a non-global zone. Another
+way to change the priority is to bind the non-global zone in which the application
+is running to a resource pool, although scheduling processes in that zone
+is ultimately decided by the Fair Share Scheduler. </para>
+</listitem><listitem><para>The P_ONLINE, P_OFFLINE, P_NOINTR, P_FAULTED, P_SPARE, and
+PZ-FORCED flags in the <olink targetdoc="refman2" targetptr="p-online-2" remap="external"><citerefentry><refentrytitle>p_online</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call require the PRIV_SYS_RES_CONFIG privilege to return or change process
+operational status. This limitation affects applications that need to enable
+or disable CPUs. </para>
+</listitem><listitem><para>The PC_SETPARMS and PC_SETXPARMS flags in the <olink targetdoc="refman2" targetptr="priocntl-2" remap="external"><citerefentry><refentrytitle>priocntl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>system call requires the PRIV_PROC_PRIOCNTL
+privilege to change the scheduling parameters of a lightweight process (LWP).</para>
+</listitem><listitem><para>System calls that need to manage processor sets (<literal>psets</literal>),
+including binding LWPs to psets and setting <literal>pset</literal> attributes
+require the PRIV_SYS_RES_CONFIG privilege. This limitation affects the following
+system calls: <olink targetdoc="refman2" targetptr="pset-assign-2" remap="external"><citerefentry><refentrytitle>pset_assign</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="pset-bind-2" remap="external"><citerefentry><refentrytitle>pset_bind</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="pset-create-2" remap="external"><citerefentry><refentrytitle>pset_create</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="pset-destroy-2" remap="external"><citerefentry><refentrytitle>pset_destroy</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="pset-setattr-2" remap="external"><citerefentry><refentrytitle>pset_setattr</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>. </para>
+</listitem><listitem><para>The  SHM_LOCK and SHM_UNLOCK flags in the <olink targetdoc="refman2" targetptr="shmctl-2" remap="external"><citerefentry><refentrytitle>shmctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system call require the PRIV_PROC_LOCK_MEMORY
+privilege to share memory control operations. If the application is locking
+memory for performance purposes, using the intimate shared memory (ISM) feature
+provides a potential workaround.</para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="swapctl-2" remap="external"><citerefentry><refentrytitle>swapctl</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>system
+call requires the PRIV_SYS_CONFIG privilege to add or remove swapping resources.
+This limitation affects installation and configuration software. </para>
+</listitem><listitem><para>The <olink targetdoc="refman2" targetptr="uadmin-2" remap="external"><citerefentry><refentrytitle>uadmin</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system
+call requires the PRIV_SYS_CONFIG privilege to use the <command>A_REMOUNT</command>, <command>A_FREEZE</command>, <command>A_DUMP</command>, and <command>AD_IBOOT</command> commands.
+This limitation affects applications that need to force crash dumps under
+certain circumstances. </para>
+</listitem><listitem><para>The <olink targetdoc="refman3d" targetptr="clock-settime-3rt" remap="external"><citerefentry><refentrytitle>clock_settime</refentrytitle><manvolnum>3RT</manvolnum></citerefentry></olink> function requires the PRIV_SYS_TIME privilege to set
+the CLOCK_REALTIME and CLOCK_HIRES clocks.</para>
+</listitem><listitem><para>The <olink targetdoc="refman3e" targetptr="cpc-bind-cpu-3cpc" remap="external"><citerefentry><refentrytitle>cpc_bind_cpu</refentrytitle><manvolnum>3CPC</manvolnum></citerefentry></olink> function requires the PRIV_CPC_CPU privilege to bind
+request sets to hardware counters. As a workaround, the <olink targetdoc="refman3e" targetptr="cpc-bind-curlwp-3cpc" remap="external"><citerefentry><refentrytitle>cpc_bind_curlwp</refentrytitle><manvolnum>3CPC</manvolnum></citerefentry></olink> function can be used to monitor CPU counters for the
+LWP in question. </para>
+</listitem><listitem><para>The <olink targetdoc="refman3a" targetptr="pthread-attr-setschedparam-3c" remap="external"><citerefentry><refentrytitle>pthread_attr_setschedparam</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> function
+requires the PRIV_PROC_PRIOCNTL privilege to change the underlying scheduling
+policy and parameters for a thread.</para>
+</listitem><listitem><para>The <olink targetdoc="refman3d" targetptr="timer-create-3rt" remap="external"><citerefentry><refentrytitle>timer_create</refentrytitle><manvolnum>3RT</manvolnum></citerefentry></olink> function requires the PRIV_PROC_CLOCK_HIGHRES privilege
+to create a timer using the high-resolution system clock.</para>
+</listitem><listitem><para>The APIs that are provided by the following list of libraries
+are not supported in a non-global zone. The shared objects are present in
+the zone's <filename>/usr/lib</filename> directory, so no link time errors
+occur if your code includes references to these libraries. You can inspect
+your <command>make</command> files to determine if your application has explicit
+bindings to any of these libraries and use <olink targetdoc="refman1" targetptr="pmap-1" remap="external"><citerefentry><refentrytitle>pmap</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> while the application is executing to verify that
+none of these libraries are dynamically loaded.</para><itemizedlist><listitem><para><olink targetdoc="refman3f" targetptr="libdevinfo-3lib" remap="external"><citerefentry><refentrytitle>libdevinfo</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman3f" targetptr="libcfgadm-3lib" remap="external"><citerefentry><refentrytitle>libcfgadm</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman3f" targetptr="libpool-3lib" remap="external"><citerefentry><refentrytitle>libpool</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman3f" targetptr="libtnfctl-3lib" remap="external"><citerefentry><refentrytitle>libtnfctl</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman3f" targetptr="libsysevent-3lib" remap="external"><citerefentry><refentrytitle>libsysevent</refentrytitle><manvolnum>3LIB</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Zones have a restricted set of devices, consisting primarily
+of pseudo devices that form part of the Solaris programming API. These pseudo
+devices include <filename>/dev/null</filename>, <filename>/dev/zero</filename>, <filename>/dev/poll</filename>, <filename>/dev/random</filename>, <filename>/dev/tcp</filename>,
+and so on. Physical devices are not directly accessible from within a zone
+unless the device has been configured by a system administrator. Since devices,
+in general, are shared resources in a system, to make devices available in
+a zone requires some restrictions so system security will not be compromised,
+as follows:</para><itemizedlist><listitem><para>The <filename>/dev</filename> name space consists of symbolic
+links, that is, logical paths, to the physical paths in <filename>/devices</filename>.
+The <filename>/devices</filename> name space, which is available only in the
+global zone, reflects the current state of attached device instances that
+have been created by the driver. Only the logical path /<filename>dev</filename> is
+visible in a non-global zone.</para>
+</listitem><listitem><para>Processes within a non-global zone cannot create new device
+nodes . For example, <olink targetdoc="refman2" targetptr="mknod-2" remap="external"><citerefentry><refentrytitle>mknod</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> cannot
+create special files in a non-global zone. The <olink targetdoc="refman2" targetptr="creat-2" remap="external"><citerefentry><refentrytitle>creat</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="link-2" remap="external"><citerefentry><refentrytitle>link</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="mkdir-2" remap="external"><citerefentry><refentrytitle>mkdir</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="rename-2" remap="external"><citerefentry><refentrytitle>rename</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, <olink targetdoc="refman2" targetptr="symlink-2" remap="external"><citerefentry><refentrytitle>symlink</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink>, and <olink targetdoc="refman2" targetptr="unlink-2" remap="external"><citerefentry><refentrytitle>unlink</refentrytitle><manvolnum>2</manvolnum></citerefentry></olink> system calls fail with EACCES
+if a file in <filename>/dev</filename> is specified. You can create a symbolic
+link to an entry in <filename>/dev</filename>, but that link cannot be created
+in <filename>/dev</filename>.</para>
+</listitem><listitem><para>Devices that expose system data are only available in the
+global zone. Examples of such devices include <olink targetdoc="refman7" targetptr="dtrace-7d" remap="external"><citerefentry><refentrytitle>dtrace</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, <olink targetdoc="refman7" targetptr="kmem-7d" remap="external"><citerefentry><refentrytitle>kmem</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, <olink targetdoc="refman7" targetptr="kmdb-7d" remap="external"><citerefentry><refentrytitle>kmdb</refentrytitle><manvolnum>7d</manvolnum></citerefentry></olink>, <olink targetdoc="refman7" targetptr="ksyms-7d" remap="external"><citerefentry><refentrytitle>ksyms</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, <olink targetdoc="refman7" targetptr="lockstat-7d" remap="external"><citerefentry><refentrytitle>lockstat</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>, and <olink targetdoc="refman1m" targetptr="trapstat-1m" remap="external"><citerefentry><refentrytitle>trapstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>The <filename>/dev</filename> name space consists of device
+nodes made up of a default, &ldquo;safe&rdquo; set of drivers as well as device
+nodes that have been specified for the zone by the <olink targetdoc="refman1m" targetptr="zonecfg-1m" remap="external"><citerefentry><refentrytitle>zonecfg</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="gercy"><title>Specific Considerations for Shared-IP Non-Global
+Zones</title><para>For non-global zones that are configured to use the shared-IP instance,
+the following restrictions apply.</para><itemizedlist><listitem><para>The <olink targetdoc="refman3b" targetptr="socket-3socket" remap="external"><citerefentry><refentrytitle>socket</refentrytitle><manvolnum>3SOCKET</manvolnum></citerefentry></olink> function requires the PRIV_NET_RAWACCESS privilege
+to create a raw socket with the protocol set to IPPROTO_RAW or IPPROTO_IGMP.
+This limitation affects applications that use raw sockets or need to create
+or inspect TCP/IP headers. </para>
+</listitem><listitem><para>The <olink targetdoc="refman3b" targetptr="t-open-3nsl" remap="external"><citerefentry><refentrytitle>t_open</refentrytitle><manvolnum>3NSL</manvolnum></citerefentry></olink> function
+requires the PRIV_NET_RAWACCESS privilege to establish a transport endpoint.
+This limitation affects applications that use the <filename>/dev/rawip</filename> device
+to implement network protocols as wall as applications that operate on TCP/IP
+headers.</para>
+</listitem><listitem><para>No NIC devices that support the DLPI programming interface
+are accessible in a shared-IP non-global zone, for example, <olink targetdoc="refman7" targetptr="hme-7d" remap="external"><citerefentry><refentrytitle>hme</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> and <olink targetdoc="refman7" targetptr="ce-7d" remap="external"><citerefentry><refentrytitle>ce</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Each non-global shared-IP zone has its own logical network
+and loopback interface. Bindings between upper layer streams and logical interfaces
+are restricted such that a stream may only establish bindings to logical interfaces
+in the same zone. Likewise, packets from a logical interface can only be passed
+to upper layer streams in the same zone as the logical interface. Bindings
+to the loopback address are kept within a zone with one exception: When a
+stream in one zone attempts to access the IP address of an interface in another
+zone.  While applications within a zone can bind to privileged network ports,
+they have no control over the network configuration, including IP addresses
+and the routing table.</para>
+</listitem>
+</itemizedlist><para>Note that these restrictions do not apply to exclusive-IP zones.</para>
+</sect2>
+</sect1>
+</chapter>

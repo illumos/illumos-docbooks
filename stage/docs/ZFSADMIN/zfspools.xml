@@ -1,0 +1,1505 @@
+<chapter id="gavwn"><title>Managing
+ZFS Storage Pools</title><highlights><para>This chapter describes how to create and administer ZFS storage pools.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gcfog" remap="internal">Components of a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gaypw" remap="internal">Creating and Destroying ZFS Storage
+Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gayrd" remap="internal">Managing Devices in ZFS Storage Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gfifk" remap="internal">Managing ZFS Storage Pool Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gaynp" remap="internal">Querying ZFS Storage Pool Status</olink></para>
+</listitem><listitem><para><olink targetptr="gbchy" remap="internal">Migrating ZFS Storage Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gcikw" remap="internal">Upgrading ZFS Storage Pools</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gcfog"><title>Components of a ZFS Storage Pool</title><para>The following sections provide detailed information about the following
+storage pool components:</para><itemizedlist><listitem><para><olink targetptr="gazdp" remap="internal">Using Disks in a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazcr" remap="internal">Using Files in a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazca" remap="internal">Identifying Virtual Devices in a
+Storage Pool</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gazdp"><title>Using Disks in a ZFS Storage Pool</title><para>The most basic element of a storage pool is a piece of physical storage.
+Physical storage can be any block device of at least 128 Mbytes in size. Typically,
+this device is a hard drive that is visible to the system in the <filename>/dev/dsk</filename> directory.</para><para>A storage device can be a whole disk (<filename>c1t0d0</filename>) or
+an individual slice (<filename>c0t0d0s7</filename>). The recommended mode
+of operation is to use an entire disk, in which case the disk does not need
+to be specially formatted. ZFS formats the disk using an EFI label to contain
+a single, large slice. When used in this way, the partition table that is
+displayed by the <command>format</command> command appears similar to the
+following:</para><screen>Current partition table (original):
+Total disk sectors available: 71670953 + 16384 (reserved sectors)
+
+Part      Tag    Flag     First Sector        Size        Last Sector
+  0        usr    wm                34      34.18GB         71670953    
+  1 unassigned    wm                 0          0              0    
+  2 unassigned    wm                 0          0              0    
+  3 unassigned    wm                 0          0              0    
+  4 unassigned    wm                 0          0              0    
+  5 unassigned    wm                 0          0              0    
+  6 unassigned    wm                 0          0              0    
+  7 unassigned    wm                 0          0              0    
+  8   reserved    wm          71670954       8.00MB         71687337</screen><para>To use whole disks, the disks must be named using the standard Solaris
+convention, such as <filename>/dev/dsk/cXtXdXsX</filename>. Some third-party
+drivers use a different naming convention or place disks in a location other
+than the <filename>/dev/dsk</filename> directory. To use these disks, you
+must manually label the disk and provide a slice to ZFS. </para><para>ZFS applies an EFI label when you create a storage pool with whole disks.
+Disks can be labeled with a traditional Solaris VTOC label when you create
+a storage pool with a disk slice.</para><para>Slices should only be used under the following conditions:</para><itemizedlist><listitem><para>The device name is nonstandard.</para>
+</listitem><listitem><para>A single disk is shared between ZFS and another file system,
+such as UFS.</para>
+</listitem><listitem><para>A disk is used as a swap or a dump device.</para>
+</listitem>
+</itemizedlist><para>Disks can be specified by using either the full path, such as <filename>/dev/dsk/c1t0d0</filename>, or a shorthand name that consists of the device name within the <filename>/dev/dsk</filename> directory, such as <filename>c1t0d0</filename>. For example,
+the following are valid disk names:</para><itemizedlist><listitem><para><filename>c1t0d0</filename></para>
+</listitem><listitem><para><filename>/dev/dsk/c1t0d0</filename></para>
+</listitem><listitem><para><filename>c0t0d6s2</filename></para>
+</listitem><listitem><para><filename>/dev/foo/disk</filename></para>
+</listitem>
+</itemizedlist><para>Using whole physical disks is the simplest way to create ZFS storage
+pools. ZFS configurations become progressively more complex, from management,
+reliability, and performance perspectives, when you build pools from disk
+slices, LUNs in hardware RAID arrays, or volumes presented by software-based
+volume managers. The following considerations might help you determine how
+to configure ZFS with other hardware or software storage solutions:</para><itemizedlist><listitem><para>If you construct ZFS configurations on top of LUNs from hardware
+RAID arrays, you need to understand the relationship between ZFS redundancy
+features and the redundancy features offered by  the array. Certain configurations
+might provide adequate redundancy and performance, but other configurations
+might not.</para>
+</listitem><listitem><para>You can construct logical devices for ZFS using volumes presented
+by software-based volume managers, such as <trademark>Solaris</trademark> Volume
+Manager (SVM) or Veritas Volume Manager (VxVM).  However, these configurations
+are not recommended. While ZFS functions properly on such devices, less-than-optimal
+performance might be the result.</para>
+</listitem>
+</itemizedlist><para>For additional information about storage pool recommendations, see the
+ZFS best practices site:</para><para><ulink url="http://www.solarisinternals.com/wiki/index.php/ZFS_Best_Practices_Guide" type="url">http://www.solarisinternals.com/wiki/index.php/ZFS_Best_Practices_Guide</ulink></para><para>Disks are identified both by their path and by their device ID, if available.
+This method allows devices to be reconfigured on a system without having to
+update any ZFS state. If a disk is switched between controller 1 and controller
+2, ZFS uses the device ID to detect that the disk has moved and should now
+be accessed using controller 2. The device ID is unique to the drive's firmware.
+While unlikely, some firmware updates have been known to change device IDs.
+If this situation happens, ZFS can still access the device by path and update
+the stored device ID automatically. If you inadvertently change both the path
+and the ID of the device, then export and re-import the pool in order to use
+it.</para>
+</sect2><sect2 id="gazcr"><title>Using Files in a ZFS Storage Pool</title><para>ZFS also allows you to use UFS files as virtual devices in your storage
+pool. This feature is aimed primarily at testing and enabling simple experimentation,
+not for production use. The reason is that <emphasis role="strong">any use
+of files relies on the underlying file system for consistency</emphasis>.
+If you create a ZFS pool backed by files on a UFS file system, then you are
+implicitly relying on UFS to guarantee correctness and synchronous semantics.</para><para>However, files can be quite useful when you are first trying out ZFS
+or experimenting with more complicated layouts when not enough physical devices
+are present. All files must be specified as complete paths and must be at
+least 64 Mbytes in size.
+If a file is moved or renamed, the pool must be exported and re-imported in
+order to use it, as no device ID is associated with files by which they can
+be located.</para>
+</sect2><sect2 id="gazca"><title>Identifying Virtual Devices in a Storage Pool</title><para>Each storage pool is comprised of one or more virtual devices. A <emphasis>virtual device</emphasis> is an internal representation of the storage pool
+that describes the layout of physical storage and its fault characteristics.
+As such, a virtual device represents the disk devices or files that are used
+to create the storage pool. </para><para>Two top-level virtual devices provide data redundancy: mirror and RAID-Z
+virtual devices. These virtual devices consist of disks, disk slices, or files.</para><para>Disks, disk slices, or files that are used in pools outside of mirrors
+and RAID-Z virtual devices, function as top-level virtual devices themselves.</para><para>Storage pools typically contain multiple top-level virtual devices.
+ZFS dynamically stripes data among all of the top-level virtual devices in
+a pool.</para>
+</sect2>
+</sect1><sect1 id="gcfof"><title>Replication Features of a ZFS Storage Pool</title><para>ZFS provides data redundancy, as well as self-healing properties, in
+a mirrored and a RAID-Z configuration.</para><itemizedlist><listitem><para><olink targetptr="gamss" remap="internal">Mirrored Storage Pool Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="gamtu" remap="internal">RAID-Z Storage Pool Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="gazch" remap="internal">Self-Healing Data in a Redundant
+Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="gazdd" remap="internal">Dynamic Striping in a Storage Pool</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gamss"><title>Mirrored Storage Pool Configuration</title><para>A mirrored storage pool configuration requires at least two disks, preferably
+on separate controllers. Many disks can be used in a mirrored configuration.
+In addition, you can create more than one mirror in each pool. Conceptually,
+a simple mirrored configuration would look similar to the following:</para><screen>mirror c1t0d0 c2t0d0</screen><para>Conceptually, a more complex mirrored configuration would look similar
+to the following:</para><screen>mirror c1t0d0 c2t0d0 c3t0d0 mirror c4t0d0 c5t0d0 c6t0d0</screen><para>For information about creating a mirrored storage pool, see <olink targetptr="gazhv" remap="internal">Creating a Mirrored Storage Pool</olink>.</para>
+</sect2><sect2 id="gamtu"><title>RAID-Z Storage Pool Configuration</title><para>In addition to a mirrored storage pool configuration, ZFS provides a
+RAID-Z configuration with either single or double parity fault tolerance.
+Single-parity RAID-Z is similar to RAID-5. Double-parity RAID-Z is similar
+to RAID-6.</para><para>All traditional RAID-5-like algorithms (RAID-4. RAID-5. RAID-6, RDP,
+and EVEN-ODD, for example) suffer from a problem known as the &ldquo;RAID-5
+write hole.&rdquo; If only part of a RAID-5 stripe is written, and power is
+lost before all blocks have made it to disk, the parity will remain out of
+sync with the data, and therefore useless, forever (unless a subsequent full-stripe
+write overwrites it). In RAID-Z, ZFS uses variable-width RAID stripes so that
+all writes are full-stripe writes. This design is only possible because ZFS
+integrates file system and device management in such a way that the file system's
+metadata has enough information about the underlying data redundancy model
+to handle variable-width RAID stripes. RAID-Z is the world's first software-only
+solution to the RAID-5 write hole.</para><para>You need at least
+two disks for a RAID-Z configuration. Otherwise, no special hardware is required
+to create a RAID-Z configuration. Currently, RAID-Z provides single parity.
+For example, if you have three disks in a RAID-Z configuration, parity data
+occupies space equal to one of the three disks. </para><para>A RAID-Z configuration with N disks of size X with P parity disks can
+hold approximately (N-P)*X bytes and can withstand P device(s) failing before
+data integrity is compromised.  You need at least two disks for a single-parity
+RAID-Z configuration and at least three disks for a double-parity RAID-Z configuration.
+For example, if you have three disks in a single-parity RAID-Z configuration,
+parity data occupies space equal to one of the three disks. Otherwise, no
+special hardware is required to create a RAID-Z configuration. </para><para>Conceptually, a RAID-Z configuration with three disks would look similar
+to the following:</para><screen>raidz c1t0d0 c2t0d0 c3t0d0</screen><para>A more complex conceptual RAID-Z configuration would look similar to
+the following:</para><screen remap="wide">raidz c1t0d0 c2t0d0 c3t0d0 c4t0d0 c5t0d0 c6t0d0 c7t0d0 raidz c8t0d0 c9t0d0 c10t0d0 c11t0d0
+c12t0d0 c13t0d0 c14t0d0</screen><para>If you are creating a RAID-Z configuration with many disks, as in this
+example, a RAID-Z configuration with 14 disks is better split into a two 7-disk
+groupings. RAID-Z configurations with single-digit groupings of disks should
+perform better.</para><para>For information about creating a RAID-Z storage pool, see <olink targetptr="gcvjg" remap="internal">Creating RAID-Z Storage Pools</olink>.</para><para>For more information about choosing between a mirrored configuration
+or a RAID-Z configuration based on performance and space considerations, see
+the following blog:</para><para><ulink url="http://blogs.sun.com/roller/page/roch?entry=when_to_and_not_to" type="url">http://blogs.sun.com/roller/page/roch?entry=when_to_and_not_to</ulink></para><para>For additional information on RAID-Z storage pool recommendations, see
+the ZFS best practices site:</para><para><ulink url="http://www.solarisinternals.com/wiki/index.php/ZFS_Best_Practices_Guide" type="url">http://www.solarisinternals.com/wiki/index.php/ZFS_Best_Practices_Guide</ulink></para>
+</sect2><sect2 id="gazch"><title>Self-Healing Data in a Redundant Configuration</title><para>ZFS provides for self-healing data in a mirrored or RAID-Z configuration.</para><para>When a bad data block is detected, not only does ZFS fetch the correct
+data from another redundant copy, but it also repairs the bad data by replacing
+it with the good copy.</para>
+</sect2><sect2 id="gazdd"><title>Dynamic Striping in a Storage Pool</title><para>For each virtual device that is added to the pool, ZFS dynamically stripes
+data across all available devices. The decision about where to place data
+is done at write time, so no fixed width stripes are created at allocation
+time.</para><para>When virtual devices are added to a pool, ZFS gradually allocates data
+to the new device in order to maintain performance and space allocation policies.
+Each virtual device can also be a mirror or a RAID-Z device that contains
+other disk devices or files. This configuration allows for flexibility in
+controlling the fault characteristics of your pool. For example, you could
+create the following configurations out of 4 disks:</para><itemizedlist><listitem><para>Four disks using dynamic striping</para>
+</listitem><listitem><para>One four-way RAID-Z configuration</para>
+</listitem><listitem><para>Two two-way mirrors using dynamic striping</para>
+</listitem>
+</itemizedlist><para>While ZFS supports combining different types of virtual devices within
+the same pool, this practice is not recommended. For example, you can create
+a pool with a two-way mirror and a three-way RAID-Z configuration. However,
+your fault tolerance is as good as your worst virtual device, RAID-Z in this
+case. The recommended practice is to use top-level virtual devices of the
+same type with the same redundancy level in each device.</para>
+</sect2>
+</sect1><sect1 id="gaypw"><title>Creating and Destroying ZFS Storage Pools</title><para>The following sections describe different scenarios for creating and
+destroying ZFS storage pools.</para><itemizedlist><listitem><para><olink targetptr="gaynr" remap="internal">Creating a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazhs" remap="internal">Handling ZFS Storage Pool Creation
+Errors</olink></para>
+</listitem><listitem><para><olink targetptr="gammr" remap="internal">Destroying ZFS Storage Pools</olink></para>
+</listitem>
+</itemizedlist><para>By design, creating and destroying pools is fast and easy. However,
+be cautious when doing these operations. Although checks are performed to
+prevent using devices known to be in use in a new pool, ZFS cannot always
+know when a device is already in use. Destroying a pool is even easier. Use <command>zpool destroy</command> with caution. This is a simple command with significant
+consequences. </para><sect2 id="gaynr"><title>Creating a ZFS Storage Pool</title><para>To create a storage pool, use the <command>zpool create</command> command.
+This command takes a pool name and any number of virtual devices as arguments.
+The pool name must satisfy the naming conventions outlined in <olink targetptr="gbcpt" remap="internal">ZFS Component Naming Requirements</olink>.</para><sect3 id="gazgt"><title>Creating a Basic Storage Pool</title><para>The following command creates a new pool named <filename>tank</filename> that
+consists of the disks <filename>c1t0d0</filename> and <filename>c1t1d0</filename>:</para><screen># <userinput>zpool create tank c1t0d0 c1t1d0</userinput></screen><para>These whole disks are found in the <filename>/dev/dsk</filename> directory
+and are labelled appropriately by ZFS to contain a single, large slice. Data
+is dynamically striped across both disks.</para>
+</sect3><sect3 id="gazhv"><title>Creating a Mirrored Storage Pool</title><para>To create a mirrored pool, use the <literal>mirror</literal> keyword,
+followed by any number of storage devices that will comprise the mirror. Multiple
+mirrors can be specified by repeating the <literal>mirror</literal> keyword
+on the command line. The following command creates a pool with two, two-way
+mirrors:</para><screen># <userinput>zpool create tank mirror c1d0 c2d0 mirror c3d0 c4d0</userinput></screen><para>The second <literal>mirror</literal> keyword indicates that a new top-level
+virtual device is being specified. Data is dynamically striped across both
+mirrors, with data being redundant between each disk appropriately.</para><para>Currently, the following operations are supported on a ZFS mirrored
+configuration:</para><itemizedlist><listitem><para>Adding another set of disks for an additional top-level <literal>vdev</literal> to an existing mirrored configuration. For more information,
+see <olink targetptr="gazgw" remap="internal">Adding Devices to a Storage Pool</olink>.</para>
+</listitem><listitem><para>Attaching additional disks to an existing mirrored configuration.
+Or, attaching additional disks to a non-replicated configuration to create
+a mirrored configuration. For more information, see <olink targetptr="gcfhe" remap="internal">Attaching
+and Detaching Devices in a Storage Pool</olink>.</para>
+</listitem><listitem><para>Replace a disk or disks in an existing mirrored configuration
+as long as the replacement disks are greater than or equal to the device to
+be replaced. For more information, see <olink targetptr="gazgd" remap="internal">Replacing
+Devices in a Storage Pool</olink>.</para>
+</listitem><listitem><para>Detach a disk or disk in a mirrored configuration as long
+as the remaining devices provide adequate redundancy for the configuration.
+For more information, see <olink targetptr="gcfhe" remap="internal">Attaching and Detaching
+Devices in a Storage Pool</olink>.</para>
+</listitem>
+</itemizedlist><para>Currently, the following operations are not supported on a mirrored
+configuration:</para><itemizedlist><listitem><para>You cannot outright remove a device from a mirrored storage
+pool. An RFE is filed for this feature.</para>
+</listitem><listitem><para>You cannot split or break a mirror for backup purposes. An
+RFE is filed for this feature.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="gcvjg"><title>Creating RAID-Z Storage Pools</title><para>Creating a single-parity RAID-Z pool is identical to creating a mirrored
+pool, except that the <literal>raidz</literal> or <literal>raidz1</literal> keyword
+is used instead of <literal>mirror</literal>. The following example shows
+how to create a pool with a single RAID-Z device that consists of five disks:</para><screen># <userinput>zpool create tank raidz c1t0d0 c2t0d0 c3t0d0 c4t0d0 /dev/dsk/c5t0d0</userinput></screen><para>This example demonstrates that disks can be specified by using their
+full paths. The <filename>/dev/dsk/c5t0d0</filename> device is identical to
+the <filename>c5t0d0</filename> device.</para><para>A similar configuration could be created with disk slices. For example:</para><screen># <userinput>zpool create tank raidz c1t0d0s0 c2t0d0s0 c3t0d0s0 c4t0d0s0 c5t0d0s0</userinput></screen><para>However, the disks must be preformatted to have an appropriately sized
+slice zero.</para><para>You can create a double-parity RAID-Z configuration by using the <literal>raidz2</literal> keyword when the pool is created. For example:</para><screen># <userinput>zpool create tank raidz2 c1t0d0 c2t0d0 c3t0d0</userinput>
+# <userinput>zpool status -v tank</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME          STATE     READ WRITE CKSUM
+        tank          ONLINE       0     0     0
+          raidz2      ONLINE       0     0     0
+            c1t0d0    ONLINE       0     0     0
+            c2t0d0    ONLINE       0     0     0
+            c3t0d0    ONLINE       0     0     0
+
+errors: No known data errors</screen><para>Currently, the following operations are supported on a ZFS RAID-Z configuration:</para><itemizedlist><listitem><para>Add another set of disks for an additional top-level <literal>vdev</literal> to an existing RAID-Z configuration. For more information, see <olink targetptr="gazgw" remap="internal">Adding Devices to a Storage Pool</olink>.</para>
+</listitem><listitem><para>Replace a disk or disks in an existing RAID-Z configuration
+as long as the replacement disks are greater than or equal to the device to
+be replaced. For more information, see <olink targetptr="gazgd" remap="internal">Replacing
+Devices in a Storage Pool</olink>.</para>
+</listitem>
+</itemizedlist><para>Currently, the following operations are not supported on a RAID-Z configuration:</para><itemizedlist><listitem><para>Attach an additional disk to an existing RAID-Z configuration.</para>
+</listitem><listitem><para>Detach a disk from a RAID-Z configuration.</para>
+</listitem><listitem><para>You cannot outright remove a device from a RAID-Z configuration.
+An RFE is filed for this feature.</para>
+</listitem>
+</itemizedlist><para>For more information about a RAID-Z configuration, see <olink targetptr="gamtu" remap="internal">RAID-Z Storage Pool Configuration</olink>.</para>
+</sect3><sect3 id="gffyt"><title>Creating a ZFS Storage Pool with Log Devices</title><para>By default,  the ZIL is allocated  from blocks within the main pool.
+However, better performance might be possible by using separate intent log
+devices, such as NVRAM or a dedicated disk. For more information about ZFS
+log devices, see <olink targetptr="gfgaa" remap="internal">Setting Up Separate ZFS Logging
+Devices</olink>.</para><para>You can set up a ZFS logging device when the storage pool is created
+or after the pool is created.</para><para>For example, create a mirrored storage pool with mirrored log devices.</para><screen># zpool create datap mirror c1t1d0 c1t2d0 mirror c1t3d0 c1t4d0 log mirror c1t5d0 c1t8d0
+# zpool status
+  pool: datap
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        datap       ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+            c1t2d0  ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t3d0  ONLINE       0     0     0
+            c1t4d0  ONLINE       0     0     0
+        logs        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t5d0  ONLINE       0     0     0
+            c1t8d0  ONLINE       0     0     0
+
+errors: No known data errors</screen>
+</sect3><sect3 id="gfxtd"><title>Creating
+a ZFS Storage Pool with Cache Devices</title><para>You can create a storage pool with cache devices to cache storage pool
+data. For example:</para><screen># zpool create tank mirror c2t0d0 c2t1d0 c2t3d0 cache c2t5d0 c2t8d0
+# zpool status tank
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0
+            c2t3d0  ONLINE       0     0     0
+        cache
+          c2t5d0    ONLINE       0     0     0
+          c2t8d0    ONLINE       0     0     0</screen><itemizedlist><para>Review the following points when considering whether to create a ZFS
+storage pool with cache devices:</para><listitem><para>Using cache devices provide the greatest performance improvement
+for random read-workloads of mostly static content.</para>
+</listitem><listitem><para>Capacity and reads can be monitored by using the <command>zpool
+iostat</command> command.</para>
+</listitem><listitem><para>Single or multiple cache devices can be added when the pool
+is created or added and removed after the pool is created. For more information,
+see <olink targetptr="gfxrx" remap="internal">Example&nbsp;4&ndash;3</olink>.</para>
+</listitem><listitem><para>Cache devices cannot be mirrored or be part of a RAID-Z configuration.</para>
+</listitem><listitem><para>If a read error is encountered on a cache device, that read
+I/O is reissued to the original storage pool device, which might be part of
+a mirrored or RAID-Z configuration. The content of the cache devices is considered
+volatile, as is the case with other system caches.</para>
+</listitem>
+</itemizedlist>
+</sect3>
+</sect2><sect2 id="gazhs"><title>Handling ZFS Storage Pool Creation Errors</title><para>Pool creation errors can occur for many reasons. Some of these reasons
+are obvious, such as when a specified device doesn't exist, while other reasons
+are more subtle.</para><sect3 id="gazht"><title>Detecting in Use Devices</title><para>Before formatting a device, ZFS first determines if the disk is in use
+by ZFS or some other part of the operating system. If the disk is in use,
+you might see errors such as the following:</para><screen># <userinput>zpool create tank c1t0d0 c1t1d0</userinput>
+invalid vdev specification
+use '-f' to override the following errors:
+/dev/dsk/c1t0d0s0 is currently mounted on /. Please see umount(1M).
+/dev/dsk/c1t0d0s1 is currently mounted on swap. Please see swap(1M).
+/dev/dsk/c1t1d0s0 is part of active ZFS pool zeepool. Please see zpool(1M).</screen><para>Some of these errors can be overridden by using the <option>f</option> option,
+but most errors cannot. The following uses cannot be overridden by using the <option>f</option> option, and you must manually correct them:</para><variablelist><varlistentry><term><emphasis role="strong">Mounted file system</emphasis></term><listitem><para>The disk or one of its slices contains a file system that
+is currently mounted. To correct this error, use the <command>umount</command> command.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">File system in /etc/vfstab</emphasis></term><listitem><para>The disk contains a file system that is listed in the <filename>/etc/vfstab</filename> file, but the file system is not currently mounted. To correct
+this error, remove or comment out the line in the <filename>/etc/vfstab</filename> file.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Dedicated dump device</emphasis></term><listitem><para>The disk is in use as the dedicated dump device for the system.
+To correct this error, use the <command>dumpadm</command> command.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Part of a ZFS pool</emphasis></term><listitem><para>The disk or file is part of an active ZFS storage pool. To
+correct this error, use the <command>zpool</command> command to destroy the
+pool.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following in-use checks serve as helpful warnings and can be overridden
+by using the <option>f</option> option to create the pool:</para><variablelist><varlistentry><term><emphasis role="strong">Contains a file system</emphasis></term><listitem><para>The disk contains a known file system, though it is not mounted
+and doesn't appear to be in use.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Part of volume</emphasis></term><listitem><para>The disk is part of an SVM volume.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Live upgrade</emphasis></term><listitem><para>The disk is in use as an alternate boot environment for Solaris
+Live Upgrade.</para>
+</listitem>
+</varlistentry><varlistentry><term><emphasis role="strong">Part of exported ZFS pool</emphasis></term><listitem><para>The disk is part of a storage pool that has been exported
+or manually removed from a system. In the latter case, the pool is reported
+as <literal>potentially active</literal>, as the disk might or might not be
+a network-attached drive in use by another system. Be cautious when overriding
+a potentially active pool.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following example demonstrates how the <option>f</option> option
+is used:</para><screen># <userinput>zpool create tank c1t0d0</userinput>
+invalid vdev specification
+use '-f' to override the following errors:
+/dev/dsk/c1t0d0s0 contains a ufs filesystem.
+# <userinput>zpool create -f tank c1t0d0</userinput></screen><para>Ideally, correct the errors rather than use the <option>f</option> option.</para>
+</sect3><sect3 id="gazgc"><title>Mismatched Replication Levels</title><para>Creating pools with virtual devices of different replication levels
+is not recommended. The <command>zpool</command> command tries to prevent
+you from accidentally creating a pool with mismatched levels of redundancy.
+If you try to create a pool with such a configuration, you see errors similar
+to the following:</para><screen># <userinput>zpool create tank c1t0d0 mirror c2t0d0 c3t0d0</userinput>
+invalid vdev specification
+use '-f' to override the following errors:
+mismatched replication level: both disk and mirror vdevs are present
+# <userinput>zpool create tank mirror c1t0d0 c2t0d0 mirror c3t0d0 c4t0d0 c5t0d0</userinput>
+invalid vdev specification
+use '-f' to override the following errors:
+mismatched replication level: 2-way mirror and 3-way mirror vdevs are present</screen><para>You can override these errors with the <option>f</option> option, though
+this practice is not recommended. The command also warns you about creating
+a mirrored or RAID-Z pool using devices of different sizes. While this configuration
+is allowed, mismatched levels of redundancy result in unused space on the
+larger device, and requires the <option>f</option> option to override the
+warning.</para>
+</sect3><sect3 id="gazhd"><title>Doing a Dry Run of Storage Pool Creation</title><para>Because creating a pool can fail unexpectedly in different ways, and
+because formatting disks is such a potentially harmful action, the <command>zpool
+create</command> command has an additional option, <option>n</option>, which
+simulates creating the pool without actually writing data to disk. This option
+performs the device in-use checking and replication level validation, and
+reports any errors in the process. If no errors are found, you see output
+similar to the following:</para><screen># <userinput>zpool create -n tank mirror c1t0d0 c1t1d0</userinput>
+would create 'tank' with the following layout:
+
+        tank
+          mirror
+            c1t0d0
+            c1t1d0</screen><para>Some errors cannot be detected without actually creating the pool. The
+most common example is specifying the same device twice in the same configuration.
+This error cannot be reliably detected without writing the data itself, so
+the <command>create -n</command> command can report success and yet fail to
+create the pool when run for real.</para>
+</sect3><sect3 id="gbeef"><title>Default Mount Point for Storage Pools</title><para>When a pool is created, the default mount point for the root dataset
+is <replaceable>/pool-name</replaceable>. This directory must either not exist
+or be empty. If the directory does not exist, it is automatically created.
+If the directory is empty, the root dataset is mounted on top of the existing
+directory. To create a pool with a different default mount point, use the <option>m</option> option of the <command>zpool create</command> command:</para><screen># <userinput>zpool create home c1t0d0</userinput>
+default mountpoint '/home' exists and is not empty
+use '-m' option to specify a different default
+# <userinput>zpool create -m /export/zfs home c1t0d0</userinput></screen><screen># <userinput>zpool create home c1t0d0</userinput>
+default mountpoint '/home' exists and is not empty
+use '-m' option to provide a different default
+# <userinput>zpool create -m /export/zfs home c1t0d0</userinput></screen><para>This command creates a new pool <literal>home</literal> and the <literal>home</literal> dataset with a mount point of <filename>/export/zfs</filename>.</para><para>For more information about mount points, see <olink targetptr="gaztn" remap="internal">Managing
+ZFS Mount Points</olink>.</para>
+</sect3>
+</sect2><sect2 id="gammr"><title>Destroying ZFS Storage Pools</title><para>Pools are destroyed by using the <command>zpool destroy</command> command.
+This command destroys the pool even if it contains mounted datasets.</para><screen># <userinput>zpool destroy tank</userinput></screen><caution><para>Be very careful when you destroy a pool. Make sure you are
+destroying the right pool and you always have copies of your data. If you
+accidentally destroy the wrong pool, you can attempt to recover the pool.
+For more information, see <olink targetptr="gcfhw" remap="internal">Recovering Destroyed ZFS
+Storage Pools</olink>.</para>
+</caution><sect3 id="gazhm"><title>Destroying a Pool With Faulted Devices</title><para>The act of destroying a pool requires that data be written to disk to
+indicate that the pool is no longer valid. This state information prevents
+the devices from showing up as a potential pool when you perform an import.
+If one or more devices are unavailable, the pool can still be destroyed. However,
+the necessary state information won't be written to these damaged devices.</para><para>These devices, when suitably repaired, are reported as <emphasis>potentially
+active</emphasis> when you create a new pool, and appear as valid devices
+when you search for pools to import. If a pool has enough faulted devices
+such that the pool itself is faulted (meaning that a top-level virtual device
+is faulted), then the command prints a warning and cannot complete without
+the <option>f</option> option. This option is necessary because the pool cannot
+be opened, so whether data is stored there or not is unknown. For example:</para><screen># <userinput>zpool destroy tank</userinput>
+cannot destroy 'tank': pool is faulted
+use '-f' to force destruction anyway
+# <userinput>zpool destroy -f tank</userinput></screen><para>For more information about pool and device health, see <olink targetptr="gamno" remap="internal">Determining the Health Status of ZFS Storage Pools</olink>.</para><para>For more information about importing pools, see <olink targetptr="gazuf" remap="internal">Importing
+ZFS Storage Pools</olink>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="gayrd"><title>Managing Devices in ZFS Storage Pools</title><para>Most of the basic information regarding devices is covered in <olink targetptr="gcfog" remap="internal">Components of a ZFS Storage Pool</olink>. Once a pool has
+been created, you can perform several tasks to manage the physical devices
+within the pool.</para><itemizedlist><listitem><para><olink targetptr="gazgw" remap="internal">Adding Devices to a Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gcfhe" remap="internal">Attaching and Detaching Devices in
+a Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazgm" remap="internal">Onlining and Offlining Devices in
+a Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazge" remap="internal">Clearing Storage Pool Devices</olink></para>
+</listitem><listitem><para><olink targetptr="gazgd" remap="internal">Replacing Devices in a Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gcvcw" remap="internal">Designating Hot Spares in Your Storage
+Pool</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gazgw"><title>Adding Devices to a Storage Pool</title><para>You can dynamically add space to a pool by adding a new top-level virtual
+device. This space is immediately available to all datasets within the pool.
+To add a new virtual device to a pool, use the <command>zpool add</command> command.
+For example:</para><screen># <userinput>zpool add zeepool mirror c2t1d0 c2t2d0</userinput></screen><para>The format of the virtual devices is the same as for the <command>zpool
+create</command> command, and the same rules apply. Devices are checked to
+determine if they are in use, and the command cannot change the level of redundancy
+without the <option>f</option> option. The command also supports the <option>n</option> option
+so that you can perform a dry run. For example:</para><screen># <userinput>zpool add -n zeepool mirror c3t1d0 c3t2d0</userinput>
+would update 'zeepool' to the following configuration:
+      zeepool
+        mirror
+            c1t0d0
+            c1t1d0
+        mirror
+            c2t1d0
+            c2t2d0
+        mirror
+            c3t1d0
+            c3t2d0</screen><para>This command syntax would add mirrored devices <literal>c3t1d0</literal> and <literal>c3t2d0</literal> to <filename>zeepool</filename>'s existing configuration.</para><para>For more information about how virtual device validation is done, see <olink targetptr="gazht" remap="internal">Detecting in Use Devices</olink>.</para><example id="gevok"><title>Adding Disks to a RAID-Z Configuration</title><para>Additional disks can be added similarly to a RAID-Z configuration. The
+following example shows how to convert a storage pool with one RAID&ndash;Z
+device comprised of 3 disks to a storage pool with two RAID-Z devices comprised
+of 3 disks.</para><screen># <userinput>zpool status</userinput>
+  pool: rpool
+ state: ONLINE
+ scrub: none requested
+config:
+        NAME         STATE     READ WRITE CKSUM
+        rpool        ONLINE       0     0     0
+          raidz1     ONLINE       0     0     0
+            c1t2d0   ONLINE       0     0     0
+            c1t3d0   ONLINE       0     0     0
+            c1t4d0   ONLINE       0     0     0
+
+errors: No known data errors
+# <userinput>zpool add rpool raidz c2t2d0 c2t3d0 c2t4d0</userinput>
+# <userinput>zpool status</userinput>
+  pool: rpool
+ state: ONLINE
+ scrub: none requested
+config:
+        NAME         STATE     READ WRITE CKSUM
+        rpool        ONLINE       0     0     0
+          raidz1     ONLINE       0     0     0
+            c1t2d0   ONLINE       0     0     0
+            c1t3d0   ONLINE       0     0     0
+            c1t4d0   ONLINE       0     0     0
+          raidz1     ONLINE       0     0     0
+            c2t2d0   ONLINE       0     0     0
+            c2t3d0   ONLINE       0     0     0
+            c2t4d0   ONLINE       0     0     0
+
+errors: No known data errors</screen>
+</example><example id="gfgaw"><title>Adding a Mirrored Log Device to a ZFS Storage Pool</title><para>The following example shows how to add a mirrored log device to mirrored
+storage pool.For
+more information about using log devices in your storage pool, see <olink targetptr="gfgaa" remap="internal">Setting Up Separate ZFS Logging Devices</olink>.</para><screen># zpool status newpool
+  pool: newpool
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        newpool      ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t9d0   ONLINE       0     0     0
+            c1t10d0  ONLINE       0     0     0
+
+errors: No known data errors
+# zpool add newpool log mirror c1t11d0 c1t12d0
+# zpool status newpool
+  pool: newpool
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        newpool      ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t9d0   ONLINE       0     0     0
+            c1t10d0  ONLINE       0     0     0
+        logs         ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t11d0  ONLINE       0     0     0
+            c1t12d0  ONLINE       0     0     0
+
+errors: No known data errors</screen><para>You can attach a log device to an existing log device to create a mirrored
+log device. This operation is identical to attaching a device in a unmirrored
+storage pool.</para>
+</example><example id="gfxrx"><title>Adding and Removing Cache Devices to Your ZFS Storage Pool</title><para>You can add and remove cache
+devices to your ZFS storage pool.</para><para>Use the <command>zpool add</command> command to add cache devices. For
+example:</para><screen># zpool add tank cache c2t5d0 c2t8d0
+# zpool status tank
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0
+            c2t3d0  ONLINE       0     0     0
+        cache
+          c2t5d0    ONLINE       0     0     0
+          c2t8d0    ONLINE       0     0     0
+
+errors: No known data errors</screen><para>Cache devices cannot
+be mirrored or be part of a RAID-Z configuration.</para><para>Use the <command>zpool
+remove</command> command to remove cache devices. For example:</para><screen>E zpool remove tank c2t5d0 c2t8d0
+# zpool status tank
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0
+            c2t3d0  ONLINE       0     0     0
+
+errors: No known data errors</screen><para>Currently, the <command>zpool remove</command> command
+only supports removing hot spares and cache devices. Devices that are part
+of the main mirrored pool configuration can be removed by using the <command>zpool
+detach</command> command. Non-redundant and RAID-Z devices cannot be removed
+from a pool.</para><para>For more information about using cache devices in a ZFS storage pool,
+see <olink targetptr="gfxtd" remap="internal">Creating a ZFS Storage Pool with Cache Devices</olink>.</para>
+</example>
+</sect2><sect2 id="gcfhe"><title>Attaching and Detaching Devices in a Storage Pool</title><para>In addition to the <command>zpool add</command> command, you can use
+the <command>zpool attach</command> command to add a new device to an existing
+mirrored or non-mirrored device. </para><example id="gevnu"><title>Converting a Two-Way Mirrored Storage Pool to a
+Three-way Mirrored Storage Pool</title><para>In this example, <literal>zeepool</literal> is an existing two-way mirror
+that is transformed to a three-way mirror by attaching <literal>c2t1d0</literal>,
+the new device, to the existing device, <literal>c1t1d0</literal>.</para><screen># <userinput>zpool status</userinput>
+  pool: zeepool
+ state: ONLINE
+ scrub: none requested
+config:
+        NAME        STATE     READ WRITE CKSUM
+        zeepool     ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c0t1d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+errors: No known data errors
+# <userinput>zpool attach zeepool c1t1d0 c2t1d0</userinput>
+# <userinput>zpool status</userinput>
+  pool: zeepool
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Fri Jan 12 14:47:36 2007
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        zeepool     ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c0t1d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+            c2t1d0  ONLINE       0     0     0</screen><para>If the existing device is part of a two-way mirror, attaching the new
+device, creates a three-way mirror, and so on. In either case, the new device
+begins to resilver  immediately.</para>
+</example><example id="gevpf"><title>Converting a Non-Redundant ZFS Storage Pool to
+a Mirrored ZFS Storage Pool</title><para>In addition, you can convert a non-redundant storage pool into a redundant
+storage pool by using the <command>zpool attach</command> command. For example:</para><screen># <userinput>zpool create tank c0t1d0</userinput>
+# <userinput>zpool status</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          c0t1d0    ONLINE       0     0     0
+
+errors: No known data errors
+# <userinput>zpool attach tank c0t1d0 c1t1d0</userinput>
+# <userinput>zpool status</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Fri Jan 12 14:55:48 2007
+config:
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c0t1d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0</screen>
+</example><para>You can use the <command>zpool detach</command> command to detach a
+device from a mirrored storage pool. For example:</para><screen># <userinput>zpool detach zeepool c2t1d0</userinput></screen><para>However, this operation is refused if  there are no other valid replicas
+of the data. For example:</para><screen># <userinput>zpool detach newpool c1t2d0</userinput>
+cannot detach c1t2d0: only applicable to mirror and replacing vdevs</screen>
+</sect2><sect2 id="gazgm"><title>Onlining and Offlining Devices in a Storage Pool</title><para>ZFS allows individual devices to be taken offline or brought online.
+When hardware is unreliable or not functioning properly, ZFS continues to
+read or write data to the device, assuming the condition is only temporary.
+If the condition is not temporary, it is possible to instruct ZFS to ignore
+the device by bringing it offline. ZFS does not send any requests to an offlined
+device.</para><note><para>Devices do not need to be taken offline in order to replace them.</para>
+</note><para>You can use the <command>offline</command> command when you need to
+temporarily disconnect storage. For example, if you need to physically disconnect
+an array from one set of Fibre Channel switches and connect the array to a
+different set, you could take the LUNs offline from the array that was used
+in ZFS storage pools. After the array was reconnected and operational on the
+new set of switches, you could then bring the same LUNs online. Data that
+had been added to the storage pools while the LUNs were offline would resilver
+to the LUNs after they were brought back online.</para><para>This scenario is possible assuming that the systems in question see
+the storage once it is attached to the new switches, possibly through different
+controllers than before, and your pools are set up as RAID-Z or mirrored configurations.</para><sect3 id="gazfy"><title>Taking a Device Offline</title><para>You can take a device offline by using the <command>zpool offline</command> command.
+The device can be specified by path or by short name, if the device is a disk.
+For example:</para><screen># <userinput>zpool offline tank c1t0d0</userinput>
+bringing device c1t0d0 offline</screen><para>Keep the following points in mind when taking a device offline:</para><itemizedlist><listitem><para>You cannot take a pool offline to the point where it becomes
+faulted. For example, you cannot take offline two devices out of a RAID-Z
+configuration, nor can you take offline a top-level virtual device.</para><screen># <userinput>zpool offline tank c1t0d0</userinput>
+cannot offline c1t0d0: no valid replicas</screen>
+</listitem><listitem><para>By default, the offline state is persistent. The device remains
+offline when the system is rebooted. </para><para>To temporarily take a device
+offline, use the <command>zpool offline</command> <option>t</option> option.
+For example:</para><screen># <userinput>zpool offline -t tank c1t0d0</userinput>
+ bringing device 'c1t0d0' offline</screen><para>When the system is rebooted, this device is automatically returned to
+the <literal>ONLINE</literal> state.</para>
+</listitem><listitem><para>When a device is taken offline, it is not detached from the
+storage pool. If you attempt to use the offlined device in another pool, even
+after the original pool is destroyed, you will see a message similar to the
+following:</para><screen><replaceable>device</replaceable> is part of exported or potentially active ZFS <replaceable>pool</replaceable>. Please see zpool(1M)</screen><para>If you want to use the offlined device in another storage pool after
+destroying the original storage pool, first bring the device back online,
+then destroy the original storage pool.</para><para>Another way to use a device
+from another storage pool if you want to keep the original storage pool is
+to replace the existing device in the original storage pool with another comparable
+device. For information about replacing devices, see <olink targetptr="gazgd" remap="internal">Replacing
+Devices in a Storage Pool</olink>.</para>
+</listitem>
+</itemizedlist><para>Offlined devices show up in the <literal>OFFLINE</literal> state when
+you query pool status. For information about querying pool status, see <olink targetptr="gaynp" remap="internal">Querying ZFS Storage Pool Status</olink>.</para><para>For more information on device health, see <olink targetptr="gamno" remap="internal">Determining
+the Health Status of ZFS Storage Pools</olink>.</para>
+</sect3><sect3 id="gazgk"><title>Bringing a Device Online</title><para>Once a device is taken offline, it can be restored by using the <command>zpool
+online</command> command:</para><screen># <userinput>zpool online tank c1t0d0</userinput>
+bringing device c1t0d0 online</screen><para>When a device is brought online, any data that has been written to the
+pool is resynchronized to the newly available device. Note that you cannot
+use device onlining to replace a disk. If you offline a device, replace the
+drive, and try to bring it online, it remains in the faulted state.</para><para>If you attempt to online a faulted device, a message similar to the
+following is displayed from <command>fmd</command>:</para><screen remap="wide"># <userinput>zpool online tank c1t0d0</userinput>
+Bringing device c1t0d0 online
+# 
+SUNW-MSG-ID: ZFS-8000-D3, TYPE: Fault, VER: 1, SEVERITY: Major
+EVENT-TIME: Thu Aug 31 11:13:59 MDT 2006
+PLATFORM: SUNW,Ultra-60, CSN: -, HOSTNAME: neo
+SOURCE: zfs-diagnosis, REV: 1.0
+EVENT-ID: e11d8245-d76a-e152-80c6-e63763ed7e4f
+DESC: A ZFS device failed.  Refer to http://sun.com/msg/ZFS-8000-D3 for more information.
+AUTO-RESPONSE: No automated response will occur.
+IMPACT: Fault tolerance of the pool may be compromised.
+REC-ACTION: Run 'zpool status -x' and replace the bad device.</screen><para>For more information on replacing a faulted device, see <olink targetptr="gbbvb" remap="internal">Repairing a Missing Device</olink>.</para>
+</sect3>
+</sect2><sect2 id="gazge"><title>Clearing Storage Pool Devices</title><para>If a device is taken offline due to a failure that causes errors to
+be listed in the <command>zpool status</command> output, you can clear the
+error counts with the <command>zpool clear</command> command. </para><para>If specified with no arguments, this command clears all device errors
+within the pool. For example:</para><screen># <userinput>zpool clear tank</userinput></screen><para>If one or more devices are specified, this command only clear errors
+associated with the specified devices. For example:</para><screen># <userinput>zpool clear tank c1t0d0</userinput></screen><para>For more information on clearing <command>zpool</command> errors, see <olink targetptr="gbbzv" remap="internal">Clearing Transient Errors</olink>.</para>
+</sect2><sect2 id="gazgd"><title>Replacing Devices in a Storage Pool</title><para>You can replace a device in a storage pool by using the <command>zpool
+replace</command> command.</para><para>If you are physically replacing a device with another device in the
+same location in a redundant pool, then you only need identify the replaced
+device. ZFS recognizes that it is a different disk in the same location. For
+example, to replace a failed disk (<literal>c1t1d0</literal>) by removing
+the disk and replacing it in the same location, use the syntax similar to
+the following:</para><screen># <userinput>zpool replace tank c1t1d0</userinput></screen><para>If you are replacing a device in a non-redundant storage pool that contains
+only one device, you will need to specify both devices. For example:</para><screen># <userinput>zpool replace tank c1t1d0 c1t2d0</userinput></screen><para>Keep the following considerations
+in mind when replacing devices in a ZFS storage pool:</para><itemizedlist><listitem><para>The replacement device must be greater than or equal to the
+minimum size of all the devices in a mirrored or RAID-Z  configuration.</para>
+</listitem><listitem><para>If the replacement device is larger, the pool capacity is
+increased when the replacement is complete. Currently, you must export and
+import the pool to see the expanded capacity. For example:</para><screen># zpool list tank
+NAME   SIZE   USED  AVAIL    CAP  HEALTH  ALTROOT
+tank  16.8G    94K  16.7G     0%  ONLINE  -
+# zpool replace tank c0t0d0 c0t4d0
+# zpool list tank
+NAME   SIZE   USED  AVAIL    CAP  HEALTH  ALTROOT
+tank  16.8G   112K  16.7G     0%  ONLINE  -
+# zpool export tank
+# zpool import tank
+# zpool list tank
+NAME   SIZE   USED  AVAIL    CAP  HEALTH  ALTROOT
+tank  33.9G   114K  33.9G     0%  ONLINE  -</screen><para>For more information about exporting and importing pools, see <olink targetptr="gbchy" remap="internal">Migrating ZFS Storage Pools</olink>.</para>
+</listitem><listitem><para>Currently, you must also perform the export and import steps
+when growing the size of an existing LUN that is part of a storage pool to
+see the expanded capacity.</para>
+</listitem><listitem><para>Replacing many disks in a large pool is time consuming due
+to resilvering the data onto the new disks. In addition, you might consider
+running the <command>zpool scrub</command> command between disk replacements
+to ensure that the replacement devices are operational and the data is written
+correctly.</para>
+</listitem>
+</itemizedlist><para>For more information about replacing devices, see <olink targetptr="gbbvb" remap="internal">Repairing a Missing Device</olink> and <olink targetptr="gbbvf" remap="internal">Repairing
+a Damaged Device</olink>.</para>
+</sect2><sect2 id="gcvcw"><title>Designating Hot Spares in Your Storage Pool</title><para>The hot spares feature enables you to identify disks that could be used
+to replace a failed or faulted device in one or more storage pools. Designating
+a device as a <emphasis>hot spare</emphasis> means that the device is not
+an active device in a pool, but if an active device in the pool fails, the
+hot spare automatically replaces the failed device.</para><para>Devices can be designated as hot spares in the following ways:</para><itemizedlist><listitem><para>When the pool is created with the <command>zpool create</command> command</para>
+</listitem><listitem><para>After the pool is created with the <command>zpool add</command> command</para>
+</listitem><listitem><para>Hot spare devices can be shared between multiple pools</para>
+</listitem>
+</itemizedlist><para>Designate devices as hot spares when the pool is created. For example:</para><screen># <userinput>zpool create zeepool mirror c1t1d0 c2t1d0 spare c1t2d0 c2t2d0</userinput>
+# <userinput>zpool status zeepool</userinput>
+pool: zeepool
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        zeepool      ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t1d0   ONLINE       0     0     0
+            c2t1d0   ONLINE       0     0     0
+        spares
+          c1t2d0     AVAIL   
+          c2t2d0     AVAIL   </screen><para>Designate hot spares by adding them to a pool after the pool is created.
+For example:</para><screen># <userinput>zpool add -f zeepool spare c1t3d0 c2t3d0</userinput>
+# <userinput>zpool status zeepool</userinput>
+pool: zeepool
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        zeepool      ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t1d0   ONLINE       0     0     0
+            c2t1d0   ONLINE       0     0     0
+        spares
+          c1t3d0     AVAIL   
+          c2t3d0     AVAIL   </screen><para>Multiple pools can share devices that are designated as hot spares.
+For example:</para><screen># <userinput>zpool create zeepool mirror c1t1d0 c2t1d0 spare c1t2d0 c2t2d0</userinput>
+# <userinput>zpool create tank raidz c3t1d0 c4t1d0 spare c1t2d0 c2t2d0</userinput></screen><para>Hot spares can be removed from a storage pool by using the <command>zpool
+remove</command> command. For example:</para><screen># <userinput>zpool remove zeepool c1t2d0</userinput>
+# <userinput>zpool status zeepool</userinput>
+pool: zeepool
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        zeepool      ONLINE       0     0     0
+          mirror     ONLINE       0     0     0
+            c1t1d0   ONLINE       0     0     0
+            c2t1d0   ONLINE       0     0     0
+        spares
+          c1t3d0     AVAIL</screen><para>A hot spare cannot be removed if it is currently used by the storage
+pool.</para><para>Keep the following points in mind when using ZFS hot spares:</para><itemizedlist><listitem><para>Currently, the <command>zpool remove</command> command can
+only be used to remove hot spares.</para>
+</listitem><listitem><para>Add a disk as a spare that is equal to or larger than the
+size of the largest disk in the pool. Adding a smaller disk as a spare to
+a pool is allowed. However, when the smaller spare disk is activated, either
+automatically or with the <command>zpool replace</command> command, the operation
+fails with an error similar to the following:</para><screen>cannot replace <replaceable>disk3</replaceable> with <replaceable>disk4</replaceable>: device is too small</screen>
+</listitem>
+</itemizedlist><sect3 id="gcvdi"><title>Activating and Deactivating Hot Spares in Your Storage
+Pool</title><para>Hot spares are activated in the following ways:</para><itemizedlist><listitem><para>Manually replacement &ndash; Replace a failed device in a
+storage pool with a hot spare by using the <command>zpool replace</command> command.</para>
+</listitem><listitem><para>Automatic replacement &ndash; When a fault is received, an
+FMA agent examines the pool to see if it has any available hot spares. If
+so, it replaces the faulted device with an available spare.</para><para>If
+a hot spare that is currently in use fails, the agent detaches the spare and
+thereby cancels the replacement. The agent then attempts to replace the device
+with another hot spare, if one is available. This feature is currently limited
+by the fact that the ZFS diagnosis engine only emits faults when a device
+disappears from the system. </para><para>Currently, no automated response
+is available to bring the original device back online. You must explicitly
+take one of the actions described in the example below. A future enhancement
+will allow ZFS to subscribe to hotplug events and automatically replace the
+affected device when it is replaced on the system.</para>
+</listitem>
+</itemizedlist><para>Manually replace a device with a hot spare by using the <command>zpool
+replace</command> command. For example:</para><screen># <userinput>zpool replace zeepool c2t1d0 c2t3d0</userinput>
+# <userinput>zpool status zeepool</userinput>
+  pool: zeepool
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Fri Jun  2 13:44:40 2006
+config:
+
+        NAME            STATE     READ WRITE CKSUM
+        zeepool         ONLINE       0     0     0
+          mirror        ONLINE       0     0     0
+            c1t2d0      ONLINE       0     0     0
+            spare       ONLINE       0     0     0
+              c2t1d0    ONLINE       0     0     0
+              c2t3d0    ONLINE       0     0     0
+        spares
+          c1t3d0        AVAIL   
+          c2t3d0        INUSE     currently in use
+
+errors: No known data errors</screen><para>A faulted device is automatically replaced if a hot spare is available.
+For example:</para><screen># <userinput>zpool status -x</userinput>
+  pool: zeepool
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-D3
+ scrub: resilver completed with 0 errors on Fri Jun  2 13:56:49 2006
+config:
+
+        NAME                 STATE     READ WRITE CKSUM
+        zeepool              DEGRADED     0     0     0
+          mirror             DEGRADED     0     0     0
+            c1t2d0           ONLINE       0     0     0
+            spare            DEGRADED     0     0     0
+              c2t1d0         UNAVAIL      0     0     0  cannot open
+              c2t3d0         ONLINE       0     0     0
+        spares
+          c1t3d0             AVAIL   
+          c2t3d0             INUSE     currently in use
+
+errors: No known data errors</screen><para>Currently, three ways to deactivate hot spares are available:</para><itemizedlist><listitem><para>Canceling the hot spare by removing it from the storage pool</para>
+</listitem><listitem><para>Replacing the original device with a hot spare</para>
+</listitem><listitem><para>Permanently swapping in the hot spare</para>
+</listitem>
+</itemizedlist><para>After the faulted device is replaced, use the <command>zpool detach</command> command
+to return the hot spare back to the spare set. For example:</para><screen># <userinput>zpool detach zeepool c2t3d0</userinput>
+# <userinput>zpool status zeepool</userinput>
+  pool: zeepool
+ state: ONLINE
+ scrub: resilver completed with 0 errors on Fri Jun  2 13:58:35 2006
+config:
+
+        NAME               STATE     READ WRITE CKSUM
+        zeepool            ONLINE       0     0     0
+          mirror           ONLINE       0     0     0
+            c1t2d0         ONLINE       0     0     0
+            c2t1d0         ONLINE       0     0     0
+        spares
+          c1t3d0           AVAIL   
+          c2t3d0           AVAIL
+
+errors: No known data errors</screen>
+</sect3>
+</sect2>
+</sect1><sect1 id="gfifk"><title>Managing
+ZFS Storage Pool Properties</title><para>You can use the <command>zpool get</command> command to display pool
+property information. For example:</para><screen># zpool get all tank2
+NAME   PROPERTY     VALUE       SOURCE
+tank2  size         33.8G       -
+tank2  used         158K        -
+tank2  available    33.7G       -
+tank2  capacity     0%          -
+tank2  altroot      -           default
+tank2  health       ONLINE      -
+tank2  guid         8032621780930948264  -
+tank2  version      8           default
+tank2  bootfs       -           default
+tank2  delegation   on          default
+tank2  autoreplace  off         default
+tank2  temporary    off         default
+tank2  failmode     wait        default</screen><para>Storage pool properties can be set with the <command>zpool set</command> command.
+For example:</para><screen># zpool set autoreplace=on tank
+# zpool get autoreplace tank
+NAME  PROPERTY     VALUE    SOURCE
+tank  autoreplace  on       default</screen><table frame="topbot" id="gfiex"><title>ZFS Pool Property Descriptions</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="16.17*"/><colspec colwidth="11.73*"/><colspec colwidth="13.42*"/><colspec colwidth="58.65*"/><thead><row rowsep="1"><entry><para>Property Name</para>
+</entry><entry><para>Type</para>
+</entry><entry><para>Default Value</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry rowsep="1"><para><literal>altroot</literal></para>
+</entry><entry rowsep="1"><para>String</para>
+</entry><entry rowsep="1"><para>off</para>
+</entry><entry rowsep="1"><para>Identifies an alternate root directory.  If set, this directory  is
+prepended  to any mount points within the pool. This property can be used
+when  examining an unknown pool, if the mount points cannot  be trusted, or
+in an alternate boot environment, where the typical paths are not valid. 
+Setting this property implies that the <literal>temporary</literal> property
+is also set.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>available</literal></para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only value that identifies the amount of storage that is available
+within the pool.</para><para>This property can also be referred to by its shortened column name, <literal>avail</literal>. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>autoreplace</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>off</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls automatic device replacement. If set to off, device replacement
+must be initiated by the administrator by using the <command>zpool</command> <command>replace</command> command. If set to on, any new device, found in the same
+physical location as a device that previously belonged to the pool, is automatically
+formatted and replaced. The default behavior is off. This property can also be referred to by its shortened column
+name, <literal>replace</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>bootfs</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Identifies the default bootable dataset for the root pool. This property
+is expected to be set mainly by the installation and upgrade programs.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>capacity</literal></para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only value that identifies the percentage of pool space used.</para><para>This property can also be referred to by its shortened column name, <literal>cap</literal>. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>delegation</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>on</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether a non-privileged user can be granted access permissions
+that are defined for the dataset.  For more information, see <olink targetptr="gbchv" remap="internal">Chapter&nbsp;8, ZFS Delegated Administration</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>guid</literal></para>
+</entry><entry rowsep="1"><para>String</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only property that identifies the unique identifier for the pool.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>health</literal></para>
+</entry><entry rowsep="1"><para>String</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only property that identifies the current health of the pool, as
+either ONLINE, DEGRADED, FAULTED,  OFFLINE, REMOVED, or UNAVAIL.</para>
+</entry>
+</row><row><entry rowsep="1"><para>size</para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only property that identifies the total size of the storage pool.</para>
+</entry>
+</row><row><entry rowsep="1"><para>used</para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Read-only property that identifies the amount of storage space used
+within the pool. </para>
+</entry>
+</row><row><entry rowsep="1"><para>temporary</para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>off</para>
+</entry><entry rowsep="1"><para>Controls whether the pool is available temporarily. By default, all
+pools are persistent, and are automatically opened when the system is rebooted.
+Setting this property to <literal>on</literal> causes the pool to exist only
+while the system is up. If the system is rebooted, the pool has to be manually
+ imported  by using the <command>zpool  import</command> command. Setting
+this property is helpful when using pools on removable media, where the devices
+might not be present when the system reboots.</para><para>This property can also be referred to by  its shortened column name, <literal>temp</literal>. </para>
+</entry>
+</row><row><entry rowsep="1"><para>version</para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>N/A</para>
+</entry><entry rowsep="1"><para>Identifies the current on-disk version of the pool. The value of this
+property can be increased,  but never decreased. The preferred method of 
+updating pools is with the <command>zpool upgrade</command> command, although
+this property can be used when a specific version is needed for backwards
+compatibility. This property can be set to any number between  1 and the current
+version reported by the <command>zpool upgrade</command>  <option>v</option> command.
+ The <literal>current</literal> value is an alias for the latest supported
+version.  </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="gaynp"><title>Querying ZFS Storage Pool Status</title><para>The <command>zpool list</command> command provides a number of ways
+to request information regarding pool status. The information available generally
+falls into three categories: basic usage information, I/O statistics, and
+health status. All three types of storage pool information are covered in
+this section.</para><itemizedlist><listitem><para><olink targetptr="gamml" remap="internal">Displaying Basic ZFS Storage Pool
+Information</olink></para>
+</listitem><listitem><para><olink targetptr="gammt" remap="internal">Viewing ZFS Storage Pool I/O Statistics</olink></para>
+</listitem><listitem><para><olink targetptr="gamno" remap="internal">Determining the Health Status of
+ZFS Storage Pools</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gamml"><title>Displaying Basic ZFS Storage Pool Information</title><para>You can use the <command>zpool list</command> command to display basic
+information about pools.</para><sect3 id="gazij"><title>Listing Information About All Storage Pools</title><para>With no arguments, the command displays all the fields for all pools
+on the system. For example:</para><screen># <userinput>zpool list</userinput>
+NAME                    SIZE    USED   AVAIL    CAP  HEALTH     ALTROOT
+tank                   80.0G   22.3G   47.7G    28%  ONLINE     -
+dozer                   1.2T    384G    816G    32%  ONLINE     -</screen><para>This output displays the following information:</para><variablelist><varlistentry><term><literal>NAME</literal></term><listitem><para>The name of the pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>SIZE</literal></term><listitem><para>The total size of the pool, equal to the sum of the size of
+all top-level virtual devices.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>USED</literal></term><listitem><para>The amount of space allocated by all datasets and internal
+metadata. Note that this amount is different from the amount of space as reported
+at the file system level.</para><para>For more information about determining available file system space,
+see <olink targetptr="gbchp" remap="internal">ZFS Space Accounting</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>AVAILABLE</literal></term><listitem><para>The amount of unallocated space in the pool.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>CAPACITY</literal> (<literal>CAP</literal>)</term><listitem><para>The amount of space used, expressed as a percentage of total
+space.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>HEALTH</literal></term><listitem><para>The current health status of the pool.</para><para>For more information about pool health, see <olink targetptr="gamno" remap="internal">Determining
+the Health Status of ZFS Storage Pools</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>ALTROOT</literal></term><listitem><para>The alternate root of the pool, if any.</para><para>For more information about alternate root pools, see <olink targetptr="gbcgl" remap="internal">Using ZFS Alternate Root Pools</olink>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>You can also gather statistics for a specific pool by specifying the
+pool name. For example:</para><screen># <userinput>zpool list tank</userinput>
+NAME                    SIZE    USED   AVAIL    CAP  HEALTH     ALTROOT
+tank                   80.0G   22.3G   47.7G    28%  ONLINE     -</screen>
+</sect3><sect3 id="gazil"><title>Listing Specific Storage Pool Statistics</title><para>Specific statistics can be requested by using the <option>o</option> option.
+This option allows for custom reports or a quick way to list pertinent information.
+For example, to list only the name and size of each pool, you use the following
+syntax:</para><screen># <userinput>zpool list -o name,size</userinput>
+NAME                    SIZE
+tank                   80.0G
+dozer                   1.2T</screen><para>The column names correspond to the properties that are listed in <olink targetptr="gazij" remap="internal">Listing Information About All Storage Pools</olink>.</para>
+</sect3><sect3 id="gazje"><title>Scripting ZFS Storage Pool Output</title><para>The default output for the <command>zpool list</command> command is
+designed for readability, and is not easy to use as part of a shell script.
+To aid programmatic uses of the command, the <option>H</option> option can
+be used to suppress the column headings and separate fields by tabs, rather
+than by spaces. For example, to request a simple list of all pool names on
+the system:</para><screen># <userinput>zpool list -Ho name</userinput>
+tank
+dozer</screen><para>Here is another example:</para><screen># <userinput>zpool list -H -o name,size</userinput>
+tank   80.0G
+dozer  1.2T</screen>
+</sect3>
+</sect2><sect2 id="gammt"><title>Viewing ZFS Storage Pool I/O Statistics</title><para>To request I/O statistics for a pool or specific virtual devices, use
+the <command>zpool iostat</command> command. Similar to the <command>iostat</command> command,
+this command can display a static snapshot of all I/O activity so far, as
+well as updated statistics for every specified interval. The following statistics
+are reported:</para><variablelist><varlistentry><term><literal>USED CAPACITY</literal></term><listitem><para>The amount of data currently stored in the pool or device.
+This figure differs from the amount of space available to actual file systems
+by a small amount due to internal implementation details.</para><para>For more information about the difference between pool space and dataset
+space, see <olink targetptr="gbchp" remap="internal">ZFS Space Accounting</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>AVAILABLE CAPACITY</literal></term><listitem><para>The amount of space available in the pool or device. As with
+the <literal>used</literal> statistic, this amount differs from the amount
+of space available to datasets by a small margin.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>READ OPERATIONS</literal></term><listitem><para>The number of read I/O operations sent to the pool or device,
+including metadata requests.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>WRITE OPERATIONS</literal></term><listitem><para>The number of write I/O operations sent to the pool or device.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>READ BANDWIDTH</literal></term><listitem><para>The bandwidth of all read operations (including metadata),
+expressed as units per second.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>WRITE BANDWIDTH</literal></term><listitem><para>The bandwidth of all write operations, expressed as units
+per second.</para>
+</listitem>
+</varlistentry>
+</variablelist><sect3 id="gazng"><title>Listing Pool-Wide Statistics</title><para>With no options, the <command>zpool iostat</command> command displays
+the accumulated statistics since boot for all pools on the system. For example:</para><screen># <userinput>zpool iostat</userinput>
+               capacity     operations    bandwidth
+pool         used  avail   read  write   read  write
+----------  -----  -----  -----  -----  -----  -----
+tank         100G  20.0G   1.2M   102K   1.2M  3.45K
+dozer       12.3G  67.7G   132K  15.2K  32.1K  1.20K</screen><para>Because these statistics are cumulative since boot, bandwidth might
+appear low if the pool is relatively idle. You can request a more accurate
+view of current bandwidth usage by specifying an interval. For example:</para><screen># <userinput>zpool iostat tank 2</userinput>
+               capacity     operations    bandwidth
+pool         used  avail   read  write   read  write
+----------  -----  -----  -----  -----  -----  -----
+tank         100G  20.0G   1.2M   102K   1.2M  3.45K
+tank         100G  20.0G    134      0  1.34K      0
+tank         100G  20.0G     94    342  1.06K   4.1M</screen><para>In this example, the command displays usage statistics only for the
+pool <literal>tank</literal> every two seconds until you type Ctrl-C. Alternately,
+you can specify an additional <literal>count</literal> parameter, which causes
+the command to terminate after the specified number of iterations. For example, <command>zpool iostat 2 3</command> would print a summary every two seconds for three
+iterations, for a total of six seconds. If there is a single pool, then the
+statistics are displayed on consecutive lines. If more than one pool exists,
+then an additional dashed line delineates each iteration to provide visual
+separation.</para>
+</sect3><sect3 id="gazne"><title>Listing Virtual Device Statistics</title><para>In addition to pool-wide I/O statistics, the <command>zpool iostat</command> command
+can display statistics for specific virtual devices. This command can be used
+to identify abnormally slow devices, or simply to observe the distribution
+of I/O generated by ZFS. To request the complete virtual device layout as
+well as all I/O statistics, use the <command>zpool iostat -v</command> command.
+For example:</para><screen># <userinput>zpool iostat -v</userinput>
+               capacity     operations    bandwidth
+tank         used  avail   read  write   read  write
+----------  -----  -----  -----  -----  -----  -----
+mirror      20.4G  59.6G      0     22      0  6.00K
+  c1t0d0        -      -      1    295  11.2K   148K
+  c1t1d0        -      -      1    299  11.2K   148K
+----------  -----  -----  -----  -----  -----  -----
+total       24.5K   149M      0     22      0  6.00K</screen><para>Note two important things when viewing I/O statistics on a virtual device
+basis.</para><itemizedlist><listitem><para>First, space usage is only available for top-level virtual
+devices. The way in which space is allocated among mirror and RAID-Z virtual
+devices is particular to the implementation and not easily expressed as a
+single number. </para>
+</listitem><listitem><para>Second, the numbers might not add up exactly as you would
+expect them to. In particular, operations across RAID-Z and mirrored devices
+will not be exactly equal. This difference is particularly noticeable immediately
+after a pool is created, as a significant amount of I/O is done directly to
+the disks as part of pool creation that is not accounted for at the mirror
+level. Over time, these numbers should gradually equalize, although broken,
+unresponsive, or offlined devices can affect this symmetry as well.</para>
+</listitem>
+</itemizedlist><para>You can use the same set of options (interval and count) when examining
+virtual device statistics.</para>
+</sect3>
+</sect2><sect2 id="gamno"><title>Determining the Health Status of ZFS Storage Pools</title><para>ZFS provides an integrated method of examining pool and device health.
+The health of a pool is determined from the state of all its devices. This
+state information is displayed by using the <command>zpool status</command> command.
+In addition, potential pool and device failures are reported by <command>fmd</command> and
+are displayed on the system console and the <command>/var/adm/messages</command> file.
+This section describes how to determine pool and device health. This chapter
+does not document how to repair or recover from unhealthy pools. For more
+information on troubleshooting and data recovery, see <olink targetptr="gavwg" remap="internal">Chapter&nbsp;10,
+ZFS Troubleshooting and Data Recovery</olink>.</para><para>Each device can fall into one of the following states:</para><variablelist><varlistentry><term><literal>ONLINE</literal></term><listitem><para>The device is in normal working order. While some transient
+errors might still occur, the device is otherwise in working order.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DEGRADED</literal></term><listitem><para>The virtual device has experienced failure but is still able
+to function. This state is most common when a mirror or RAID-Z device has
+lost one or more constituent devices. The fault tolerance of the pool might
+be compromised, as a subsequent fault in another device might be unrecoverable.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>FAULTED</literal></term><listitem><para>The virtual device is completely inaccessible. This status
+typically indicates total failure of the device, such that ZFS is incapable
+of sending or receiving data from it. If a top-level virtual device is in
+this state, then the pool is completely inaccessible.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>OFFLINE</literal></term><listitem><para>The virtual device has been explicitly taken offline by the
+administrator.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>UNAVAILABLE</literal></term><listitem><para>The device or virtual device cannot be opened. In some cases,
+pools with <literal>UNAVAILABLE</literal> devices appear in <literal>DEGRADED</literal> mode.
+If a top-level virtual device is unavailable, then nothing in the pool can
+be accessed.</para>
+</listitem>
+</varlistentry><varlistentry><term>REMOVED</term><listitem><para>The device was physically removed while the system was running.
+ Device removal detection is hardware-dependent and might not be supported
+on all platforms.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The health of a pool is determined from the health of all its top-level
+virtual devices. If all virtual devices are <literal>ONLINE</literal>, then
+the pool is also <literal>ONLINE</literal>. If any one of the virtual devices
+is <literal>DEGRADED</literal> or <literal>UNAVAILABLE</literal>, then the
+pool is also <literal>DEGRADED</literal>. If a top-level virtual device is <literal>FAULTED</literal> or <literal>OFFLINE</literal>, then the pool is also <literal>FAULTED</literal>. A pool in the faulted state is completely inaccessible. No data
+can be recovered until the necessary devices are attached or repaired. A pool
+in the degraded state continues to run, but you might not achieve the same
+level of data redundancy or data throughput than if the pool were online.</para><sect3 id="gazqw"><title>Basic Storage Pool Health Status</title><para>The simplest way to request a quick overview of pool health status is
+to use the <command>zpool status</command> command:</para><screen># <userinput>zpool status -x</userinput>
+all pools are healthy</screen><para>Specific pools can be examined by specifying a pool name to the command.
+Any pool that is not in the <literal>ONLINE</literal> state should be investigated
+for potential problems, as described in the next section.</para>
+</sect3><sect3 id="gazqf"><title>Detailed Health Status</title><para>You can request a more detailed health summary by using the <option>v</option> option.
+For example:</para><screen># <userinput>zpool status -v tank</userinput>
+  pool: tank
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist 
+        for the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-2Q
+ scrub: none requested
+config:
+
+        NAME                STATE     READ WRITE CKSUM
+        tank                DEGRADED     0     0     0
+          mirror            DEGRADED     0     0     0
+            c1t0d0          FAULTED      0     0     0  cannot open
+            c1t1d0          ONLINE       0     0     0
+errors: No known data errors</screen><para>This output displays a complete description of why the pool is in its
+current state, including a readable description of the problem and a link
+to a knowledge article for more information. Each knowledge article provides
+up-to-date information on the best way to recover from your current problem.
+Using the detailed configuration information, you should be able to determine
+which device is damaged and how to repair the pool.</para><para>In the above example, the faulted device should be replaced. After the
+device is replaced, use the <command>zpool online</command> command to bring
+the device back online. For example:</para><screen># <userinput>zpool online tank c1t0d0</userinput>
+Bringing device c1t0d0 online
+# <userinput>zpool status -x</userinput>
+all pools are healthy</screen><para>If a pool has an offlined device, the command output identifies the
+problem pool. For example:</para><screen># <userinput>zpool status -x</userinput>
+  pool: tank
+ state: DEGRADED
+status: One or more devices has been taken offline by the adminstrator.
+        Sufficient replicas exist for the pool to continue functioning in a
+        degraded state.
+action: Online the device using 'zpool online' or replace the device with
+        'zpool replace'.
+ scrub: none requested
+config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         DEGRADED     0     0     0
+          mirror     DEGRADED     0     0     0
+             c1t0d0  ONLINE       0     0     0
+             c1t1d0  OFFLINE      0     0     0
+
+errors: No known data errors</screen><para>The <literal>READ</literal> and <literal>WRITE</literal> columns provides
+a count of I/O errors seen on the device, while the <literal>CKSUM</literal> column
+provides a count of uncorrectable checksum errors that occurred on the device.
+Both of these error counts likely indicate potential device failure, and some
+corrective action is needed. If non-zero errors are reported for a top-level
+virtual device, portions of your data might have become inaccessible. The
+errors count identifies any known data errors.</para><para>In the example output above, the offlined device is not causing data
+errors.</para><para>For more information about diagnosing and repairing faulted pools and
+data, see <olink targetptr="gavwg" remap="internal">Chapter&nbsp;10, ZFS Troubleshooting and
+Data Recovery</olink>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="gbchy"><title>Migrating ZFS Storage Pools</title><para>Occasionally, you might need to move a storage pool between machines.
+To do so, the storage devices must be disconnected from the original machine
+and reconnected to the destination machine. This task can be accomplished
+by physically recabling the devices, or by using multiported devices such
+as the devices on a SAN. ZFS enables you to export the pool from one machine
+and import it on the destination machine, even if the machines are of different
+endianness. For information about replicating or migrating file systems between
+different storage pools, which might reside on different machines, see <olink targetptr="gbchx" remap="internal">Saving and Restoring ZFS Data</olink>.</para><itemizedlist><listitem><para><olink targetptr="gazre" remap="internal">Preparing for ZFS Storage Pool Migration</olink></para>
+</listitem><listitem><para><olink targetptr="gazqr" remap="internal">Exporting a ZFS Storage Pool</olink></para>
+</listitem><listitem><para><olink targetptr="gazru" remap="internal">Determining Available Storage Pools
+to Import</olink></para>
+</listitem><listitem><para><olink targetptr="gaztk" remap="internal">Finding ZFS Storage Pools From Alternate
+Directories</olink></para>
+</listitem><listitem><para><olink targetptr="gazuf" remap="internal">Importing ZFS Storage Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gcfhw" remap="internal">Recovering Destroyed ZFS Storage
+Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gcikw" remap="internal">Upgrading ZFS Storage Pools</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gazre"><title>Preparing for ZFS Storage Pool Migration</title><para>Storage pools should be explicitly exported to indicate that they are
+ready to be migrated. This operation flushes any unwritten data to disk, writes
+data to the disk indicating that the export was done, and removes all knowledge
+of the pool from the system.</para><para>If you do not explicitly export the pool, but instead remove the disks
+manually, you can still import the resulting pool on another system. However,
+you might lose the last few seconds of data transactions, and the pool will
+appear faulted on the original machine because the devices are no longer present.
+By default, the destination machine refuses to import a pool that has not
+been explicitly exported. This condition is necessary to prevent accidentally
+importing an active pool that consists of network attached storage that is
+still in use on another system.</para>
+</sect2><sect2 id="gazqr"><title>Exporting a ZFS Storage Pool</title><para>To export a pool, use the <command>zpool export</command> command. For
+example:</para><screen># <userinput>zpool export tank</userinput></screen><para>Once this command is executed, the pool <literal>tank</literal> is no
+longer visible on the system. The command attempts to unmount any mounted
+file systems within the pool before continuing. If any of the file systems
+fail to unmount, you can forcefully unmount them by using the <option>f</option> option.
+For example:</para><screen># <userinput>zpool export tank</userinput>
+cannot unmount '/export/home/eschrock': Device busy
+# <userinput>zpool export -f tank</userinput></screen><para>If devices are unavailable at the time of export, the disks cannot be
+specified as cleanly exported. If one of these devices is later attached to
+a system without any of the working devices, it appears as &ldquo;potentially
+active.&rdquo; If ZFS volumes are in use in the pool, the pool cannot be exported,
+even with the <option>f</option> option. To export a pool with an ZFS volume,
+first make sure that all consumers of the volume are no longer active.</para><para>For more information about ZFS volumes, see <olink targetptr="gaypf" remap="internal">ZFS
+Volumes</olink>.</para>
+</sect2><sect2 id="gazru"><title>Determining Available Storage Pools to Import</title><para>Once the pool has been removed from the system (either through export
+or by forcefully removing the devices), attach the devices to the target system.
+Although ZFS can handle some situations in which only a portion of the devices
+is available, all devices within the pool must be moved between the systems.
+The devices do not necessarily have to be attached under the same device name.
+ZFS detects any moved or renamed devices, and adjusts the configuration appropriately.
+To discover available pools, run the <command>zpool import</command> command
+with no options. For example:</para><screen># <userinput>zpool import</userinput>
+  pool: tank
+    id: 3778921145927357706
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        tank        ONLINE
+          mirror    ONLINE
+            c1t0d0  ONLINE
+            c1t1d0  ONLINE</screen><para>In this example, the pool <literal>tank</literal> is available to be
+imported on the target system. Each pool is identified by a name as well as
+a unique numeric identifier. If multiple pools available to import have the
+same name, you can use the numeric identifier to distinguish between them.</para><para>Similar to the <command>zpool status</command> command, the <command>zpool
+import</command> command refers to a knowledge article available on the web
+with the most up-to-date information regarding repair procedures for a problem
+that is preventing a pool from being imported. In this case, the user can
+force the pool to be imported. However, importing a pool that is currently
+in use by another system over a storage network can result in data corruption
+and panics as both systems attempt to write to the same storage. If some devices
+in the pool are not available but enough redundancy is available to have a
+usable pool, the pool appears in the <literal>DEGRADED</literal> state. For
+example:</para><screen># <userinput>zpool import</userinput>
+  pool: tank
+    id: 3778921145927357706
+ state: DEGRADED
+status: One or more devices are missing from the system.
+action: The pool can be imported despite missing or damaged devices.  The
+        fault tolerance of the pool may be compromised if imported.
+   see: http://www.sun.com/msg/ZFS-8000-2Q
+config:
+
+        tank         DEGRADED
+          mirror     DEGRADED
+            c1t0d0   UNAVAIL   cannot open
+            c1t1d0   ONLINE</screen><para>In this example, the first disk is damaged or missing, though you can
+still import the pool because the mirrored data is still accessible. If too
+many faulted or missing devices are present, the pool cannot be imported.
+For example:</para><screen># <userinput>zpool import</userinput>
+  pool: dozer
+    id: 12090808386336829175
+ state: FAULTED
+action: The pool cannot be imported. Attach the missing
+        devices and try again.
+   see: http://www.sun.com/msg/ZFS-8000-6X
+config:
+        raidz               FAULTED
+          c1t0d0    ONLINE
+          c1t1d0    FAULTED
+          c1t2d0    ONLINE
+          c1t3d0    FAULTED</screen><para>In this example, two disks are missing from a RAID-Z virtual device,
+which means that sufficient redundant data is not available to reconstruct
+the pool. In some cases, not enough devices are present to determine the complete
+configuration. In this case, ZFS doesn't know what other devices were part
+of the pool, though ZFS does report as much information as possible about
+the situation. For example:</para><screen># <userinput>zpool import</userinput>
+pool: dozer
+    id: 12090808386336829175
+ state: FAULTED
+status: One or more devices are missing from the system.
+action: The pool cannot be imported. Attach the missing
+        devices and try again.
+   see: http://www.sun.com/msg/ZFS-8000-6X
+config:
+        dozer          FAULTED   missing device
+          raidz       ONLINE
+            c1t0d0    ONLINE
+            c1t1d0    ONLINE
+            c1t2d0    ONLINE
+            c1t3d0    ONLINE
+        Additional devices are known to be part of this pool, though their
+        exact configuration cannot be determined.</screen>
+</sect2><sect2 id="gaztk"><title>Finding ZFS Storage Pools From Alternate Directories</title><para>By default, the <command>zpool import</command> command only searches
+devices within the <filename>/dev/dsk</filename> directory. If devices exist
+in another directory, or you are using pools backed by files, you must use
+the <option>d</option> option to search different directories. For example:</para><screen># <userinput>zpool create dozer mirror /file/a /file/b</userinput>
+# <userinput>zpool export dozer</userinput>
+# <userinput>zpool import -d /file</userinput>
+  pool: dozer
+    id: 10952414725867935582
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer        ONLINE
+          mirror     ONLINE
+            /file/a  ONLINE
+            /file/b  ONLINE
+# <userinput>zpool import -d /file dozer</userinput></screen><para>If devices exist in multiple directories, you can specify multiple <option>d</option> options.</para>
+</sect2><sect2 id="gazuf"><title>Importing ZFS Storage Pools</title><para>Once a pool has been identified for import, you can import it by specifying
+the name of the pool or its numeric identifier as an argument to the <command>zpool
+import</command> command. For example:</para><screen># <userinput>zpool import tank</userinput></screen><para>If multiple available pools have the same name, you can specify which
+pool to import using the numeric identifier. For example:</para><screen># <userinput>zpool import</userinput>
+  pool: dozer
+    id: 2704475622193776801
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer       ONLINE
+          c1t9d0    ONLINE
+
+  pool: dozer
+    id: 6223921996155991199
+ state: ONLINE
+action: The pool can be imported using its name or numeric identifier.
+config:
+
+        dozer       ONLINE
+          c1t8d0    ONLINE
+# <userinput>zpool import dozer</userinput>
+cannot import 'dozer': more than one matching pool
+import by numeric ID instead
+# <userinput>zpool import 6223921996155991199</userinput></screen><para>If the pool name conflicts with an existing pool name, you can import
+the pool under a different name. For example:</para><screen># <userinput>zpool import dozer zeepool</userinput></screen><para>This command imports the exported pool <literal>dozer</literal> using
+the new name <literal>zeepool</literal>. If the pool was not cleanly exported,
+ZFS requires the <option>f</option> flag to prevent users from accidentally
+importing a pool that is still in use on another system. For example:</para><screen># <userinput>zpool import dozer</userinput>
+cannot import 'dozer': pool may be in use on another system
+use '-f' to import anyway
+# <userinput>zpool import -f dozer</userinput></screen><para>Pools can also be imported under an alternate root by using the <option>R</option> option.
+For more information on alternate root pools, see <olink targetptr="gbcgl" remap="internal">Using
+ZFS Alternate Root Pools</olink>.</para>
+</sect2><sect2 id="gcfhw"><title>Recovering Destroyed ZFS Storage Pools</title><para>You can use the <command>zpool import</command> <option>D</option> command
+to recover a storage pool that has been destroyed. For example:</para><screen># <userinput>zpool destroy tank</userinput>
+# <userinput>zpool import -D</userinput>
+pool: tank
+    id: 3778921145927357706
+ state: ONLINE (DESTROYED)
+action: The pool can be imported using its name or numeric identifier.  The
+        pool was destroyed, but can be imported using the '-Df' flags.
+config:
+
+        tank        ONLINE
+          mirror    ONLINE
+            c1t0d0  ONLINE
+            c1t1d0  ONLINE</screen><para>In the above <command>zpool import</command> output, you can identify
+this pool as the destroyed pool because of the following state information:</para><screen>state: ONLINE (DESTROYED)</screen><para>To recover the destroyed pool, issue the <command>zpool import</command> <option>D</option> command again with the pool to be recovered and the <option>f</option> option.
+For example:</para><screen># <userinput>zpool import -Df tank</userinput>
+# <userinput>zpool status tank</userinput>
+  pool: tank
+ state: ONLINE
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c1t0d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+
+errors: No known data errors</screen><para>If one of the devices in the destroyed pool is faulted or unavailable,
+you might be able to recover the destroyed pool anyway. In this scenario,
+import the degraded pool and then attempt to fix the device failure. For example:</para><screen># <userinput>zpool destroy dozer</userinput>
+# <userinput>zpool import -D</userinput>
+pool: dozer
+    id: 
+ state: DEGRADED (DESTROYED)
+status: One or more devices are missing from the system.
+action: The pool can be imported despite missing or damaged devices.  The
+        fault tolerance of the pool may be compromised if imported.  The
+        pool was destroyed, but can be imported using the '-Df' flags.
+   see: http://www.sun.com/msg/ZFS-8000-2Q
+config:
+
+        dozer        DEGRADED
+           raidz      ONLINE
+            c1t0d0    ONLINE
+            c1t1d0    ONLINE
+            c1t2d0    UNAVAIL  cannot open
+            c1t3d0    ONLINE
+# <userinput>zpool import -Df dozer</userinput>
+# <userinput>zpool status -x</userinput>
+  pool: dozer
+ state: DEGRADED
+status: One or more devices could not be opened.  Sufficient replicas exist for
+        the pool to continue functioning in a degraded state.
+action: Attach the missing device and online it using 'zpool online'.
+   see: http://www.sun.com/msg/ZFS-8000-D3
+ scrub: resilver completed with 0 errors on Fri Mar 17 16:11:35 2006
+config:
+
+        NAME                     STATE     READ WRITE CKSUM
+        dozer                    DEGRADED     0     0     0
+          raidz                  ONLINE       0     0     0
+            c1t0d0               ONLINE       0     0     0
+            c1t1d0               ONLINE       0     0     0
+            c1t2d0               UNAVAIL      0     0     0  cannot open
+            c1t3d0               ONLINE       0     0     0
+
+errors: No known data errors
+# <userinput>zpool online dozer c1t2d0</userinput>
+Bringing device c1t2d0 online
+# <userinput>zpool status -x</userinput>
+all pools are healthy</screen>
+</sect2><sect2 id="gcikw"><title>Upgrading ZFS Storage Pools</title><para>If you have ZFS storage pools from a previous Solaris release, such
+as the Solaris 10 6/06 release, you can upgrade your pools with the <command>zpool
+upgrade</command> command to take advantage of the pool features in the Solaris
+10 11/06 release. In addition, the <command>zpool status</command> command
+has been modified to notify you when your pools are running older versions.
+For example:</para><screen># <userinput>zpool status</userinput>
+  pool: test
+ state: ONLINE
+status: The pool is formatted using an older on-disk format.  The pool can
+        still be used, but some features are unavailable.
+action: Upgrade the pool using 'zpool upgrade'.  Once this is done, the
+        pool will no longer be accessible on older software versions.
+ scrub: none requested
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        test        ONLINE       0     0     0
+          c1t27d0   ONLINE       0     0     0
+
+errors: No known data errors</screen><para>You can use the following syntax to identify additional information
+about a particular version and supported releases.</para><screen># <userinput>zpool upgrade -v</userinput>
+This system is currently running ZFS version 3.
+
+The following versions are supported:
+
+VER  DESCRIPTION
+---  --------------------------------------------------------
+ 1   Initial ZFS version
+ 2   Ditto blocks (replicated metadata)
+ 3   Hot spares and double parity RAID-Z
+
+For more information on a particular version, including supported releases, see:
+
+http://www.opensolaris.org/os/community/zfs/version/N
+
+Where 'N' is the version number.</screen><para>Then, you can run the <command>zpool upgrade</command> command to upgrade
+your pools. For example:</para><screen># <userinput>zpool upgrade -a</userinput></screen><note><para>If you upgrade your pools to the latest version, they will not
+be accessible on systems that run older ZFS versions.</para>
+</note>
+</sect2>
+</sect1>
+</chapter>

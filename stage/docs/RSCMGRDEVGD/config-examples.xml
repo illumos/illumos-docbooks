@@ -1,0 +1,132 @@
+<chapter id="faate"><title>Configuration Examples</title><highlights><para>This chapter show example configurations for the <filename>/etc/project</filename> file.</para><itemizedlist><listitem><para><olink targetptr="fair-share-sched-1" remap="internal">Configure Resource Controls</olink></para>
+</listitem><listitem><para><olink targetptr="fair-share-sched-2" remap="internal">Configure Resource Pools</olink></para>
+</listitem><listitem><para><olink targetptr="fair-share-sched-3" remap="internal">Configure FSS project.cpu-shares
+for a Project</olink></para>
+</listitem><listitem><para><olink targetptr="fair-share-sched-4" remap="internal">Configure Five Applications
+with Different Characteristics</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="faave"><title><filename>/etc/project</filename> Project File</title><para>The project file is a local source of  project  information. The  project
+file can be used in conjunction with other project sources, including the
+NIS maps <literal>project.byname</literal> and <literal>project.bynumber</literal> and
+the LDAP database project. Programs use the <literal>getprojent</literal>(3PROJECT)
+routines to access this information.</para><sect2 id="faauc"><title id="config-examples-100">Define Two Projects</title><para><filename>/etc/project</filename> defines two projects: <literal>database</literal> and <literal>appserver</literal>. The <emphasis>user</emphasis> defaults are <literal>user.database</literal> and <literal>user.appserver</literal>. The <emphasis>admin</emphasis> default
+can switch between <literal>user.database</literal> or <literal>user.appserver</literal>.</para><para><literal>hostname#</literal> <userinput>cat /etc/project</userinput></para><programlisting>.
+.
+.
+user.database:2001:Database backend:admin::
+user.appserver:2002:Application Server frontend:admin::
+.
+.</programlisting>
+</sect2><sect2 id="fair-share-sched-1"><title>Configure Resource Controls</title><para>The <filename>/etc/project</filename> file shows the resource controls
+for the application.</para><para><literal>hostname#</literal> <userinput>cat /etc/project</userinput></para><programlisting>.
+.
+.
+development:2003:Developers:::task.ax-lwps=(privileged,10,deny);
+process.max-addressspace=(privileged,209715200,deny)
+.
+.</programlisting>
+</sect2><sect2 id="fair-share-sched-2"><title>Configure Resource Pools</title><para>The <filename>/etc/project</filename> file shows the resource pools
+for the application.</para><para><literal>hostname#</literal> <userinput>cat /etc/project</userinput></para><programlisting>.
+.
+.
+batch:2001:Batch project:::project.pool=batch_pool
+process:2002:Process control:::project.pool=process_pool
+.
+.
+.</programlisting>
+</sect2><sect2 id="fair-share-sched-3"><title>Configure FSS <literal>project.cpu-shares</literal> for
+a Project</title><para>Set up FSS for two projects: <emphasis>database</emphasis> and <emphasis>appserver</emphasis>. The <emphasis>database</emphasis> project has 20 CPU shares.
+The <emphasis>appserver</emphasis> project has 10 CPU shares.</para><para><literal>hostname#</literal> <userinput>cat /etc/project</userinput></para><programlisting>.
+.
+.
+user.database:2001:database backend:admin::project.cpu-shares=(privileged,
+     20,deny)
+user.appserver:2002:Application Server frontend:admin::project.cpu-shares=
+     (privileged,10,deny)
+.
+.
+.</programlisting><note><para>The line break in the lines that precede  &ldquo;20,deny&rdquo;
+and &ldquo;(privileged,&rdquo; is  not valid in an <filename>/etc/project</filename> file.
+The line breaks are shown here only to allow the example to display on a printed
+or displayed page. Each entry in the <filename>/etc/project</filename> file
+must be on a single line.</para>
+</note><para>If the FSS is enabled but each user and application is not assigned
+to a unique project, then the users and applications will all run in the same
+project. By running in the same project, all compete for the same share, in
+a timeshare fashion. This occurs because shares are assigned to projects,
+not to users or processes. To take advantage of the FSS scheduling capabilities,
+assign each user and application to a unique project.</para><para>To configure a project, see <olink targetdoc="sysadrm" targetptr="rmtaskproj-12" remap="external"><citetitle remap="section">Local /etc/project File
+Format</citetitle> in <citetitle remap="book">System Administration Guide:
+Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para>
+</sect2><sect2 id="fair-share-sched-4"><title>Configure Five Applications with Different
+Characteristics</title><para>The following example configures five applications with different characteristics.</para><table frame="topbot" id="fair-share-sched-tbl-5"><title>Target Applications
+and Characteristics</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="34.15*"/><colspec colwidth="65.85*"/><thead><row rowsep="1"><entry><para>Application Type and Name</para>
+</entry><entry><para>Characteristics</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Application server, <literal>app_server</literal>.</para>
+</entry><entry><para>Negative scalability beyond two CPUs. Assign a two-CPU processor set
+to <literal>app_server</literal>. Use TS scheduling class.</para>
+</entry>
+</row><row><entry><para>Database instance, <literal>app_db</literal>.</para>
+</entry><entry><para>Heavily multithreaded. Use FSS scheduling class.</para>
+</entry>
+</row><row><entry><para>Test and development, <literal>development</literal>.</para>
+</entry><entry><para>Motif based. Hosts untested code execution. Interactive scheduling class
+ensures user interface responsiveness. Use <literal>process.max-address-space</literal> to
+impose memory limitations and minimize the effects of antisocial processing.</para>
+</entry>
+</row><row><entry><para>Transaction processing engine, <literal>tp_engine</literal>.</para>
+</entry><entry><para>Response time is paramount. Assign a dedicated set of at least two CPUs
+to ensure response latency is kept to a minimum. Use timeshare scheduling
+class.</para>
+</entry>
+</row><row><entry><para>Standalone database instance, <literal>geo_db</literal>.</para>
+</entry><entry><para>Heavily multithreaded. Serves multiple time zones. Use FSS scheduling
+class.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><note><para>Consolidate database applications (<literal>app.db</literal> and <literal>geo_db</literal>) onto a single processor set of at least four CPUs. Use FSS
+scheduling class. Application <literal>app_db</literal> gets 25% of the <literal>project.cpu-shares</literal>. Application <literal>geo_db</literal> gets 75%
+of the <literal>project.cpu-shares</literal>.</para>
+</note><para>Edit the <filename>/etc/project</filename> file. Map users to resource
+pools for the <literal>app_server</literal>, <literal>app_db</literal>, <literal>development</literal>, <literal>tp_engine</literal>, and <literal>geo_db</literal> project
+entries. </para><para><literal>hostname#</literal> <userinput>cat /etc/project</userinput></para><programlisting>.
+.
+.
+user.app_server:2001:Production Application Server::
+     project.pool=appserver_pool
+user.app_db:2002:App Server DB:::project.pool=db_pool,
+     project.cpu-shares=(privileged,1,deny)
+development:2003:Test and delopment::staff:project.pool=dev.pool,
+     process.max-addressspace=(privileged,536870912,deny)
+user.tp_engine:Transaction Engine:::project.pool=tp_pool
+user.geo_db:EDI DB:::project.pool=db_pool;
+     project.cpu-shares=(privileged,3,deny)</programlisting><note><para>The line break in the lines that begin  with  &ldquo;project.pool&rdquo;
+, &ldquo;project.cpu-shares=&rdquo;, &ldquo;process.max-addressspace&rdquo;,
+and &ldquo;project.cpu-shares=&rdquo; is  not valid in a project file. The
+line breaks are shown here only to allow the example to display on a  printed
+ or  displayed page. Each entry must be on one and only one line.</para>
+</note><para>Create the <filename>pool.host</filename> script and add entries for
+resource pools.</para><para><literal>hostname#</literal> <userinput>cat pool.host</userinput></para><programlisting>create system host
+create pset dev_pset (uint pset.max = 2)
+create pset tp_pset (uint pset.min = 2; uint pset.max = 2)
+create pset db_pset (uint pset.min = 4; uint pset.max = 6)
+create pset app_pset (uint pset.min = 1; uint pset.max = 2)
+create pool dev_pool (string pool.scheduler="IA")
+create pool appserver_pool (string pool.scheduler="TS")
+create pool db_pool (string pool.scheduler="FSS")
+create pool tp_pool (string pool.scheduler="TS")
+associate pool pool_default (pset pset_default)
+associate pool dev_pool (pset dev_pset)
+associate pool appserver_pool (pset app_pset)
+associate pool db_pool (pset db_pset)
+associate pool tp_pool (pset tp_pset)</programlisting><para>Run the <filename>pool.host</filename> script and modify the configuration
+as specified in the <filename>pool.host</filename> file.</para><para><literal>hostname#</literal> <userinput>poolcfg &mdash;f pool.host</userinput></para><para>Read the <filename>pool.host</filename> resource pool configuration
+file and initialize the resource pools on the system.</para><para><literal>hostname#</literal> <userinput>pooladm &mdash;c</userinput></para>
+</sect2>
+</sect1>
+</chapter>

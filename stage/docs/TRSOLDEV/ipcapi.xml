@@ -1,0 +1,167 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bsol dash hellip gt lt minus?><?Pub CX solbook(book(title()bookinfo()chapter()?><chapter id="ipcapi-1"><title>Interprocess Communications</title><highlights><para><indexterm><primary>DAC (discretionary access control)</primary></indexterm><indexterm><primary>MAC (mandatory access control)</primary></indexterm><indexterm><primary>IPC (interprocess communication)</primary></indexterm>A system that is configured with Solaris Trusted Extensions enforces mandatory access control (MAC) and discretionary access control (DAC). Access control is enforced between communicating processes on the same host and across the network. This chapter summarizes the interprocess communication (IPC) mechanisms that are available in a system configured with Trusted Extensions. This chapter also discusses how access controls apply.</para><para>For examples of how the Trusted Extensions APIs are used in the Solaris OS, see the Solaris source code. Go to the <ulink url="http://opensolaris.org/" type="text_url">Open Solaris web site</ulink> and click Source Browser in the left navigation bar. Use the Source Browser to search through the Solaris source code.</para><itemizedlist><para>This chapter covers the following topics:</para><listitem><para><olink targetptr="ipcapi-19" remap="internal">Multilevel Port Information</olink></para>
+</listitem><listitem><para><olink targetptr="ipcapi-16" remap="internal">Communication Endpoints</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="ipcapi-19"><title>Multilevel Port Information</title><indexterm><primary>multilevel ports</primary><secondary>description of</secondary>
+</indexterm><indexterm><primary>privileged tasks</primary><secondary>multilevel port connections</secondary>
+</indexterm><indexterm><primary>access</primary><secondary>multilevel port connections</secondary>
+</indexterm><indexterm><primary>security policy</primary><secondary>multilevel ports</secondary>
+</indexterm><para>A system that is configured with Solaris Trusted Extensions supports single-level and multilevel ports. These ports are used to create connections between applications. A multilevel port can receive data within the range of sensitivity labels that is defined for that port. A single-level port can receive data at a designated sensitivity label only.</para><itemizedlist><listitem><para><indexterm><primary>single-level ports</primary><secondary>description of</secondary></indexterm><indexterm><primary>ports</primary><secondary>single-level</secondary></indexterm><emphasis role="strong">Single-level port &ndash;</emphasis> A communication channel is established between two unprivileged applications. The sensitivity label of the communication endpoints must be equal.</para>
+</listitem><listitem><para><indexterm><primary><constant>net_bindmlp</constant> privilege</primary></indexterm><indexterm><primary>privileges</primary><secondary><constant>net_bindmlp</constant></secondary></indexterm><indexterm><primary>multilevel ports</primary><secondary>description of</secondary></indexterm><indexterm><primary>ports</primary><secondary>multilevel</secondary></indexterm><emphasis role="strong">Multilevel port &ndash;</emphasis> A communication channel is established between an application with the <constant>net_bindmlp</constant> privilege in its effective set and any number of unprivileged applications that run at different sensitivity labels. The application with the <constant>net_bindmlp</constant> privilege in the effective set of its process can receive all data from the applications, regardless of the receiving application's sensitivity label.</para><para>A multilevel port is a server-side mechanism to establish a connection between two Trusted Extensions applications that are running at different labels. If you want a Trusted Extensions client application to communicate with a service that runs on an untrusted operating system at a different label, you might be able to use the <literal>SO_MAC_EXEMPT</literal> socket option. For more information, see <olink targetptr="api-intro-11" remap="internal">MAC-Exempt Sockets</olink>.</para>
+</listitem>
+</itemizedlist><caution><para>If a connection is multilevel, ensure that the application does not make a connection at one sensitivity label, and then send or receive data at another sensitivity label. Such a configuration would cause data to reach an unauthorized destination.</para>
+</caution><para>The Trusted Network library provides an interface to retrieve the label from a packet. The programmatic manipulation of network packets is not needed. Specifically, you cannot change the security attributes of a message before it is sent. Also, you cannot change the security attributes on the communication endpoint over which the message is sent. You can read the label of a packet, just as you read other security information of a packet. The <function>ucred_getlabel</function> function is used to retrieve label information.</para><para>If your application requires the use of a multilevel port, that port cannot be created programmatically. Rather, you must tell the system administrator to create a multilevel port for the application.</para><itemizedlist><para>For more information about multilevel ports, see the following:</para><listitem><para><olink targetdoc="trsoladmproc" targetptr="managezones-31" remap="external"><citetitle remap="section">Zones and Multilevel Ports</citetitle> in <citetitle remap="book">Solaris Trusted Extensions Administrator&rsquo;s Procedures</citetitle></olink></para>
+</listitem><listitem><para><olink targetdoc="trsoladmproc" targetptr="managezones-5" remap="external"><citetitle remap="section">How to Create a Multilevel Port for a Zone</citetitle> in <citetitle remap="book">Solaris Trusted Extensions Administrator&rsquo;s Procedures</citetitle></olink></para>
+</listitem><listitem><para><olink targetdoc="trsoladmproc" targetptr="manageprint-20" remap="external"><citetitle remap="section">How to Configure a Multilevel Print Server and Its Printers</citetitle> in <citetitle remap="book">Solaris Trusted Extensions Administrator&rsquo;s Procedures</citetitle></olink></para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="ipcapi-16"><title>Communication Endpoints</title><indexterm><primary>sockets</primary><secondary>access checks</secondary>
+</indexterm><indexterm><primary>access</primary><secondary>checks for</secondary><tertiary>network</tertiary>
+</indexterm><indexterm><primary>security policy</primary><secondary>communication endpoints</secondary>
+</indexterm><indexterm><primary>communication endpoints</primary><secondary>access checks</secondary>
+</indexterm><itemizedlist><para>The Trusted Extensions software supports IPC over communication endpoints by using the following socket-based mechanisms:</para><listitem><para>Berkeley sockets</para>
+</listitem><listitem><para>Transport Layer Interface (TLI)</para>
+</listitem><listitem><para>Remote procedure calls (RPC)</para>
+</listitem>
+</itemizedlist><para>This section summarizes the socket communication mechanisms and the related security policy. See the appropriate man page for specific information about the security policy and applicable privileges.</para><para>In addition to these mechanisms, Trusted Extensions also supports multilevel ports. See <olink targetptr="ipcapi-19" remap="internal">Multilevel Port Information</olink>.</para><sect2 id="ipcapi-13"><title>Berkeley Sockets and TLI</title><indexterm><primary>communication endpoints</primary><secondary>connections described</secondary>
+</indexterm><para>The Trusted Extensions software supports network communication by using Berkeley sockets and the TLI over single-level ports and multilevel ports. The <constant>AF_UNIX</constant> family of system calls establishes interprocess connections in the same labeled zone by means of a special file that is specified by using a fully resolved path name. The <constant>AF_INET</constant> family of system calls establishes interprocess connections across the network by using IP addresses and port numbers.</para><sect3 id="ipcapi-14"><title><constant>AF_UNIX</constant> Family</title><para><indexterm><primary>privileges</primary><secondary><constant>net_bindmlp</constant></secondary></indexterm><indexterm><primary>access</primary><secondary>checks for</secondary><tertiary>sockets</tertiary></indexterm><indexterm><primary>security policy</primary><secondary>sockets</secondary></indexterm><indexterm><primary>sockets</primary><secondary>access checks</secondary></indexterm>In the <constant>AF_UNIX</constant> family of interfaces, only one server bind can be established to a single special file, which is a <trademark class="registered">UNIX</trademark> domain socket. The <constant>AF_UNIX</constant> family does not support multilevel ports.</para><para>Like UNIX domain sockets, doors and named pipes use special files for rendezvous purposes.</para><itemizedlist><para>The default policy for all Trusted Extensions IPC mechanisms is that they are all constrained to work within a single labeled zone. The following are exceptions to this policy:</para><listitem><para>The global zone administrator can make a named pipe (FIFO) available to a zone whose label dominates the owning zone. The administrator does this by loopback-mounting the directory that contains the FIFO.</para><para>A process that runs in the higher-level zone is permitted to open the FIFO in read-only mode. A process is not permitted to use the FIFO to write down.</para>
+</listitem><listitem><para>A labeled zone can access global zone door servers if the global zone rendezvous file is loopback-mounted into the labeled zone.</para><para>The Trusted Extensions software depends on the door policy to support the <command>labeld</command> and <command>nscd</command> doors-based services. The default <filename>zonecfg</filename> template specifies that the <filename>/var/tsol/doors</filename> directory in the global zone is loopback-mounted into each labeled zone.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="ipcapi-2"><title><constant>AF_INET</constant> Family</title><para>In the <constant>AF_INET</constant> family, the process can establish a single-label connection or a multilabel connection to privileged or unprivileged port numbers. To connect to privileged port numbers, the <constant>net_priv_addr</constant> privilege is required. If a multilevel port connection is sought, the <constant>net_bindmlp</constant> privilege is also required.</para><para>The server process needs the <constant>net_bindmlp</constant> privilege in its effective set for a multilevel port connection. If a single-level port connection is made instead, the server process needs mandatory read-equal access to the socket, and the client process needs mandatory write-equal access. Both processes need mandatory and discretionary access to the file. If access to the file is denied, any process that is denied access needs the appropriate file privilege in its effective set to gain access.</para><para>The following code example shows how a multilevel server can obtain the labels of its connected clients. The standard C library function <function>getpeerucred</function> obtains a connected socket or a STREAM peer's credentials. In the context of Trusted Extensions, when the listening socket of a multilevel port server accepts a connection request, the first argument is typically a client socket file descriptor. The Trusted Extensions application uses the <function>getpeerucred</function> function in exactly the same way a normal application program does. The Trusted Extensions addition is <function>ucred_getlabel</function>, which returns a label. For more information, see the <olink targetdoc="refman" targetptr="ucred-get-3c" remap="external"><citerefentry><refentrytitle>ucred_get</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> man page.</para><programlisting>/*
+ * This example shows how a multilevel server can 
+ * get the label of its connected clients.
+ */
+void
+remote_client_label(int svr_fd)
+{
+	ucred_t *uc = NULL;
+	m_label_t *sl;
+	struct sockaddr_in6 remote_addr;
+
+	bzero((void *)&amp;remote_addr, sizeof (struct sockaddr_in6));
+
+	while (1) {
+		int clnt_fd;
+		clnt_fd = accept(svr_fd, (struct sockaddr *)&amp;remote_addr,
+				&amp;sizeof (struct sockaddr_in6));
+
+		/*
+		 * Get client attributes from the socket
+		 */
+		if (getpeerucred(clnt_fd, &amp;uc) == -1) {
+			return;
+		}
+
+		/*
+		 * Extract individual fields from the ucred structure
+		 */
+
+		sl = ucred_getlabel(uc);
+
+		/*
+		 * Security label usage here
+		 * .....
+		 */
+
+		ucred_free(uc);
+		close(clnt_fd);
+	}
+}</programlisting>
+</sect3>
+</sect2><sect2 id="ipcapi-17"><title>RPC Mechanism</title><para><indexterm><primary><literal>PORTMAPPER</literal> service</primary></indexterm><indexterm><primary>RPC (remote procedure call)</primary></indexterm>The Trusted Extensions software provides multilevel port support for remote procedure calls (RPCs). A client application can send inquiries to a server's <literal>PORTMAPPER</literal> service (port <literal>111</literal>) whether or not a particular service is available. If the requested service is registered with the <literal>PORTMAPPER</literal> on the server, the server will dynamically allocate an anonymous port and return this port to the client.</para><para>On a Solaris Trusted Extensions system, an administrator can configure the <literal>PORTMAPPER</literal> port as a multilevel port so that multiple single-level applications can use this service. If the <literal>PORTMAPPER</literal> port is made a multilevel port, all anonymous ports allocated by the <literal>PORTMAPPER</literal> service are also multilevel ports. There are no other programmable interfaces or administrative interfaces to control anonymous multilevel ports.</para>
+</sect2><sect2 id="mlpsandudp"><title>Using Multilevel Ports With UDP</title><indexterm><primary>multilevel ports</primary><secondary>using with UDP</secondary>
+</indexterm><para>The <constant>PORTMAPPER</constant> service described in the previous section is implemented by using UDP. Unlike TCP, UDP sockets are not connection oriented, so some ambiguity might arise about which credentials to use when replying to a client on a multilevel port. Therefore, the client's request socket must be explicitly associated with the server's reply packet. To make this association, use the <constant>SO_RECVUCRED</constant> socket option.</para><para><indexterm><primary><constant>SOL_SOCKET</constant></primary></indexterm><indexterm><primary><constant>SCM_UCRED</constant></primary></indexterm>When <constant>SO_RECVUCRED</constant> is set on a UDP socket, the kernel UDP module can pass a label in a <literal>ucred</literal> structure as ancillary data to an application. The <literal>level</literal> and <literal>type</literal> values of the <literal>ucred</literal> are <constant>SOL_SOCKET</constant> and <constant>SCM_UCRED</constant>, respectively.</para><itemizedlist><para>An application can handle this <literal>ucred</literal> structure in one of these ways:</para><listitem><para>Copy this <literal>ucred</literal> structure from the receiving buffer to the send buffer</para>
+</listitem><listitem><para>Reuse the receiving buffer as the send buffer and leave the <literal>ucred</literal> structure in the receiving buffer</para>
+</listitem>
+</itemizedlist><para>The following code excerpt shows the reuse case.</para><programlisting>/*
+ * Find the SCM_UCRED in src and place a pointer to that
+ * option alone in dest. Note that these two 'netbuf'
+ * structures might be the same one, so the code has to
+ * be careful about referring to src after changing dest.
+ */
+static void
+extract_cred(const struct netbuf *src, struct netbuf *dest)
+{
+    char *cp = src-&gt;buf;
+    unsigned int len = src-&gt;len;
+    const struct T_opthdr *opt;
+    unsigned int olen;
+
+    while (len &gt;= sizeof (*opt)) {
+        /* LINTED: pointer alignment */
+        opt = (const struct T_opthdr *)cp;
+        olen = opt-&gt;len;
+        if (olen &gt; len || olen &lt; sizeof (*opt) ||
+            !IS_P2ALIGNED(olen, sizeof (t_uscalar_t)))
+            break;
+        if (opt-&gt;level == SOL_SOCKET &amp;&amp;
+            opt-&gt;name == SCM_UCRED) {
+            dest-&gt;buf = cp;
+            dest-&gt;len = olen;
+            return;
+        }
+        cp += olen;
+        len -= olen;
+    }
+    dest-&gt;len = 0;
+}</programlisting><para>The following code excerpt shows how to access the user credential from the receiving buffer:</para><programlisting>void
+examine_udp_label()
+{
+    struct msghdr   recv_msg;
+    struct cmsghdr  *cmsgp;
+    char message[MAX_MSGLEN+1];
+    char inmsg[MAX_MSGLEN+1];
+    int on = 1;
+
+    setsockopt(sockfd, SOL_SOCKET, SO_RECVUCRED, (void *)&amp;on,
+        sizeof (int));
+
+    [...]
+
+    while (1) {
+       if (recvmsg(sockfd, &amp;recv_msg, 0) &lt; 0) {
+           (void) fprintf(stderr, "recvmsg_errno:   %d\n", errno);
+           exit(1);
+           }
+
+           /*
+            * Check ucred in ancillary data
+            */
+           ucred = NULL;
+
+           for (cmsgp = CMSG_FIRSTHDR(&amp;recv_msg); cmsgp;
+               cmsgp = CMSG_NXTHDR(&amp;recv_msg, cmsgp)) {
+               if (cmsgp-&gt;cmsg_level == SOL_SOCKET &amp;&amp;
+                  cmsgp-&gt;cmsg_type == SCM_UCRED) {
+                  ucred = (ucred_t *)CMSG_DATA(cmsgp);
+                     break;
+                     }
+
+               if (ucred == NULL) {
+                   (void) sprintf(&amp;message[0],
+                       "No ucred info in ancillary data with UDP");
+               } else {
+                   /*
+                    * You might want to extract the label from the
+                    * ucred by using ucred_getlabel(3C) here.
+                    */
+               }
+
+           }
+
+           [...]
+
+           if (message != NULL)
+               (void) strlcpy(&amp;inmsg[0], message, MAX_MSGLEN);
+           /*
+            * Use the received message so that it will contain
+            * the correct label
+            */
+           iov.iov_len = strlen(inmsg);
+           ret = sendmsg(sockfd, &amp;recv_msg, 0);
+       }
+}</programlisting>
+</sect2>
+</sect1>
+</chapter>

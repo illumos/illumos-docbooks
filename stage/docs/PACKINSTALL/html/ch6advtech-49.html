@@ -1,0 +1,182 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Upgrading Packages - Application Packaging Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-09-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Application Packaging Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-41.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-87.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-10.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="ch1designpkg-51728.html">1.&nbsp;&nbsp;Designing  a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch2buildpkg-22939.html">2.&nbsp;&nbsp;Building a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch3enhancepkg-11350.html">3.&nbsp;&nbsp;Enhancing the Functionality of a Package (Tasks)</a></p>
+<p class="toc level1 tocsp"><a href="ch4verifypkg-18395.html">4.&nbsp;&nbsp;Verifying and Transferring a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch5pkgcasestudies-80583.html">5.&nbsp;&nbsp;Case Studies of Package Creation</a></p>
+<p class="toc level1 tocsp"><a href="ch6advtech-96543.html">6.&nbsp;&nbsp;Advanced Techniques for Creating Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-33.html">Specifying the Base Directory</a></p>
+<p class="toc level2"><a href="ch6advtech-53.html">Accommodating Relocation</a></p>
+<p class="toc level2"><a href="ch6advtech-10.html">Supporting Relocation in a Heterogeneous Environment</a></p>
+<p class="toc level2"><a href="ch6advtech-9.html">Making Packages Remotely Installable</a></p>
+<p class="toc level2"><a href="ch6advtech-41.html">Patching Packages</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Upgrading Packages</a></p>
+</div>
+<p class="toc level2"><a href="ch6advtech-87.html">Creating Class Archive Packages</a></p>
+<p class="toc level1 tocsp"><a href="gloss-1.html">Glossary</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="ch6advtech-49"></a><h3>Upgrading Packages</h3>
+<p><a name="indexterm-323"></a><a name="indexterm-324"></a><a name="indexterm-325"></a><a name="indexterm-326"></a>The process of upgrading a package is very different from that of overwriting
+a package. While there are special tools to support the upgrade of standard
+packages delivered as part of the Solaris operating environment, an unbundled package can be
+designed to support its own upgrade&mdash;several previous examples described packages that look ahead
+and control the precise method of installation under the direction of the administrator.
+You can design the <tt>request</tt> script to support direct upgrade of a package
+as well. If the administrator chooses to have one package install so as
+to completely replace another, leaving no residual obsolete files, the package scripts can
+do this. </p><p>The <tt>request</tt> script and <tt>postinstall</tt> script in this example provide a simple upgradable
+package. The <tt>request</tt> script communicates with the administrator and then sets up a
+simple file in the <tt>/tmp</tt> directory to remove the old package instance.
+(Although the <tt>request</tt> script creates a file (which is forbidden), it is
+okay because everyone has access to <tt>/tmp</tt>). </p><p><a name="indexterm-327"></a>The <tt>postinstall</tt> script then executes the shell script in <tt>/tmp</tt>, which executes the
+necessary <tt>pkgrm</tt> command against the old package and then deletes itself.</p><p>This example illustrates a basic upgrade. It is less than fifty lines of
+code including some fairly long messages. It could be expanded to backout the
+upgrade or make other major transformations to the package as required by the
+designer. </p><p>The design of the user interface for an upgrade option must be
+absolutely sure that the administrator is fully aware of the process and has
+actively requested upgrade rather than parallel installation. There is nothing wrong with performing a
+well understood complex operation like upgrade as long as the user interface makes
+the operation clear. </p>
+
+<a name="ch6advtech-50"></a><h4>The <tt>request</tt> Script</h4>
+<a name="indexterm-328"></a><pre># request script
+control an upgrade installation
+ 
+PATH=/usr/sadm/bin:$PATH
+UPGR_SCRIPT=/tmp/upgr.$PKGINST
+ 
+UPGRADE_MSG="Do you want to upgrade the installed version ?"
+ 
+UPGRADE_HLP="If upgrade is desired, the existing version of the \
+    package will be replaced by this version. If it is not \
+    desired, this new version will be installed into a different \
+    base directory and both versions will be usable."
+ 
+UPGRADE_NOTICE="Conflict approval questions may be displayed. The \
+    listed files are the ones that will be upgraded. Please \
+    answer \"y\" to these questions if they are presented."
+ 
+pkginfo -v 1.0 -q SUNWstuf.\*
+ 
+if [ $? -eq 0 ]; then
+      # See if upgrade is desired here
+      response=`ckyorn -p "$UPGRADE_MSG" -h "$UPGRADE_HLP"`
+      if [ $response = "y" ]; then
+            OldPkg=`pkginfo -v 1.0 -x SUNWstuf.\* | nawk ' \
+            /SUNW/{print $1} '`
+            # Initiate upgrade
+            echo "PATH=/usr/sadm/bin:$PATH" &gt; $UPGR_SCRIPT
+            echo "sleep 3" &gt;&gt; $UPGR_SCRIPT
+            echo "echo Now removing old instance of $PKG" &gt;&gt; \
+            $UPGR_SCRIPT
+            if [ ${PKG_INSTALL_ROOT} ]; then
+                  echo "pkgrm -n -R $PKG_INSTALL_ROOT $OldPkg" &gt;&gt; \
+                  $UPGR_SCRIPT
+            else
+                  echo "pkgrm -n $OldPkg" &gt;&gt; $UPGR_SCRIPT
+            fi
+            echo "rm $UPGR_SCRIPT" &gt;&gt; $UPGR_SCRIPT
+            echo "exit $?" &gt;&gt; $UPGR_SCRIPT
+ 
+            # Get the original package's base directory
+            OldBD=`pkgparam $OldPkg BASEDIR`
+            echo "BASEDIR=$OldBD" &gt; $1
+            puttext -l 5 "$UPGRADE_NOTICE"
+       else
+             if [ -f $UPGR_SCRIPT ]; then
+                   rm -r $UPGR_SCRIPT
+             fi
+       fi
+fi
+ 
+exit 0</pre>
+
+<a name="ch6advtech-51"></a><h4>The <tt>postinstall</tt> Script</h4>
+<a name="indexterm-329"></a><pre># postinstall
+to execute a simple upgrade
+ 
+PATH=/usr/sadm/bin:$PATH
+UPGR_SCRIPT=/tmp/upgr.$PKGINST
+ 
+if [ -f $UPGR_SCRIPT ]; then
+      sh $UPGR_SCRIPT &amp;
+fi
+ 
+exit 0</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-41.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-87.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

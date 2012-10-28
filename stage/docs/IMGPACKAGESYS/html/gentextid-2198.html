@@ -1,0 +1,150 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+
+<!--   The contents of this Documentation are subject to the Public Documentation
+License Version 1.01 (the "License"); you may only use this Documentation if
+you comply with the terms of this License. A copy of the License is
+available at http://www.opensolaris.org/os/community/documentation/license.
+  -->
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Setting Up a Mirror Repository - OpenSolaris 2009.06 Image Packaging System Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/opensol.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.com"><img border="0" src="graphics/opensolaris_logo_trans.png"></img></a>
+   </div>
+   <div class="Title">OpenSolaris 2009.06 Image Packaging System Guide</div>
+</div>
+<div class="headerbar"></div>
+
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="repo_mirror.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gentextid-2274.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="index.html">1.&nbsp;&nbsp;Introduction to IPS</a></p>
+<p class="toc level1 tocsp"><a href="learn_ips.html">2.&nbsp;&nbsp;Learning About IPS</a></p>
+<p class="toc level1 tocsp"><a href="ips_cmds.html">3.&nbsp;&nbsp;Working With Packages</a></p>
+<p class="toc level1 tocsp"><a href="image.html">4.&nbsp;&nbsp;Creating and Managing Images</a></p>
+<p class="toc level1 tocsp"><a href="ips_dev_cmds.html">5.&nbsp;&nbsp;Advanced IPS Commands</a></p>
+<p class="toc level1 tocsp"><a href="ips_dev_tasks.html">6.&nbsp;&nbsp;Advanced Packaging Tasks</a></p>
+<p class="toc level1 tocsp"><a href="keys_cert.html">7.&nbsp;&nbsp;Using Keys and Certificates for Repositories</a></p>
+<p class="toc level1 tocsp"><a href="repo_mirror.html">8.&nbsp;&nbsp;Mirroring Repositories</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Setting Up a Mirror Repository</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="gentextid-2274.html">9.&nbsp;&nbsp;Classification of Packages</a></p>
+<p class="toc level1 tocsp"><a href="cmd_ref.html">10.&nbsp;&nbsp;<tt>pkg</tt>(1) Command Reference</a></p>
+<p class="toc level1 tocsp"><a href="gentextid-3044.html">11.&nbsp;&nbsp;Additional Developer Information</a></p>
+<p class="toc level1 tocsp"><a href="glossary-1.html">Glossary</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gentextid-2198"></a><h3>Setting Up a Mirror Repository</h3>
+<p>The following figure gives an overview of the IPS repository mirroring and the
+IPS certificate servers.</p><a name="ghqhv"></a><h6>Figure&nbsp;8-1 IPS Repository and Mirrors</h6><img src="figures/image_pkgng_system.gif" alt="" width="466" height="341"></img>
+
+<a name="ghnok"></a><h4>How to Set Up a Mirror</h4><h6>Before You Begin</h6>
+<ul><li><p>Ensure that you are running the OpenSolaris 2009.06 operating system.</p></li>
+<li><p>Read the section on the depot server, <a href="depot_server.html">Overview of the <tt>pkg.depotd</tt> Depot Server</a> and become familiar with the <tt>pkg.depotd(1M)</tt> command.</p></li>
+<li><p>Ensure that you have sufficient bandwidth and disk space on the system that will mirror the master repository.</p></li></ul>
+<ol>
+<li><b>Become root.</b></li>
+<li><b>Import the SMF service manifest.</b><p><tt># svccfg import /var/svc/manifest/application/pkg-server.xml</tt></p></li>
+<li><b>Prepare a location for your mirror server, by briefly running a packaging depot
+server in normal mode.</b><p>The depot server will create the appropriate directory structures. In this example, <tt>/export/pkg</tt>
+is such a location.</p><pre># mkdir /export/pkg 
+ # /usr/lib/pkg.depotd -d /export/pkg -p 8009
+ [wait for startup messages to conclude]</pre></li>
+<li><b>Deploy a second instance of the packaging server to run as a
+read-only mirror. Set <tt>pkg/port</tt> to a different value if you do not want your
+mirror to run on port 80.</b><pre># svccfg -s pkg/server 
+svc:/application/pkg/server&gt; add mirror
+svc:/application/pkg/server&gt; select mirror
+svc:/application/pkg/server&gt;    addpg pkg application
+svc:/application/pkg/server&gt;    addpg start method
+svc:/application/pkg/server&gt;    setprop start/exec= astring: "/usr/lib/pkg.depotd
+--mirror -p %{pkg/port} -d %{pkg/inst_root} -t    %{pkg/socket_timeout} -s
+% {pkg/threads} --proxy-base=%{pkg/proxy_base} 
+--log-access=%{pkg/log_access} --log-errors=%{pkg/log_errors}" 
+svc:/application/pkg/server&gt;    setprop pkg/inst_root = astring: "/export/pkg"
+svc:/application/pkg/server&gt;    setprop pkg/threads = count: 50
+svc:/application/pkg/server&gt;    setprop
+exit</pre></li>
+<li><b>Refresh the mirror.</b><pre># svcadm refresh pkg/server:mirror</pre></li>
+<li><b>Enable the mirror.</b><pre># svcadm enable pkg/server:mirror</pre></li>
+<li><b>For system performance, mount the file system that contains your repository with <tt>noatime</tt>
+so that file accesses do not cause directory metadata updates. The following command
+uses ZFS.</b><pre># zfs set atime=off <i>filesystem_name</i></pre></li>
+<li><b>Add a mirror to the configuration of the <a href="http://opensolaris.org">http://opensolaris.org</a> repository on your
+local packaging clients.</b><pre># pkg set-publisher -m http://my.hostname.sun.com opensolaris.org</pre></li></ol>
+
+<a name="ghuor"></a><h4>How to Add a Mirror</h4><h6>Before You Begin</h6><p>Ensure that you have set up a mirror. For instructions on setting
+up a mirror, see <a href="#ghnok">How to Set Up a Mirror</a></p><ul>
+<li><b>Use the following command to add a mirror.</b><p><tt>$ pfexec pkg set-publisher -m <i>name_of_mirror_to_add</i> <i>publisher</i></tt></p></li></ul><a name="ghydp"></a><h6>Example&nbsp;8-1 Add a Mirror</h6><p>This example creates an image, adds a mirror within the image, and
+installs a package.</p><pre>$ pfexec pkg image-create -a os=http://ipkg.sun.com /tmp/io
+$ cd /tmp/io
+$ pfexec pkg set-publisher -m http://ipkg.mirror os
+$ pfexec pkg install SUNWzsh</pre>
+
+<a name="ghuoy"></a><h4>How to Remove a Mirror</h4><h6>Before You Begin</h6><p>Ensure that you have set up a mirror and added the mirror
+to the current publisher associated with your image. For instructions on setting up
+a mirror, see <a href="#ghnok">How to Set Up a Mirror</a>.</p><ul>
+<li><b>Use the following command to remove a mirror.</b><p><tt>$ pfexec pkg set-publisher -M <i>name_of_mirror_to_remove</i> <i>publisher</i></tt></p></li></ul>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="repo_mirror.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gentextid-2274.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

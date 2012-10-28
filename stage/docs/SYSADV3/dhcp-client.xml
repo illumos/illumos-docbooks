@@ -1,0 +1,566 @@
+<chapter id="eyatl"><title>Configuring and Administering  DHCP Clients</title><highlights><para>This chapter discusses the Dynamic Host Configuration Protocol
+(DHCP) client DHCPv4, which enables DHCP servers to pass configuration parameters
+such as IPv4 network addresses to IPv4 nodes. The chapter explains how the
+client works, and how you can affect the behavior of the client. </para><para>This chapter contains the following information:</para><itemizedlist><listitem><para><olink targetptr="geflo" remap="internal">About the
+Solaris DHCP Client</olink></para>
+</listitem><listitem><para><olink targetptr="dhcp-config-67" remap="internal">Enabling and Disabling a
+Solaris DHCP Client</olink></para>
+</listitem><listitem><para><olink targetptr="dhcp-overview-33a" remap="internal">DHCP Client Administration</olink></para>
+</listitem><listitem><para><olink targetptr="dhcp-overview-35a" remap="internal">DHCP Client Systems With
+Multiple Network Interfaces</olink></para>
+</listitem><listitem><para><olink targetptr="eyhuv" remap="internal">DHCP Client Host Names</olink></para>
+</listitem><listitem><para><olink targetptr="dhcp-overview-5" remap="internal">DHCP Client Systems and
+Name Services</olink></para>
+</listitem><listitem><para><olink targetptr="extkj" remap="internal">DHCP Client Event Scripts</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="geflo"><title>About the Solaris DHCP Client</title><para>The Solaris DHCP client is the <literal>dhcpagent</literal> daemon,
+which is part of the Solaris Operating System (Solaris OS). When you install
+the Solaris OS, you are prompted to use DHCP to configure network interfaces.
+If you specify Yes, the DHCP client software is enabled on your system during
+Solaris installation. You do not need to do anything else with the Solaris
+client to use DHCP. The DHCP server's configuration determines what information
+is given to DHCP client systems that use the DHCP service.</para><para>If a client system is already running the Solaris OS, but not using
+DHCP, you can reconfigure the client system to use DHCP. You can also reconfigure
+a DHCP client system so that it stops using DHCP and uses static network information
+that you provide. See <olink type="auto-generated" targetptr="dhcp-config-67" remap="internal">Enabling
+and Disabling a Solaris DHCP Client</olink> for more information.</para><sect2 id="gefmi"><title>Logical Interfaces</title><para>In the DHCPv4 client, each logical interface is independent and is an
+administrative unit.  In addition to the zeroth logical interface (which defaults
+to the interface MAC address as an identifier), the user may configure specific
+logical interfaces to run DHCP by specifying a CLIENT_ID in the dhcpagent
+configuration file.  For example:</para><para><command>hme0:1.CLIENT_ID=orangutan</command></para>
+</sect2><sect2 id="dhcp-overview-31a"><title>DHCP Client Startup</title><para>The <literal>dhcpagent</literal> daemon obtains configuration
+information that is needed by other processes involved in booting the system.
+For this reason, the system startup scripts start <literal>dhcpagent</literal> early
+in the boot process and wait until the network configuration information from
+the DHCP server arrives.</para><para>The presence of the file <filename>/etc/dhcp.<replaceable>interface</replaceable></filename> (for
+example, <filename>/etc/dhcp.ce0</filename> on a <trademark>Sun Fire</trademark> 880
+system) indicates to the startup scripts that DHCP is to be used on the specified
+interface. Upon finding a <filename>dhcp.<replaceable>interface</replaceable></filename> file,
+the startup scripts start <literal>dhcpagent</literal>.</para><para>After startup, <literal>dhcpagent</literal> waits until it receives
+instructions to configure a network interface. The startup scripts issue the <command>ifconfig <replaceable>interface</replaceable> dhcp start</command> command,
+which instructs <literal>dhcpagent</literal> to start DHCP as described in <olink targetptr="dhcp-overview-3" remap="internal">How DHCP Works</olink>. If commands are contained
+within the <filename>dhcp.<replaceable>interface</replaceable></filename> file,
+they are appended to the <literal>dhcp start</literal> option of <literal>ifconfig</literal>. See the <olink targetdoc="refman1m" targetptr="ifconfig-1m" remap="external"><citerefentry><refentrytitle>ifconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information about options used with the <command>ifconfig <replaceable>interface</replaceable> dhcp</command> command.</para>
+</sect2><sect2 id="dhcp-overview-32a"><title>How the DHCP Client Manages Network Configuration
+Information</title><para>After the information packet is obtained from a DHCP server, <literal>dhcpagent</literal> configures the network interface and brings up the interface.
+The daemon controls the interface for the duration of the lease time for the
+IP address, and maintains the configuration data in an internal table. The
+system startup scripts use the <command>dhcpinfo</command> command to extract
+configuration option values from the internal table. The values are used to
+configure the system and enable it to communicate on the network.</para><para>The <literal>dhcpagent</literal> daemon waits passively until a period
+of time elapses, usually half the lease time. The daemon then requests an
+extension of the lease from a DHCP server. If <literal>dhcpagent</literal> finds
+that the interface is down or that the IP address has changed, the daemon
+does not control the interface until instructed by the <literal>ifconfig</literal> command
+to do so. If <literal>dhcpagent</literal> finds that the interface is up and
+the IP address hasn't changed, the daemon sends a request to the server for
+a lease renewal. If the lease cannot be renewed, <literal>dhcpagent</literal> takes
+down the interface at the end of the lease time.</para><para>Each time <literal>dhcpagent</literal> performs an action related to
+the lease, the daemon looks for an executable file called <filename>/etc/dhcp/eventhook</filename>. If an executable file with this name is found, <literal>dhcpagent</literal> invokes
+the executable. See <olink type="auto-generated" targetptr="extkj" remap="internal">DHCP Client
+Event Scripts</olink> for more information about using the event executable.</para>
+</sect2><sect2 id="dhcp-overview-34a"><title>DHCP Client Shutdown</title><para>When the DHCP client system shuts down normally, <literal>dhcpagent</literal> writes
+the current configuration information to the file <filename>/etc/dhcp/<replaceable>interface</replaceable>.dhc</filename>. The lease is dropped rather than released,
+so the DHCP server does not know that the IP address is not in active use.</para><para>If the lease is still valid when the system reboots, <literal>dhcpagent</literal> sends
+an abbreviated request to use the same IP address and network configuration
+information. If the DHCP server permits this request, <literal>dhcpagent</literal> can
+use the information that it wrote to disk when the system shut down. If the
+server does not permit the client to use the information, <literal>dhcpagent</literal> initiates
+the DHCP protocol sequence described in <olink targetptr="dhcp-overview-3" remap="internal">How
+DHCP Works</olink>. As a result, the client obtains new network configuration
+information.</para>
+</sect2>
+</sect1><sect1 id="dhcp-config-67"><title>Enabling and Disabling a Solaris DHCP Client</title><para>To enable the DHCP client on a system that is already running the Solaris
+OS and is not using DHCP, you must first unconfigure the system. When the
+system boots, you must issue some commands to set up the system and enable
+the DHCP client.</para><para>If your DHCP client is not a Solaris DHCP client, consult the client
+documentation for instructions.</para><note><para>Routers, NIS or NIS+ servers, DNS servers, and other hosts that
+are critical to the network should <emphasis>not</emphasis> be DHCP clients.
+Hosts that provide services to the network should not rely on the network
+to obtain their IP addresses. Hosts that are print servers or file servers
+should have consistent IP addresses as well. However, print servers and file
+servers can become DHCP clients to receive their network configurations through
+DHCP. You can configure the DHCP server to provide consistent IP addresses
+to such DHCP clients, as described in <olink targetptr="dhcp-admin-161" remap="internal">Assigning
+a Reserved IP Address to a DHCP Client</olink>.</para>
+</note><task id="dhcp-config-105"><title>How to Enable the Solaris DHCP Client</title><tasksummary><para>This procedure is necessary only if DHCP was not enabled during Solaris
+installation.</para>
+</tasksummary><procedure><step id="dhcp-config-step-73"><para>Become superuser on the client system.</para>
+</step><step id="dhcp-config-step-11"><para>If this system uses preconfiguration
+instead of interactive configuration, edit the <filename>sysidcfg</filename> file.
+Add the <literal>dhcp</literal> subkey to the <literal>network_interface</literal> keyword
+in the <filename>sysidcfg</filename> file.</para><para>For example, <literal>network_interface=hme0
+{dhcp}</literal>. See the <olink targetdoc="refman4" targetptr="sysidcfg-4" remap="external"><citerefentry><refentrytitle>sysidcfg</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</step><step id="dhcp-config-step-67"><para>Unconfigure and shut down the system.</para><screen># <userinput>sys-unconfig</userinput></screen><para>See the <olink targetdoc="refman1m" targetptr="sys-unconfig-1m" remap="external"><citerefentry><refentrytitle>sys-unconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page for more information about the configuration
+information that is removed by this command.</para>
+</step><step id="dhcp-config-step-80"><para>Reboot the system after shutdown is complete.</para><para>If the system uses preconfiguration, the <literal>dhcp</literal> subkey
+in the <filename>sysidcfg</filename> file configures the system to use the
+DHCP client as the system boots.</para><para>If the system does not use preconfiguration,
+you are prompted for system configuration information by <literal>sysidtool</literal> programs
+when the system reboots. See the <olink targetdoc="refman1m" targetptr="sysidtool-1m" remap="external"><citerefentry><refentrytitle>sysidtool</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page for more information. </para>
+</step><step id="dhcp-config-step-92"><para>When prompted to use DHCP to configure
+network interfaces, specify Yes.</para>
+</step>
+</procedure>
+</task><task id="dhcp-config-104"><title>How to Disable a Solaris DHCP Client</title><procedure><step id="dhcp-config-step-85"><para>Become superuser on the client system.</para>
+</step><step id="dhcp-config-step-120"><para>If you used a <filename>sysidcfg</filename> file
+to preconfigure the system, remove the <literal>dhcp</literal> subkey from
+the <literal>network_interface</literal> keyword.</para>
+</step><step id="dhcp-config-step-79"><para>Unconfigure and shut down the system.</para><screen># <userinput>sys-unconfig</userinput></screen><para>See the <olink targetdoc="refman1m" targetptr="sys-unconfig-1m" remap="external"><citerefentry><refentrytitle>sys-unconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page for more information about the configuration
+information that is removed by this command.</para>
+</step><step id="dhcp-config-step-91"><para>Reboot the system after shutdown is complete.</para><para>If the system uses preconfiguration, you are not prompted for
+configuration information, and the DHCP client is not configured.</para><para>If
+the system does not use preconfiguration, you are prompted for system configuration
+information by <literal>sysidtool</literal> programs when the system reboots.
+See the <olink targetdoc="refman1m" targetptr="sysidtool-1m" remap="external"><citerefentry><refentrytitle>sysidtool</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</step><step id="dhcp-config-step-93"><para>When prompted to use DHCP to configure
+network interfaces, specify No.</para>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="dhcp-overview-33a"><title>DHCP Client Administration</title><para>The Solaris DHCP client software does not require administration
+under normal system operation. The <literal>dhcpagent</literal> daemon automatically
+starts when the system boots, renegotiates leases, and stops when the system
+shuts down. You cannot manually start and stop the <literal>dhcpagent</literal> daemon
+directly. However, as superuser on the client system, you can use the <command>ifconfig</command> command to affect <literal>dhcpagent</literal>'s management of
+the network interface, if necessary.</para><sect2 id="dhcp-overview-21"><title><literal>ifconfig</literal> Command Options
+Used With the DHCP Client</title><itemizedlist><para>The <command>ifconfig</command> command enables you to do the
+following:</para><listitem><para><emphasis role="strong">Start the DHCP client</emphasis> &ndash;
+The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp start</command> initiates the interaction between <literal>dhcpagent</literal> and
+the DHCP server to obtain an IP address and a new set of configuration options.
+This command is useful when you change information that you want a client
+to use immediately, such as when you add IP addresses or change the subnet
+mask.</para>
+</listitem><listitem><para><emphasis role="strong">Request network configuration information
+only</emphasis> &ndash; The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp inform</command> causes <literal>dhcpagent</literal> to
+issue a request for network configuration parameters, with the exception of
+the IP address. This command is useful when the network interface has a valid
+IP address, but the client system needs updated network options. For example,
+this command is useful if you do not use DHCP to manage IP addresses, but
+you do use it to configure hosts on the network.</para>
+</listitem><listitem><para><emphasis role="strong">Request a lease extension</emphasis> &ndash;
+The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp extend</command> causes <literal>dhcpagent</literal> to issue a request
+to renew the lease. The client does automatically request to renew leases.
+However, you might want to use this command if you change the lease time and
+want clients to use the new lease time immediately, rather than waiting for
+the next attempt at lease renewal.</para>
+</listitem><listitem><para><emphasis role="strong">Release the IP address</emphasis> &ndash;
+The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp release</command> causes <command>dhcpagent</command> to relinquish the
+IP address used by the network interface. Release of the IP address happens
+automatically when the lease expires. You might want to issue this command
+if the lease time is long and you need to take down the network interface
+for an extended period of time. You should use this command when you remove
+the system from the network.</para>
+</listitem><listitem><para><emphasis role="strong">Drop the IP address</emphasis> &ndash;
+The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp drop</command> causes <literal>dhcpagent</literal> to take down the network
+interface without informing the DHCP server. This command enables the client
+to use the same IP address when it reboots.</para>
+</listitem><listitem><para><emphasis role="strong">Ping the network interface</emphasis> &ndash;
+The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp ping</command> lets you determine if the interface is under the control
+of DHCP.</para>
+</listitem><listitem><para><emphasis role="strong">View the DHCP configuration status of
+the network interface</emphasis> &ndash; The command <command>ifconfig</command> <replaceable>interface</replaceable> <command>dhcp status</command> displays the current
+state of the DHCP client. The display indicates the following items:</para><itemizedlist><listitem><para>If an IP address has been bound to the client</para>
+</listitem><listitem><para>The number of requests sent, received, and declined</para>
+</listitem><listitem><para>If this interface is the primary interface</para>
+</listitem><listitem><para>Times when the lease was obtained, when it expires, and when
+renewal attempts are scheduled to begin</para>
+</listitem>
+</itemizedlist><para>For example:</para><screen width="100"># <userinput>ifconfig hme0 dhcp status</userinput>
+Interface  State         Sent  Recv  Declined  Flags 
+hme0       BOUND            1     1         0   [PRIMARY]  
+(Began,Expires,Renew)=(08/16/2005 15:27, 08/18/2005 13:31, 08/17/2005 15:24)</screen>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="dhcp-overview-22"><title>Setting DHCP Client Configuration Parameters</title><para>The <literal>/etc/default/dhcpagent</literal> file on the client system
+contains tunable parameters for the <literal>dhcpagent</literal>. You can
+use a text editor to change several parameters that affect client operation.
+The <literal>/etc/default/dhcpagent</literal> file is well documented, so
+for more information, you should refer to the file as well as to the <olink targetdoc="refman1m" targetptr="dhcpagent-1m" remap="external"><citerefentry><refentrytitle>dhcpagent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para><para>The <filename>/etc/dhcp.<replaceable>interface</replaceable></filename> file
+is another location in which parameters affecting the DHCP client are set.
+Parameters set in this file are used by system startup scripts with the <command>ifconfig</command> command.</para><para>By default, the DHCP client is configured as follows:</para><itemizedlist><listitem><para>The client system uses DHCP on one physical network interface.</para><para>If you want to use DHCP on more than one physical network interface,
+see <olink type="auto-generated" targetptr="dhcp-overview-35a" remap="internal">DHCP Client
+Systems With Multiple Network Interfaces</olink>.</para>
+</listitem><listitem><para>The client system does not require a particular host name.</para><para>If you want a client to request a specific host name, see <olink targetptr="eyhuv" remap="internal">DHCP Client Host Names</olink>.</para>
+</listitem><listitem><para>The client is not automatically configured as a name service
+client if the DHCP client was configured after the Solaris installation.</para><para>See <olink type="auto-generated" targetptr="dhcp-overview-5" remap="internal">DHCP Client
+Systems and Name Services</olink> for information about using name services
+with DHCP clients.</para>
+</listitem><listitem><para>The client requests only the subnet mask, router IP address,
+client host name, and encapsulated vendor options.</para><para>The DHCP client's
+parameter file can be set up to request more options in the <literal>PARAM_REQUEST_LIST</literal> keyword in the <literal>/etc/default/dhcpagent</literal> file.
+The DHCP server can be configured to provide options that were not specifically
+requested. See <olink targetptr="dhcp-overview-9" remap="internal">About DHCP Macros</olink> and <olink targetptr="dhcp-admin-125" remap="internal">Working With DHCP Macros (Task Map)</olink> for
+information about using DHCP server macros to send information to clients.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="dhcp-overview-35a"><title>DHCP Client Systems With Multiple Network
+Interfaces</title><para>The DHCP client can simultaneously manage several different interfaces
+on one system. The interfaces can be physical interfaces or logical interfaces.
+Each interface has its own IP address and lease time. If more than one network
+interface is configured for DHCP, the client issues separate requests to configure
+them. The client maintains a separate set of network configuration parameters
+for each interface. Although the parameters are stored separately, some of
+the parameters are global in nature. The global parameters apply to the system
+as a whole, rather than to a particular network interface.</para><para>The host name, NIS domain name, and time zone are global parameters
+and should have the same values for each interface. However, these values
+may differ due to errors in the information specified by the DHCP administrator.
+To ensure that there is only one answer to a query for a global parameter,
+only the parameters for the primary network interface are requested. You can
+insert the word <literal>primary</literal> in the <literal>/etc/dhcp.</literal><replaceable>interface</replaceable> file for the interface that you want to be treated
+as the primary interface. If the <literal>primary</literal> keyword is not
+used, the first interface in alphabetical order is considered to be the primary
+interface.</para><para>The DHCP client manages leases for logical interfaces and physical interfaces
+identically, except for the following limitations on logical interfaces:</para><itemizedlist><listitem><para>The DHCP client does not manage the default routes that are
+associated with logical interfaces.</para><para>The Solaris kernel associates
+routes with physical interfaces, not logical interfaces. When a physical interface's
+IP address is established, the necessary default routes should be placed in
+the routing table. If DHCP is used subsequently to configure a logical interface
+associated with that physical interface, the necessary routes should already
+be in place. The logical interface uses the same routes.</para><para>When
+a lease expires on a physical interface, the DHCP client removes the default
+routes that are associated with the interface. When a lease expires on a logical
+interface, the DHCP client does not remove the default routes associated with
+the logical interface. The associated physical interface and possibly other
+logical interfaces might need to use the same routes.</para><para>If you need
+to add or remove default routes that are associated with a DHCP-controlled
+interface, you can use the DHCP client event script mechanism. See <olink type="auto-generated" targetptr="extkj" remap="internal">DHCP Client Event Scripts</olink>.</para>
+</listitem><listitem><para>The DHCP client does not automatically generate client identifiers
+for logical interfaces.</para><para>The client identifier is used to uniquely
+identify a DHCP client so that it can receive configuration information that
+is specifically targeted to that client. For physical interfaces, the DHCP
+client identifier is derived from the media access control (MAC) address of
+the system's network interface hardware. However, no Internet standard exists
+for the format of DHCP client identifiers for physical interfaces that have
+multiple leases. You must create your own client identifier for any logical
+interface that you want to be configured through DHCP. The client identifier
+must be specified in the <literal>/etc/default/dhcpagent</literal> file with
+the <replaceable>interface</replaceable>.<literal>CLIENT_ID</literal> keyword.
+For example, to specify the client identifier <literal>orangutan-ce0&ndash;1</literal> for
+the logical interface <literal>ce0:1</literal>, you would use the following
+entry:</para><para><literal>ce0:1.CLIENT_ID=orangutan-ce0-1</literal></para><para>See the <literal>/etc/default/dhcpagent</literal> file and the <olink targetdoc="refman1m" targetptr="dhcpagent-1m" remap="external"><citerefentry><refentrytitle>dhcpagent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page
+for more information about the parameters you can set in the file.</para><para>If
+you do not configure a client identifier, <command>ifconfig</command> fails
+when it tries to configure the logical interface to use DHCP. The error message
+is:</para><screen>ifconfig: ce0:1: interface does not have a configured DHCP client id</screen>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="eyhuv"><title>DHCP Client Host Names</title><para>By default, the Solaris DHCP client does not supply its own host name,
+because the client expects the DHCP server to supply the host name. The Solaris
+DHCP server is configured to supply host names to DHCP clients by default.
+When you use the Solaris DHCP client and server together, these defaults work
+well. However, when you use the Solaris DHCP client with some third-party
+DHCP servers, the client might not receive a host name from the server. If
+the Solaris DHCP client does not receive a host name through DHCP, the client
+system looks at the <filename>/etc/nodename</filename> file for a name to
+use as the host name. If the file is empty, the host name is set to <literal>unknown</literal>.</para><para>If the DHCP server supplies a name in the DHCP <literal>Hostname</literal> option,
+the client uses that host name, even if a different value is placed in the <filename>/etc/nodename</filename> file. If you want the client to use a specific host
+name, you can enable the client to request that name. See the following procedure.</para><task id="dhcp-admin-1058sm"><title>How to Enable a Solaris Client to Request
+a Specific Host Name</title><procedure><step id="dhcp-admin-step-523"><para>On the client system, edit the <literal>/etc/default/dhcpagent</literal> file as superuser.</para>
+</step><step id="dhcp-admin-step-524"><para>Find the <literal>REQUEST_HOSTNAME</literal> keyword
+in the <literal>/etc/default/dhcpagent</literal> file and modify the keyword
+as follows:</para><screen>REQUEST_HOSTNAME=yes</screen><para>If a comment sign (#) is in front of <literal>REQUEST_HOSTNAME</literal>,
+remove the #. If the <literal>REQUEST_HOSTNAME</literal> keyword is not present,
+insert the keyword.</para>
+</step><step id="dhcp-admin-step-525"><para>Edit the <literal>/etc/hostname</literal>.<replaceable>interface</replaceable> file on the client system to add the following line:</para><literallayout><literal>inet</literal> <replaceable>hostname</replaceable></literallayout><para><replaceable>hostname</replaceable> is the name that you want the client
+to use.</para>
+</step><step id="dhcp-admin-step-526"><para>Type the following commands to have the
+client perform a full DHCP negotiation upon rebooting:</para><screen># <userinput>pkill dhcpagent</userinput>
+# <userinput>rm /etc/dhcp/<replaceable>interface</replaceable>.dhc</userinput>
+# <userinput>reboot</userinput></screen><para>The DHCP data that is cached on the client is removed. The client restarts
+the protocol to request new configuration information, including a new host
+name. The DHCP server first makes sure that the host name is not in use by
+another system on the network. The server then assigns the host name to the
+client. If configured to do so, the DHCP server can update name services with
+the client's host name.</para><para>If you want to change the host name later,
+repeat <olink targetptr="dhcp-admin-step-525" remap="internal">Step&nbsp;3</olink> and <olink targetptr="dhcp-admin-step-526" remap="internal">Step&nbsp;4</olink>.</para>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="dhcp-overview-5"><title>DHCP Client Systems and Name Services</title><para>Solaris systems support the following name services: DNS, NIS, NIS+,
+and a local file store (<literal>/etc/inet/hosts</literal>). Each name service
+requires some configuration before it is usable. The name service switch configuration
+file (see <olink targetdoc="refman4" targetptr="nsswitch.conf-4" remap="external"><citerefentry><refentrytitle>nsswitch.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink>) must also be set up appropriately to indicate the
+name services to be used.</para><para>Before a DHCP client system can use a name service, you must configure
+the system as a client of the name service.</para><para>The following table summarizes issues that are related to each name
+service and DHCP. The table includes links to documentation that can help
+you set up clients for each name service.</para><table frame="topbot" id="dhcp-overview-tbl-3"><title>Name Service Client
+Setup Information for DHCP Client Systems</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="23.57*"/><colspec colname="colspec1" colwidth="76.43*"/><thead><row rowsep="1"><entry><para>Name Service </para>
+</entry><entry><para>Client Setup Information</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>NIS</para>
+</entry><entry><para>If you are using Solaris DHCP to send Solaris network install information
+to a client system, you can use a configuration macro that contains the <literal>NISservs</literal> and <literal>NISdmain</literal> options. These options
+pass the IP addresses of NIS servers and the NIS domain name to the client.
+The client then automatically becomes an NIS client.</para><para>If a DHCP client system is already running the Solaris OS, the NIS client
+is not automatically configured on that system when the DHCP server sends
+NIS information to the client.</para><para>If the DHCP server is configured to send NIS information to the DHCP
+client system, you can see the values given to the client if you use the <literal>dhcpinfo</literal> command on the client as follows:</para><para># <literal>/sbin/dhcpinfo NISdmain</literal></para><para># <literal>/sbin/dhcpinfo NISservs</literal></para><para>Use the values returned for the NIS domain name and NIS servers when
+you set up the system as an NIS client.</para><para>You set up an NIS client for a Solaris DHCP client system in the standard
+way, as documented in <olink targetdoc="sysadv5" targetptr="cnis1-25208" remap="external">Chapter 5, <citetitle remap="chapter">Setting Up and Configuring NIS Service,</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>. </para><tip><para>You can write a script that uses <literal>dhcpinfo</literal> and <literal>ypinit</literal> to automate NIS client configuration on DHCP client systems.</para>
+</tip>
+</entry>
+</row><row><entry><para>NIS+</para>
+</entry><entry><para>If the DHCP client system receives a nonreserved IP address, the address
+might not always be the same. You must set up the NIS+ client for a DHCP client
+system in a nonstandard way, which is documented in <olink targetptr="dhcp-admin-77" remap="internal">Setting Up DHCP Clients as NIS+ Clients</olink>.
+This procedure is necessary because NIS+ uses security measures to authenticate
+requests for service. The security measures depend upon the IP address.</para><para>If the DHCP client system has been manually assigned an IP address,
+the client's address is always the same. You can set up the NIS+ client in
+the standard way, which is documented in <olink targetdoc="sysadv7" targetptr="c2setup-14140" remap="external"><citetitle remap="section">Setting Up NIS+ Client Machines</citetitle> in <citetitle remap="book">System Administration Guide: Naming and Directory Services (NIS+)</citetitle></olink>.</para>
+</entry>
+</row><row><entry><para><filename>/etc/inet/hosts</filename></para>
+</entry><entry><para>You must set up the <filename>/etc/inet/hosts</filename> file for a
+DHCP client system that is to use <filename>/etc/inet/hosts</filename> for
+its name service.</para><para>The DHCP client system's host name is added to its own <filename>/etc/inet/hosts</filename> file by the DHCP tools. However, you must manually add the host
+name to the <filename>/etc/inet/hosts</filename> files of other systems in
+the network. If the DHCP server system uses <filename>/etc/inet/hosts</filename> for
+name resolution, you must also manually add the client's host name on the
+system.</para>
+</entry>
+</row><row><entry><para>DNS</para>
+</entry><entry><para>If the DHCP client system receives the DNS domain name through DHCP,
+the client system's <literal>/etc/resolv.conf</literal> file is configured
+automatically. The <literal>/etc/nsswitch.conf</literal> file is also automatically
+updated to append <literal>dns</literal> to the <literal>hosts</literal> line
+after any other name services in the search order. See <olink targetdoc="sysadv5" remap="external"><citetitle remap="book">System Administration Guide: Naming and Directory Services (DNS, NIS, and LDAP)</citetitle></olink>for more information about DNS.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="dhcp-admin-77"><title>Setting Up DHCP Clients as NIS+ Clients</title><para>You can use the NIS+ name service on Solaris systems that are DHCP clients.
+However, to do so requires you to partially circumvent one of the security-enhancing
+features of NIS+, the creation of Data Encryption Standard (DES) credentials.
+When you set up an NIS+ client that is <emphasis>not</emphasis> using DHCP,
+you add unique DES credentials for the client to the NIS+ server. There are
+several ways to create credentials, such as using the <filename>nisclient</filename> script
+or the <filename>nisaddcred</filename> command.</para><para>For DHCP clients, you <emphasis>cannot</emphasis> use these methods.
+NIS+ credential generation requires a client to have a static host name to
+create and store the credentials. If you want to use NIS+ and DHCP, you must
+create identical credentials to be used for all the host names of DHCP clients.
+In this way, no matter what IP address and associated host name that a DHCP
+client receives, the client can use the same DES credentials.</para><caution><para>Before performing the following procedure, be aware that NIS+
+was designed for increased security. This procedure weakens that security
+by allowing random DHCP clients to receive NIS+ credentials.</para>
+</caution><para>The following procedure shows you how to create identical credentials
+for all DHCP host names. This procedure is valid only if you know the host
+names that DHCP clients use. For example, when the DHCP server generates the
+host names, you know the possible host names that a client can receive.</para><task id="dhcp-admin-22"><title>How to Set Up Solaris DHCP Clients as NIS+
+Clients</title><tasksummary><para>A DHCP client system that is to be an NIS+ client must use credentials
+that belong to another NIS+ client system in the NIS+ domain. This procedure
+only produces credentials for the system, which apply only to the superuser
+logged in to the system. Other users who log in to the DHCP client system
+must have their own unique credentials in the NIS+ server. These credentials
+are created according to a procedure in the <olink targetdoc="sysadv7" remap="external"><citetitle remap="book">System Administration Guide: Naming and Directory Services (NIS+)</citetitle></olink>.</para>
+</tasksummary><procedure><step id="dhcp-admin-step-564"><para>Create the credentials for a client by
+typing the following command on the NIS+ server:</para><screen># <userinput>nisgrep <replaceable>nisplus-client-name</replaceable> cred.org_dir > /tmp/<replaceable>file</replaceable></userinput></screen><para>This command writes the <literal>cred.org_dir</literal> table entry
+for the NIS+ client to a temporary file.</para>
+</step><step id="dhcp-admin-step-565"><para>Use the <command>cat</command> command
+to view the contents of the temporary file.</para><para>Or, use a text editor.</para>
+</step><step id="dhcp-admin-step-565a"><para>Copy the credentials to use for DHCP
+clients.</para><para>You must copy the public key and private key, which are
+long strings of numbers and letters separated by colons. The credentials are
+to be pasted into the command issued in the next step.</para>
+</step><step id="dhcp-admin-step-566"><para>Add credentials for a DHCP client by
+typing the following command:</para><screen># <userinput>nistbladm -a cname="</userinput> <replaceable>dhcp-client-name</replaceable>@<replaceable>nisplus-domain</replaceable><userinput>" auth_type=DES \</userinput>
+<userinput>auth_name="unix.</userinput><replaceable>dhcp-client-name</replaceable>@<replaceable>nisplus-domain</replaceable><userinput>" \</userinput>
+<userinput>public_data=</userinput><replaceable>copied-public-key</replaceable> <userinput>\</userinput> 
+<userinput>private_data=</userinput><replaceable>copied-private-key</replaceable></screen><para>For the <replaceable>copied-public-key</replaceable>, paste the public
+key information that you copied from the temporary file. For the <replaceable>copied-private-key</replaceable>, paste the private key information that you copied from the
+temporary file.</para>
+</step><step id="dhcp-admin-step-567"><para>Remote copy files from the NIS+ client
+system to the DHCP client system by typing the following commands on the DHCP
+client system:</para><screen># <userinput>rcp</userinput> <replaceable>nisplus-client-name</replaceable><userinput>:/var/nis/NIS_COLD_START /var/nis</userinput>
+# <userinput>rcp</userinput> <replaceable>nisplus-client-name</replaceable><userinput>:/etc/.rootkey /etc</userinput>
+# <userinput>rcp</userinput> <replaceable>nisplus-client-name</replaceable><userinput>:/etc/defaultdomain /etc</userinput></screen><para>If you get a &ldquo;permission denied&rdquo; message, the systems might
+not be set up to allow remote copying. In this case, you can copy the files
+as a regular user to an intermediate location. As superuser, copy the files
+from the intermediate location to the proper location on the DHCP client system.</para>
+</step><step id="dhcp-admin-step-568"><para>Copy the correct name service switch
+file for NIS+ by typing the following command on the DHCP client system:</para><screen># <userinput>cp /etc/nsswitch.nisplus /etc/nsswitch.conf</userinput></screen>
+</step><step id="dhcp-admin-step-569"><para>Reboot the DHCP client system.</para><para>The
+DHCP client system should now be able to use NIS+ services.</para>
+</step>
+</procedure><example id="dhcp-admin-570"><title>Setting up a Solaris DHCP Client System as an NIS+ Client</title><para>The following example assumes that you have one system <literal>nisei</literal>,
+which is an NIS+ client in the NIS+ domain <literal>dev.example.net</literal>.
+You also have one DHCP client system, <literal>dhow</literal>, and you want <literal>dhow</literal> to be an NIS+ client.</para><screen width="100"><lineannotation>(First log in as superuser on the NIS+ server)</lineannotation>
+# <userinput>nisgrep nisei cred.org_dir > /tmp/nisei-cred</userinput>
+# <userinput>cat /tmp/nisei-cred</userinput>
+nisei.dev.example.net.:DES:unix.nisei@dev.example.net:46199279911a84045b8e0
+c76822179138173a20edbd8eab4:90f2e2bb6ffe7e3547346dda624ec4c7f0fe1d5f37e21cff63830
+c05bc1c724b
+# <userinput>nistbladm -a cname="dhow@dev.example.net." \</userinput>
+<userinput>auth_type=DES auth_name="unix.dhow@dev.example.net" \</userinput>
+<userinput>public_data=46199279911a84045b8e0c76822179138173a20edbd8eab4 \</userinput>
+<userinput>private_data=90f2e2bb6ffe7e3547346dda624ec4c7f0fe1d5f37e21cff63830\</userinput>
+<userinput>c05bc1c724b</userinput>
+# <userinput>rlogin dhow</userinput>
+<lineannotation>(Log in as superuser on dhow)</lineannotation>
+# <userinput>rcp nisei:/var/nis/NIS_COLD_START /var/nis</userinput>
+# <userinput>rcp nisei:/etc/.rootkey /etc</userinput>
+# <userinput>rcp nisei:/etc/defaultdomain /etc</userinput>
+# <userinput>cp /etc/nsswitch.nisplus /etc/nsswitch.conf</userinput>
+# <userinput>reboot</userinput></screen><para>The DHCP client system <literal>dhow</literal> should now be able to
+use NIS+ services.</para>
+</example><example id="eojcc"><title>Adding Credentials With a Script</title><para>If you want to set up a large number of DHCP client systems as NIS+
+clients, you can write a script. A script can quickly add the entries to the <filename>cred.org_dir</filename> NIS+ table. The following example shows a sample script.</para><screen width="80100">#! /usr/bin/ksh  
+# 
+# Copyright (c) by Sun Microsystems, Inc. All rights reserved. 
+# 
+# Sample script for cloning a credential. Hosts file is already populated  
+# with entries of the form dhcp-[0-9][0-9][0-9]. The entry we're cloning 
+# is dhcp-001. 
+#  
+#  
+PUBLIC_DATA=6e72878d8dc095a8b5aea951733d6ea91b4ec59e136bd3b3 
+PRIVATE_DATA=3a86729b685e2b2320cd7e26d4f1519ee070a60620a93e48a8682c5031058df4
+HOST="dhcp-" 
+DOMAIN="mydomain.example.com"  
+ 
+for 
+i in 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019
+do         
+     print - ${HOST}${i}         
+     #nistbladm -r [cname="${HOST}${i}.${DOMAIN}."]cred.org_dir         
+     nistbladm -a cname="${HOST}${i}.${DOMAIN}." \
+         auth_type=DES auth_name="unix.${HOST}${i}@${DOMAIN}" \
+         public_data=${PUBLIC_DATA} private_data=${PRIVATE_DTA} cred.org_Dir
+done  
+ 
+exit 0</screen>
+</example>
+</task>
+</sect2>
+</sect1><sect1 id="extkj"><title>DHCP Client Event Scripts</title><para>You can set up the Solaris DHCP client to run an executable program
+or script that can perform any action that is appropriate for the client system.
+The program or script, which is called an <emphasis>event script</emphasis>,
+is automatically executed after certain DHCP lease events occur. The event
+script can be used to run other commands, programs, or scripts in response
+to specific lease events. You must provide your own event script to use this
+feature.</para><para>The following event keywords are used by <literal>dhcpagent</literal> to
+signify DHCP lease events:</para><variablelist><varlistentry><term><emphasis role="strong">Event Keyword</emphasis></term><listitem><para><emphasis role="strong">Description</emphasis></para>
+</listitem>
+</varlistentry><varlistentry><term><literal>BOUND</literal></term><listitem><para>The interface is configured for DHCP. The client receives
+the acknowledgement message (<literal>ACK</literal>) from the DHCP server,
+which grants the lease request for an IP address. The event script is invoked
+immediately after the interface is configured successfully.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>EXTEND</literal></term><listitem><para>The client successfully extends a lease. The event script
+is invoked immediately after the client receives the acknowledgement message
+from the DHCP server for the renew request.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>EXPIRE</literal></term><listitem><para>The lease expires when the lease time is up. The event script
+is invoked immediately before the leased address is removed from the interface
+and the interface is marked as down.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>DROP</literal></term><listitem><para>The client drops the lease to remove the interface from DHCP
+control. The event script is invoked immediately before the interface is removed
+from DHCP control.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>RELEASE</literal></term><listitem><para>The client relinquishes the IP address. The event script is
+invoked immediately before the client releases the address on the interface
+and sends the <literal>RELEASE</literal> packet to the DHCP server.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>With each of these events, <literal>dhcpagent</literal> invokes
+the following command:</para><screen>/etc/dhcp/eventhook <replaceable>interface event</replaceable></screen><para>where <replaceable>interface</replaceable> is the interface that is
+using DHCP and <replaceable>event</replaceable> is one of the event keywords
+described previously. For example, when the <literal>ce0</literal> interface
+is first configured for DHCP, the <literal>dhcpagent</literal> invokes the
+event script as follows:</para><screen>/etc/dhcp/eventhook ce0 BOUND</screen><para>To use the event script feature, you must do the following:</para><itemizedlist><listitem><para>Name the executable file <filename>/etc/dhcp/eventhook</filename>.</para>
+</listitem><listitem><para>Set the owner of the file to be <literal>root</literal>.</para>
+</listitem><listitem><para>Set permissions to <literal>755</literal> (<literal>rwxr-xr-x</literal>).</para>
+</listitem><listitem><para>Write the script or program to perform a sequence of actions
+in response to any of the documented events. Because Sun might add new events,
+the program must silently ignore any events that are not recognized or do
+not require action. For example, the program or script might write to a log
+file when the event is <literal>RELEASE</literal>, and ignore all other events.</para>
+</listitem><listitem><para>Make the script or program noninteractive. Before the event
+script is invoked, <literal>stdin</literal>, <literal>stdout</literal>, and <literal>stderr</literal> are connected to <literal>/dev/null</literal>. To see the
+output or errors, you must redirect to a file.</para>
+</listitem><listitem><para>Enable the script or program to be run with the following
+command:</para><screen>/etc/dhcp/eventhook <replaceable>interface event</replaceable></screen>
+</listitem>
+</itemizedlist><para>The event script inherits its program environment from <literal>dhcpagent</literal>,
+and runs with <literal>root</literal> privileges. The script can use the <command>dhcpinfo</command> utility to obtain more information about the interface,
+if necessary. See the <olink targetdoc="refman1" targetptr="dhcpinfo-1" remap="external"><citerefentry><refentrytitle>dhcpinfo</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para><para>The <literal>dhcpagent</literal> daemon waits for the event script to
+exit on all events. If the event script does not exit after 55 seconds, <literal>dhcpagent</literal> sends a <literal>SIGTERM</literal> signal to the script
+process. If the process still does not exit after three additional seconds,
+the daemon sends a <literal>SIGKILL</literal> signal to kill the process.</para><para>The <olink targetdoc="refman1m" targetptr="dhcpagent-1m" remap="external"><citerefentry><refentrytitle>dhcpagent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page includes one example of an event script.</para><para><olink targetptr="fapgt" remap="internal">Example 16&ndash;3</olink> shows how to use
+a DHCP event script to keep the content of the <filename>/etc/resolv.conf</filename> file
+up to date. When the <literal>BOUND</literal> and <literal>EXTEND</literal> events
+occur, the script replaces the names of the domain server and name server.
+When the <literal>EXPIRE</literal>, <literal>DROP</literal> and <literal>RELEASE</literal> events
+occur, the script removes the names of the domain server and name server from
+the file.</para><note><para>The example script assumes that DHCP is the authoritative source
+for the names of the domain server and the name server. The script also assumes
+that all interfaces under DHCP control return consistent and current information.
+These assumptions might not reflect conditions on your system.</para>
+</note><example id="fapgt"><title>Event Script for Updating the <filename>/etc/resolv.conf</filename> File</title><programlisting>#!/bin/ksh -p
+
+PATH=/bin:/sbin export PATH
+umask 0222
+
+# Refresh the domain and name servers on /etc/resolv.conf
+
+insert ()
+{
+	dnsservers=`dhcpinfo -i $1 DNSserv`
+	if [ -n "$dnsservers" ]; then
+		# remove the old domain and name servers
+		if [ -f /etc/resolv.conf ]; then
+			rm -f /tmp/resolv.conf.$$
+			sed -e '/^domain/d' -e '/^nameserver/d' \
+			    /etc/resolv.conf > /tmp/resolv.conf.$$
+		fi
+
+		# add the new domain
+		dnsdomain=`dhcpinfo -i $1 DNSdmain`
+		if [ -n "$dnsdomain" ]; then
+			echo "domain $dnsdomain" >> /tmp/resolv.conf.$$
+		fi
+
+		# add new name servers
+		for name in $dnsservers; do
+			echo nameserver $name >> /tmp/resolv.conf.$$
+		done
+		mv -f /tmp/resolv.conf.$$ /etc/resolv.conf
+	fi
+}
+
+# Remove the domain and name servers from /etc/resolv.conf
+
+remove ()
+{
+	if [ -f /etc/resolv.conf ]; then
+		rm -f /tmp/resolv.conf.$$
+		sed -e '/^domain/d' -e '/^nameserver/d' \
+		    /etc/resolv.conf > /tmp/resolv.conf.$$
+		mv -f /tmp/resolv.conf.$$ /etc/resolv.conf
+	fi
+}
+
+case $2 in
+BOUND | EXTEND)
+	insert $1
+	exit 0
+	;;
+EXPIRE | DROP | RELEASE)
+	remove
+	exit 0
+	;;
+*)
+	exit 0
+	;;
+esac</programlisting>
+</example>
+</sect1>
+</chapter>

@@ -1,0 +1,170 @@
+<chapter id="ipsecref-1"><title>IP Security Architecture (Reference)</title><highlights><para>This chapter contains the following reference information:</para><itemizedlist><listitem><para><olink targetptr="ipsecref-22" remap="internal">ipsecconf Command</olink></para>
+</listitem><listitem><para><olink targetptr="ipsecref-23" remap="internal">ipsecinit.conf File</olink></para>
+</listitem><listitem><para><olink targetptr="ipsecref-17" remap="internal">ipsecalgs Command</olink></para>
+</listitem><listitem><para><olink targetptr="ipsecref-24" remap="internal">Security Associations Database
+for IPsec</olink></para>
+</listitem><listitem><para><olink targetptr="ipsecref-25" remap="internal">Utilities for Key Generation
+in IPsec</olink></para>
+</listitem><listitem><para><olink targetptr="ipsecref-26" remap="internal">snoop Command and IPsec</olink></para>
+</listitem>
+</itemizedlist><para>For instructions on how to implement IPsec on your network, see <olink targetptr="ipsec-mgtasks-1" remap="internal">Chapter&nbsp;20, Configuring IPsec (Tasks)</olink>.
+For an overview of IPsec, see <olink targetptr="ipsec-ov-1" remap="internal">Chapter&nbsp;19,
+IP Security Architecture (Overview)</olink>.</para>
+</highlights><sect1 id="ipsecref-22"><title><command>ipsecconf</command> Command</title><para>You use the <command>ipsecconf</command> command to configure
+the IPsec policy for a host. When you run the command to configure the policy,
+the system creates  the IPsec policy entries in the kernel. The system uses these entries to check
+the policy on all outbound and inbound IP datagrams. Forwarded datagrams are
+not subjected to policy checks that are added by using this command. The <command>ipsecconf</command> command also configures the security policy database (SPD).</para><itemizedlist><listitem><para>For information on how to protect forwarded packets, see the <olink targetdoc="refman1m" targetptr="ifconfig-1m" remap="external"><citerefentry><refentrytitle>ifconfig</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="refman7" targetptr="lc-tun-7m" remap="external"><citerefentry><refentrytitle>tun</refentrytitle><manvolnum>7M</manvolnum></citerefentry></olink> man pages.</para>
+</listitem><listitem><para>For IPsec policy options, see the <olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>For instructions on how to use the <command>ipsecconf</command> command
+to protect traffic between systems, see <olink targetptr="ike-task-7" remap="internal">Configuring
+IKE (Task Map)</olink>.</para>
+</listitem>
+</itemizedlist><para>You must become superuser or assume an equivalent role to invoke the <command>ipsecconf</command> command. The command accepts entries that protect traffic
+in both directions. The command also accepts entries that protect traffic
+in only one direction.</para><para>Policy entries with a format of local address and remote address can
+protect traffic in both directions with a single policy entry. For example,
+entries that contain the patterns <literal>laddr host1</literal> and <literal>raddr
+host2</literal> protect traffic in both directions, if no direction is specified
+for the named host. Thus, you need only one policy entry for each host.</para><para>Policy entries with a format of source address to destination address
+protect traffic in only one direction. For example, a policy entry of the
+pattern <literal>saddr host1 daddr host2</literal> protects inbound traffic
+or outbound traffic, not both directions. Thus, to protect traffic in both
+directions, you need to pass the <command>ipsecconf</command> command another
+entry, as in <literal>saddr host2 daddr host1</literal>.</para><para>The <filename>ipsecpolicy.conf</filename> file is deleted
+when the system shuts down. To ensure that the IPsec policy is active when
+the machine boots, you can create an IPsec policy file, <filename>/etc/inet/ipsecinit.conf</filename>. This file is read when the network services are started. For
+instructions on how to create an IPsec policy file, see <olink targetptr="ipsec-mgtasks-2" remap="internal">Protecting Traffic With IPsec (Task Map)</olink>.</para>
+</sect1><sect1 id="ipsecref-23"><title><filename>ipsecinit.conf</filename> File</title><para>To invoke IPsec security policies when you start the Solaris Operating System,
+you create a configuration file to initialize IPsec with your specific IPsec
+policy entries. You should name the file <filename>/etc/inet/ipsecinit.conf</filename>.
+See the <olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page for details about policy entries and their format. After policies are
+configured, you can use the <command>ipsecconf</command> command to view or
+modify the existing configuration.</para><sect2 id="ipsecref-44"><title>Sample <filename>ipsecinit.conf</filename> File</title><para>The Solaris software includes a sample IPsec policy file, <filename>ipsecinit.sample</filename>. You can use the file as a template to create your own <filename>ipsecinit.conf</filename> file. The <filename>ipsecinit.sample</filename> file contains
+the following examples:</para><screen>#
+# For example,
+#
+#	 {rport 23} ipsec {encr_algs des encr_auth_algs md5}
+#
+# will protect the telnet traffic originating from the host with ESP using
+# DES and MD5. Also:
+#
+#	 {raddr 10.5.5.0/24} ipsec {auth_algs any}
+#
+# will protect traffic to or from the 10.5.5.0 subnet with AH 
+# using any available algorithm.
+#
+#
+# To do basic filtering, a drop rule may be used. For example:
+#
+#    {lport 23 dir both} drop {}
+# will disallow any remote system from telnetting in.
+#
+# If you are using IPv6, it may be useful to bypass neighbor discovery
+# to allow in.iked to work properly with on-link neighbors. To do that,
+# add the following lines:
+#
+#        {ulp ipv6-icmp type 133-137 dir both } pass { }
+#
+# This will allow neighbor discovery to work normally.</screen>
+</sect2><sect2 id="ipsecref-42"><title>Security Considerations for <filename>ipsecinit.conf</filename> and <command>ipsecconf</command></title><para>Use extreme caution if transmitting a copy of the <filename>ipsecinit.conf</filename> file
+over a network. An adversary can read a network-mounted file as the file is
+being read. If, for example, the <filename>/etc/inet/ipsecinit.conf</filename> file
+is accessed or is copied from an NFS-mounted file system, an adversary can
+change the policy that is contained in the file.</para><para>Ensure that you set up IPsec policies before starting any communications,
+because existing connections might be affected by the addition of new policy
+entries. Similarly, do not change policies in the middle of a communication.</para><para>Specifically, IPsec policy cannot be changed for SCTP, TCP, or
+UDP sockets on which a <function>connect</function> or <function>accept</function> function
+call has been issued. A socket whose policy cannot be changed is called a <emphasis>latched socket</emphasis>. New policy entries do not protect sockets that
+are already latched. For more information, see the <olink targetdoc="refman3b" targetptr="connect-3socket" remap="external"><citerefentry><refentrytitle>connect</refentrytitle><manvolnum>3SOCKET</manvolnum></citerefentry></olink> and <olink targetdoc="refman3b" targetptr="accept-3socket" remap="external"><citerefentry><refentrytitle>accept</refentrytitle><manvolnum>3SOCKET</manvolnum></citerefentry></olink> man
+pages.</para><para>Protect your naming system. If the following two conditions are met,
+then your host names are no longer trustworthy:</para><itemizedlist><listitem><para>Your source address is a host that can be looked up over the
+network.</para>
+</listitem><listitem><para>Your naming system is compromised.</para>
+</listitem>
+</itemizedlist><para>Security weaknesses often arise from the misapplication of tools, not
+from the actual tools. You should be cautious when using the <command>ipsecconf</command> command.
+Use a console or other hard-connected TTY for the safest mode of operation.</para>
+</sect2>
+</sect1><sect1 id="ipsecref-17"><title><command>ipsecalgs</command> Command</title><para>The Solaris cryptographic framework provides authentication and
+encryption algorithms to IPsec. You use the <command>ipsecalgs</command> command
+to query and modify the list of protocols and the list of algorithms that
+IPsec supports. The <command>ipsecalgs</command> command stores this information
+in tabular format in the IPsec protocols and algorithms file, <command>/etc/inet/ipsecalgs</command>. This file must never be edited manually.</para><para>The valid IPsec protocols and algorithms are described by the ISAKMP <olink targetptr="glossary-125" remap="internal">domain of interpretation (DOI)</olink>, which is
+covered by RFC 2407. In a general sense, a DOI defines data formats, network
+traffic exchange types, and conventions for naming security-relevant information.
+Security policies, cryptographic algorithms, and cryptographic modes are examples
+of security-relevant information.</para><para>Specifically, the ISAKMP DOI defines the naming and numbering conventions
+for the valid IPsec algorithms and for their protocols, <literal>PROTO_IPSEC_AH</literal> and <literal>PROTO_IPSEC_ESP</literal>. Each algorithm is  associated with exactly one
+protocol. These ISAKMP DOI definitions are in the <filename>/etc/inet/ipsecalgs</filename> file.
+The algorithm and protocol numbers are defined by the Internet Assigned Numbers
+Authority (IANA). The <command>ipsecalgs</command> command makes the list
+of algorithms for IPsec extensible.</para><para>For more information on the algorithms, refer to the <olink targetdoc="refman1m" targetptr="ipsecalgs-1m" remap="external"><citerefentry><refentrytitle>ipsecalgs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.
+For more information on the Solaris cryptographic framework, see <olink targetdoc="sysadv6" targetptr="scf-1" remap="external">Chapter 12, <citetitle remap="chapter">Solaris Cryptographic Framework (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</sect1><sect1 id="ipsecref-24"><title>Security Associations Database for IPsec</title><para>Information on key material for IPsec security services is maintained
+in a security associations database (<olink targetptr="glossary-58" remap="internal">SADB</olink>).
+Security associations (SAs) protect inbound packets and outbound packets.
+The SADBs are maintained by a user process, or possibly multiple cooperating
+processes, that send messages over a special kind of socket. This method of
+maintaining SADBs is analogous to the method that is described in the <olink targetdoc="refman7" targetptr="route-7p" remap="external"><citerefentry><refentrytitle>route</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man page. Only superuser
+or a user who has assumed an equivalent role can access the database.</para><para>The <command>in.iked</command> daemon and the <command>ipseckey</command> command
+use the <command>PF_KEY</command> socket interface to maintain SADBs. For more information
+on how SADBs handle requests and messages, see the <olink targetdoc="refman7" targetptr="pf-key-7p" remap="external"><citerefentry><refentrytitle>pf_key</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man page.</para>
+</sect1><sect1 id="ipsecref-25"><title>Utilities for Key Generation in IPsec</title><para>The IKE protocol provides automatic key management for IPv4 and IPv6
+addresses. See <olink targetptr="ike-task-1" remap="internal">Chapter&nbsp;23, Configuring
+IKE (Tasks)</olink> for instructions on how to set up IKE. The manual keying
+utility is the <command>ipseckey</command> command, which is described in
+the <olink targetdoc="refman1m" targetptr="ipseckey-1m" remap="external"><citerefentry><refentrytitle>ipseckey</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><para>You use the <command>ipseckey</command> command to manually populate
+the security association databases (SADBs) when automated key management is
+not used. When you invoke the <command>ipseckey</command> command with no
+arguments, the command enters an interactive mode and displays a prompt that
+enables you to make entries. Some commands require an explicit security association
+(SA) type, while others permit you to specify the SA type and act on all SA
+types.</para><para>While the <command>ipseckey</command> command has only a limited number
+of general options, the command supports a rich command language. You can
+specify that requests be delivered by means of a programmatic interface specific
+for manual keying. For additional information, see the <olink targetdoc="refman7" targetptr="pf-key-7p" remap="external"><citerefentry><refentrytitle>pf_key</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man page.</para><sect2 id="ipsecref-41"><title>Security Considerations for <command>ipseckey</command></title><para>The <command>ipseckey</command> command enables superuser or a
+role with the Network Security profile to enter sensitive cryptographic keying
+information. If an adversary gains access to this information, the adversary
+can compromise the security of IPsec traffic. You should consider the following
+issues when you handle keying material and use the <command>ipseckey</command> command:</para><itemizedlist><listitem><para>Have you refreshed the keying material? Periodic key refreshment
+is a fundamental security practice. Key refreshment guards against potential
+weaknesses of the algorithm and keys, and limits the damage of an exposed
+key.</para>
+</listitem><listitem><para>Is the TTY going over a network? Is the <command>ipseckey</command> command
+in interactive mode?</para><itemizedlist><listitem><para>In interactive mode, the security of the keying material is
+the security of the network path for this TTY's traffic. You should avoid
+using the <command>ipseckey</command> command over a clear-text telnet or
+rlogin session.</para>
+</listitem><listitem><para>Even local windows might be vulnerable to attacks by a concealed
+program that reads window events.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Have you used the <option>f</option> option? Is the file being
+accessed over the network? Can the file be read by the world?</para><itemizedlist><listitem><para>An adversary can read a network-mounted file as the file is
+being read. You should avoid using a world-readable file that contains keying
+material.</para>
+</listitem><listitem><para>Protect your naming system. If the following two conditions
+are met, then your host names are no longer trustworthy:</para><itemizedlist><listitem><para>Your source address is a host that can be looked up over the
+network.</para>
+</listitem><listitem><para>Your naming system is compromised.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><para>Security weaknesses often arise from the misapplication of tools, not
+from the actual tools. You should be cautious when using the <command>ipseckey</command> command.
+Use a console or other hard-connected TTY for the safest mode of operation.</para>
+</sect2>
+</sect1><sect1 id="ipsecref-26"><title><command>snoop</command> Command and IPsec</title><para>The <command>snoop</command> command can parse AH and ESP headers.
+Because ESP encrypts its data, the <command>snoop</command> command cannot
+see encrypted headers that are protected by ESP. AH does not encrypt data.
+Therefore, traffic that is protected by AH can be inspected with the <command>snoop</command> command. The <option>V</option> option to the command shows when
+AH is in use on a packet. For more details, see the <olink targetdoc="refman1m" targetptr="snoop-1m" remap="external"><citerefentry><refentrytitle>snoop</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para><para>For a sample of verbose <command>snoop</command> output on a protected
+packet, see <olink targetptr="ipsec-mgtasks-11" remap="internal">How to Verify That Packets
+Are Protected With IPsec</olink>.</para>
+</sect1>
+</chapter>

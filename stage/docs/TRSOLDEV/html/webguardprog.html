@@ -1,0 +1,154 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Accessing Lower-Level Untrusted Servers - Solaris Trusted Extensions Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-08-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Trusted Extensions Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="webguardadmin.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="javatxlabelapis.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="api-intro-1.html">1.&nbsp;&nbsp;Solaris Trusted Extensions APIs and Security Policy</a></p>
+<p class="toc level1 tocsp"><a href="labelapi-1.html">2.&nbsp;&nbsp;Labels and Clearances</a></p>
+<p class="toc level1 tocsp"><a href="labelcode-1.html">3.&nbsp;&nbsp;Label Code Examples</a></p>
+<p class="toc level1 tocsp"><a href="labelprint-1.html">4.&nbsp;&nbsp;Printing and the Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="ipcapi-1.html">5.&nbsp;&nbsp;Interprocess Communications</a></p>
+<p class="toc level1 tocsp"><a href="windowapi-1.html">6.&nbsp;&nbsp;Trusted X Window System</a></p>
+<p class="toc level1 tocsp"><a href="lbuilder-1.html">7.&nbsp;&nbsp;Label Builder APIs</a></p>
+<p class="toc level1 tocsp"><a href="webguard.html">8.&nbsp;&nbsp;Trusted Web Guard Prototype</a></p>
+<p class="toc level2"><a href="webguardadmin.html">Administrative Web Guard Prototype</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Accessing Lower-Level Untrusted Servers</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="javatxlabelapis.html">9.&nbsp;&nbsp;Experimental Java Bindings for the Solaris Trusted Extensions Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="appa-1.html">A.&nbsp;&nbsp;Programmer's Reference</a></p>
+<p class="toc level1 tocsp"><a href="appb-1.html">B.&nbsp;&nbsp;Solaris Trusted Extensions API Reference</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="webguardprog"></a><h3>Accessing Lower-Level Untrusted Servers</h3>
+<p>Sometimes a client needs to be able to access a server on
+an unlabeled system. An <b>unlabeled system</b> is a system that does not run
+the Trusted Extensions software. In such a case, you cannot use multilevel
+ports because they are restricted to privileged servers that run in the
+global zone or in labeled zones.</p><p>For example, suppose your browser is running in the <tt>INTERNAL</tt> zone. You
+want to access a web server that runs on a single-level network
+that has been assigned the <tt>PUBLIC</tt> sensitivity label by means of the
+<tt>tnrhdb</tt> database. Such access is not permitted by default. However, you could
+write a privileged proxy server to forward the HTTP request to the
+<tt>PUBLIC</tt> web server. The proxy should use a special Trusted Extensions socket
+option called <tt>SO_MAC_EXEMPT</tt>. This socket option permits a request to be sent
+to an untrusted lower-level service, and permits the reply from that service
+to be returned to the requester.</p>
+<hr><p><b>Note - </b>The use of the <tt>SO_MAC_EXEMPT</tt> option represents an unprotected downgrade channel and
+should be used <b>very carefully</b>. The <tt>SO_MAC_EXEMPT</tt> option cannot be set unless the
+calling process has the <tt>PRIV_NET_MAC_AWARE</tt> privilege in its effective set. Such a
+process must enforce its own data filtering policy to prevent leaking higher-level
+data to the lower-level service. For example, the proxy should sanitize URLs
+to restrict words from being used as values.</p>
+<hr>
+<p>The following code excerpt demonstrates the use of <tt>SO_MAC_EXEMPT</tt> in a modified
+version of the <tt>wget</tt> command's <tt>connect_to_ip()</tt> routine in <tt>connect.c</tt>. The call to
+<tt>setsockopt()</tt> has been added to show how to set the <tt>SO_MAC_EXEMPT</tt> option.</p><pre>int
+connect_to_ip (const ip_address *ip, int port, const char *print)
+{
+  struct sockaddr_storage ss;
+  struct sockaddr *sa = (struct sockaddr *)&amp;ss;
+  int sock;
+  int on = 1;
+
+  /* If PRINT is non-NULL, print the "Connecting to..." line, with
+     PRINT being the host name we're connecting to.  */
+  if (print)
+    {
+      const char *txt_addr = pretty_print_address (ip);
+      if (print &amp;&amp; 0 != strcmp (print, txt_addr))
+    logprintf (LOG_VERBOSE, _("Connecting to %s|%s|:%d... "),
+           escnonprint (print), txt_addr, port);
+      else
+    logprintf (LOG_VERBOSE, _("Connecting to %s:%d... "), txt_addr, port);
+    }
+
+  /* Store the sockaddr info to SA.  */
+  sockaddr_set_data (sa, ip, port);
+
+  /* Create the socket of the family appropriate for the address.  */
+  sock = socket (sa-&gt;sa_family, SOCK_STREAM, 0);
+  if (sock &lt; 0)
+    goto err;
+
+  if (setsockopt (sock, SOL_SOCKET, SO_MAC_EXEMPT, &amp;on, sizeof (on)) == -1) {
+    perror("setsockopt SO_MAC_EXEMPT");
+  }
+
+#if defined(ENABLE_IPV6) &amp;&amp; defined(IPV6_V6ONLY)
+  if (opt.ipv6_only) {
+    /* In case of error, we will go on anyway... */
+    int err = setsockopt (sock, IPPROTO_IPV6, IPV6_V6ONLY, &amp;on, sizeof (on));
+  }
+#endif</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="webguardadmin.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="javatxlabelapis.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

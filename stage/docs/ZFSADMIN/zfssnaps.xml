@@ -1,0 +1,388 @@
+<chapter id="gavvx"><title>Working
+With ZFS Snapshots and Clones</title><highlights><para>This chapter describes how to create and manage ZFS snapshots and clones.
+Information about saving snapshots is also provided in this chapter.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gbciq" remap="internal">Overview of ZFS Snapshots</olink></para>
+</listitem><listitem><para><olink targetptr="gbcya" remap="internal">Creating and Destroying ZFS Snapshots</olink></para>
+</listitem><listitem><para><olink targetptr="gbiqe" remap="internal">Displaying and Accessing ZFS Snapshots</olink></para>
+</listitem><listitem><para><olink targetptr="gbcxk" remap="internal">Rolling Back to a ZFS Snapshot</olink></para>
+</listitem><listitem><para><olink targetptr="gbcxz" remap="internal">Overview of ZFS Clones</olink></para>
+</listitem><listitem><para><olink targetptr="gbcyg" remap="internal">Creating a ZFS Clone</olink></para>
+</listitem><listitem><para><olink targetptr="gbiob" remap="internal">Destroying a ZFS Clone</olink></para>
+</listitem><listitem><para><olink targetptr="gbchx" remap="internal">Saving and Restoring ZFS Data</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gbciq"><title>Overview of ZFS Snapshots</title><para>A <emphasis>snapshot</emphasis> is a read-only copy of a file system
+or volume. Snapshots can be created almost instantly, and initially consume
+no additional disk space within the pool. However, as data within the active
+dataset changes, the snapshot consumes disk space by continuing to reference
+the old data and so prevents the space from being freed.</para><para>ZFS snapshots include the following features:</para><itemizedlist><listitem><para>Persist across system reboots.</para>
+</listitem><listitem><para>The theoretical maximum number of snapshots is 2<superscript>64</superscript>.</para>
+</listitem><listitem><para>Use no separate backing store. Snapshots consume disk space
+directly from the same storage pool as the file system from which they were
+created.</para>
+</listitem><listitem><para>Recursive snapshots are created quickly as one atomic operation.
+The snapshots are created together (all at once) or not created at all. The
+benefit of atomic snapshots operations is that the snapshot data is always
+taken at one consistent time, even across descendent file systems.</para>
+</listitem>
+</itemizedlist><para>Snapshots of volumes cannot be accessed directly, but they can be cloned,
+backed up, rolled back to, and so on. For information about backing up a ZFS
+snapshot, see <olink targetptr="gbchx" remap="internal">Saving and Restoring ZFS Data</olink>.</para><sect2 id="gbcya"><title>Creating and Destroying ZFS Snapshots</title><para>Snapshots are created by using the <command>zfs snapshot</command> command,
+which takes as its only argument the name of the snapshot to create. The snapshot
+name is specified as follows:</para><screen><replaceable>filesystem@snapname</replaceable>
+<replaceable>volume@snapname</replaceable></screen><para>The snapshot name must satisfy the naming conventions defined in  <olink targetptr="gbcpt" remap="internal">ZFS Component Naming Requirements</olink>.</para><para>In the following example, a snapshot of <filename>tank/home/ahrens</filename> that
+is named <filename>friday</filename> is created.</para><screen># <userinput>zfs snapshot tank/home/ahrens@friday</userinput></screen><para>You can create snapshots for all descendent file systems by using the <option>r</option> option. For example:</para><screen># <userinput>zfs snapshot -r tank/home@now</userinput>
+# <userinput>zfs list -t snapshot</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/home@now             0      -  29.5K  -
+tank/home/ahrens@now      0      -  2.15M  -
+tank/home/anne@now        0      -  1.89M  -
+tank/home/bob@now         0      -  1.89M  -
+tank/home/cindys@now      0      -  2.15M  -</screen><para>Snapshots have no modifiable properties. Nor can dataset properties
+be applied to a snapshot.</para><screen># zfs set compression=on tank/home/ahrens@tuesday
+cannot set compression property for 'tank/home/ahrens@tuesday': snapshot
+properties cannot be modified</screen><para>Snapshots are destroyed by using the <command>zfs destroy</command> command.
+For example:</para><screen># <userinput>zfs destroy tank/home/ahrens@friday</userinput></screen><para>A dataset cannot be destroyed if snapshots of the dataset exist. For
+example:</para><screen># <userinput>zfs destroy tank/home/ahrens</userinput>
+cannot destroy 'tank/home/ahrens': filesystem has children
+use '-r' to destroy the following datasets:
+tank/home/ahrens@tuesday
+tank/home/ahrens@wednesday
+tank/home/ahrens@thursday</screen><para>In addition, if clones have been created from a snapshot, then they
+must be destroyed before the snapshot can be destroyed.</para><para>For more information about the <command>destroy</command> subcommand,
+see <olink targetptr="gammq" remap="internal">Destroying a ZFS File System</olink>.</para><sect3 id="gbion"><title>Renaming ZFS Snapshots</title><para>You can rename snapshots but they must be renamed within the pool and
+dataset from which they were created. For example:</para><screen># <userinput>zfs rename tank/home/cindys@083006 tank/home/cindys@today</userinput></screen><para>In addition, the following shortcut syntax provides equivalent snapshot
+renaming syntax as the example above.</para><screen># <userinput>zfs rename tank/home/cindys@083006 today</userinput></screen><para>The following snapshot rename operation is not supported because the
+target pool and file system name are different from the pool and file system
+where the snapshot was created.</para><screen># zfs rename tank/home/cindys@today pool/home/cindys@saturday
+cannot rename to 'pool/home/cindys@today': snapshots must be part of same 
+dataset</screen><para>You can recursively rename snapshots with the <command>zfs rename</command> <option>r</option> command. For example:</para><screen># <userinput>zfs list</userinput>
+NAME                         USED  AVAIL  REFER  MOUNTPOINT
+users                        270K  16.5G    22K  /users
+users/home                    76K  16.5G    22K  /users/home
+users/home@yesterday            0      -    22K  -
+users/home/markm              18K  16.5G    18K  /users/home/markm
+users/home/markm@yesterday      0      -    18K  -
+users/home/marks              18K  16.5G    18K  /users/home/marks
+users/home/marks@yesterday      0      -    18K  -
+users/home/neil               18K  16.5G    18K  /users/home/neil
+users/home/neil@yesterday       0      -    18K  -
+# <userinput>zfs rename -r users/home@yesterday @2daysago</userinput>
+# <userinput>zfs list -r users/home</userinput>
+NAME                        USED  AVAIL  REFER  MOUNTPOINT
+users/home                   76K  16.5G    22K  /users/home
+users/home@2daysago            0      -    22K  -
+users/home/markm             18K  16.5G    18K  /users/home/markm
+users/home/markm@2daysago      0      -    18K  -
+users/home/marks             18K  16.5G    18K  /users/home/marks
+users/home/marks@2daysago      0      -    18K  -
+users/home/neil              18K  16.5G    18K  /users/home/neil
+users/home/neil@2daysago       0      -    18K  -</screen>
+</sect3>
+</sect2><sect2 id="gbiqe"><title>Displaying and Accessing ZFS Snapshots</title><para>Snapshots of file systems are accessible in the <filename>.zfs/snapshot</filename> directory
+within the root of the containing file system. For example, if <filename>tank/home/ahrens</filename> is mounted on <filename>/home/ahrens</filename>, then the <filename>tank/home/ahrens@thursday</filename> snapshot data is accessible in the <filename>/home/ahrens/.zfs/snapshot/thursday</filename> directory.</para><screen># <userinput>ls /tank/home/ahrens/.zfs/snapshot</userinput>
+tuesday wednesday thursday</screen><para>You can list snapshots as follows:</para><screen># <userinput>zfs list -t snapshot</userinput>
+NAME                        USED  AVAIL  REFER  MOUNTPOINT
+pool/home/anne@monday          0      -   780K  -
+pool/home/bob@monday           0      -  1.01M  -
+tank/home/ahrens@tuesday   8.50K      -   780K  -
+tank/home/ahrens@wednesday 8.50K      -  1.01M  -
+tank/home/ahrens@thursday      0      -  1.77M  -
+tank/home/cindys@today     8.50K      -   524K  -</screen><para>You can list snapshots that were created for a particular file system
+as follows:</para><screen># <userinput>zfs list -r -t snapshot -o name,creation tank/home</userinput>
+NAME                       CREATION
+tank/home@now               Wed Aug 30 10:53 2006
+tank/home/ahrens@tuesday    Wed Aug 30 10:53 2006
+tank/home/ahrens@wednesday  Wed Aug 30 10:54 2006
+tank/home/ahrens@thursday   Wed Aug 30 10:53 2006
+tank/home/cindys@now        Wed Aug 30 10:57 2006</screen><sect3 id="gbcxc"><title>Snapshot Space Accounting</title><para>When a snapshot is created, its space is initially shared between the
+snapshot and the file system, and possibly with previous snapshots. As the
+file system changes, space that was previously shared becomes unique to the
+snapshot, and thus is counted in the snapshot's <property>used</property> property.
+Additionally, deleting snapshots can increase the amount of space unique to
+(and thus <emphasis>used</emphasis> by) other snapshots.</para><para>A snapshot's space <property>referenced</property> property is the same
+as the file system's was when the snapshot was created.</para>
+</sect3>
+</sect2><sect2 id="gbcxk"><title>Rolling Back to a ZFS Snapshot</title><para>The <command>zfs rollback</command> command can be used to discard all
+changes made since a specific snapshot. The file system reverts to its state
+at the time the snapshot was taken. By default, the command cannot roll back
+to a snapshot other than the most recent snapshot.</para><para>To roll back to an earlier snapshot, all intermediate snapshots must
+be destroyed. You can destroy earlier snapshots by specifying the <option>r</option> option.</para><para>If clones of any intermediate snapshots exist, the <option>R</option> option
+must be specified to destroy the clones as well. </para><note><para>The file system that you want to roll back must be unmounted and
+remounted, if it is currently mounted. If the file system cannot be unmounted,
+the rollback fails. The <option>f</option> option forces the file system to
+be unmounted, if necessary.</para>
+</note><para>In the following example, the <filename>tank/home/ahrens</filename> file
+system is rolled back to the <filename>tuesday</filename> snapshot:</para><screen># <userinput>zfs rollback tank/home/ahrens@tuesday</userinput>
+cannot rollback to 'tank/home/ahrens@tuesday': more recent snapshots exist
+use '-r' to force deletion of the following snapshots:
+tank/home/ahrens@wednesday
+tank/home/ahrens@thursday
+# <userinput>zfs rollback -r tank/home/ahrens@tuesday</userinput></screen><para>In the above example, the <literal>wednesday</literal> and <literal>thursday</literal> snapshots are removed because you rolled back to the previous <literal>tuesday</literal> snapshot.</para><screen># <userinput>zfs list -r -t snapshot -o name,creation tank/home/ahrens</userinput>
+NAME                      CREATION
+tank/home/ahrens@tuesday  Wed Aug 30 10:53 2006</screen>
+</sect2>
+</sect1><sect1 id="gbcxz"><title>Overview of ZFS Clones</title><para>A <emphasis>clone</emphasis> is a writable volume or file system whose
+initial contents are the same as the dataset from which it was created.  As
+with snapshots, creating a clone is nearly instantaneous, and initially consumes
+no additional disk space. In addition, you can snapshot a clone.</para><itemizedlist><listitem><para><olink targetptr="gbcyg" remap="internal">Creating a ZFS Clone</olink></para>
+</listitem><listitem><para><olink targetptr="gbiob" remap="internal">Destroying a ZFS Clone</olink></para>
+</listitem><listitem><para><olink targetptr="gcvfl" remap="internal">Replacing a ZFS File System With
+a ZFS Clone</olink></para>
+</listitem>
+</itemizedlist><para>Clones can only be created from a snapshot. When a snapshot is cloned,
+an implicit dependency is created between the clone and snapshot. Even though
+the clone is created somewhere else in the dataset hierarchy, the original
+snapshot cannot be destroyed as long as the clone exists. The <property>origin</property> property
+exposes this dependency, and the <command>zfs destroy</command> command lists
+any such dependencies, if they exist.</para><para>Clones do not inherit the properties of the dataset from which it was
+created. Use the <command>zfs get</command> and <command>zfs set</command> commands
+to view and change the properties of a cloned dataset. For more information
+about setting ZFS dataset properties, see <olink targetptr="gazsp" remap="internal">Setting
+ZFS Properties</olink>.</para><para>Because a clone initially shares all its disk space with the original
+snapshot, its <property>used</property> property is initially zero. As changes
+are made to the clone, it uses more space. The <property>used</property> property
+of the original snapshot does not consider the disk space consumed by the
+clone.</para><sect2 id="gbcyg"><title>Creating a ZFS Clone</title><para>To create a clone, use the <command>zfs clone</command> command, specifying
+the snapshot from which to create the clone, and the name of the new file
+system or volume. The new file system or volume can be located anywhere in
+the ZFS hierarchy. The type of the new dataset (for example, file system or
+volume) is the same type as the snapshot from which the clone was created.
+You cannot create clone of a file system in a pool that is different from
+where the original file system snapshot resides. </para><para>In the following example, a new clone named <literal>tank/home/ahrens/bug123</literal> with the same initial contents as the snapshot <literal>tank/ws/gate@yesterday</literal> is created.</para><screen># <userinput>zfs snapshot tank/ws/gate@yesterday</userinput>
+# <userinput>zfs clone tank/ws/gate@yesterday tank/home/ahrens/bug123</userinput></screen><para>In the following example, a cloned workspace is created from the <filename>projects/newproject@today</filename> snapshot for a temporary user as <filename>projects/teamA/tempuser</filename>. Then, properties are set on the cloned workspace.</para><screen># <userinput>zfs snapshot projects/newproject@today</userinput>
+# <userinput>zfs clone projects/newproject@today projects/teamA/tempuser</userinput>
+# <userinput>zfs set sharenfs=on projects/teamA/tempuser</userinput>
+# <userinput>zfs set quota=5G projects/teamA/tempuser</userinput></screen>
+</sect2><sect2 id="gbiob"><title>Destroying a ZFS Clone</title><para>ZFS clones are destroyed by using the <command>zfs destroy</command> command.
+For example:</para><screen># <userinput>zfs destroy tank/home/ahrens/bug123</userinput></screen><para>Clones must be destroyed before the parent snapshot can be destroyed.</para>
+</sect2><sect2 id="gcvfl"><title>Replacing a ZFS File System With a ZFS Clone</title><para>You can use the <command>zfs promote</command> command to replace an
+active ZFS file system with a clone of that file system. This feature facilitates
+the ability to clone and replace file systems so that the &ldquo;origin&rdquo;
+file system become the clone of the specified file system. In addition, this
+feature makes it possible to destroy the file system from which the clone
+was originally created. Without clone promotion, you cannot destroy a &ldquo;origin&rdquo;
+file system of active clones. For more information about destroying clones,
+see <olink targetptr="gbiob" remap="internal">Destroying a ZFS Clone</olink>.</para><para>In the following example, the <filename>tank/test/productA</filename> file
+system is cloned and then the clone file system, <filename>tank/test/productAbeta</filename> becomes the <filename>tank/test/productA</filename> file system.</para><screen># <userinput>zfs create tank/test</userinput>
+# <userinput>zfs create tank/test/productA</userinput>
+# <userinput>zfs snapshot tank/test/productA@today</userinput>
+# <userinput>zfs clone tank/test/productA@today tank/test/productAbeta</userinput>
+# <userinput>zfs list -r tank/test</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/test              314K  8.24G  25.5K  /tank/test
+tank/test/productA     288K  8.24G   288K  /tank/test/productA
+tank/test/productA@today      0      -   288K  -
+tank/test/productAbeta      0  8.24G   288K  /tank/test/productAbeta
+# <userinput>zfs promote tank/test/productAbeta</userinput>
+# <userinput>zfs list -r tank/test</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/test              316K  8.24G  27.5K  /tank/test
+tank/test/productA        0  8.24G   288K  /tank/test/productA
+tank/test/productAbeta   288K  8.24G   288K  /tank/test/productAbeta
+tank/test/productAbeta@today      0      -   288K  -</screen><para>In the above <command>zfs</command> <option>list</option> output, you
+can see that the space accounting of the original <filename>productA</filename> file
+system has been replaced with the <filename>productAbeta</filename> file system.</para><para>Complete the clone replacement process by renaming the file systems.
+For example:</para><screen># <userinput>zfs rename tank/test/productA tank/test/productAlegacy</userinput>
+# <userinput>zfs rename tank/test/productAbeta tank/test/productA</userinput>
+# <userinput>zfs list -r tank/test</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/test              316K  8.24G  27.5K  /tank/test
+tank/test/productA     288K  8.24G   288K  /tank/test/productA
+tank/test/productA@today      0      -   288K  -
+tank/test/productAlegacy      0  8.24G   288K  /tank/test/productAlegacy</screen><para>Optionally, you can remove the legacy file system. For example:</para><screen># <userinput>zfs destroy tank/test/productAlegacy</userinput></screen>
+</sect2>
+</sect1><sect1 id="gbchx"><title>Saving and Restoring ZFS Data</title><para>The <command>zfs send</command> command creates a stream representation
+of a snapshot that is written to standard output. By default, a full stream
+is generated. You can redirect the output to a file or to a different system.
+The <command>zfs receive</command> command creates a snapshot whose contents
+are specified in the stream that is provided on standard input. If a full
+stream is received, a new file system is created as well. You can save ZFS
+snapshot data and restore ZFS snapshot data and file systems with these commands.
+See the examples in the next section.</para><itemizedlist><listitem><para><olink targetptr="gbscu" remap="internal">Saving ZFS Data With Other Backup
+Products</olink></para>
+</listitem><listitem><para><olink targetptr="gbinw" remap="internal">Saving a ZFS Snapshot</olink></para>
+</listitem><listitem><para><olink targetptr="gbimy" remap="internal">Restoring a ZFS Snapshot</olink></para>
+</listitem><listitem><para><olink targetptr="gbinz" remap="internal">Remote Replication of ZFS Data</olink></para>
+</listitem>
+</itemizedlist><para>The following solutions for saving ZFS data are provided:</para><itemizedlist><listitem><para>Saving ZFS snapshots and rolling back snapshots, if necessary.</para>
+</listitem><listitem><para>Saving full and incremental copies of ZFS snapshots and restoring
+the snapshots and file systems, if necessary.</para>
+</listitem><listitem><para>Remotely replicating ZFS file systems by saving and restoring
+ZFS snapshots and file systems.</para>
+</listitem><listitem><para>Saving ZFS data with archive utilities such as <command>tar</command> and <command>cpio</command> or third-party backup products.</para>
+</listitem>
+</itemizedlist><para>Consider the following when choosing a solution for saving ZFS data:</para><itemizedlist><listitem><para>File system snapshots and rolling back snapshots &ndash; Use
+the <command>zfs snapshot</command> and <command>zfs rollback</command> commands
+if you want to easily create a copy of a file system and revert back to a
+previous file system version, if necessary. For example, if you want to restore
+a file or files from a previous version of a file system, you could use this
+solution.</para><para>For more information about creating and rolling back
+to a snapshot, see <olink targetptr="gbciq" remap="internal">Overview of ZFS Snapshots</olink>.</para>
+</listitem><listitem><para>Saving snapshots &ndash; Use the <command>zfs send</command> and <command>zfs receive</command> commands to save and restore a ZFS snapshot. You can
+save incremental changes between snapshots, but you cannot restore files individually.
+You must restore the entire file system snapshot.</para>
+</listitem><listitem><para>Remote replication &ndash; Use the <command>zfs send</command> and <command>zfs receive</command> commands when you want to copy a file system from one
+system to another. This process is different from a traditional volume management
+product that might mirror devices across a WAN. No special configuration or
+hardware is required. The advantage of replicating a ZFS file system is that
+you can re-create a file system on a storage pool on another system, and specify
+different levels of configuration for the newly created pool, such as RAID-Z,
+but with identical file system data.</para>
+</listitem>
+</itemizedlist><sect2 id="gbscu"><title>Saving ZFS Data With Other Backup Products</title><para>In addition to the <command>zfs send</command> and <command>zfs receive</command> commands,
+you can also use archive utilities, such as the <command>tar</command> and <command>cpio</command> commands, to save ZFS files. All of these utilities save and
+restore ZFS file attributes and ACLs. Check the appropriate options for both
+the <command>tar</command> and <command>cpio</command> commands.</para><para>For up-to-date information about issues with ZFS and third-party backup
+products, please see the Solaris Express Developer Edition release
+notes.</para><para><ulink url="http://opensolaris.org/os/community/zfs/faq/#backupsoftware" type="url"></ulink></para>
+</sect2><sect2 id="gbinw"><title>Saving a ZFS Snapshot</title><para>The most common use of the <command>zfs send</command> command is to
+save a copy of a snapshot and receive the snapshot on another system that
+is used to store backup data. For example:</para><screen>host1# <userinput>zfs send tank/dana@snap1 | ssh host2 zfs recv newtank/dana</userinput></screen><para>When sending a full stream, the destination file system must not exist.</para><para>You can save incremental data by using the <command>zfs send</command> <option>i</option> option. For example:</para><screen>host1# <userinput>zfs send -i tank/dana@snap1 tank/dana@snap2 | ssh host2 zfs recv newtank/dana</userinput></screen><para>Note that the first argument is the earlier snapshot and the second
+argument is the later snapshot. In this case, the <filename>newtank/dana</filename> file
+system must exist for the incremental receive to be successful.</para><para>The incremental <replaceable>snapshot1</replaceable> source can be specified
+as the last component of the snapshot name. This shortcut means you only have
+to specify the name after the <literal>@</literal> sign for <replaceable>snapshot1</replaceable>, which is assumed to be from the same file system as <replaceable>snapshot2</replaceable>. For example:</para><screen>host1# <userinput>zfs send -i snap1 tank/dana@snap2 > ssh host2 zfs recv newtank/dana</userinput></screen><para>This syntax is equivalent to the above example of the incremental syntax.</para><para>The following message is displayed if you attempt to generate an incremental
+stream from a different file system <replaceable>snapshot1</replaceable>:</para><screen>cannot send 'pool/fs@name': not an earlier snapshot from the same fs</screen><para>If you need to store many copies, you might consider compressing a ZFS
+snapshot stream representation with the <command>gzip</command> command. For
+example:</para><screen># <userinput>zfs send pool/fs@snap | gzip > backupfile.gz</userinput></screen>
+</sect2><sect2 id="gbimy"><title>Restoring a ZFS Snapshot</title><para>Keep the following key points in mind when you restore a file system
+snapshot: </para><itemizedlist><listitem><para>The snapshot and the file system are restored.</para>
+</listitem><listitem><para>The file system and all descendent file systems are unmounted.</para>
+</listitem><listitem><para>The file systems are inaccessible while they are being restored.</para>
+</listitem><listitem><para>The original file system to be restored must not exist while
+it is being restored.</para>
+</listitem><listitem><para> If a conflicting file system name exists, <command>zfs rename</command> can
+be used to rename the file system. </para>
+</listitem>
+</itemizedlist><para>For example:</para><screen># <userinput>zfs send tank/gozer@0830 > /bkups/gozer.083006</userinput>
+# <userinput>zfs receive tank/gozer2@today &lt; /bkups/gozer.083006</userinput>
+# <userinput>zfs rename tank/gozer tank/gozer.old</userinput>
+# <userinput>zfs rename tank/gozer2 tank/gozer</userinput></screen><para>You can use <command>zfs recv</command> as an alias for the <command>zfs
+receive</command> command.</para><para>If you make a change to the file system and you want to do another incremental
+send of a snapshot, you must first rollback the receiving file system.</para><para>For example, if you make a change to the file system as follows:</para><screen>host2# <userinput>rm newtank/dana/file.1</userinput></screen><para>And you do an incremental send of <filename>tank/dana@snap3</filename>,
+you must first rollback the receiving file system to receive the new incremental
+snapshot. You can eliminate the rollback step by using the <option>F</option> option.
+For example:</para><screen remap="wide">host1# <userinput>zfs send -i tank/dana@snap2 tank/dana@snap3 | ssh host2 zfs recv -F newtank/dana</userinput></screen><para>When you receive an incremental snapshot, the destination file system
+must already exist.</para><para>If you make changes to the file system and you do not rollback the receiving
+file system to receive the new incremental snapshot or you do not use the <option>F</option> option, you will see the following message:</para><screen>host1# <userinput>zfs send -i tank/dana@snap4 tank/dana@snap5 | ssh host2 zfs recv newtank/dana</userinput>
+cannot receive: destination has been modified since most recent snapshot</screen><para>The following checks are performed before the <option>F</option> option
+is successful:</para><itemizedlist><listitem><para>If the most recent snapshot doesn't match the incremental
+source, neither the rollback nor the receive is completed, and an error message
+is returned.</para>
+</listitem><listitem><para>If you accidentally provide the name of different file system
+that doesn't match the incremental source to the <command>zfs receive</command> command,
+neither the rollback nor the receive is completed, and the following error
+message is returned.</para><screen>cannot send 'pool/fs@name': not an earlier snapshot from the same fs</screen>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="gfwqb"><title>Sending
+and Receiving Complex ZFS Snapshot Streams</title><para>This section describes how to use the <command>zfs send</command> <option>I</option> and <option>R</option> options to send and receive more complex
+snapshot streams.</para><itemizedlist><para>Keep the following points in mind when sending and receiving ZFS snapshot
+streams:</para><listitem><para>Use the <command>zfs send</command> <option>I</option> option
+to send all incremental streams from one snapshot to a cumulative snapshot.
+Or, use this option to send an incremental stream from the origin snapshot
+to create a clone. The original snapshot must already exist on the receiving
+side to accept the incremental stream.</para>
+</listitem><listitem><para>Use the <command>zfs send</command> <option>R</option> option
+to send a replication stream of all descendent file systems.  When received,
+all properties, snapshots, descendent file systems, and clones are preserved.</para>
+</listitem><listitem><para>Or use both options to send an incremental replication stream.</para><itemizedlist><listitem><para>Changes to properties and snapshot and file system renames
+and destroys are preserved.</para>
+</listitem><listitem><para> If <command>zfs recv</command> <option>F</option> is not
+specified when receiving the replication stream, dataset destroys are ignored.
+ The <command>zfs recv</command> <option>F</option> syntax in this case also
+retains its <emphasis>rollback if necessary</emphasis> meaning. </para>
+</listitem><listitem><para>As with other (non <command>zfs send</command> <option>R</option>) <option>i</option> or <option>I</option> cases, if <option>I</option> is used, all
+snapshots between snapA and snapD are sent. If <option>i</option> is used,
+only snapD (for all descendents) are sent.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>To receive any of these new types of <command>zfs send</command> streams,
+the receiving system must be running a software version capable of sending
+them. The stream version is incremented. </para>
+</listitem><listitem><para>However, you can access streams from older pool versions by
+using a newer software version, which can also access newer pool versions.
+For example, you can send and receive streams created with the newer options
+to and from a version 3 pool.  But, you must be running recent software to
+receive a stream sent with the newer options.</para>
+</listitem>
+</itemizedlist><example id="gfxpm"><title>Examples&mdash;Sending and Receiving Complex ZFS
+Snapshot Streams</title><para>A group of incremental snapshots can be combined into one snapshot by
+using the <command>zfs send</command> <option>I</option> option. For example:</para><screen># zfs send -I pool/fs@snapA pool/fs@snapD > /snaps/fs@all-I</screen><para>Remove snapshots B, C, and D.</para><screen># zfs destroy pool/fs@snapB
+# zfs destroy pool/fs@snapC
+# zfs destroy pool/fs@snapD</screen><para>Restore the combined snapshot.</para><screen># zfs receive -d -F pool/fs &lt; /snaps/fs@all-I
+# zfs list
+NAME                      USED  AVAIL  REFER  MOUNTPOINT
+pool                      428K  16.5G    20K  /pool
+pool/fs                    71K  16.5G    21K  /pool/fs
+pool/fs@snapA              16K      -  18.5K  -
+pool/fs@snapB              17K      -    20K  -
+pool/fs@snapC              17K      -  20.5K  -
+pool/fs@snapD                0      -    21K  -</screen><para>You can also use the <command>zfs send</command> <option>I</option> command
+to combine a snapshot and a clone snapshot to create a combined dataset. For
+example:</para><screen># zfs create pool/fs
+# zfs snapshot pool/fs@snap1
+# zfs clone pool/fs@snap1 pool/clone
+# zfs snapshot pool/clone@snapA
+# zfs send -I pool/fs@snap1 pool/clone@snapA > /snaps/fsclonesnap-I
+# zfs destroy pool/clone@snapA
+# zfs destroy pool/clone
+# zfs receive -F pool/clone &lt; /snaps/fsclonesnap-I</screen><para>Use the <command>zfs send</command> <option>R</option> command to replicate
+a ZFS file system and all descendent file systems, up to the named snapshot.
+When received, all properties, snapshots, descendent file systems, and clones
+are preserved.</para><para>In the following example, snapshots are created of user file systems.
+One replication stream is created of all user snapshots. Then, the original
+file systems and snapshots are destroyed and recovered.</para><screen># zfs snapshot -r users@today
+# zfs list
+NAME                USED  AVAIL  REFER  MOUNTPOINT
+users               187K  33.2G    22K  /users
+users@today            0      -    22K  -
+users/user1          18K  33.2G    18K  /users/user1
+users/user1@today      0      -    18K  -
+users/user2          18K  33.2G    18K  /users/user2
+users/user2@today      0      -    18K  -
+users/user3          18K  33.2G    18K  /users/user3
+users/user3@today      0      -    18K  -
+# zfs send -R users@today > /snaps/users-R
+# zfs destroy -r users
+# zfs receive -F -d users &lt; /snaps/users-R
+# zfs list
+NAME                USED  AVAIL  REFER  MOUNTPOINT
+users               196K  33.2G    22K  /users
+users@today            0      -    22K  -
+users/user1          18K  33.2G    18K  /users/user1
+users/user1@today      0      -    18K  -
+users/user2          18K  33.2G    18K  /users/user2
+users/user2@today      0      -    18K  -
+users/user3          18K  33.2G    18K  /users/user3
+users/user3@today      0      -    18K  -</screen><para>You can use the <command>zfs send</command> <command>R</command> command
+to replicate the <filename>users</filename> dataset and its descendents and
+send the replicated stream to another pool, <filename>users2</filename>.</para><screen># zfs create users2 mirror c0t1d0 c1t1d0
+# zfs receive -F -d users2 &lt; /snaps/users-R
+# zfs list
+NAME                 USED  AVAIL  REFER  MOUNTPOINT
+users                224K  33.2G    22K  /users
+users@today             0      -    22K  -
+users/user1           33K  33.2G    18K  /users/user1
+users/user1@today     15K      -    18K  -
+users/user2           18K  33.2G    18K  /users/user2
+users/user2@today       0      -    18K  -
+users/user3           18K  33.2G    18K  /users/user3
+users/user3@today       0      -    18K  -
+users2               188K  16.5G    22K  /users2
+users2@today            0      -    22K  -
+users2/user1          18K  16.5G    18K  /users2/user1
+users2/user1@today      0      -    18K  -
+users2/user2          18K  16.5G    18K  /users2/user2
+users2/user2@today      0      -    18K  -
+users2/user3          18K  16.5G    18K  /users2/user3
+users2/user3@today      0      -    18K  -</screen>
+</example><sect3 id="gbinz"><title>Remote Replication of ZFS Data</title><para>You can use the <command>zfs send</command> and <command>zfs recv</command> commands
+to remotely copy a snapshot stream representation from one system to another
+system. For example:</para><screen># <userinput>zfs send tank/cindy@today | ssh newsys zfs recv sandbox/restfs@today</userinput></screen><para>This command saves the <filename>tank/cindy@today</filename> snapshot
+data and restores it into the <filename>sandbox/restfs</filename> file system
+and also creates a <filename>restfs@today</filename> snapshot on the <literal>newsys</literal> system. In this example, the user has been configured to use <command>ssh</command> on the remote system.</para>
+</sect3>
+</sect2>
+</sect1>
+</chapter>

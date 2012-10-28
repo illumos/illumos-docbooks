@@ -1,0 +1,1725 @@
+<?Pub UDT _bookmark _target?><?Pub CX solbook(?><chapter id="faatl"><?Pub Tag atict:info tracking="on" ref="0"?><?Pub Tag atict:user
+user="ae149097" fullname="Alta Elstad"?><title>Reading and Writing Data in
+Kernel Memory</title><highlights><para>In this chapter, you will extend the very simple prototype driver you
+developed in the previous chapter. The driver you will develop in this chapter
+displays data read from kernel memory. The first version of this driver writes
+data to a system log every time the driver is loaded. The second version of
+this driver displays data at user request. In the third version of this driver,
+the user can write new data to the device.</para>
+</highlights><sect1 id="fahrt"><title>Displaying Data Stored in Kernel Memory</title><para>The pseudo device driver presented in this section writes a constant
+string to a system log when the driver is loaded.</para><para>This first version of the Quote Of The Day driver (<literal>qotd_1</literal>)
+is even more simple than the <literal>dummy</literal> driver from the previous
+chapter. The <literal>dummy</literal> driver includes all functions that are
+required to drive hardware. This <literal>qotd_1</literal> driver includes
+only the bare minimum functions it needs to make a string available to a user
+command. For example, this <literal>qotd_1</literal> driver has no <citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.
+Therefore, this driver defines no <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, or <citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry> function. If you examine the <olink targetdoc="group-refman" targetptr="dev-ops-9s" remap="external"><citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+for this <literal>qotd_1</literal> driver, you see that no <citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry>,
+or <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> function is defined. This driver contains no function declarations
+because all the functions that are defined in this driver are declared in
+the <filename>modctl.h</filename> header file. You must include the <filename>modctl.h</filename> header file in your <filename>qotd_1.c</filename> file.</para><para><indexterm><primary><function>cmn_err</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cmn_err</function></secondary></indexterm>This <literal>qotd_1</literal> driver defines
+a global variable to hold its text data. The <olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point for this driver
+uses the <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to write the string to a system log. The <literal>dummy</literal> driver also
+uses the <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to display messages. The <literal>qotd_1</literal> driver
+is different from the <literal>dummy</literal> driver because the <literal>qotd_1</literal> driver stores its string in kernel memory.</para><sect2 id="fcajm"><title>Writing Quote Of The Day Version 1</title><para>Enter the source code shown in the following example into a text file
+named <filename>qotd_1.c</filename>.</para><example id="fcajp"><title>Quote Of The Day Version 1 Source File</title><programlisting>#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#define QOTD_MAXLEN     128
+
+static const char qotd[QOTD_MAXLEN]
+        = "Be careful about reading health books. \
+You may die of a misprint. - Mark Twain\n";
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        ddi_no_info,            /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        nulldev,                /* devo_attach */
+        nulldev,                /* devo_detach */
+        nodev,                  /* devo_reset */
+        (struct cb_ops *)NULL,  /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the Day 1.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        cmn_err(CE_CONT, "QOTD: %s\n", qotd);
+        return (mod_install(&amp;modlinkage));
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+int
+_fini(void)
+{
+        return (mod_remove(&amp;modlinkage));
+}</programlisting>
+</example><para>Enter the configuration information shown in the following example into
+a text file named <filename>qotd_1.conf</filename>.</para><example id="fcajq"><title>Quote Of The Day Version 1 Configuration File</title><programlisting>name="qotd_1" parent="pseudo" instance=0;</programlisting>
+</example>
+</sect2><sect2 id="fcajo"><title>Building, Installing, and Using Quote Of The Day
+Version&nbsp;1</title><para>Compile and link the driver. Use the <option>D_KERNEL</option> option
+to indicate that this code defines a kernel module. The following example
+shows compiling and linking for a 32-bit architecture using the Sun Studio
+C compiler:</para><screen>% <userinput>cc -D_KERNEL -c qotd_1.c</userinput>
+% <userinput>ld -r -o qotd_1 qotd_1.o</userinput></screen><para>Note that the name of the driver, <literal>qotd_1</literal>, must match
+the <literal>name</literal> property in the configuration file.</para><para>Make sure you are user <literal>root</literal> when you install the
+driver.</para><para>Copy the driver binary to the <filename>/tmp</filename> directory as
+discussed in <olink targetptr="fdlbq" remap="internal">Device Driver Testing Tips</olink>.</para><screen># <userinput>cp qotd_1 /tmp</userinput>
+# <userinput>ln -s /tmp/qotd_1 /usr/kernel/drv/qotd_1</userinput></screen><para>Copy the configuration file to the kernel driver area of the system.</para><screen># <userinput>cp qotd_1.conf /usr/kernel/drv</userinput></screen><para><indexterm><primary>files</primary><secondary><filename>/var/adm/messages</filename></secondary></indexterm><indexterm><primary><filename>/var/adm/messages</filename> file</primary></indexterm><indexterm><primary>commands</primary><secondary><command>syslogd</command></secondary></indexterm><indexterm><primary><command>syslogd</command> command</primary></indexterm>This <literal>qotd_1</literal> driver writes a message to a system
+log each time the driver is loaded. The <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function writes low priority
+messages such as the message defined in this <literal>qotd_1</literal> driver
+to <filename>/dev/log</filename>. The <olink targetdoc="group-refman" targetptr="syslogd-1m" remap="external"><citerefentry><refentrytitle>syslogd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> daemon reads messages from <filename>/dev/log</filename> and writes low priority messages to <filename>/var/adm/messages</filename>.</para><para>To test this driver, watch for the message in <literal>/var/adm/messages</literal>.
+In a separate window, enter the following command:</para><screen>% <userinput>tail -f /var/adm/messages</userinput></screen><para>Make sure you are user <literal>root</literal> when you load the driver.
+Use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to load the driver:</para><screen># <userinput>add_drv qotd_1</userinput></screen><para>You should see the following messages in the window where you are viewing <filename>/var/adm/messages</filename>:</para><screen><replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> pseudo: [ID 129642 kern.info] pseudo-device: devinfo0
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> genunix: [ID 936769 kern.info] devinfo0 is /pseudo/devinfo@0
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> qotd: [ID 197678 kern.notice] QOTD_1: Be careful about
+reading health books. You may die of a misprint. - Mark Twain</screen><para>This last line is the content of the variable output by the <olink targetdoc="group-refman" targetptr="cmn-err-9f" remap="external"><citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+in the <olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point. The <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point is called when the driver is loaded.</para>
+</sect2>
+</sect1><sect1 id="dataondemand"><title>Displaying Data on Demand</title><para>The sample code in this section creates a pseudo device that is controlled
+by the driver. The driver stores data in the device and makes the data available
+when the user accesses the device for reading.</para><para>This section first discusses the important code differences between
+these two versions of the Quote Of The Day driver. This section then shows
+you how you can access the device to cause the quotation to display.</para><sect2 id="fcove"><title>Writing Quote Of The Day Version 2</title><para>The driver that controls the pseudo device is more complex than the
+driver shown in the previous section. This section first explains some important
+features of this version of the driver. This section then shows all the source
+for this driver.</para><itemizedlist><para>The following list summarizes the differences between the two versions
+of the Quote Of The Day driver:</para><listitem><para><indexterm><primary>state structures</primary></indexterm>Version
+2 of the driver defines a state structure that holds information about each
+instance of the device.</para>
+</listitem><listitem><para>Version 2 defines a <citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure and a more complete <citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure.</para>
+</listitem><listitem><para>Version 2 defines <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, and <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points.</para>
+</listitem><listitem><para>Version 1 uses the <citerefentry><refentrytitle>cmn_err</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to write a constant string
+to a system log in the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point of the driver. The <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point is called when the driver is loaded. Version 2 uses the <citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function
+to copy the quotation from kernel memory. The copied data is returned by the <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point. The <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point is called when the driver is accessed for reading.</para>
+</listitem><listitem><para><indexterm><primary><function>ASSERT</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ASSERT</function></secondary></indexterm>Version 2 of the driver uses <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> statements to check the validity
+of data.</para>
+</listitem>
+</itemizedlist><para>The following sections provide more detail about the additions and changes
+in Version&nbsp;2 of the Quote Of The Day driver.</para><sect3 id="fcowf"><title>Managing Device State</title><indexterm><primary>state structures</primary>
+</indexterm><indexterm><primary>soft state</primary>
+</indexterm><indexterm><primary>devices</primary><secondary>state</secondary>
+</indexterm><para>The <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> and <citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points and all six new entry
+points defined in this driver maintain a soft state for the device. Most device
+drivers maintain state information with each instance of the device they control.
+An instance usually is a sub-device. For example, a disk driver might communicate
+with a hardware controller device that has several disk drives attached. See <olink targetdoc="driver" targetptr="fappe" remap="external"><citetitle remap="section">Retrieving
+Driver Soft State Information</citetitle> in <citetitle remap="book">Writing
+Device Drivers</citetitle></olink> for more information about soft states.</para><para>This sample driver allows only one instance. The instance number is
+assigned in the configuration file. See <olink targetptr="fcoux" remap="internal">Example&nbsp;3&ndash;4</olink>. Most device drivers allow any number of instances of a device to
+be created. The system manages the device instance numbers, and the DDI soft
+state functions manage the instances.</para><orderedlist><para><indexterm><primary><function>ddi_soft_state_init</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_init</function></secondary></indexterm><indexterm><primary><function>ddi_soft_state_zalloc</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_zalloc</function></secondary></indexterm><indexterm><primary><function>ddi_get_soft_state</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_soft_state</function></secondary></indexterm><indexterm><primary><function>ddi_soft_state_free</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_free</function></secondary></indexterm><indexterm><primary><function>ddi_soft_state_fini</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_fini</function></secondary></indexterm>The following flow gives an overview of
+how DDI soft state functions manage a state pointer and the state of a device
+instance:</para><listitem><para>The <olink targetdoc="group-refman" targetptr="ddi-soft-state-init-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+initializes the state pointer. The state pointer is an opaque handle that
+enables allocation, deallocation, and tracking of a state structure for each
+instance of a device. The state structure is a user-defined type that maintains
+data specific to this instance of the device. In this example, the state pointer
+and state structure are declared after the entry point declarations. See <literal>qotd_state_head</literal> and <literal>qotd_state</literal> in <olink targetptr="fcova" remap="internal">Example&nbsp;3&ndash;3</olink>.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="ddi-soft-state-zalloc-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+uses the state pointer and the device instance to create the state structure
+for this instance.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+uses the state pointer and the device instance to retrieve the state structure
+for this instance of the device.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="ddi-soft-state-free-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+uses the state pointer and the device instance to free the state structure
+for this instance.</para>
+</listitem><listitem><para>The <olink targetdoc="group-refman" targetptr="ddi-soft-state-fini-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+uses the state pointer to destroy the state pointer and the state structures
+for all instances of this device.</para>
+</listitem>
+</orderedlist><para>The <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, and <citerefentry><refentrytitle>ddi_soft_state_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry> functions coordinate access to the underlying data structures
+in a way that is safe for multithreading. No additional locks should be necessary.</para>
+</sect3><sect3 id="fcoye"><title>Initializing and Unloading</title><indexterm><primary><function>_init</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>_init</function></secondary>
+</indexterm><indexterm><primary><function>ddi_soft_state_init</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_init</function></secondary>
+</indexterm><indexterm><primary><function>mod_install</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>mod_install</function></secondary>
+</indexterm><indexterm><primary><function>ddi_soft_state_fini</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_fini</function></secondary>
+</indexterm><indexterm><primary><function>_fini</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>_fini</function></secondary>
+</indexterm><indexterm><primary><function>mod_remove</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>mod_remove</function></secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="u-init-9e" remap="external"><citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point first calls the <olink targetdoc="group-refman" targetptr="ddi-soft-state-init-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to initialize the soft state. If the soft state initialization fails, that
+error code is returned. If the soft state initialization succeeds, the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point calls the <olink targetdoc="group-refman" targetptr="mod-install-9f" remap="external"><citerefentry><refentrytitle>mod_install</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to load a new module. If the module install
+fails, the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point calls the <olink targetdoc="group-refman" targetptr="ddi-soft-state-fini-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+and returns the error code from the failed module install.</para><para>Your code must undo everything that it does. You must call <citerefentry><refentrytitle>ddi_soft_state_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry> if the module install fails because the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> call
+succeeded and created a state pointer.</para><para>The <olink targetdoc="group-refman" targetptr="u-fini-9e" remap="external"><citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point must undo everything the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point did. The <citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point first calls the <olink targetdoc="group-refman" targetptr="mod-remove-9f" remap="external"><citerefentry><refentrytitle>mod_remove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to remove the module that the <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point installed. If the module remove fails, that error code is returned.
+If the module remove succeeds, the <citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point calls the <olink targetdoc="group-refman" targetptr="ddi-soft-state-fini-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_fini</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to destroy the state pointer and the state
+structures for all instances of this device.</para>
+</sect3><sect3 id="fcown"><title>Attaching and Detaching</title><indexterm><primary><function>attach</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>attach</function></secondary>
+</indexterm><indexterm><primary><function>ddi_get_instance</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_instance</function></secondary>
+</indexterm><indexterm><primary><function>ddi_soft_state_zalloc</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_zalloc</function></secondary>
+</indexterm><indexterm><primary><function>ddi_get_soft_state</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_soft_state</function></secondary>
+</indexterm><indexterm><primary><function>ddi_create_minor_node</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_create_minor_node</function></secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="attach-9e" remap="external"><citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point first calls the <olink targetdoc="group-refman" targetptr="ddi-get-instance-9f" remap="external"><citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to retrieve the
+instance number of the device information node. The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point uses this instance number to call the <olink targetdoc="group-refman" targetptr="ddi-soft-state-zalloc-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="ddi-create-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> functions.</para><para>The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point calls the <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to create
+a state structure for this device instance. If creation of the soft state
+structure fails, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> writes an error message to a system log and returns
+failure. This device instance is not attached. If creation of the soft state
+structure succeeds, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry>  calls the <citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to retrieve the state structure for this device instance.</para><para><indexterm><primary><function>ddi_soft_state_free</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_soft_state_free</function></secondary></indexterm>If
+retrieval of the state structure fails, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> writes an error message to a system
+log, calls the <olink targetdoc="group-refman" targetptr="ddi-soft-state-free-9f" remap="external"><citerefentry><refentrytitle>ddi_soft_state_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to destroy the state structure that was created
+by <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, and returns failure. This device instance is
+not attached. If retrieval of the state structure succeeds, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> calls
+the <citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to create the device node.</para><para><indexterm><primary><function>ddi_remove_minor_node</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_remove_minor_node</function></secondary></indexterm>At
+the top of this driver source file, a constant named <literal>QOTD_NAME</literal> is
+defined that holds the string name of the device. This constant is one of
+the arguments that is passed to <citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry>. If creation of the
+device node fails, <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> writes an error message to a system
+log, calls the <citerefentry><refentrytitle>ddi_soft_state_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to destroy the state structure
+that was created by <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, calls the <olink targetdoc="group-refman" targetptr="ddi-remove-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_remove_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function, and returns failure. This device instance
+is not attached.</para><para><indexterm><primary><function>ddi_report_dev</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_report_dev</function></secondary></indexterm><indexterm><primary><command>dmesg</command> command</primary></indexterm><indexterm><primary>commands</primary><secondary><command>dmesg</command></secondary></indexterm>If creation of the device node succeeds,
+this device instance is attached. The <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point assigns the instance
+number that was retrieved with <citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to the instance member of the state
+structure for this instance. Then <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> assigns the <literal>dev_info</literal> structure
+pointer that was passed in the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> call to the <literal>dev_info</literal> structure
+pointer member of the state structure for this instance. The <olink targetdoc="group-refman" targetptr="ddi-report-dev-9f" remap="external"><citerefentry><refentrytitle>ddi_report_dev</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function writes a message in the system log file when
+the device is added or when the system is booted. The message announces this
+device as shown in the following example:</para><screen>% <userinput>dmesg</userinput>
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> pseudo: [ID 129642 kern.info] pseudo-device: qotd_20
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> genunix: [ID 936769 kern.info] qotd_20 is /pseudo/qotd_2@0</screen><para><indexterm><primary><function>detach</function> entry point</primary></indexterm><indexterm><primary>entry points</primary><secondary><function>detach</function></secondary></indexterm>The <olink targetdoc="group-refman" targetptr="detach-9e" remap="external"><citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point first calls the <citerefentry><refentrytitle>ddi_get_instance</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to retrieve the instance number of the device information
+node. The <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point uses this instance number to call the <citerefentry><refentrytitle>ddi_soft_state_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to destroy the state structure that was created by <citerefentry><refentrytitle>ddi_soft_state_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> in the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point. The <citerefentry><refentrytitle>detach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point then calls the <citerefentry><refentrytitle>ddi_remove_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to remove the device that
+was created by <citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry> in the <citerefentry><refentrytitle>attach</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point.</para>
+</sect3><sect3 id="fcows"><title>Opening the Device, Closing the Device, and Getting
+Module Information</title><indexterm><primary><function>open</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>open</function></secondary>
+</indexterm><indexterm><primary><function>close</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>close</function></secondary>
+</indexterm><indexterm><primary><function>getminor</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>getminor</function></secondary>
+</indexterm><indexterm><primary><function>ddi_get_soft_state</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_soft_state</function></secondary>
+</indexterm><indexterm><primary><function>getinfo</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>getinfo</function></secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="open-9e" remap="external"><citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="close-9e" remap="external"><citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry points are identical
+in this sample driver. In each case, the entry point first calls the <olink targetdoc="group-refman" targetptr="getminor-9f" remap="external"><citerefentry><refentrytitle>getminor</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve the minor number of the device. Then each entry point uses this
+instance number to call the <olink targetdoc="group-refman" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve the state structure for this device instance. If no state structure
+is retrieved, an error code is returned. If a state structure is retrieved,
+the <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry> and <citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry points both verify the type
+of this device. If this device is not a character device, the <literal>EINVAL</literal> (invalid)
+error code is returned.</para><para>If the user wants device information for this device instance, the <olink targetdoc="group-refman" targetptr="getinfo-9e" remap="external"><citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point
+returns the device information from the state structure. If the user wants
+the instance number of this device instance, the <citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point uses
+the <citerefentry><refentrytitle>getminor</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function to return the minor number.</para>
+</sect3><sect3 id="fcowr"><title>Reading the Data</title><indexterm><primary><function>read</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>read</function></secondary>
+</indexterm><indexterm><primary><function>getminor</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>getminor</function></secondary>
+</indexterm><indexterm><primary><function>ddi_get_soft_state</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_get_soft_state</function></secondary>
+</indexterm><indexterm><primary><function>uiomove</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>uiomove</function></secondary>
+</indexterm><indexterm><primary><literal>uio</literal> kernel structure</primary>
+</indexterm><indexterm><primary>kernel structures</primary><secondary><literal>uio</literal></secondary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="read-9e" remap="external"><citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point first calls the <olink targetdoc="group-refman" targetptr="getminor-9f" remap="external"><citerefentry><refentrytitle>getminor</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve the minor number of the device. The <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point uses
+this instance number to call the <olink targetdoc="group-refman" targetptr="ddi-get-soft-state-9f" remap="external"><citerefentry><refentrytitle>ddi_get_soft_state</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to retrieve the state structure for this device instance. If no state structure
+is retrieved, <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> returns an error code. If a state structure is retrieved, <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> calls
+the <olink targetdoc="group-refman" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to copy the quotation from the driver to the <olink targetdoc="group-refman" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> I/O request structure.</para>
+</sect3><sect3 id="fgowt"><title>Checking Data Validity</title><indexterm><primary><function>ASSERT</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ASSERT</function></secondary>
+</indexterm><para>Version 2 of the driver uses <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> statements to check the validity
+of data. If the asserted expression is true, the <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statement does nothing.
+If the asserted expression is false, the <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statement writes an error message
+to the console and causes the system to panic.</para><para>To use <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statements, include the <filename>sys/debug.h</filename> header
+file in your source and define the <literal>DEBUG</literal> preprocessor symbol.
+If you do not define the <literal>DEBUG</literal> preprocessor symbol, then
+the <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statements do nothing. Simply recompile to activate or inactivate <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statements.</para>
+</sect3><sect3 id="fcowy"><title>Quote Of The Day Version 2 Source</title><para>Enter the source code shown in the following example into a text file
+named <filename>qotd_2.c</filename>.</para><example id="fcova"><title>Quote Of The Day Version 2 Source File</title><programlisting>#include &lt;sys/types.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/open.h&gt;
+#include &lt;sys/cred.h&gt;
+#include &lt;sys/uio.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/debug.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#define QOTD_NAME       "qotd"
+#define QOTD_MAXLEN     128
+
+static const char qotd[QOTD_MAXLEN]
+        = "You can't have everything. \
+Where would you put it? - Steven Wright\n";
+
+static void *qotd_state_head;
+
+struct qotd_state {
+        int             instance;
+        dev_info_t      *devi;
+};
+
+static int qotd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int qotd_attach(dev_info_t *, ddi_attach_cmd_t);
+static int qotd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int qotd_open(dev_t *, int, int, cred_t *);
+static int qotd_close(dev_t, int, int, cred_t *);
+static int qotd_read(dev_t, struct uio *, cred_t *);
+
+static struct cb_ops qotd_cb_ops = {
+        qotd_open,              /* cb_open */
+        qotd_close,             /* cb_close */
+        nodev,                  /* cb_strategy */
+        nodev,                  /* cb_print */
+        nodev,                  /* cb_dump */
+        qotd_read,              /* cb_read */
+        nodev,                  /* cb_write */
+        nodev,                  /* cb_ioctl */
+        nodev,                  /* cb_devmap */
+        nodev,                  /* cb_mmap */
+        nodev,                  /* cb_segmap */
+        nochpoll,               /* cb_chpoll */
+        ddi_prop_op,            /* cb_prop_op */
+        (struct streamtab *)NULL,       /* cb_str */
+        D_MP | D_64BIT,         /* cb_flag */
+        CB_REV,                 /* cb_rev */
+        nodev,                  /* cb_aread */
+        nodev                   /* cb_awrite */
+};
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        qotd_getinfo,           /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        qotd_attach,            /* devo_attach */
+        qotd_detach,            /* devo_detach */
+        nodev,                  /* devo_reset */
+        &amp;qotd_cb_ops,           /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the Day 2.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        int retval;
+
+        if ((retval = ddi_soft_state_init(&amp;qotd_state_head,
+            sizeof (struct qotd_state), 1)) != 0)
+                return retval;
+        if ((retval = mod_install(&amp;modlinkage)) != 0) {
+                ddi_soft_state_fini(&amp;qotd_state_head);
+                return (retval);
+        }
+
+        return (retval);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+
+int
+_fini(void)
+{
+        int retval;
+
+        if ((retval = mod_remove(&amp;modlinkage)) != 0)
+                return (retval);
+        ddi_soft_state_fini(&amp;qotd_state_head);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
+{
+        struct qotd_state *qsp;
+        int retval = DDI_FAILURE;
+
+        ASSERT(resultp != NULL);
+
+        switch (cmd) {
+        case DDI_INFO_DEVT2DEVINFO:
+                if ((qsp = ddi_get_soft_state(qotd_state_head,
+                    getminor((dev_t)arg))) != NULL) {
+                        *resultp = qsp-&gt;devi;
+                        retval = DDI_SUCCESS;
+                } else
+                        *resultp = NULL;
+                break;
+        case DDI_INFO_DEVT2INSTANCE:
+                *resultp = (void *)getminor((dev_t)arg);
+                retval = DDI_SUCCESS;
+                break;
+        }
+
+        return (retval);
+}
+
+static int
+qotd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_ATTACH:
+                if (ddi_soft_state_zalloc(qotd_state_head, instance)
+                    != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to allocate state for %d",
+                            instance);
+                        return (DDI_FAILURE);
+                }
+                if ((qsp = ddi_get_soft_state(qotd_state_head, instance))
+                    == NULL) {
+                        cmn_err(CE_WARN, "Unable to obtain state for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        return (DDI_FAILURE);
+                }
+                if (ddi_create_minor_node(dip, QOTD_NAME, S_IFCHR, instance,
+                    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Cannot create minor node for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        ddi_remove_minor_node(dip, NULL);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;instance = instance;
+                qsp-&gt;devi = dip;
+
+                ddi_report_dev(dip);
+                return (DDI_SUCCESS);
+        case DDI_RESUME:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+static int
+qotd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+
+        switch (cmd) {
+        case DDI_DETACH:
+                ddi_soft_state_free(qotd_state_head, instance);
+                ddi_remove_minor_node(dip, NULL);
+                return (DDI_SUCCESS);
+        case DDI_SUSPEND:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+/*ARGSUSED*/
+static int
+qotd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+        int instance = getminor(*devp);
+        struct qotd_state *qsp;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        return (uiomove((void *)qotd, min(uiop-&gt;uio_resid, strlen(qotd)),
+            UIO_READ, uiop));
+}</programlisting>
+</example><para>Enter the configuration information shown in the following example into
+a text file named <filename>qotd_2.conf</filename>.</para><example id="fcoux"><title>Quote Of The Day Version 2 Configuration File</title><programlisting>name="qotd_2" parent="pseudo" instance=0;</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="fcovc"><title>Building, Installing, and Using Quote Of The Day
+Version&nbsp;2</title><indexterm><primary><function>ASSERT</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ASSERT</function></secondary>
+</indexterm><para>Version 2 of the driver uses <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> statements to check the validity
+of data. To use <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statements, include the <filename>sys/debug.h</filename> header
+file in your source and define the <literal>DEBUG</literal> preprocessor symbol.</para><para>Compile and link the driver. If you use <olink targetdoc="refman9f" targetptr="assert-9f" remap="external"><citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> statements to check the validity
+of data, you must define the <literal>DEBUG</literal> preprocessor symbol:</para><screen>% <userinput>cc -D_KERNEL -DDEBUG -c qotd_2.c</userinput>
+% <userinput>ld -r -o qotd_2 qotd_2.o</userinput></screen><para>The following example shows compiling and linking for a 32-bit architecture
+if you are not using <citerefentry><refentrytitle>ASSERT</refentrytitle><manvolnum>9F</manvolnum></citerefentry> statements:</para><screen>% <userinput>cc -D_KERNEL -c qotd_2.c</userinput>
+% <userinput>ld -r -o qotd_2 qotd_2.o</userinput></screen><para>Make sure you are user <literal>root</literal> when you install the
+driver.</para><para>Copy the driver binary to the <filename>/tmp</filename> directory as
+discussed in <olink targetptr="eoxzr" remap="internal">Building and Installing the Template
+Driver</olink>.</para><screen># <userinput>cp qotd_2 /tmp</userinput>
+# <userinput>ln -s /tmp/qotd_2 /usr/kernel/drv/qotd_2</userinput></screen><para>Copy the configuration file to the kernel driver area of the system.</para><screen># <userinput>cp qotd_2.conf /usr/kernel/drv</userinput></screen><para>In a separate window, enter the following command:</para><screen>% <userinput>tail -f /var/adm/messages</userinput></screen><para>Make sure you are user <literal>root</literal> when you load the driver.
+Use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to load the driver:</para><screen># <userinput>add_drv qotd_2</userinput></screen><para>You should see the following messages in the window where you are viewing <literal>/var/adm/messages</literal>:</para><screen><replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> pseudo: [ID 129642 kern.info] pseudo-device: devinfo0
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> genunix: [ID 936769 kern.info] devinfo0 is /pseudo/devinfo@0
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> pseudo: [ID 129642 kern.info] pseudo-device: qotd_20
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> genunix: [ID 936769 kern.info] qotd_20 is /pseudo/qotd_2@0</screen><para>When this version of the Quote Of The Day driver loads, it does not
+display its quotation. The <literal>qotd_1</literal> driver wrote a message
+to a system log through its <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point. This <literal>qotd_2</literal> driver
+stores its data and makes the data available through its <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point.</para><para><indexterm><primary>commands</primary><secondary><command>modinfo</command></secondary></indexterm><indexterm><primary><command>modinfo</command> command</primary></indexterm><indexterm><primary>files</primary><secondary><filename>/etc/name_to_major</filename></secondary></indexterm><indexterm><primary><filename>/etc/name_to_major</filename> file</primary></indexterm>You can use the <olink targetdoc="group-refman" targetptr="modinfo-1m" remap="external"><citerefentry><refentrytitle>modinfo</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to
+display the module information for this version of the Quote Of The Day driver.
+The module name is the value you entered for the second member of the <literal>modldrv</literal> structure. The value <literal>96</literal> is the major number
+of this module.</para><screen>% <userinput>modinfo | grep qotd</userinput>
+182 ed115948    754  96   1  qotd_2 (Quote of the Day 2.0)
+% <userinput>grep qotd /etc/name_to_major</userinput>
+qotd_1 94
+qotd_2 96</screen><para><indexterm><primary>commands</primary><secondary><command>prtconf</command></secondary></indexterm><indexterm><primary><command>prtconf</command> command</primary></indexterm>This driver also is the most recent module listed by <citerefentry><refentrytitle>prtconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry> in
+the pseudo device section:</para><screen>% <userinput>prtconf -P | grep qotd</userinput>
+        qotd_1, instance #0 (driver not attached)
+        qotd_2, instance #0</screen><para><indexterm><primary><literal>/devices/pseudo</literal> directory</primary></indexterm>When you access this <literal>qotd_2</literal> device for reading,
+the command you use to access the device retrieves the data from the device
+node. The command then displays the data in the same way that the command
+displays any other input. To get the name of the device special file, look
+in the <filename>/devices</filename> directory:</para><screen>% <userinput>ls -l /devices/pseudo/qotd*</userinput>
+crw-------   1 root   sys   96, 0 <replaceable>date</replaceable> <replaceable>time</replaceable> /devices/pseudo/qotd_2@0:qotd</screen><para><indexterm><primary>devices</primary><secondary>reading</secondary></indexterm><indexterm><primary>commands</primary><secondary><command>more</command></secondary></indexterm><indexterm><primary><command>more</command> command</primary></indexterm>This output shows that <literal>qotd_2@0:qotd</literal> is a character
+device. This listing also shows that only the <literal>root</literal> user
+has permission to read or write this device. Make sure you are user <literal>root</literal> when you test this driver. To test the <literal>qotd_2</literal> driver,
+you can use the <olink targetdoc="group-refman" targetptr="more-1" remap="external"><citerefentry><refentrytitle>more</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command
+to access the device file for reading:</para><screen># <userinput>more /devices/pseudo/qotd_2@0:qotd</userinput>
+You can't have everything. Where would you put it? - Steven Wright
+You can't have everything. Where would you put it? - Steven Wright</screen>
+</sect2>
+</sect1><sect1 id="ffdqq"><title>Modifying Data Stored in Kernel Memory</title><indexterm><primary>devices</primary><secondary>writing</secondary>
+</indexterm><para><indexterm><primary>devices</primary><secondary>ramdisk</secondary></indexterm>In this third version of the Quote Of The Day driver, the user
+can write to the data that is stored in kernel memory. The pseudo device that
+is created in this section is a pseudo-disk device or ramdisk device. A ramdisk
+device simulates a disk device by allocating kernel memory that is subsequently
+used as data storage. See <olink targetdoc="group-refman" targetptr="ramdisk-7d" remap="external"><citerefentry><refentrytitle>ramdisk</refentrytitle><manvolnum>7D</manvolnum></citerefentry></olink> for
+more information about ramdisk devices.</para><para>As in Version&nbsp;2 of the Quote Of The Day driver, this Version&nbsp;3
+driver stores its data and makes the data available through its <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point. This Version&nbsp;3 driver overwrites characters from the beginning
+of the data when the user writes to the device.</para><para>This section first discusses the important code differences between
+this version and the previous version of the Quote Of The Day driver. This
+section then shows you how you can modify and display the quotation.</para><para>In addition to changes in the driver, Quote Of The Day Version&nbsp;3
+introduces a header file and an auxiliary program. The header file is discussed
+in the following section. The utility program is discussed in <olink targetptr="ffzsc" remap="internal">Using Quote Of The Day Version 3</olink>.</para><sect2 id="ffdqv"><title>Writing Quote Of The Day Version 3</title><para>This third version of the Quote Of The Day driver is more complex than
+the second version because this third version enables a user to change the
+text that is stored in the device.</para><para>This section first explains some important features of this version
+of the driver. This section then shows all the source for this driver, including
+the header file and the configuration file.</para><itemizedlist><para>The following list summarizes the new features in Version&nbsp;3 of
+the Quote Of The Day driver:</para><listitem><para>Version 3 of the driver allocates and frees kernel memory.</para>
+</listitem><listitem><para>Version 3 uses condition variables and mutexes to manage thread
+synchronization.</para>
+</listitem><listitem><para>Version 3 copies data from user space to kernel space to enable
+the user to change the quotation.</para>
+</listitem><listitem><para>Version 3 adds two new entry points: <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>.</para>
+</listitem><listitem><para>Version 3 adds a third new routine. The <function>qotd_rw</function> routine
+is called by both the <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point and the <citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point.</para>
+</listitem><listitem><para><indexterm><primary><function>uiomove</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>uiomove</function></secondary></indexterm><indexterm><primary><function>ddi_copyin</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyin</function></secondary></indexterm><indexterm><primary><function>ddi_copyout</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyout</function></secondary></indexterm>As in Version 2, Version 3 of the driver uses the <citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function
+to make the quotation available to the user. Version&nbsp;3 uses the <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to copy the new quotation and the new device size from user space to kernel
+space. Version&nbsp;3 uses the <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to report the current
+device size back to the user.</para>
+</listitem><listitem><para><indexterm><primary>data model</primary><secondary>converting</secondary></indexterm><indexterm><primary><function>ddi_model_convert_from</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_model_convert_from</function></secondary></indexterm>Because
+the driver copies data between kernel space and user space, Version&nbsp;3
+of the driver uses the <olink targetdoc="group-refman" targetptr="ddi-model-convert-from-9f" remap="external"><citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to determine whether the data must be converted between 32-bit and 64-bit
+models. The 64-bit kernel supports both 64-bit and 32-bit user data.</para>
+</listitem><listitem><para>Version 3 defines one new constant to tell the driver whether
+the device is busy. Another new constant tells the driver whether the quotation
+has been modified. Version 3 defines four new constants to help the driver
+undo everything it has done.</para>
+</listitem><listitem><para>Version 3 includes a separate utility program to test the
+driver's I/O controls.</para>
+</listitem>
+</itemizedlist><para>The following sections provide more detail about the additions and changes
+in Version 3 of the Quote Of The Day driver. The <citerefentry><refentrytitle>dev_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure and the <citerefentry><refentrytitle>modlinkage</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure are the same as they were in Version&nbsp;2 of the
+driver. The <citerefentry><refentrytitle>modldrv</refentrytitle><manvolnum>9S</manvolnum></citerefentry> structure has not changed except for the version number of
+the driver. The <citerefentry><refentrytitle>_init</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>_info</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>_fini</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>getinfo</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, <citerefentry><refentrytitle>open</refentrytitle><manvolnum>9E</manvolnum></citerefentry>, and <citerefentry><refentrytitle>close</refentrytitle><manvolnum>9E</manvolnum></citerefentry> functions are the same as in Version&nbsp;2
+of the driver.</para><sect3 id="fggxn"><title>Attaching, Allocating Memory, and Initializing a
+Mutex and a Condition Variable</title><indexterm><primary><function>ddi_create_minor_node</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_create_minor_node</function></secondary>
+</indexterm><para>The <function>qotd_attach</function> entry point first allocates and
+gets the device soft state. The <function>qotd_attach</function> routine then
+creates a minor node. All of this code is the same as in Version&nbsp;2 of
+the Quote Of The Day driver. If the call to <olink targetdoc="group-refman" targetptr="ddi-create-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_create_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> is successful,
+the <function>qotd_attach</function> routine sets the <literal>QOTD_DIDMINOR</literal> flag
+in the new <literal>flags</literal> member of the <literal>qotd_state</literal> state
+structure.</para><para>Version&nbsp;3 of the Quote Of The Day driver defines four new constants
+that keep track of four different events. A routine can test these flags to
+determine whether to deallocate, close, or remove resources. All four of these
+flags are set in the <function>qotd_attach</function> entry point. All four
+of these conditions are checked in the <function>qotd_detach</function> entry
+point, and the appropriate action is taken for each condition.</para><para>Note that operations are undone in the <function>qotd_detach</function> entry
+point in the opposite order in which they were done in the <function>qotd_attach</function> entry
+point. The <function>qotd_attach</function> routine creates a minor node,
+allocates memory for the quotation, initializes a mutex, and initializes a
+condition variable. The <function>qotd_detach</function> routine destroys
+the condition variable, destroys the mutex, frees the memory, and removes
+the minor node.</para><para>After the minor node is created, the <function>qotd_attach</function> routine
+allocates memory for the quotation. For information on allocating and freeing
+memory in this driver, see <olink targetptr="ffdqy" remap="internal">Allocating and Freeing
+Kernel Memory</olink>. If memory is allocated,  the <function>qotd_attach</function> routine
+sets the <literal>QOTD_DIDALLOC</literal> flag in the <literal>flags</literal> member
+of the state structure.</para><para><indexterm><primary><function>mutex_init</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>mutex_init</function></secondary></indexterm><indexterm><primary><function>cv_init</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_init</function></secondary></indexterm><indexterm><primary><function>strlcpy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>strlcpy</function></secondary></indexterm><indexterm><primary><function>strncpy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>strncpy</function></secondary></indexterm>The <function>qotd_attach</function> routine
+then calls the <olink targetdoc="group-refman" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to initialize a mutex. If this operation
+is successful, the <function>qotd_attach</function> routine sets the <literal>QOTD_DIDMUTEX</literal> flag. The <function>qotd_attach</function> routine then calls the <olink targetdoc="group-refman" targetptr="cv-init-9f" remap="external"><citerefentry><refentrytitle>cv_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to initialize a condition variable. If this operation is successful, the <function>qotd_attach</function> routine sets the <literal>QOTD_DIDCV</literal> flag.</para><para>The <function>qotd_attach</function> routine then calls the <olink targetdoc="group-refman" targetptr="strlcpy-9f" remap="external"><citerefentry><refentrytitle>strlcpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to copy the initial quotation string to the new quotation member of the device
+state structure. Note that the <citerefentry><refentrytitle>strlcpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is used instead of the <olink targetdoc="group-refman" targetptr="strncpy-9f" remap="external"><citerefentry><refentrytitle>strncpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.
+The <citerefentry><refentrytitle>strncpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function can be wasteful because it always copies <replaceable>n</replaceable> characters,
+even if the destination is smaller than <replaceable>n</replaceable> characters.
+Try using <citerefentry><refentrytitle>strncpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry> instead of <citerefentry><refentrytitle>strlcpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry> and note the difference in the behavior
+of the driver.</para><para>Finally, the initial quotation length is copied to the new quotation
+length member of the state structure. The remainder of the <function>qotd_attach</function> routine
+is the same as in Version&nbsp;2.</para>
+</sect3><sect3 id="fgvsj"><title>Checking for Changes, Cleaning Up, and Detaching</title><para>The <function>qotd_detach</function> routine is almost all new. The <function>qotd_detach</function> routine must first get the soft state because the <function>qotd_detach</function> routine needs to check the <literal>flags</literal> member
+of the state structure.</para><para>The first flag the <function>qotd_detach</function> routine checks is
+the <literal>QOTD_CHANGED</literal> flag. The <literal>QOTD_CHANGED</literal> flag
+indicates whether the device is in the initial state. The <literal>QOTD_CHANGED</literal> flag
+is set in the <function>qotd_rw</function> routine and in the <function>qotd_ioctl</function> entry point. The <literal>QOTD_CHANGED</literal> flag is set any
+time the user does anything to the device other than simply inspect the device.
+If the <literal>QOTD_CHANGED</literal> flag is set, the size or content of
+the storage buffer has been modified. See <olink targetptr="ffdra" remap="internal">Writing
+New Data</olink> for more information on the <literal>QOTD_CHANGED</literal> flag.
+When the <literal>QOTD_CHANGED</literal> flag is set, the detach operation
+fails because the device might contain data that is valuable to the user and
+the device should not be removed. If the <literal>QOTD_CHANGED</literal> flag
+is set, the <function>qotd_detach</function> routine returns an error that
+the device is busy.</para><para>Once the quotation has been modified, the device cannot be detached
+until the user runs the <command>qotdctl</command> command with the <option>r</option> option.
+The <option>r</option> option reinitializes the quotation and indicates that
+the user is no longer interested in the contents of the device. See <olink targetptr="fgvsf" remap="internal">Exercising the Driver's I/O Controls</olink> for more information
+about the <command>qotdctl</command> command.</para><para><indexterm><primary><function>mutex_destroy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>mutex_destroy</function></secondary></indexterm><indexterm><primary><function>cv_destroy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_destroy</function></secondary></indexterm><indexterm><primary><function>ddi_umem_free</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_umem_free</function></secondary></indexterm><indexterm><primary><function>ddi_remove_minor_node</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_remove_minor_node</function></secondary></indexterm>The <function>qotd_detach</function> routine then checks the four
+flags that were set in the <function>qotd_attach</function> routine. If the <literal>QOTD_DIDCV</literal> flag is set, the <function>qotd_detach</function> routine
+calls the <olink targetdoc="group-refman" targetptr="cv-destroy-9f" remap="external"><citerefentry><refentrytitle>cv_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. If the <literal>QOTD_DIDMUTEX</literal> flag
+is set, the <function>qotd_detach</function> routine calls the <olink targetdoc="group-refman" targetptr="mutex-destroy-9f" remap="external"><citerefentry><refentrytitle>mutex_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. If the <literal>QOTD_DIDALLOC</literal> flag
+is set, the <function>qotd_detach</function> routine calls the <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. Finally, if the <literal>QOTD_DIDMINOR</literal> flag
+is set, the <function>qotd_detach</function> routine calls the <olink targetdoc="group-refman" targetptr="ddi-remove-minor-node-9f" remap="external"><citerefentry><refentrytitle>ddi_remove_minor_node</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para>
+</sect3><sect3 id="ffdqy"><title>Allocating and Freeing Kernel Memory</title><indexterm><primary><function>ddi_umem_alloc</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_umem_alloc</function></secondary>
+</indexterm><indexterm><primary><function>ddi_umem_free</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_umem_free</function></secondary>
+</indexterm><para>One of the new members of the device state structure supports memory
+allocation and deallocation. The <literal>qotd_cookie</literal> member receives
+a value from the <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function. The <literal>qotd_cookie</literal> value
+is then used by the <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to free the memory.</para><itemizedlist><para>Version 3 of the Quote Of The Day driver allocates kernel memory in
+three places:</para><listitem><para>After the minor node is created</para>
+</listitem><listitem><para>In the <literal>QOTDIOCSSZ</literal> case of the <function>qotd_ioctl</function> entry point</para>
+</listitem><listitem><para>In the <literal>QOTDIOCDISCARD</literal> case of the <function>qotd_ioctl</function> entry point</para>
+</listitem>
+</itemizedlist><para>The <function>qotd_attach</function> routine allocates memory after
+the minor node is created. Memory must be allocated to enable the user to
+modify the quotation. The <function>qotd_attach</function> routine calls the <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function with the <literal>DDI_UMEM_NOSLEEP</literal> flag
+so that the <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function will return immediately.
+If the requested amount of memory is not available, <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> returns <literal>NULL</literal> immediately and does not wait
+for memory to become available. If no memory is allocated, <function>qotd_attach</function> calls <function>qotd_detach</function> and returns an error. If memory is allocated, <function>qotd_attach</function> sets the <literal>QOTD_DIDALLOC</literal> flag so that this memory
+will be freed by <function>qotd_detach</function> later.</para><para>The second place the driver allocates memory is in the <literal>QOTDIOCSSZ</literal> case
+of the <function>qotd_ioctl</function> entry point. The <literal>QOTDIOCSSZ</literal> case
+sets a new size for the device. A new size is set when the user runs the <command>qotdctl</command> command with the <option>s</option> option. See <olink targetptr="fgvsf" remap="internal">Exercising the Driver's I/O Controls</olink> for more information
+about the <command>qotdctl</command> command. This time, the <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function is called with the <literal>DDI_UMEM_SLEEP</literal> flag
+so that <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> will wait for the requested amount of memory to be available.
+When the <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns, the requested memory has been
+allocated.</para><para><indexterm><primary><function>kmem_alloc</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>kmem_alloc</function></secondary></indexterm><indexterm><primary><function>kmem_zalloc</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>kmem_zalloc</function></secondary></indexterm>Note that
+you cannot always use the <literal>DDI_UMEM_SLEEP</literal> flag. See the <literal>CONTEXT</literal> sections of the <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry>, <olink targetdoc="group-refman" targetptr="kmem-alloc-9f" remap="external"><citerefentry><refentrytitle>kmem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="kmem-zalloc-9f" remap="external"><citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> man pages. Also note the behavioral differences among
+these three functions. The <citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is more efficient for small
+amounts of memory. The <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is faster and better for
+large allocations. The <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is used in this <literal>qotd_3</literal> driver because <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> allocates whole pages of memory.
+The <citerefentry><refentrytitle>kmem_zalloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function might save memory because it might allocate smaller
+chunks of memory. This <literal>qotd_3</literal> driver demonstrates a ramdisk
+device. In a production ramdisk device, you would use <citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry> to allocate page-aligned memory.</para><para>After the current quotation is copied to the new space, the <function>qotd_ioctl</function> routine calls the <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to free the memory
+that was previously allocated.</para><para>The third place the driver allocates memory is in the <literal>QOTDIOCDISCARD</literal> case of the <function>qotd_ioctl</function> entry point. The <literal>QOTDIOCDISCARD</literal> case is called from the <command>qotdctl</command> command.
+The <command>qotdctl</command> command with the <option>r</option> option
+sets the quotation back to its initial value. If the number of bytes allocated
+for the current quotation is different from the initial number of bytes, then
+new memory is allocated to reinitialize the quotation. Again, the <literal>DDI_UMEM_SLEEP</literal> flag is used so that when the <olink targetdoc="group-refman" targetptr="ddi-umem-alloc-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_alloc</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function returns, the requested
+memory has been allocated. The <function>qotd_ioctl</function> routine then
+calls the <olink targetdoc="group-refman" targetptr="ddi-umem-free-9f" remap="external"><citerefentry><refentrytitle>ddi_umem_free</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function to free the memory that was previously allocated.</para>
+</sect3><sect3 id="ffzre"><title>Managing Thread Synchronization</title><indexterm><primary>thread synchronization</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>thread synchronization</secondary>
+</indexterm><indexterm><primary>mutexes</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>mutexes</secondary>
+</indexterm><indexterm><primary>condition variables</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>condition variables</secondary>
+</indexterm><para>The Quote Of The Day Version&nbsp;3 driver uses condition variables
+and mutual exclusion locks (mutexes) together to manage thread synchronization.
+See the <olink targetdoc="mtp" remap="external"><citetitle remap="book">Multithreaded Programming
+Guide</citetitle></olink> for more information about mutexes, condition variables,
+and thread synchronization.</para><para>In this driver, the mutex and condition variable both are initialized
+in the <function>qotd_attach</function> entry point and destroyed in the <function>qotd_detach</function> entry point. The condition variable is tested in the <function>qotd_rw</function> routine and in the <function>qotd_ioctl</function> entry
+point.</para><para><indexterm><primary><literal>QOTD_BUSY</literal> condition</primary></indexterm>The condition variable waits on the <literal>QOTD_BUSY</literal> condition.
+This condition is needed because the driver must do some operations that rely
+on exclusive access to internal structures without holding a lock. Accessing
+the storage buffer or its metadata requires mutual exclusion, but the driver
+cannot hold a lock if the operation might sleep. Instead of holding a lock
+in this case, the driver waits on the <literal>QOTD_BUSY</literal> condition.</para><para>The driver acquires a mutex when the driver tests the condition variable
+and when the driver accesses the storage buffer. The mutex protects the storage
+buffer. Failure to use a mutual exclusion when accessing the storage buffer
+could allow one user process to resize the buffer while another user process
+tries to read the buffer, for example. The result of unprotected buffer access
+could be data corruption or a panic.</para><para><indexterm><primary><function>uiomove</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>uiomove</function></secondary></indexterm><indexterm><primary><function>ddi_copyin</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyin</function></secondary></indexterm>The condition
+variable is used when functions are called that might need to sleep. The <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>, and <olink targetdoc="group-refman" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> functions can sleep. Memory
+allocation can sleep if you use the <literal>SLEEP</literal> flag. Functions
+must not hold a mutex while they are sleeping. Sleeping while holding a mutex
+can cause deadlock. When a function might sleep, set the <literal>QOTD_BUSY</literal> flag
+and take the condition variable, which drops the mutex. To avoid race conditions,
+the <literal>QOTD_BUSY</literal> flag can be set or cleared only when holding
+the mutex. For more information on deadlock, see <olink targetdoc="mtp" targetptr="sync-110" remap="external"><citetitle remap="section">Using Mutual Exclusion Locks</citetitle> in <citetitle remap="book">Multithreaded Programming Guide</citetitle></olink> and <olink targetdoc="mtp" targetptr="guide-35930" remap="external"><citetitle remap="section">Avoiding
+Deadlock</citetitle> in <citetitle remap="book">Multithreaded Programming
+Guide</citetitle></olink>.</para><sect4 id="fgpaf"><title>Locking Rules for Quote Of The Day Version 3</title><orderedlist><para><indexterm><primary>devices</primary><secondary>exclusive access</secondary></indexterm><indexterm><primary><literal>QOTD_BUSY</literal> condition</primary></indexterm>The locking rules for this <literal>qotd_3</literal> driver are
+as follows:</para><listitem><para>You must have exclusive access to do any of the following
+operations. To have exclusive access, you must own the mutex or you must set <literal>QOTD_BUSY</literal>. Threads must wait on <literal>QOTD_BUSY</literal>.</para><itemizedlist><listitem><para>Test the contents of the storage buffer.</para>
+</listitem><listitem><para>Modify the contents of the storage buffer.</para>
+</listitem><listitem><para>Modify the size of the storage buffer.</para>
+</listitem><listitem><para>Modify variables that refer to the address of the storage
+buffer.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><orderedlist><para>If your operation does not need to sleep, do the following actions:</para><listitem><para>Acquire the mutex.</para>
+</listitem><listitem><para>Wait until <literal>QOTD_BUSY</literal> is cleared. When the
+thread that set <literal>QOTD_BUSY</literal> clears <literal>QOTD_BUSY</literal>,
+that thread also should signal threads waiting on the condition variable and
+then drop the mutex.</para>
+</listitem><listitem><para>Perform your operation. You do not need to set <literal>QOTD_BUSY</literal> before you perform your operation.</para>
+</listitem><listitem><para>Drop the mutex.</para>
+</listitem>
+</orderedlist><para>The following code sample illustrates this rule:</para><programlisting>mutex_enter(&amp;qsp-&gt;lock);
+while (qsp-&gt;flags &amp; QOTD_BUSY) {
+        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                ddi_umem_free(new_cookie);
+                return (EINTR);
+        }
+}
+memcpy(new_qotd, qsp-&gt;qotd, min(qsp-&gt;qotd_len, new_len));
+ddi_umem_free(qsp-&gt;qotd_cookie);
+qsp-&gt;qotd = new_qotd;
+qsp-&gt;qotd_cookie = new_cookie;
+qsp-&gt;qotd_len = new_len;
+qsp-&gt;flags |= QOTD_CHANGED;
+mutex_exit(&amp;qsp-&gt;lock);</programlisting>
+</listitem><listitem><orderedlist><para>If your operation must sleep, do the following actions:</para><listitem><para>Acquire the mutex.</para>
+</listitem><listitem><para>Set <literal>QOTD_BUSY</literal>.</para>
+</listitem><listitem><para>Drop the mutex.</para>
+</listitem><listitem><para>Perform your operation.</para>
+</listitem><listitem><para>Reacquire the mutex.</para>
+</listitem><listitem><para>Signal any threads waiting on the condition variable.</para>
+</listitem><listitem><para>Drop the mutex.</para>
+</listitem>
+</orderedlist>
+</listitem>
+</orderedlist><para>These locking rules are very simple. These three rules ensure consistent
+access to the buffer and its metadata. Realistic drivers probably have more
+complex locking requirements. For example, drivers that use ring buffers or
+drivers that manage multiple register sets or multiple devices have more complex
+locking requirements.</para>
+</sect4><sect4 id="fgvsa"><title>Lock and Condition Variable Members of the State
+Structure</title><indexterm><primary><function>mutex</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>mutex</function></secondary>
+</indexterm><indexterm><primary><function>cv_wait_sig</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_wait_sig</function></secondary>
+</indexterm><indexterm><primary><function>condvar</function> kernel functions</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>condvar</function></secondary>
+</indexterm><itemizedlist><para>The device state structure for Version&nbsp;3 of the Quote Of The Day
+driver contains two new members to help manage thread synchronization:</para><listitem><para>The <literal>lock</literal> member is used to acquire and
+exit mutexes for the current instance of the device. The <literal>lock</literal> member
+is an argument to each <olink targetdoc="group-refman" targetptr="mutex-9f" remap="external"><citerefentry><refentrytitle>mutex</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+call. The <literal>lock</literal> member also is an argument to the <olink targetdoc="group-refman" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function call. In the <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function call, the <literal>lock</literal> value ensures that the condition will not be changed before
+the <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function returns.</para>
+</listitem><listitem><para>The <literal>cv</literal> member is a condition variable.
+The <literal>cv</literal> member is an argument to each <olink targetdoc="group-refman" targetptr="condvar-9f" remap="external"><citerefentry><refentrytitle>condvar</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> (<literal>cv_</literal>)
+function call.</para>
+</listitem>
+</itemizedlist>
+</sect4><sect4 id="fgvsd"><title>Creating and Destroying Locks and Condition Variables</title><para>Version&nbsp;3 of the Quote Of The Day driver defines two constants
+to make sure the mutex and condition variable are destroyed when the driver
+is finished with them. The driver uses these constants to set and reset the
+new <literal>flags</literal> member of the device state structure.</para><itemizedlist><listitem><para><indexterm><primary><function>mutex_init</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>mutex_init</function></secondary></indexterm><indexterm><primary><function>mutex_destroy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>mutex_destroy</function></secondary></indexterm><indexterm><primary><function>cv_init</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_init</function></secondary></indexterm><indexterm><primary><function>cv_destroy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_destroy</function></secondary></indexterm>The <literal>QOTD_DIDMUTEX</literal> flag is set in the <function>qotd_attach</function> entry point immediately after a successful call to <olink targetdoc="group-refman" targetptr="mutex-init-9f" remap="external"><citerefentry><refentrytitle>mutex_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. If the <literal>QOTD_DIDMUTEX</literal> flag is set when the <function>qotd_detach</function> entry
+point is called, the <function>qotd_detach</function> entry point calls the <olink targetdoc="group-refman" targetptr="mutex-destroy-9f" remap="external"><citerefentry><refentrytitle>mutex_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para>
+</listitem><listitem><para>The <literal>QOTD_DIDCV</literal> flag is set in the <function>qotd_attach</function> entry point immediately after a successful call to <olink targetdoc="group-refman" targetptr="cv-init-9f" remap="external"><citerefentry><refentrytitle>cv_init</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. If the <literal>QOTD_DIDCV</literal> flag is set when the <function>qotd_detach</function> entry
+point is called, the <function>qotd_detach</function> entry point calls the <olink targetdoc="group-refman" targetptr="cv-destroy-9f" remap="external"><citerefentry><refentrytitle>cv_destroy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function.</para>
+</listitem>
+</itemizedlist>
+</sect4><sect4 id="fgvsc"><title>Waiting on Signals</title><indexterm><primary><function>cv_wait_sig</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_wait_sig</function></secondary>
+</indexterm><indexterm><primary><function>signal</function> function</primary>
+</indexterm><indexterm><primary>functions</primary><secondary><function>signal</function></secondary>
+</indexterm><indexterm><primary><function>cv_signal</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_signal</function></secondary>
+</indexterm><indexterm><primary><function>cv_broadcast</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_broadcast</function></secondary>
+</indexterm><indexterm><primary><function>cv_wait</function> kernel function</primary>
+</indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_wait</function></secondary>
+</indexterm><para>In the <function>qotd_rw</function> and <function>qotd_ioctl</function> routines,
+the <olink targetdoc="group-refman" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> calls wait until the condition variable is signaled
+to proceed or until a <olink targetdoc="group-refman" targetptr="signal-3c" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> is
+received. Either the <olink targetdoc="group-refman" targetptr="cv-signal-9f" remap="external"><citerefentry><refentrytitle>cv_signal</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+or the <olink targetdoc="group-refman" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function signals the <literal>cv</literal> condition
+variable to proceed.</para><para>A thread can wait on a condition variable until either the condition
+variable is signaled or a <olink targetdoc="group-refman" targetptr="signal-3c" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> is
+received by the process. The <olink targetdoc="group-refman" targetptr="cv-wait-9f" remap="external"><citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function waits until the
+condition variable is signaled but ignores <citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry> signals. This driver uses the <olink targetdoc="group-refman" targetptr="cv-wait-sig-9f" remap="external"><citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function instead of the <citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function because
+this driver responds if a signal is received by the process performing the
+operation. If a <citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry> is taken by the process, this driver returns an interrupt
+error and does not complete the operation. The <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function usually
+is preferred to the <citerefentry><refentrytitle>cv_wait</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function because this implementation
+offers the user program more precise response. The <citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry> causes an effect
+closer to the point at which the process was executing when the <citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry> was
+received.</para><para>In some cases, you cannot use the <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function because your driver cannot
+be interrupted by a <citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry>. For example, you cannot use the <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function during a DMA transfer that will result in an interrupt
+later. In this case, if you abandon the <citerefentry><refentrytitle>cv_wait_sig</refentrytitle><manvolnum>9F</manvolnum></citerefentry> call, you have nowhere to put the
+data when the DMA transfer is finished, and your driver will panic.</para>
+</sect4>
+</sect3><sect3 id="ffdra"><title>Writing New Data</title><indexterm><primary>devices</primary><secondary>writing</secondary>
+</indexterm><indexterm><primary><literal>cb_ops</literal> driver structure</primary>
+</indexterm><indexterm><primary>driver structures</primary><secondary><literal>cb_ops</literal></secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>write</function></secondary>
+</indexterm><indexterm><primary><function>write</function> entry point</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>ioctl</function></secondary>
+</indexterm><indexterm><primary><function>ioctl</function> entry point</primary>
+</indexterm><para>The <olink targetdoc="group-refman" targetptr="cb-ops-9s" remap="external"><citerefentry><refentrytitle>cb_ops</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> structure
+for Version&nbsp;3 of the Quote Of The Day driver declares two new entry points
+that support modifying the quotation. The two new entry points are <olink targetdoc="group-refman" targetptr="write-9e" remap="external"><citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink>. The <function>qotd_rw</function> routine
+is a third new routine in Version&nbsp;3 of the driver. The <function>qotd_rw</function> routine
+is called by both the <citerefentry><refentrytitle>read</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry point and the <citerefentry><refentrytitle>write</refentrytitle><manvolnum>9E</manvolnum></citerefentry> entry
+point.</para><para>The device state structure for Version&nbsp;3 of the Quote Of The Day
+driver contains two new members that are used to modify the quotation. The <literal>qotd</literal> string holds the quotation for the current instance of the
+device. The <literal>qotd_len</literal> member holds the length in bytes of
+the current quotation.</para><para>Version&nbsp;3 of the driver also defines two new constants that support
+modifying the quotation. In place of <literal>QOTD_MAXLEN</literal>, Version&nbsp;3
+of the driver defines <literal>QOTD_MAX_LEN</literal>. <literal>QOTD_MAX_LEN</literal> is
+used in the <function>qotd_ioctl</function> entry point to test whether the
+user has entered a string that is too long. Version&nbsp;3 of the driver also
+defines <literal>QOTD_CHANGED</literal>. The <literal>QOTD_CHANGED</literal> flag
+is set in the <function>qotd_rw</function> routine and in the <function>qotd_ioctl</function> entry point when a new quotation is copied from the user.</para><para>When the <literal>qotd_3</literal> device is opened for writing, the
+kernel calls the <function>qotd_write</function> entry point. The <function>qotd_write</function> entry point then calls the <function>qotd_rw</function> routine
+and passes a <literal>UIO_WRITE</literal> flag. The new <function>qotd_read</function> entry
+point is exactly the same as the <function>qotd_write</function> entry point,
+except that the <function>qotd_read</function> entry point passes a <literal>UIO_READ</literal> flag. The <function>qotd_rw</function> routine supports both reading
+and writing the device and thereby eliminates much duplicate code.</para><para><indexterm><primary><literal>uio</literal> kernel structure</primary></indexterm><indexterm><primary>kernel structures</primary><secondary><literal>uio</literal></secondary></indexterm>The <function>qotd_rw</function> routine
+first gets the device soft state. Then the <function>qotd_rw</function> routine
+checks the length of the I/O request in the <olink targetdoc="group-refman" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> I/O request structure. If this length is zero, the <function>qotd_rw</function> routine returns zero. If this length is not zero, the <function>qotd_rw</function> routine enters a mutex.</para><para><indexterm><primary><function>signal</function> function</primary></indexterm><indexterm><primary>functions</primary><secondary><function>signal</function></secondary></indexterm>While the device is busy, the <function>qotd_rw</function> routine
+checks whether the condition variable has been signaled or a <olink targetdoc="group-refman" targetptr="signal-3c" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> is pending.
+If either of these conditions is true, the <function>qotd_rw</function> routine
+exits the mutex and returns an error.</para><para>When the device is not busy, the <function>qotd_rw</function> routine
+checks whether the data offset in the <olink targetdoc="group-refman" targetptr="uio-9s" remap="external"><citerefentry><refentrytitle>uio</refentrytitle><manvolnum>9S</manvolnum></citerefentry></olink> I/O request structure is valid. If the offset is not
+valid, the <function>qotd_rw</function> routine exits the mutex and returns
+an error. If the offset is valid, the local length variable is set to the
+difference between the offset in the I/O request structure and the length
+in the device state structure. If this difference is zero, the <function>qotd_rw</function> routine
+exits the mutex and returns. If the device was opened for writing, the <function>qotd_rw</function> routine returns a space error. Otherwise, the <function>qotd_rw</function> routine returns zero.</para><para><indexterm><primary><function>uiomove</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>uiomove</function></secondary></indexterm>The <function>qotd_rw</function> routine
+then sets the <literal>QOTD_BUSY</literal> flag in the <literal>flags</literal> member
+of the device state structure and exits the mutex. The <function>qotd_rw</function> routine
+then calls the <olink targetdoc="group-refman" targetptr="uiomove-9f" remap="external"><citerefentry><refentrytitle>uiomove</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to copy the quotation. If the <literal>rw</literal> argument is <literal>UIO_READ</literal>, then the quotation is transferred from the state structure to
+the I/O request structure. If the <literal>rw</literal> argument is <literal>UIO_WRITE</literal>, then the quotation is transferred from the I/O request structure
+to the state structure.</para><para><indexterm><primary><function>cv_broadcast</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>cv_broadcast</function></secondary></indexterm>The <function>qotd_rw</function> routine
+then enters a mutex again. If the device was opened for writing, the <function>qotd_rw</function> routine sets the <literal>QOTD_CHANGED</literal> flag. The <function>qotd_rw</function> routine then sets the device to not busy, calls <olink targetdoc="group-refman" targetptr="cv-broadcast-9f" remap="external"><citerefentry><refentrytitle>cv_broadcast</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to unblock any threads that were blocked on this condition
+variable, and exits the mutex.</para><para>Finally, the <function>qotd_rw</function> routine returns the quotation.
+The quotation is written to the device node.</para>
+</sect3><sect3 id="fgham"><title>Reporting and Setting Device Size and Re-initializing
+the Device</title><indexterm><primary>I/O controls</primary>
+</indexterm><indexterm><primary>device drivers</primary><secondary>I/O controls</secondary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>ioctl</function></secondary>
+</indexterm><indexterm><primary><function>ioctl</function> entry point</primary>
+</indexterm><para>The behavior of the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry
+point depends on the command value passed in to the entry point. These constants
+are defined in the new <filename>qotd.h</filename> header file. The <function>qotd_ioctl</function> routine reports the size of the space allocated for the quotation,
+sets a new amount of space to allocate for the quotation, or resets the quotation
+back to its initial value.</para><para>If the request is to report the size of the space allocated for the
+quotation, then the <function>qotd_ioctl</function> routine first sets a local
+size variable to the value of the quotation length in the state structure.
+If the device was not opened for reading, the <function>qotd_ioctl</function> routine
+returns an error.</para><para><indexterm><primary><function>ddi_model_convert_from</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_model_convert_from</function></secondary></indexterm><indexterm><primary><function>ddi_copyout</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyout</function></secondary></indexterm>Because the <function>qotd_ioctl</function> routine transfers
+data between kernel space and user space, the <function>qotd_ioctl</function> routine
+must check whether both spaces are using the same data model. If the return
+value of the <olink targetdoc="group-refman" targetptr="ddi-model-convert-from-9f" remap="external"><citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+is <literal>DDI_MODEL_ILP32</literal>, then the driver must convert to 32-bit
+data before calling <olink targetdoc="group-refman" targetptr="ddi-copyout-9f" remap="external"><citerefentry><refentrytitle>ddi_copyout</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to transfer the current size of the quotation space.
+If the return value of the <citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry> function is <literal>DDI_MODEL_NONE</literal>,
+then no data type conversion is necessary.</para><para>If the request is to set a new size for the space allocated for the
+quotation, then the <function>qotd_ioctl</function> routine first sets local
+variables for the new size, the new quotation, and a new memory allocation
+cookie. If the device was not opened for writing, the <function>qotd_ioctl</function> routine
+returns an error.</para><para><indexterm><primary><function>ddi_copyin</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>ddi_copyin</function></secondary></indexterm>The <function>qotd_ioctl</function> routine
+then checks again for data model mismatch. If the return value of the <olink targetdoc="group-refman" targetptr="ddi-model-convert-from-9f" remap="external"><citerefentry><refentrytitle>ddi_model_convert_from</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function is <literal>DDI_MODEL_ILP32</literal>, then
+the driver declares a 32-bit size variable to receive the new size from <olink targetdoc="group-refman" targetptr="ddi-copyin-9f" remap="external"><citerefentry><refentrytitle>ddi_copyin</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink>. When the
+new size is received, the size is converted to the data type of the kernel
+space.</para><para>If the new size is zero or is greater than <literal>QOTD_MAX_LEN</literal>,
+the <function>qotd_ioctl</function> routine returns an error. If the new size
+is valid, then the <function>qotd_ioctl</function> routine allocates new memory
+for the quotation and enters a mutex.</para><para><indexterm><primary><function>signal</function> function</primary></indexterm><indexterm><primary>functions</primary><secondary><function>signal</function></secondary></indexterm>While the device is busy, the <function>qotd_ioctl</function> routine
+checks whether the condition variable has been signaled or a <olink targetdoc="group-refman" targetptr="signal-3c" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> is pending.
+If either of these conditions is true, the <function>qotd_ioctl</function> routine
+exits the mutex, frees the new memory it allocated, and returns an error.</para><para><indexterm><primary><function>memcpy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>memcpy</function></secondary></indexterm>When the device is not busy, the <function>qotd_ioctl</function> routine uses <olink targetdoc="group-refman" targetptr="memcpy-9f" remap="external"><citerefentry><refentrytitle>memcpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to
+copy the quotation from the driver's state structure to the new space. The <function>qotd_ioctl</function> routine then frees the memory currently pointed to by
+the state structure, and updates the state structure members to the new values.
+The <function>qotd_ioctl</function> routine then sets the <literal>QOTD_CHANGED</literal> flag,
+exits the mutex, and returns.</para><para>If the request is to discard the current quotation and reset to the
+initial quotation, then the <function>qotd_ioctl</function> routine first
+sets local variables for the new quotation and a new memory allocation cookie.
+If the device was not opened for writing, the <function>qotd_ioctl</function> routine
+returns an error. If the space allocated for the current quotation is different
+from the space allocated for the initial quotation, then the <function>qotd_ioctl</function> routine allocates new memory that is the size of the initial space
+and enters a mutex.</para><para>While the device is busy, the <function>qotd_ioctl</function> routine
+checks whether the condition variable has been signaled or a <olink targetdoc="group-refman" targetptr="signal-3c" remap="external"><citerefentry><refentrytitle>signal</refentrytitle><manvolnum>3C</manvolnum></citerefentry></olink> is pending.
+If either of these conditions is true, the <function>qotd_ioctl</function> routine
+exits the mutex, frees the new memory it allocated, and returns an error.</para><para><indexterm><primary><function>bzero</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>bzero</function></secondary></indexterm><indexterm><primary><function>strlcpy</function> kernel function</primary></indexterm><indexterm><primary>kernel functions</primary><secondary><function>strlcpy</function></secondary></indexterm>When the device
+is not busy, the <function>qotd_ioctl</function> routine frees the memory
+currently pointed to by the state structure, updates the memory state structure
+members to the new values, and resets the length to its initial value. If
+the size of the current quotation space was the same as the initial size and
+no new memory was allocated, then <function>qotd_ioctl</function> calls <olink targetdoc="group-refman" targetptr="bzero-9f" remap="external"><citerefentry><refentrytitle>bzero</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> to clear the current quotation.
+The <function>qotd_ioctl</function> routine then calls the <olink targetdoc="group-refman" targetptr="strlcpy-9f" remap="external"><citerefentry><refentrytitle>strlcpy</refentrytitle><manvolnum>9F</manvolnum></citerefentry></olink> function
+to copy the initial quotation string to the quotation member of the state
+structure.  The <function>qotd_ioctl</function> routine then unsets the <literal>QOTD_CHANGED</literal> flag, exits the mutex, and returns.</para><para>Once the <literal>QOTD_CHANGED</literal> flag has been set, the only
+way to unset it is to run the <command>qotdctl</command> command with the <option>r</option> option. See <olink targetptr="fgvsf" remap="internal">Exercising the Driver's I/O
+Controls</olink> for more information about the <command>qotdctl</command> command.</para>
+</sect3><sect3 id="ffdqw"><title>Quote Of The Day Version 3 Source</title><para>Enter the source code shown in the following example into a text file
+named <filename>qotd_3.c</filename>.</para><example id="ffdqz"><title>Quote Of The Day Version 3 Source File</title><programlisting>#include &lt;sys/types.h&gt;
+#include &lt;sys/file.h&gt;
+#include &lt;sys/errno.h&gt;
+#include &lt;sys/open.h&gt;
+#include &lt;sys/cred.h&gt;
+#include &lt;sys/uio.h&gt;
+#include &lt;sys/stat.h&gt;
+#include &lt;sys/ksynch.h&gt;
+#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/debug.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#include "qotd.h"
+
+#define QOTD_NAME       "qotd_3"
+
+static const char init_qotd[]
+        = "On the whole, I'd rather be in Philadelphia. - W. C. Fields\n";
+static const size_t init_qotd_len = 128;
+
+#define QOTD_MAX_LEN    65536           /* Maximum quote in bytes */
+#define QOTD_CHANGED    0x1             /* User has made modifications */
+#define QOTD_DIDMINOR   0x2             /* Created minors */
+#define QOTD_DIDALLOC   0x4             /* Allocated storage space */
+#define QOTD_DIDMUTEX   0x8             /* Created mutex */
+#define QOTD_DIDCV      0x10            /* Created cv */
+#define QOTD_BUSY       0x20            /* Device is busy */
+
+static void *qotd_state_head;
+
+struct qotd_state {
+        int             instance;
+        dev_info_t      *devi;
+        kmutex_t        lock;
+        kcondvar_t      cv;
+        char            *qotd;
+        size_t          qotd_len;
+        ddi_umem_cookie_t qotd_cookie;
+        int             flags;
+};
+
+static int qotd_getinfo(dev_info_t *, ddi_info_cmd_t, void *, void **);
+static int qotd_attach(dev_info_t *, ddi_attach_cmd_t);
+static int qotd_detach(dev_info_t *, ddi_detach_cmd_t);
+static int qotd_open(dev_t *, int, int, cred_t *);
+static int qotd_close(dev_t, int, int, cred_t *);
+static int qotd_read(dev_t, struct uio *, cred_t *);
+static int qotd_write(dev_t, struct uio *, cred_t *);
+static int qotd_rw(dev_t, struct uio *, enum uio_rw);
+static int qotd_ioctl(dev_t, int, intptr_t, int, cred_t *, int *);
+
+static struct cb_ops qotd_cb_ops = {
+        qotd_open,              /* cb_open */
+        qotd_close,             /* cb_close */
+        nodev,                  /* cb_strategy */
+        nodev,                  /* cb_print */
+        nodev,                  /* cb_dump */
+        qotd_read,              /* cb_read */
+        qotd_write,             /* cb_write */
+        qotd_ioctl,             /* cb_ioctl */
+        nodev,                  /* cb_devmap */
+        nodev,                  /* cb_mmap */
+        nodev,                  /* cb_segmap */
+        nochpoll,               /* cb_chpoll */
+        ddi_prop_op,            /* cb_prop_op */
+        (struct streamtab *)NULL,       /* cb_str */
+        D_MP | D_64BIT,         /* cb_flag */
+        CB_REV,                 /* cb_rev */
+        nodev,                  /* cb_aread */
+        nodev                   /* cb_awrite */
+};
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        qotd_getinfo,           /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        qotd_attach,            /* devo_attach */
+        qotd_detach,            /* devo_detach */
+        nodev,                  /* devo_reset */
+        &amp;qotd_cb_ops,           /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the day 3.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        int retval;
+
+        if ((retval = ddi_soft_state_init(&amp;qotd_state_head,
+            sizeof (struct qotd_state), 1)) != 0)
+                return retval;
+        if ((retval = mod_install(&amp;modlinkage)) != 0) {
+                ddi_soft_state_fini(&amp;qotd_state_head);
+                return (retval);
+        }
+
+        return (retval);
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+
+int
+_fini(void)
+{
+        int retval;
+
+        if ((retval = mod_remove(&amp;modlinkage)) != 0)
+                return (retval);
+        ddi_soft_state_fini(&amp;qotd_state_head);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_getinfo(dev_info_t *dip, ddi_info_cmd_t cmd, void *arg, void **resultp)
+{
+        struct qotd_state *qsp;
+        int retval = DDI_FAILURE;
+
+        ASSERT(resultp != NULL);
+
+        switch (cmd) {
+        case DDI_INFO_DEVT2DEVINFO:
+                if ((qsp = ddi_get_soft_state(qotd_state_head,
+                    getminor((dev_t)arg))) != NULL) {
+                        *resultp = qsp-&gt;devi;
+                        retval = DDI_SUCCESS;
+                } else
+                        *resultp = NULL;
+                break;
+        case DDI_INFO_DEVT2INSTANCE:
+                *resultp = (void *)getminor((dev_t)arg);
+                retval = DDI_SUCCESS;
+                break;
+        }
+
+        return (retval);
+}
+
+static int
+qotd_attach(dev_info_t *dip, ddi_attach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_ATTACH:
+                if (ddi_soft_state_zalloc(qotd_state_head, instance)
+                    != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to allocate state for %d",
+                            instance);
+                        return (DDI_FAILURE);
+                }
+                if ((qsp = ddi_get_soft_state(qotd_state_head, instance))
+                    == NULL) {
+                        cmn_err(CE_WARN, "Unable to obtain state for %d",
+                            instance);
+                        ddi_soft_state_free(dip, instance);
+                        return (DDI_FAILURE);
+                }
+                if (ddi_create_minor_node(dip, QOTD_NAME, S_IFCHR, instance,
+                    DDI_PSEUDO, 0) != DDI_SUCCESS) {
+                        cmn_err(CE_WARN, "Unable to create minor node for %d",
+                            instance);
+                        (void)qotd_detach(dip, DDI_DETACH);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;flags |= QOTD_DIDMINOR;
+                qsp-&gt;qotd = ddi_umem_alloc(init_qotd_len, DDI_UMEM_NOSLEEP,
+                    &amp;qsp-&gt;qotd_cookie);
+                if (qsp-&gt;qotd == NULL) {
+                        cmn_err(CE_WARN, "Unable to allocate storage for %d",
+                            instance);
+                        (void)qotd_detach(dip, DDI_DETACH);
+                        return (DDI_FAILURE);
+                }
+                qsp-&gt;flags |= QOTD_DIDALLOC;
+                mutex_init(&amp;qsp-&gt;lock, NULL, MUTEX_DRIVER, NULL);
+                qsp-&gt;flags |= QOTD_DIDMUTEX;
+                cv_init(&amp;qsp-&gt;cv, NULL, CV_DRIVER, NULL);
+                qsp-&gt;flags |= QOTD_DIDCV;
+
+                (void)strlcpy(qsp-&gt;qotd, init_qotd, init_qotd_len);
+                qsp-&gt;qotd_len = init_qotd_len;
+                qsp-&gt;instance = instance;
+                qsp-&gt;devi = dip;
+
+                ddi_report_dev(dip);
+                return (DDI_SUCCESS);
+        case DDI_RESUME:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+
+static int
+qotd_detach(dev_info_t *dip, ddi_detach_cmd_t cmd)
+{
+        int instance = ddi_get_instance(dip);
+        struct qotd_state *qsp;
+
+        switch (cmd) {
+        case DDI_DETACH:
+                qsp = ddi_get_soft_state(qotd_state_head, instance);
+                if (qsp != NULL) {
+                        ASSERT(!(qsp-&gt;flags &amp; QOTD_BUSY));
+                        if (qsp-&gt;flags &amp; QOTD_CHANGED)
+                                return (EBUSY);
+                        if (qsp-&gt;flags &amp; QOTD_DIDCV)
+                                cv_destroy(&amp;qsp-&gt;cv);
+                        if (qsp-&gt;flags &amp; QOTD_DIDMUTEX)
+                                mutex_destroy(&amp;qsp-&gt;lock);
+                        if (qsp-&gt;flags &amp; QOTD_DIDALLOC) {
+                                ASSERT(qsp-&gt;qotd != NULL);
+                                ddi_umem_free(qsp-&gt;qotd_cookie);
+                        }
+                        if (qsp-&gt;flags &amp; QOTD_DIDMINOR)
+                                ddi_remove_minor_node(dip, NULL);
+                }
+                ddi_soft_state_free(qotd_state_head, instance);
+                return (DDI_SUCCESS);
+        case DDI_SUSPEND:
+                return (DDI_SUCCESS);
+        default:
+                return (DDI_FAILURE);
+        }
+}
+
+/*ARGSUSED*/
+static int
+qotd_open(dev_t *devp, int flag, int otyp, cred_t *credp)
+{
+        int instance = getminor(*devp);
+        struct qotd_state *qsp;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_close(dev_t dev, int flag, int otyp, cred_t *credp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (otyp != OTYP_CHR)
+                return (EINVAL);
+
+        return (0);
+}
+
+/*ARGSUSED*/
+static int
+qotd_read(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        return qotd_rw(dev, uiop, UIO_READ);
+}
+
+/*ARGSUSED*/
+static int
+qotd_write(dev_t dev, struct uio *uiop, cred_t *credp)
+{
+        return qotd_rw(dev, uiop, UIO_WRITE);
+}
+
+static int
+qotd_rw(dev_t dev, struct uio *uiop, enum uio_rw rw)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+        size_t len = uiop-&gt;uio_resid;
+        int retval;
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        if (len == 0)
+                return (0);
+
+        mutex_enter(&amp;qsp-&gt;lock);
+
+        while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                        mutex_exit(&amp;qsp-&gt;lock);
+                        return (EINTR);
+                }
+        }
+
+        if (uiop-&gt;uio_offset &lt; 0 || uiop-&gt;uio_offset &gt; qsp-&gt;qotd_len) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                return (EINVAL);
+        }
+
+        if (len &gt; qsp-&gt;qotd_len - uiop-&gt;uio_offset)
+                len = qsp-&gt;qotd_len - uiop-&gt;uio_offset;
+
+        if (len == 0) {
+                mutex_exit(&amp;qsp-&gt;lock);
+                return (rw == UIO_WRITE ? ENOSPC : 0);
+        }
+
+        qsp-&gt;flags |= QOTD_BUSY;
+        mutex_exit(&amp;qsp-&gt;lock);
+
+        retval = uiomove((void *)(qsp-&gt;qotd + uiop-&gt;uio_offset), len, rw, uiop);
+
+        mutex_enter(&amp;qsp-&gt;lock);
+        if (rw == UIO_WRITE)
+                qsp-&gt;flags |= QOTD_CHANGED;
+        qsp-&gt;flags &amp;= ~QOTD_BUSY;
+        cv_broadcast(&amp;qsp-&gt;cv);
+        mutex_exit(&amp;qsp-&gt;lock);
+
+        return (retval);
+}
+
+/*ARGSUSED*/
+static int
+qotd_ioctl(dev_t dev, int cmd, intptr_t arg, int mode, cred_t *credp,
+    int *rvalp)
+{
+        struct qotd_state *qsp;
+        int instance = getminor(dev);
+
+        if ((qsp = ddi_get_soft_state(qotd_state_head, instance)) == NULL)
+                return (ENXIO);
+
+        ASSERT(qsp-&gt;instance == instance);
+
+        switch (cmd) {
+        case QOTDIOCGSZ: {
+                /* We are not guaranteed that ddi_copyout(9F) will read
+                 * automatically anything larger than a byte.  Therefore we
+                 * must duplicate the size before copying it out to the user.
+                 */
+                size_t sz = qsp-&gt;qotd_len;
+
+                if (!(mode &amp; FREAD))
+                        return (EACCES);
+
+#ifdef _MULTI_DATAMODEL
+                switch (ddi_model_convert_from(mode &amp; FMODELS)) {
+                case DDI_MODEL_ILP32: {
+                        size32_t sz32 = (size32_t)sz;
+                        if (ddi_copyout(&amp;sz32, (void *)arg, sizeof (size32_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        return (0);
+                }
+                case DDI_MODEL_NONE:
+                        if (ddi_copyout(&amp;sz, (void *)arg, sizeof (size_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        return (0);
+                default:
+                        cmn_err(CE_WARN, "Invalid data model %d in ioctl\n",
+                            ddi_model_convert_from(mode &amp; FMODELS));
+                        return (ENOTSUP);
+                }
+#else /* ! _MULTI_DATAMODEL */
+                if (ddi_copyout(&amp;sz, (void *)arg, sizeof (size_t), mode) != 0)
+                        return (EFAULT);
+                return (0);
+#endif /* _MULTI_DATAMODEL */
+        }
+        case QOTDIOCSSZ: {
+                size_t new_len;
+                char *new_qotd;
+                ddi_umem_cookie_t new_cookie;
+                uint_t model;
+
+                if (!(mode &amp; FWRITE))
+                        return (EACCES);
+
+#ifdef _MULTI_DATAMODEL
+                model = ddi_model_convert_from(mode &amp; FMODELS);
+
+                switch (model) {
+                case DDI_MODEL_ILP32: {
+                        size32_t sz32;
+                        if (ddi_copyin((void *)arg, &amp;sz32, sizeof (size32_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        new_len = (size_t)sz32;
+                        break;
+                }
+                case DDI_MODEL_NONE:
+                        if (ddi_copyin((void *)arg, &amp;new_len, sizeof (size_t),
+                            mode) != 0)
+                                return (EFAULT);
+                        break;
+                default:
+                        cmn_err(CE_WARN, "Invalid data model %d in ioctl\n",
+                            model);
+                        return (ENOTSUP);
+                }
+#else /* ! _MULTI_DATAMODEL */
+                if (ddi_copyin((void *)arg, &amp;new_len, sizeof (size_t),
+                    mode) != 0)
+                        return (EFAULT);
+#endif /* _MULTI_DATAMODEL */
+
+                if (new_len == 0 || new_len &gt; QOTD_MAX_LEN)
+                        return (EINVAL);
+
+                new_qotd = ddi_umem_alloc(new_len, DDI_UMEM_SLEEP, &amp;new_cookie);
+
+                mutex_enter(&amp;qsp-&gt;lock);
+                while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                                mutex_exit(&amp;qsp-&gt;lock);
+                                ddi_umem_free(new_cookie);
+                                return (EINTR);
+                        }
+                }
+                memcpy(new_qotd, qsp-&gt;qotd, min(qsp-&gt;qotd_len, new_len));
+                ddi_umem_free(qsp-&gt;qotd_cookie);
+                qsp-&gt;qotd = new_qotd;
+                qsp-&gt;qotd_cookie = new_cookie;
+                qsp-&gt;qotd_len = new_len;
+                qsp-&gt;flags |= QOTD_CHANGED;
+                mutex_exit(&amp;qsp-&gt;lock);
+
+                return (0);
+        }
+        case QOTDIOCDISCARD: {
+                char *new_qotd = NULL;
+                ddi_umem_cookie_t new_cookie;
+
+                if (!(mode &amp; FWRITE))
+                        return (EACCES);
+
+                if (qsp-&gt;qotd_len != init_qotd_len) {
+                        new_qotd = ddi_umem_alloc(init_qotd_len,
+                            DDI_UMEM_SLEEP, &amp;new_cookie);
+                }
+
+                mutex_enter(&amp;qsp-&gt;lock);
+                while (qsp-&gt;flags &amp; QOTD_BUSY) {
+                        if (cv_wait_sig(&amp;qsp-&gt;cv, &amp;qsp-&gt;lock) == 0) {
+                                mutex_exit(&amp;qsp-&gt;lock);
+                                if (new_qotd != NULL)
+                                        ddi_umem_free(new_cookie);
+                                return (EINTR);
+                        }
+                }
+                if (new_qotd != NULL) {
+                        ddi_umem_free(qsp-&gt;qotd_cookie);
+                        qsp-&gt;qotd = new_qotd;
+                        qsp-&gt;qotd_cookie = new_cookie;
+                        qsp-&gt;qotd_len = init_qotd_len;
+                } else {
+                        bzero(qsp-&gt;qotd, qsp-&gt;qotd_len);
+                }
+                (void)strlcpy(qsp-&gt;qotd, init_qotd, init_qotd_len);
+                qsp-&gt;flags &amp;= ~QOTD_CHANGED;
+                mutex_exit(&amp;qsp-&gt;lock);
+
+                return (0);
+        }
+        default:
+                return (ENOTTY);
+        }
+}</programlisting>
+</example><para>Enter the definitions shown in the following example into a text file
+named <filename>qotd.h</filename>.</para><example id="ffzrj"><title>Quote Of The Day Version 3 Header File</title><programlisting>#ifndef _SYS_QOTD_H
+#define _SYS_QOTD_H
+
+#define QOTDIOC         ('q' &lt;&lt; 24 | 't' &lt;&lt; 16 | 'd' &lt;&lt; 8)
+
+#define QOTDIOCGSZ      (QOTDIOC | 1)   /* Get quote buffer size */
+#define QOTDIOCSSZ      (QOTDIOC | 2)   /* Set new quote buffer size */
+#define QOTDIOCDISCARD  (QOTDIOC | 3)   /* Discard quotes and reset */
+
+#endif /* _SYS_QOTD_H */</programlisting>
+</example><para>Enter the configuration information shown in the following example into
+a text file named <filename>qotd_3.conf</filename>.</para><example id="ffdqx"><title>Quote Of The Day Version 3 Configuration File</title><programlisting>name="qotd_3" parent="pseudo" instance=0;</programlisting>
+</example>
+</sect3>
+</sect2><sect2 id="ffdrd"><title>Building and Installing Quote Of The Day Version&nbsp;3</title><para>Compile and link the driver. The following example shows compiling and
+linking for a 32-bit architecture:</para><screen>% <userinput>cc -D_KERNEL -c qotd_3.c</userinput>
+% <userinput>ld -r -o qotd_3 qotd_3.o</userinput></screen><para>Make sure you are user <literal>root</literal> when you install the
+driver.</para><para>Copy the driver binary to the <filename>/tmp</filename> directory as
+discussed in <olink targetptr="eoxzr" remap="internal">Building and Installing the Template
+Driver</olink>.</para><screen># <userinput>cp qotd_3 /tmp</userinput>
+# <userinput>ln -s /tmp/qotd_3 /usr/kernel/drv/qotd_3</userinput></screen><para>Copy the configuration file to the kernel driver area of the system.</para><screen># <userinput>cp qotd_3.conf /usr/kernel/drv</userinput></screen><para>In a separate window, enter the following command:</para><screen>% <userinput>tail -f /var/adm/messages</userinput></screen><para>Make sure you are user <literal>root</literal> when you load the driver.
+Use the <olink targetdoc="group-refman" targetptr="add-drv-1m" remap="external"><citerefentry><refentrytitle>add_drv</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command
+to load the driver:</para><screen># <userinput>add_drv qotd_3</userinput></screen><para>You should see the following messages in the window where you are viewing <filename>/var/adm/messages</filename>:</para><screen><replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> pseudo: [ID 129642 kern.info] pseudo-device: qotd_30
+<replaceable>date</replaceable> <replaceable>time</replaceable> <replaceable>machine</replaceable> genunix: [ID 936769 kern.info] qotd_30 is /pseudo/qotd_3@0</screen>
+</sect2><sect2 id="ffzsc"><title>Using Quote Of The Day Version 3</title><para>This section describes how to read and write the <literal>qotd_3</literal> device
+and how to test the driver's I/O controls. The I/O controls include retrieving
+the size of the storage buffer, setting a new size for the storage buffer,
+and reinitializing the storage buffer size and contents.</para><sect3 id="fgvse"><title>Reading the Device</title><indexterm><primary>devices</primary><secondary>reading</secondary>
+</indexterm><para>When you access this <literal>qotd_3</literal> device for reading, the
+command you use to access the device retrieves the data from the device node.
+The command then displays the data in the same way that the command displays
+any other input. To get the name of the device special file, look in the <filename>/devices</filename> directory:</para><screen>% <userinput>ls -l /devices/pseudo/qotd*</userinput>
+crw-------   1 root   sys   122,  0 <replaceable>date</replaceable> <replaceable>time</replaceable> /devices/pseudo/qotd_3@0:qotd_3</screen><para>To read the <literal>qotd_3</literal> device, you can use the <olink targetdoc="group-refman" targetptr="cat-1" remap="external"><citerefentry><refentrytitle>cat</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> command:</para><screen># <userinput>cat /devices/pseudo/qotd_3@0:qotd_3</userinput>
+On the whole, I'd rather be in Philadelphia. - W. C. Fields</screen>
+</sect3><sect3 id="fgvsh"><title>Writing the Device</title><indexterm><primary>devices</primary><secondary>writing</secondary>
+</indexterm><para>To write to the <literal>qotd_3</literal> device, you can redirect command-line
+input:</para><screen># <userinput>echo "A life is not important except in the impact it has on others. 
+- Jackie Robinson" &gt;&gt; /devices/pseudo/qotd_3@0:qotd_3</userinput>
+# <userinput>cat /devices/pseudo/qotd_3@0:qotd_3</userinput>
+A life is not important except in the impact it has on others. - Jackie
+Robinson</screen>
+</sect3><sect3 id="fgvsf"><title>Exercising the Driver's I/O Controls</title><indexterm><primary>device drivers</primary><secondary>I/O controls</secondary>
+</indexterm><indexterm><primary>I/O controls</primary>
+</indexterm><indexterm><primary>entry points</primary><secondary><function>ioctl</function></secondary>
+</indexterm><indexterm><primary><function>ioctl</function> entry point</primary>
+</indexterm><para>In addition to changes in the driver, Quote Of The Day Version&nbsp;3
+introduces a new utility program. The <command>qotdctl</command> command enables
+you to test the driver's I/O controls.</para><para>The source for this command is shown in <olink targetptr="ffzrf" remap="internal">Example&nbsp;3&ndash;8</olink>. Compile the <literal>qotdctl</literal> utility as follows:</para><screen>% <userinput>cc -o qotdctl qotdctl.c</userinput></screen><para>The <command>qotdctl</command> command has the following options:</para><variablelist><varlistentry><term><option>g</option></term><listitem><para>Get the size that is currently allocated. Call the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point of the driver
+with the <literal>QOTDIOCGSZ</literal> request. The <literal>QOTDIOCGSZ</literal> request
+reports the current size of the space allocated for the quotation.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>s</option> <replaceable>size</replaceable></term><listitem><para>Set the new size to be allocated. Call the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point of the driver
+with the <literal>QOTDIOCSSZ</literal> request. The <literal>QOTDIOCSSZ</literal> request
+sets a new size for the quotation space.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>r</option></term><listitem><para>Discard the contents and reset the device. Call the <olink targetdoc="group-refman" targetptr="ioctl-9e" remap="external"><citerefentry><refentrytitle>ioctl</refentrytitle><manvolnum>9E</manvolnum></citerefentry></olink> entry point of the driver
+with the <literal>QOTDIOCDISCARD</literal> request.</para><para>Invoking <command>qotdctl</command> with the <option>r</option> option
+is the only way to unset the <literal>QOTD_CHANGED</literal> flag in the device.
+The device cannot be detached while the <literal>QOTD_CHANGED</literal> flag
+is set. This protects the contents of the ramdisk device from being unintentionally
+or automatically removed. For example, a device might be automatically removed
+by the automatic device unconfiguration thread.</para><para>When you are no longer interested in the contents of the device, run
+the <command>qotdctl</command> command with the <option>r</option> option.
+Then you can remove the device.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>h</option></term><listitem><para>Display help text.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>V</option></term><listitem><para>Display the version number of the <command>qotdctl</command> command.</para>
+</listitem>
+</varlistentry><varlistentry><term><option>d</option> <replaceable>device</replaceable></term><listitem><para>Specify the device node to use. The default value is <filename>/dev/qotd0</filename>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Use the <command>qotdctl</command> command to test the driver's I/O
+controls:</para><screen># <userinput>./qotdctl -V</userinput>
+qotdctl 1.0
+# <userinput>./qotdctl -h</userinput>
+Usage: ./qotdctl [-d device] {-g | -h | -r | -s size | -V}
+# <userinput>./qotdctl -g</userinput>
+open: No such file or directory</screen><para>By default, the <command>qotdctl</command> command accesses the <filename>/dev/qotd0</filename> device. The <literal>qotd_3</literal> device in this example is <filename>/devices/pseudo/qotd_3@0:qotd_3</filename>. Either define a link from <filename>/dev/qotd0</filename> to <filename>/devices/pseudo/qotd_3@0:qotd_3</filename> or use
+the <option>d</option> option to specify the correct device:</para><screen># <userinput>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -g</userinput>
+128
+# <userinput>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -s 512</userinput>
+# <userinput>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -g</userinput>
+512
+# <userinput>./qotdctl -d /devices/pseudo/qotd_3@0:qotd_3 -r</userinput>
+# <userinput>cat /devices/pseudo/qotd_3@0:qotd_3</userinput>
+On the whole, I'd rather be in Philadelphia. - W. C. Fields</screen><para>If you try to remove the device now, you will receive an error message:</para><screen># <userinput>rem_drv qotd_3</userinput>
+Device busy
+Cannot unload module: qotd_3
+Will be unloaded upon reboot.</screen><para>The device is still marked busy because you have not told the driver
+that you are no longer interested in this device. Run the <command>qotdctl</command> command
+with the <option>r</option> option to unset the <literal>QOTD_CHANGED</literal> flag
+in the driver and mark the device not busy:</para><screen># <userinput>./qotdctl -r</userinput></screen><para>Enter the source code shown in the following example into a text file
+named <filename>qotdctl.c</filename>.</para><example id="ffzrf"><title>Quote Of The Day I/O Control Command Source File</title><programlisting>#include &lt;sys/ioctl.h&gt;
+#include &lt;fcntl.h&gt;
+#include &lt;stdio.h&gt;
+#include &lt;unistd.h&gt;
+#include &lt;errno.h&gt;
+#include &lt;stdlib.h&gt;
+
+#include "qotd.h"
+
+static const char *DEFAULT_DEVICE = "/dev/qotd0";
+static const char *VERSION = "1.0";
+
+static void show_usage(const char *);
+static void get_size(const char *);
+static void set_size(const char *, size_t);
+static void reset_dev(const char *);
+
+int
+main(int argc, char *argv[])
+{
+        int op = -1;
+        int opt;
+        int invalid_usage = 0;
+        size_t sz_arg;
+        const char *device = DEFAULT_DEVICE;
+
+        while ((opt = getopt(argc, argv,
+            "d:(device)g(get-size)h(help)r(reset)s:(set-size)V(version)"))
+            != -1) {
+                switch (opt) {
+                case 'd':
+                        device = optarg;
+                        break;
+                case 'g':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCGSZ;
+                        break;
+                case 'h':
+                        show_usage(argv[0]);
+                        exit(0);
+                        /*NOTREACHED*/
+                case 'r':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCDISCARD;
+                        break;
+                case 's':
+                        if (op &gt;= 0)
+                                invalid_usage++;
+                        op = QOTDIOCSSZ;
+                        sz_arg = (size_t)atol(optarg);
+                        break;
+                case 'V':
+                        (void) printf("qotdctl %s\n", VERSION);
+                        exit(0);
+                        /*NOTREACHED*/
+                default:
+                        invalid_usage++;
+                        break;
+                }
+        }
+
+        if (invalid_usage &gt; 0 || op &lt; 0) {
+                show_usage(argv[0]);
+                exit(1);
+        }
+
+        switch (op) {
+        case QOTDIOCGSZ:
+                get_size(device);
+                break;
+        case QOTDIOCSSZ:
+                set_size(device, sz_arg);
+                break;
+        case QOTDIOCDISCARD:
+                reset_dev(device);
+                break;
+        default:
+                (void) fprintf(stderr,
+                    "internal error - invalid operation %d\n", op);
+                exit(2);
+        }
+
+        return (0);
+}
+
+static void
+show_usage(const char *execname)
+{
+        (void) fprintf(stderr,
+         "Usage: %s [-d device] {-g | -h | -r | -s size | -V}\n", execname);
+}
+
+static void
+get_size(const char *dev)
+{
+        size_t sz;
+        int fd;
+
+        if ((fd = open(dev, O_RDONLY)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCGSZ, &amp;sz) &lt; 0) {
+                perror("QOTDIOCGSZ");
+                exit(4);
+        }
+
+        (void) close(fd);
+
+        (void) printf("%zu\n", sz);
+}
+
+static void
+set_size(const char *dev, size_t sz)
+{
+        int fd;
+
+        if ((fd = open(dev, O_RDWR)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCSSZ, &amp;sz) &lt; 0) {
+                perror("QOTDIOCSSZ");
+                exit(4);
+        }
+
+        (void) close(fd);
+}
+
+static void
+reset_dev(const char *dev)
+{
+        int fd;
+
+        if ((fd = open(dev, O_RDWR)) &lt; 0) {
+                perror("open");
+                exit(3);
+        }
+
+        if (ioctl(fd, QOTDIOCDISCARD) &lt; 0) {
+                perror("QOTDIOCDISCARD");
+                exit(4);
+        }
+
+        (void) close(fd);
+}</programlisting>
+</example>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000141455 0?>

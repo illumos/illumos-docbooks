@@ -1,0 +1,199 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bsol dash hellip gt lt minus?><chapter id="planldap-1"><?Pub Tag atict:info tracking="off" ref="0"?><title>Planning Requirements for LDAP Naming Services (Tasks)</title><highlights><para>This chapter discusses the high-level planning you should do before
+beginning the server and client setup and installation processes.</para><para>This chapter covers the following topics.</para><itemizedlist><listitem><para><olink targetptr="planldap-10" remap="internal">LDAP Planning Overview</olink></para>
+</listitem><listitem><para><olink targetptr="planldap-11" remap="internal">Planning the LDAP Network Model</olink></para>
+</listitem><listitem><para><olink targetptr="planldap-111111" remap="internal">Planning the Directory
+Information Tree (DIT)</olink></para>
+</listitem><listitem><para><olink targetptr="sundssetup-8" remap="internal">LDAP and Replica Servers</olink></para>
+</listitem><listitem><para><olink targetptr="planldap-2" remap="internal">Planning the LDAP Security Model</olink></para>
+</listitem><listitem><para><olink targetptr="planldap-3" remap="internal">Planning Client Profiles and
+Default Attribute Values for LDAP</olink></para>
+</listitem><listitem><para><olink targetptr="planldap-4" remap="internal">Planning the LDAP Data Population</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="planldap-10"><title>LDAP Planning Overview</title><para>The LDAP client profile is a collection of configuration information
+an LDAP client uses to access LDAP naming services information about the supporting
+LDAP server. This chapter discusses the planning of the various aspects of
+the LDAP naming services. These include the network model, the directory information
+tree, the security model, the default values of the various profile attributes,
+and finally, the preparation for data population.</para>
+</sect1><sect1 id="planldap-11"><title>Planning the LDAP Network Model</title><para>For availability and performance considerations, each subnet of the
+company-wide network should have its own LDAP server to service all the LDAP
+clients in the subnet.  Only one of the servers needs to be a master LDAP
+server. The rest could all be replicas of the master server.</para><para>To plan for the network configuration, consider how many servers are
+available, how a client would be able to get to the servers, and in what order
+the servers should be accessed.  If there is one per subnet, you could use
+the <literal>defaultServerList</literal> attribute to list all the servers
+and have the LDAP client sort and manipulate the access order. If the servers
+need to be accessed in a certain order due to speed or data management reasons,
+you should use the <literal>preferredServerList</literal>  attribute to define
+the fixed order of accessing the servers. Note that you might not want to
+put the master server on either of these lists to reduce the load on the master
+server.</para><para>In addition, you might find three more attributes worth consideration
+when planning for the server and network configuration. The <literal>bindTimeLimit</literal> attribute can be used to set the time-out value for a TCP connect
+request. The <literal>searchTimeLimit</literal> attribute can be used to set
+the time-out value for an LDAP search operation. The <literal>profileTTL</literal> attribute
+can be used to control how often the LDAP client should download its profile
+from the servers. For a slow or unstable network, the <literal>bindTimeLimit</literal> and <literal>searchTimeLimit</literal> attributes might need a larger value than the defaults.
+For early stage testing of the deployment, you might want to reduce the value
+of the <literal>profileTTL</literal> attribute to have the clients pick up
+the frequent changes made to the profile stored in the LDAP servers.</para>
+</sect1><sect1 id="planldap-111111"><title>Planning the Directory Information Tree
+(DIT)</title><para>LDAP naming services have a default directory information tree (DIT)
+and an associated default schema. For example, the <literal>ou=people</literal> container
+contains the user account, password, and shadow information. The <literal>ou=hosts</literal> container contains information about systems in the network.  Each
+entry in the <literal>ou=people</literal> container would be of <literal>objectclass
+posixAccount</literal> and <literal>shadowAccount</literal>.</para><para>The default DIT is a well designed directory structure and is based
+on open standards.  It should be sufficient for most of naming service needs,
+and is recommended to be used without changes. If you choose to use the default
+DIT, the only thing you need to decide is from which node (base DN) in the
+directory tree the naming services information will be searched for a given
+domain. This node is specified with the <literal>defaultSearchBase</literal> attribute.
+ Additionally, you might want to set the <literal>defaultSearchScope</literal> attribute
+to tell the clients the scope of search a naming service lookup should perform.
+Is it just searching one level under the DN (one), or the entire subtree under
+the DN (sub)?</para><para>There are times, however, that more flexibility is needed for the LDAP
+naming service to either work with an existing DIT or handle a more complicated
+DIT with naming service data scattered around the directory tree. For example,
+user account entries may exist in different part of the tree. The <literal>serviceSearchDescriptor</literal>, <literal>attributeMap</literal>, and <literal>objectclassMap</literal> attributes
+in the client profile are designed to handle these situations.</para><para>A service search descriptor can be used to override the default search
+base, search scope, and search filter for a particular service. See <olink targetptr="ldapsecure-65" remap="internal">Service Search Descriptors (SSDs) and Schema Mapping</olink>.</para><para>The <literal>AttributeMap</literal> and <literal>ObjectclassMap</literal> attributes
+provide a way for schema mapping. They make it possible for the LDAP naming
+services to work with an existing DIT. You can map the <literal>posixAccount</literal> object
+class to an existing object class, <literal>myAccount</literal>, for example.
+You can map an attribute in the <literal>posixAccount</literal> object class
+to an attribute in the <literal>myAccount</literal> object class.</para><sect2 id="planldap-13"><title>Multiple Directory Servers</title><para>Multiple LDAP servers can serve one DIT. For example, some subtrees
+of the DIT reside on other LDAP servers.  In this case, an LDAP server may
+refer the LDAP client to a different server for the naming data it knows about
+but is not in its own database. If you plan such a DIT configuration, you
+should set the clients' profile attribute <literal>followReferrals</literal> to
+indicate to the LDAP naming service to follow server referrals to continue
+naming service lookups. However, it is best to have all naming data for a
+given domain reside on a single directory server, if at all possible.</para><para>Referrals can be useful if you want to have clients access read-only
+replicas most of the time and follow referrals to a read/write master server
+only when necessary. In this way, the master server does not get overloaded
+with requests that could be handled by replicas.</para>
+</sect2><sect2 id="planldap-5"><title>Data Sharing With Other Applications</title><para>To make best use of LDAP, you should have a single LDAP entry for each
+logical entry. For example, for a user you can have not only company white-page
+information, but also Solaris account information, and possibly application-specific
+data. Since <literal>posixAccount</literal> and <literal>shadowAccount</literal> are
+auxiliary object classes, they can be added to any entry in the directory.
+ This will require careful planning, setup, and administration.</para>
+</sect2><sect2 id="planldap-15"><title>Choosing the Directory Suffix</title><para>See the Sun Java System Directory Server (formerly Sun ONE Directory Server) documentation
+for information about how to choose an appropriate directory suffix.</para>
+</sect2>
+</sect1><sect1 id="sundssetup-8"><title>LDAP and Replica Servers</title><para>There are three different strategies to employ when setting up replica
+servers.</para><itemizedlist><listitem><para>Single-master replication</para>
+</listitem><listitem><para>Floating-master replication</para>
+</listitem><listitem><para>Multi-master replication</para>
+</listitem>
+</itemizedlist><para><emphasis>Single-master</emphasis></para><para>With single-master replication, only one master server for any given
+partition or non-partitioned network holds writable copies of directory entries.
+Any replica servers have read-only copies of the directory entries. While
+both replicas and masters can perform searches, compares, and bind operations,
+only the master server can perform write operations.</para><para>The potential disadvantage to the single-master replication strategy
+is that the master server is a single point of failure. If the master server
+goes down, none of the replicas can process write operations.</para><para><emphasis>Floating-master</emphasis></para><para>The floating-master strategy is similar to the single-master strategy
+in that there is only one master server with write capabilities at any given
+time for a given partitioned or non-partitioned network. However, when implementing
+the floating-master strategy, when the master server goes down, a replica
+is automatically transformed into a master server by way of an algorithm.</para><para>One potential disadvantage to the floating-master replication strategy
+is that if your network becomes partitioned and replicas on either side of
+the partition become masters, the process of reconciling the new masters can
+be very complicated if the network is rejoined.</para><para><emphasis>Multi-master</emphasis></para><para>With multi-master replication, there are multiple master servers with
+their own read-write copies of the directory entry data. While the multi-master
+strategy eliminates the problem of having a single point of failure, update
+conflicts can occur between servers. In other words, if an entry's attribute
+is modified around the same time on two masters, an update conflict resolution
+policy, such as &ldquo;last writer wins,&rdquo; must be in place.</para><para>For information about how to set up replica servers, refer to the <citetitle>Administration Guide</citetitle> for the version of Sun Java System Directory Server that you are
+using.</para>
+</sect1><sect1 id="planldap-2"><title>Planning the LDAP Security Model</title><para>To plan for the security model, you should first consider what identity
+the LDAP client should be using to talk to the LDAP server. For example, you
+must decide if you want an enterprise-wide single sign-on solution, with no
+passwords being sent over the wire, or the wire encryption of data and the
+ability to access control data results from the directory server on a per-user
+basis. You must also decide whether you want strong authentication to protect
+the user password flow across the wire, and/or if you need to encrypt the
+session between the LDAP client and the LDAP server to protect the LDAP data
+transmitted.</para><para>The <literal>credentialLevel</literal> and <literal>authenticationMethod</literal> attributes
+in the profile are used for this. There are four possible credential levels
+for <literal>credentialLevel</literal>: <literal>anonymous</literal>, <literal>proxy</literal>, <literal>proxy anonymous</literal> and <literal>self</literal>.
+ See <olink targetptr="ldapsecure-66" remap="internal">LDAP Naming Services Security Model</olink> for
+a detailed discussion of LDAP naming service security concepts.</para>&pamldapnote;<note><para>If you enable <literal>pam_krb5</literal> and Kerberos as
+an enterprise-wide single sign on solution, you can design a system whereby
+login passwords are only needed once at the start of a session.  See <olink targetdoc="sysadv6" remap="external"><citetitle remap="book">System Administration Guide: Security Services</citetitle></olink> for further details. If you enable Kerberos you
+will generally also need to enable DNS.  See the chapters on DNS in this manual
+for further details.</para>
+</note><para>The main decisions you need to make when planning your security model
+are the following.</para><itemizedlist><listitem><para>Will you use Kerberos and per-user authentication?</para>
+</listitem><listitem><para>What credential level and authentication methods will LDAP
+clients use?</para>
+</listitem><listitem><para>Will you use TLS?</para>
+</listitem><listitem><para>Do you need to be backward compatible with NIS or NIS+? In
+other words, will clients use <literal>pam_unix</literal> or <literal>pam_ldap</literal>?</para>
+</listitem><listitem><para>What will the servers' <literal>passwordStorageScheme</literal> attribute
+settings be?</para>
+</listitem><listitem><para>How will you set up the Access Control Information?</para><para>For
+more information about ACIs, consult the <citetitle>Administration Guide</citetitle> for
+the version of Sun Java System Directory Server that you are using.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="planldap-3"><title>Planning Client Profiles and Default Attribute
+Values for LDAP</title><para>By going through the previous planning steps (network model, DIT, and
+security model), you should have some idea of the values for the following
+profile attributes.</para><itemizedlist><listitem><para><literal>cn</literal></para>
+</listitem><listitem><para><literal>defaultServerList</literal></para>
+</listitem><listitem><para><literal>preferredServerList</literal></para>
+</listitem><listitem><para><literal>bindTimeLimit</literal></para>
+</listitem><listitem><para><literal>searchTimeLimit</literal></para>
+</listitem><listitem><para><literal>profileTTL</literal></para>
+</listitem><listitem><para><literal>defaultSearchBase</literal></para>
+</listitem><listitem><para><literal>defaultSearchScope</literal></para>
+</listitem><listitem><para><literal>serviceSearchDescriptor</literal></para>
+</listitem><listitem><para><literal>attributeMap</literal></para>
+</listitem><listitem><para><literal>objectclassMap</literal></para>
+</listitem><listitem><para><literal>followReferrals</literal></para>
+</listitem><listitem><para><literal>credentialLevel</literal></para>
+</listitem><listitem><para><literal>authenticationMethod</literal></para>
+</listitem><listitem><para><literal>serviceCredentialLevel</literal></para>
+</listitem><listitem><para><literal>serviceAuthenticationMethod</literal></para>
+</listitem>
+</itemizedlist><para>Of the preceding attributes, only <literal>cn</literal>, <literal>defaultServerList</literal>, and <literal>defaultSearchBase</literal> are required. They have
+no default values. The rest are optional, and some have default values.</para><para>See <olink targetptr="clientsetup-1" remap="internal">Chapter&nbsp;12, Setting Up LDAP
+Clients (Tasks)</olink> for more information about setting up LDAP clients.</para>
+</sect1><sect1 id="planldap-4"><title>Planning the LDAP Data Population</title><para><indexterm><primary>data population</primary></indexterm>To populate
+the LDAP server with data, after the LDAP server has been configured with
+the proper DIT and schema. Use the new <command>ldapaddent</command> tool.
+This tool will create entries in LDAP containers from their corresponding <filename>/etc</filename> files.  It can be used to populate data into the containers
+for the following types of data: <literal>aliases</literal>, <literal>auto_*</literal>, <literal>bootparams</literal>,  <literal>ethers</literal>, <literal>group</literal>, <literal>hosts</literal> (including IPv6 addresses), <literal>netgroup</literal>, <literal>netmasks</literal>, <literal>networks</literal>, <literal>passwd</literal>, <literal>shadow</literal>, <literal>protocols</literal>, <literal>publickey</literal>, <literal>rpc</literal>, and <literal>services</literal>.</para><para>By default, <literal>ldapaddent</literal> reads from the standard input
+and adds this data to the LDAP container associated with the database specified
+on the command line. But an input file from which data should be read can
+be specified using the <literal>-f</literal> option.</para><para>Because the entries are stored in the directory based on the client's
+configuration, the client must be configured to use the LDAP naming services.</para><para>For better performance, load the databases in this order:</para><orderedlist><listitem><para><literal>passwd</literal> database followed by <literal>shadow</literal> database</para>
+</listitem><listitem><para><literal>networks</literal> database followed by <literal>netmasks</literal> database</para>
+</listitem><listitem><para><literal>bootparams</literal> database followed by <literal>ethers</literal> database</para>
+</listitem>
+</orderedlist><para>Note that when adding automounter entries, the database name is in the
+form of <literal>auto_*</literal> (for example, <literal>auto_home</literal>).</para><para>If you have <filename>/etc</filename> files from different hosts to
+add to the LDAP server, you can either merge all of them into the same <filename>/etc</filename> file and then use <command>ldapaddent</command> on one host
+to add the files, or perform <command>ldapaddent</command> on the different
+hosts one by one, with the expectation that each host is already configured
+as a LDAP client.</para><para>If your naming service data is already in an NIS server, and you want
+to move the data to the LDAP server for LDAP naming services, use the <command>ypcat</command> (or <command>niscat</command>) command to dump the NIS map into
+files. Then, run <command>ldapaddent</command> against these files to add
+the data to the LDAP server.</para><note><para><command>ldapaddent</command> can only be run on an LDAP client.</para>
+</note><para>The following procedure assumes that the tables are to be extracted
+from a <literal>yp</literal> client.</para><task id="planldap-proc-17"><title>How to Populate a Server With <literal>host</literal> Entries
+Using <command>ldapaddent</command></title><procedure><step id="planldap-step-21"><para>Make sure that Sun Java System Directory Server was set up using <command>idsconfig</command>.</para>
+</step><step id="planldap-step-18"><para>On a client machine, become superuser or
+assume an equivalent role.</para><para>Roles contain authorizations and privileged
+commands. For more information about roles, see <olink targetdoc="sysadv6" targetptr="rbactask-1" remap="external">Chapter 9, <citetitle remap="chapter">Using Role-Based Access Control (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</step><step id="planldap-step-19"><para>Make the machine an LDAP client.</para><screen># <userinput>ldapclient init</userinput> <option>a</option> <userinput>profileName=new</userinput> <option>a</option> <userinput>domainName=west.example.com \</userinput>
+<userinput>192.168.0.1</userinput> </screen>
+</step><step id="planldap-step-20"><para>Populate the server with data.</para><screen># <userinput>ldapaddent</userinput> <option>D</option> <userinput>&ldquo;cn=directory manager&rdquo;</userinput> <option>f</option> <userinput>/etc/hosts hosts</userinput></screen><para>You will be prompted for a password.</para><para>In this example, <command>ldapaddent</command> will use the authentication method that has been configured
+in the profile new. Selecting simple will cause the password to be sent in
+the clear. For more information, refer to the <olink targetdoc="group-refman" targetptr="ldapaddent-1m" remap="external"><citerefentry><refentrytitle>ldapaddent</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter><?Pub *0000020322 0?>

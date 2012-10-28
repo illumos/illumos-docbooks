@@ -1,0 +1,584 @@
+<chapter id="ipsec-ov-1"><title>IP Security Architecture (Overview)</title><highlights><para>The IP Security Architecture (IPsec) provides cryptographic protection
+for IP datagrams in IPv4 and IPv6 network packets.</para><para>This chapter contains the following information:</para><itemizedlist><listitem><para><olink targetptr="ipsec-ov-25" remap="internal">What's
+New in IPsec?</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-2" remap="internal">Introduction to IPsec</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-54" remap="internal">IPsec Packet Flow</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-5" remap="internal">IPsec Security Associations</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-7" remap="internal">IPsec Protection Mechanisms</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-12" remap="internal">IPsec Protection Policies</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-13" remap="internal">Transport and Tunnel Modes
+in IPsec</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-15" remap="internal">Virtual Private Networks and
+IPsec</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-24" remap="internal">IPsec and NAT Traversal</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-22" remap="internal">IPsec and SCTP</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-18" remap="internal">IPsec and Solaris Zones</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-21" remap="internal">IPsec Utilities and Files</olink></para>
+</listitem><listitem><para><olink targetptr="ipsec-ov-16" remap="internal">Changes to IPsec for the Solaris
+10 Release</olink></para>
+</listitem>
+</itemizedlist><para>To implement IPsec on your network, see <olink targetptr="ipsec-mgtasks-1" remap="internal">Chapter&nbsp;20, Configuring IPsec (Tasks)</olink>. For reference information,
+see <olink targetptr="ipsecref-1" remap="internal">Chapter&nbsp;21, IP Security Architecture
+(Reference)</olink>.</para>
+</highlights><sect1 id="ipsec-ov-25"><title>What's New in IPsec?</title><para><emphasis role="strong">Solaris Express, Developer Edition 2/07</emphasis>: In
+this release, IPsec fully implements tunnels in tunnel mode, and modifies
+the utilities that support tunnels.</para><itemizedlist><listitem><para>IPsec implements tunnels in tunnel mode for Virtual Private Networks
+(VPNs). In tunnel mode, IPsec supports multiple clients behind a single NAT.
+In tunnel mode, IPsec is interoperable with implementations of IP-in-IP tunnels
+by other vendors. IPsec continues to support tunnels in transport mode, so
+is compatible with earlier Solaris releases.</para>
+</listitem><listitem><para>The syntax to create a tunnel is simplified. To manage IPsec
+policy, the <command>ipsecconf</command> command has been expanded. The <command>ifconfig</command> command is deprecated for managing IPsec policy.</para>
+</listitem>
+</itemizedlist><para>In this release, the <filename>/etc/ipnodes</filename> file
+is removed. Use the <filename>/etc/hosts</filename> file to configure network
+IPv6 addresses.</para><para><emphasis role="strong">Solaris 10 1/06</emphasis>: In this release,
+IKE is fully compliant with NAT-Traversal support as described in RFC 3947
+and RFC 3948. IKE operations use the PKCS&nbsp;#11 library from the cryptographic
+framework, which improves performance.</para><para>The cryptographic framework provides a softtoken keystore for applications
+that use the metaslot. When IKE uses the metaslot, you have the option of
+storing the keys on disk, on an attached board, or in the softtoken keystore.</para><itemizedlist><listitem><para>To use the softtoken keystore, see the <olink targetdoc="refman1m" targetptr="cryptoadm-1m" remap="external"><citerefentry><refentrytitle>cryptoadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>For a complete listing of new Solaris features and a description
+of Solaris releases, see <olink targetdoc="solwhatsnew" remap="external"><citetitle remap="book">Solaris Express, Developer Edition What&rsquo;s New</citetitle></olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="ipsec-ov-2"><title>Introduction to IPsec</title><para>IPsec protects IP packets by authenticating the packets, by encrypting
+the packets, or by doing both. IPsec is performed inside the IP module, well
+below the application layer. Therefore, an Internet application can take advantage
+of IPsec while not having to configure itself to use IPsec. When used properly,
+IPsec is an effective tool in securing network traffic.</para><para>IPsec protection involves five main components:</para><itemizedlist><listitem><para><emphasis role="strong">Security protocols &ndash;</emphasis> The
+IP datagram protection mechanisms. The <olink targetptr="glossary-34" remap="internal">authentication
+header</olink> (AH) signs IP packets and ensures integrity. The content of
+the datagram is not encrypted, but the receiver is assured that the packet
+contents have not been altered. The receiver is also assured that the packets
+were sent by the sender. The <olink targetptr="glossary-35" remap="internal">encapsulating
+security payload (ESP)</olink> encrypts IP data, thus obscuring the content
+during packet transmission. ESP also can ensure data integrity through an
+authentication algorithm option.</para>
+</listitem><listitem><para><emphasis role="strong">Security associations database (SADB) &ndash;</emphasis> The database that associates a security protocol with an IP destination
+address and an indexing number. The indexing number is called the <olink targetptr="glossary-94" remap="internal">security parameter index (SPI)</olink>. These three
+elements (the security protocol, the destination address, and the SPI) uniquely
+identify a legitimate IPsec packet. The database ensures that a protected
+packet that arrives to the packet destination is recognized by the receiver.
+The receiver also uses information from the database to decrypt the communication,
+verify that the packets are unchanged, reassemble the packets, and deliver
+the packets to their ultimate destination.</para>
+</listitem><listitem><para><emphasis role="strong">Key management &ndash;</emphasis> The
+generation and distribution of keys for the cryptographic algorithms and for
+the SPI.</para>
+</listitem><listitem><para><emphasis role="strong">Security mechanisms &ndash;</emphasis> The
+authentication and encryption algorithms that protect the data in the IP datagrams.</para>
+</listitem><listitem><para><emphasis role="strong">Security policy database (SPD) &ndash;</emphasis> The
+database that specifies the level of protection to apply to a packet. The
+SPD filters IP traffic to determine how the packets should be processed. A
+packet can be discarded. A packet can be passed in the clear. Or, a packet
+can be protected with IPsec. For outbound packets, the SPD and the SADB determine
+what level of protection to apply. For inbound packets, the SPD helps to determine
+if the level of protection on the packet is acceptable. If the packet is protected
+by IPsec, the SPD is consulted after the packet has been decrypted and has
+been verified.</para>
+</listitem>
+</itemizedlist><para>When you invoke IPsec, IPsec applies the security mechanisms to IP datagrams
+that travel to the IP destination address. The receiver uses information in
+its SADB to verify that the arriving packets are legitimate, and to decrypt
+them. Applications can invoke IPsec to apply security mechanisms to IP datagrams
+on a per-socket level as well.</para><itemizedlist><para>Note
+that sockets behave differently from ports:</para><listitem><para>Per-socket SAs override their corresponding port entry in
+the SPD.</para>
+</listitem><listitem><para>Also, if a socket on a port is connected, and IPsec policy
+is later applied to that port, then traffic that uses that socket is not protected
+by IPsec.</para><para>Of course, a socket that is opened on a port <emphasis>after</emphasis> IPsec policy is applied to the port is protected by IPsec policy.</para>
+</listitem>
+</itemizedlist><sect2 id="ipsec-ov-14"><title>IPsec RFCs</title><para>The Internet Engineering Task Force (IETF) has published a number
+of Requests for Comment (RFCs) that describe the security architecture for
+the IP layer. All RFCs are copyrighted by the Internet Society. For a link
+to the RFCs, see <ulink url="http://ietf.org/" type="url">http://ietf.org/</ulink>.
+The following list of RFCs covers the more general IP security references:</para><itemizedlist><listitem><para>RFC 2411, &ldquo;IP Security Document Roadmap,&rdquo; November
+1998</para>
+</listitem><listitem><para>RFC 2401, &ldquo;Security Architecture for the Internet Protocol,&rdquo;
+November 1998</para>
+</listitem><listitem><para>RFC 2402, &ldquo;IP Authentication Header,&rdquo; November
+1998</para>
+</listitem><listitem><para>RFC 2406, &ldquo;IP Encapsulating Security Payload (ESP),&rdquo;
+November 1998</para>
+</listitem><listitem><para>RFC 2408, &ldquo;Internet Security Association and Key Management
+Protocol (ISAKMP),&rdquo; November 1998</para>
+</listitem><listitem><para>RFC 2407, &ldquo;The Internet IP Security Domain of Interpretation
+for ISAKMP,&rdquo; November 1998</para>
+</listitem><listitem><para>RFC 2409, &ldquo;The Internet Key Exchange (IKE),&rdquo; November
+1998</para>
+</listitem><listitem><para>RFC 3554, &ldquo;On the Use of Stream Control Transmission Protocol
+(SCTP) with IPsec,&rdquo; July 2003 [ not implemented in the Solaris 10 release
+]</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ipsec-ov-17"><title>IPsec Terminology</title><para>The IPsec RFCs define a number of terms that are useful to recognize
+when implementing IPsec on your systems. The following table lists IPsec terms,
+provides their commonly used acronyms, and defines each term. For a list of
+terminology used in key negotiation, see <olink targetptr="ike-tbl-2" remap="internal">Table
+22&ndash;1</olink>.</para><table frame="topbot" id="ipsec-ov-tbl-4"><title>IPsec Terms, Acronyms, and
+Uses</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="20.20*"/><colspec colname="colspec1" colwidth="11.40*"/><colspec colname="colspec2" colwidth="67.40*"/><thead><row rowsep="1"><entry><para>IPsec Term</para>
+</entry><entry><para>Acronym</para>
+</entry><entry><para>Definition</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Security association</para>
+</entry><entry><para>SA</para>
+</entry><entry><para>A unique connection between two nodes on a network. The connection is
+defined by a triplet: a security protocol, a security parameter index, and
+an IP destination. The IP destination can be an IP address or a socket.</para>
+</entry>
+</row><row><entry><para>Security associations database</para>
+</entry><entry><para>SADB</para>
+</entry><entry><para>Database that contains all active security associations.</para>
+</entry>
+</row><row><entry><para>Security parameter index</para>
+</entry><entry><para>SPI</para>
+</entry><entry><para>The indexing value for a security association. An SPI is a 32-bit value
+that distinguishes among SAs that have the same IP destination and security
+protocol.</para>
+</entry>
+</row><row><entry><para>Security policy database</para>
+</entry><entry><para>SPD</para>
+</entry><entry><para>Database that determines if outbound packets and inbound packets have
+the specified level of protection.</para>
+</entry>
+</row><row><entry><para>Key exchange</para>
+</entry><entry><para></para>
+</entry><entry><para>The process of generating keys for asymmetric cryptographic algorithms.
+The two main methods are RSA protocols and the Diffie-Hellman protocol.</para>
+</entry>
+</row><row><entry><para>Diffie-Hellman protocol</para>
+</entry><entry><para>DH</para>
+</entry><entry><para>A key exchange protocol that involves key generation and key authentication.
+Often called <emphasis>authenticated key exchange</emphasis>.</para>
+</entry>
+</row><row><entry><para>RSA protocol</para>
+</entry><entry><para>RSA</para>
+</entry><entry><para>A key exchange protocol that involves key generation and key distribution.
+The protocol is named for its three creators, Rivest, Shamir, and Adleman.</para>
+</entry>
+</row><row><entry><para>Internet Security Association and Key Management Protocol</para>
+</entry><entry><para>ISAKMP</para>
+</entry><entry><para>The common framework for establishing the format of SA attributes, and
+for negotiating, modifying, and deleting SAs. ISAKMP is the IETF standard
+for handling IPsec SAs.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="ipsec-ov-54"><title>IPsec Packet Flow</title><para><olink targetptr="ipsec-ov-fig-2" remap="internal">Figure 19&ndash;1</olink> shows
+how an IP addressed packet, as part of an <olink targetptr="glossary-121" remap="internal">IP
+datagram</olink>, proceeds when IPsec has been invoked on an outbound packet.
+The flow diagram illustrates where authentication header (AH) and encapsulating
+security payload (ESP) entities can be applied to the packet. How to apply
+these entities, as well as how to choose the algorithms, are described in
+subsequent sections.</para><para><olink targetptr="ipsec-ov-fig-3" remap="internal">Figure 19&ndash;2</olink> shows
+the IPsec inbound process.</para><figure id="ipsec-ov-fig-2"><title>IPsec Applied to Outbound Packet Process</title><mediaobject><imageobject><imagedata entityref="Outgoing-datagrams.epsi"/>
+</imageobject><textobject><simpara>Flow diagram shows that the outbound packet is first
+protected by ESP, and then by AH. The packet then goes to a tunnel or a physical
+interface.</simpara>
+</textobject>
+</mediaobject>
+</figure><figure id="ipsec-ov-fig-3"><title>IPsec Applied to Inbound Packet Process</title><mediaobject><imageobject><imagedata entityref="Incoming-datagrams.epsi"/>
+</imageobject><textobject><simpara>Flow diagram shows that IPsec first processes the AH
+header, then the ESP header on inbound packets. A packet that is not protected
+enough is dropped.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect1><sect1 id="ipsec-ov-5"><title>IPsec Security Associations</title><para>An IPsec <firstterm>security association</firstterm> (SA) specifies
+security properties that are recognized by communicating hosts. A single SA
+protects data in one direction. The protection is either to a single host
+or to a group (multicast) address. Because most communication is either peer-to-peer
+or client-server, two SAs must be present to secure traffic in both directions.</para><para>The following three elements uniquely identify an IPsec SA:</para><itemizedlist><listitem><para>The security protocol (AH or ESP)</para>
+</listitem><listitem><para>The destination IP address</para>
+</listitem><listitem><para>The <olink targetptr="glossary-94" remap="internal">security parameter index
+(SPI)</olink></para>
+</listitem>
+</itemizedlist><para>The SPI, an arbitrary 32-bit value, is transmitted with an AH or ESP
+packet. The <olink targetdoc="refman7" targetptr="ipsecah-7p" remap="external"><citerefentry><refentrytitle>ipsecah</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> and <olink targetdoc="refman7" targetptr="ipsecesp-7p" remap="external"><citerefentry><refentrytitle>ipsecesp</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man pages
+explain the extent of protection that is provided by AH and ESP. An integrity
+checksum value is used to authenticate a packet. If the authentication fails,
+the packet is dropped.</para><para>Security associations are stored in a <firstterm>security associations
+database</firstterm> (SADB). A socket-based administration engine, the <command>pf_key</command> interface, enables privileged applications to manage the database.</para><itemizedlist><listitem><para>For a more complete description of the IPsec SADB, see <olink targetptr="ipsecref-24" remap="internal">Security Associations Database for IPsec</olink>.</para>
+</listitem><listitem><para>For more information about how to manage the SADB, see the <olink targetdoc="refman7" targetptr="pf-key-7p" remap="external"><citerefentry><refentrytitle>pf_key</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</itemizedlist><sect2 id="ipsec-ov-6"><title>Key Management in IPsec</title><para>Security associations (SAs) require material to create the keys for
+authentication and for encryption. The managing of this <emphasis>keying material</emphasis> is called <emphasis>key management</emphasis>. The Internet Key
+Exchange (IKE) protocol handles key management automatically. You can also
+manage keys manually with the <command>ipseckey</command> command. </para><para>SAs on IPv4 and IPv6 packets can use either method of key management.
+Unless you have an overriding reason to use manual key management, automatic
+key management is preferred. For example, to interoperate with systems other
+than Solaris systems might require manual key management.</para><itemizedlist><listitem><para>The <command>in.iked</command> daemon provides automatic key management.
+For a description of IKE, see <olink targetptr="ike-1" remap="internal">Chapter&nbsp;22, Internet
+Key Exchange (Overview)</olink>. For more information on the <command>in.iked</command> daemon,
+see the <olink targetdoc="refman1m" targetptr="in.iked-1m" remap="external"><citerefentry><refentrytitle>in.iked</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem><listitem><para>The <command>ipseckey</command> command provides manual key management.
+For a description of the command, see <olink targetptr="ipsecref-25" remap="internal">Utilities
+for Key Generation in IPsec</olink>. For a detailed description of the <command>ipseckey</command> command options, see the <olink targetdoc="refman1m" targetptr="ipseckey-1m" remap="external"><citerefentry><refentrytitle>ipseckey</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="ipsec-ov-7"><title>IPsec Protection Mechanisms</title><para>IPsec provides two security protocols for protecting data:</para><itemizedlist><listitem><para>Authentication Header (AH)</para>
+</listitem><listitem><para>Encapsulating Security Payload (ESP)</para>
+</listitem>
+</itemizedlist><para>An AH protects data with an authentication algorithm. An ESP protects
+data with an encryption algorithm. Optionally, an ESP protects data with an
+authentication algorithm. Each implementation of an algorithm is called a <emphasis>mechanism</emphasis>.</para><sect2 id="ipsec-ov-27"><title>Authentication Header</title><para>The <olink targetptr="glossary-34" remap="internal">authentication header</olink> provides
+data authentication, strong integrity, and replay protection to IP datagrams.
+AH protects the greater part of the <acronym>IP</acronym> datagram. As the
+following illustration shows, AH is inserted between the IP header and the
+transport header.</para><mediaobject><imageobject><imagedata entityref="IPsecHdr3.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the AH header between the IP header and
+the TCP header.</simpara>
+</textobject>
+</mediaobject><para>The transport header can be TCP, UDP, SCTP, or ICMP. If a <olink targetptr="glossary-95" remap="internal">tunnel</olink> is being used, the transport header
+can be another IP header.</para>
+</sect2><sect2 id="ipsec-ov-8"><title>Encapsulating Security Payload</title><para>The <olink targetptr="glossary-35" remap="internal">encapsulating security payload (ESP)</olink> module
+provides confidentiality over what the ESP encapsulates. ESP also provides
+the services that AH provides. However, ESP only provides its protections
+over the part of the datagram that ESP encapsulates. The authentication services
+of ESP are optional. These services enable you to use ESP and AH together
+on the same datagram without redundancy. Because ESP uses encryption-enabling
+technology, ESP must conform to U.S. export control laws.</para><para>ESP encapsulates its data, so ESP only protects the data that
+follows its beginning in the datagram, as shown in the following illustration.</para><mediaobject><imageobject><imagedata entityref="IPsecHdr2.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the ESP header between the IP header and
+the TCP header. The TCP header is encrypted by the ESP header.</simpara>
+</textobject>
+</mediaobject><para>In a TCP packet, ESP encapsulates only the TCP header and its data.
+If the packet is an IP-in-IP datagram, ESP protects the inner IP datagram.
+Per-socket policy allows <emphasis>self-encapsulation</emphasis>, so ESP can
+encapsulate IP options when ESP needs to.</para><para>If self-encapsulation
+is set, a copy of the IP header is made to construct an IP-in-IP datagram.
+For example, when self-encapsulation is not set on a TCP socket, the datagram
+is sent in the following format:</para><screen>[ IP(a -> b) <replaceable>options</replaceable> + TCP + data ]</screen><para>When self-encapsulation is set on that TCP socket, the datagram
+is sent in the following format:</para><screen>[ IP(a -> b) + ESP [ IP(a -> b) <replaceable>options</replaceable> + TCP + data ] ]</screen><para>For further discussion, see <olink targetptr="ipsec-ov-13" remap="internal">Transport and Tunnel Modes in IPsec</olink>.</para><sect3 id="ipsec-ov-10"><title>Security Considerations When Using
+AH and ESP</title><para>The following table compares the protections that are provided
+by AH and ESP.</para><table frame="topbot" pgwide="1" id="ipsec-ov-tbl-5"><title>Protections Provided
+by AH and ESP in IPsec</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="12.07*"/><colspec colname="colspec3" colwidth="35.24*"/><colspec colname="colspec1" colwidth="61.36*"/><colspec colname="colspec2" colwidth="30.33*"/><thead><row rowsep="1"><entry><para>Protocol</para>
+</entry><entry><para>Packet Coverage</para>
+</entry><entry><para>Protection</para>
+</entry><entry><para>Against Attacks</para>
+</entry>
+</row>
+</thead><tbody><row><entry rowsep="1"><para>AH</para>
+</entry><entry rowsep="1"><para>Protects packet from the IP header to the transport header</para>
+</entry><entry rowsep="1"><para>Provides strong integrity, data authentication:</para><itemizedlist><listitem><para>Ensures that the receiver receives exactly what the sender
+sent</para>
+</listitem><listitem><para>Is susceptible to replay attacks when an AH does not enable
+replay protection</para>
+</listitem>
+</itemizedlist>
+</entry><entry rowsep="1"><para>Replay, cut-and-paste</para>
+</entry>
+</row><row><entry morerows="2"><para>ESP</para>
+</entry><entry morerows="2"><para>Protects packet following the beginning of ESP in the datagram.</para>
+</entry><entry><para>With encryption option, encrypts the IP datagram. Ensures confidentiality</para>
+</entry><entry><para>Eavesdropping</para>
+</entry>
+</row><row><entry><para>With authentication option, provides the same protection as AH</para>
+</entry><entry><para>Replay, cut-and-paste</para>
+</entry>
+</row><row><entry><para>With both options, provides strong integrity, data authentication, and
+confidentiality</para>
+</entry><entry><para>Replay, cut-and-paste, eavesdropping</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3>
+</sect2><sect2 id="ipsec-ov-11"><title>Authentication and Encryption Algorithms in
+IPsec</title><para>IPsec security protocols use two types of algorithms, authentication
+and encryption. The AH module uses authentication algorithms. The ESP module
+can use encryption as well as authentication algorithms. You can obtain a
+list of the algorithms on your system and their properties by using the <command>ipsecalgs</command> command. For more information, see the <olink targetdoc="refman1m" targetptr="ipsecalgs-1m" remap="external"><citerefentry><refentrytitle>ipsecalgs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.
+You can also use the functions that are described in the <olink targetdoc="refman3b" targetptr="getipsecalgbyname-3nsl" remap="external"><citerefentry><refentrytitle>getipsecalgbyname</refentrytitle><manvolnum>3NSL</manvolnum></citerefentry></olink> man page to retrieve the properties of algorithms.</para><para>IPsec on a Solaris system uses the Solaris cryptographic framework to
+access the algorithms. The framework provides a central repository for algorithms,
+in addition to other services. The framework enables IPsec to take advantage
+of high performance cryptographic hardware accelerators. The framework also
+provides resource control features. For example, the framework enables you
+to limit the amount of CPU time spent in cryptographic operations in the kernel.
+For more information, see the following:</para><itemizedlist><listitem><para><olink targetdoc="sysadv6" targetptr="scf-1" remap="external">Chapter 12, <citetitle remap="chapter">Solaris Cryptographic Framework (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink></para>
+</listitem><listitem><para><olink targetdoc="gssapipg" targetptr="chapter1-1" remap="external">Chapter 8, <citetitle remap="chapter">Introduction to the Solaris Cryptographic Framework,</citetitle> in <citetitle remap="book">Solaris Security for Developers Guide</citetitle></olink></para>
+</listitem>
+</itemizedlist><sect3 id="ipsec-ov-19"><title>Authentication Algorithms in IPsec</title><para>Authentication algorithms produce an integrity checksum value
+or <emphasis>digest</emphasis> that is based on the data and a key. The AH
+module uses authentication algorithms. The ESP module can use authentication
+algorithms as well.</para>
+</sect3><sect3 id="ipsec-ov-20"><title>Encryption Algorithms in IPsec</title><para>Encryption algorithms encrypt data with a key. The ESP module
+in IPsec uses encryption algorithms. The algorithms operate on data in units
+of a <emphasis>block size</emphasis>. By default, the <olink targetptr="glossary-37" remap="internal">DES</olink>-CBC, 3DES-CBC, AES-CBC, and Blowfish-CBC
+algorithms are installed. The key sizes that are supported by the AES-CBC
+and Blowfish-CBC algorithms are limited to 128 bits.</para><para>AES-CBC and Blowfish-CBC algorithms that support key sizes that are
+greater than 128 bits are available to IPsec when you install the Solaris
+Encryption Kit. However, not all encryption
+algorithms are available outside of the United States. The kit is available
+on a separate CD that is <emphasis>not</emphasis> part of the Solaris 10 installation
+box. The <citetitle>Solaris 10 Encryption Kit Installation Guide</citetitle> describes
+how to install the kit. For more information, see the <ulink url="http://www.sun.com/download" type="text">Sun Downloads</ulink> web site. To download the kit, click the Downloads
+A-Z tab, then click the letter S. The Solaris 10 Encryption Kit is among the
+first twenty entries.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="ipsec-ov-12"><title>IPsec Protection Policies</title><para>IPsec protection policies can use any of the security mechanisms. IPsec
+policies can be applied at the following levels:</para><itemizedlist><listitem><para>On a system-wide level</para>
+</listitem><listitem><para>On a per-socket level</para>
+</listitem>
+</itemizedlist><para>IPsec applies the system-wide policy to outbound datagrams and
+inbound datagrams. Outbound datagrams are either sent with protection or without
+protection. If protection is applied, the algorithms are either specific or
+non-specific. You can apply some additional rules to outbound datagrams, because
+of the additional data that is known by the system. Inbound datagrams can
+be either accepted or dropped. The decision to drop or accept an inbound datagram
+is based on several criteria, which sometimes overlap or conflict. Conflicts
+are resolved by determining which rule is parsed first. The traffic is automatically
+accepted, except when a policy entry states that traffic should bypass all
+other policies.</para><para>The policy that normally protects a datagram can be bypassed.
+You can either specify an exception in the system-wide policy, or you can
+request a bypass in the per-socket policy. For traffic within a system, policies
+are enforced, but actual security mechanisms are not applied. Instead, the
+outbound policy on an intra-system packet translates into an inbound packet
+that has had those mechanisms applied.</para><para>You use the <filename>ipsecinit.conf</filename> file and the <command>ipsecconf</command> command to configure IPsec policies. For details and examples,
+see the <olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</sect1><sect1 id="ipsec-ov-13"><title>Transport and Tunnel Modes in IPsec</title><para>The IPsec standards
+define two distinct modes of IPsec operation, transport mode and tunnel mode.
+The modes do not affect the encoding of packets. The packets are protected
+by AH, ESP, or both in each mode. The modes differ in policy application when
+the inner packet is an IP packet.</para><itemizedlist><listitem><para>In transport mode, the outer header determines the IPsec policy
+that protects the inner IP packet.</para>
+</listitem><listitem><para>In tunnel mode, the inner IP packet determines the IPsec policy
+that protects its contents.</para>
+</listitem>
+</itemizedlist><para>In transport mode, the outer header, the next header, and any
+ports that the next header supports, can be used to determine IPsec policy.
+In effect, IPsec can enforce different transport mode policies between two
+IP addresses to the granularity of a single port. For example, if the next
+header is TCP, which supports ports, IPsec policy can be set for a TCP port
+of the outer IP address. Similarly, if the next header is an IP header, the
+outer header and the inner IP header can be used to determine IPsec policy.</para><para>Tunnel mode works only on IP-in-IP datagrams. Tunneling in tunnel
+mode can be useful when computer workers at home are connecting to a central
+computer location. In tunnel mode, IPsec policy is enforced on the contents
+of the inner IP datagram. Different IPsec policies can be enforced for different
+inner IP addresses. That is, the inner IP header, its next header, and the
+ports that the next header supports, can enforce a policy. Unlike transport
+mode, in tunnel mode the outer IP header does not dictate the policy of its
+inner IP datagram.</para><para>Therefore, in tunnel mode, IPsec policy can
+be specified for subnets of a LAN behind a router and can be specified for
+ports on those subnets. IPsec policy can also be specified for particular
+IP addresses, that is, hosts, on those subnets. The ports of those hosts can
+also have a specific IPsec policy. However, if a dynamic routing protocol
+is run over a tunnel, neither subnet selection nor address selection should
+be used, because the view of the network topology on the peer network could
+change.  Changes would invalidate the static IPsec policy.  For examples of
+tunneling procedures that include configuring static routes, see  <olink targetptr="ipsec-mgtasks-vpn-4" remap="internal">Protecting a VPN With IPsec</olink>.</para><para>In Solaris, tunnel mode can be enforced only on an IP tunneling
+network interface. The <command>ipsecconf</command> command provides a <literal>tunnel</literal> keyword to select an IP tunneling network interface. When the <literal>tunnel</literal> keyword is present in a rule, all selectors that are specified
+in that rule apply to the inner packet.</para><para>In transport mode, ESP, AH, or both
+ESP and AH, can protect the datagram.</para><para><olink targetptr="ipsec-ov-fig-5" remap="internal">Figure 19&ndash;3</olink> shows an IP header with an unprotected TCP packet.</para><figure id="ipsec-ov-fig-5"><title>Unprotected IP Packet Carrying TCP Information</title><mediaobject><imageobject><imagedata entityref="IPsecHdr1.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the IP header followed by the TCP header.
+The TCP header is not protected.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>In
+transport mode, ESP protects the data as shown in <olink targetptr="ipsec-ov-fig-7" remap="internal">Figure
+19&ndash;4</olink>.</para><figure id="ipsec-ov-fig-7"><title>Protected IP Packet Carrying TCP Information</title><mediaobject><imageobject><imagedata entityref="IPsecHdr2.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the ESP header between the IP header and
+the TCP header. The TCP header is encrypted by the ESP header.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>In
+transport mode, AH protects the data as shown in <olink targetptr="ipsec-ov-fig-8" remap="internal">Figure 19&ndash;5</olink>.</para><figure id="ipsec-ov-fig-8"><title>Packet Protected by an Authentication Header</title><mediaobject><imageobject><imagedata entityref="IPsecHdr3.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the AH header between the IP header and
+the TCP header.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>AH actually covers the data before the data appears in the datagram.
+Consequently, the protection that is provided by AH, even in transport mode,
+covers some of the IP header.</para><para>In tunnel
+mode, the entire datagram
+is <emphasis>inside</emphasis> the protection of an IPsec header. The datagram in <olink targetptr="ipsec-ov-fig-5" remap="internal">Figure
+19&ndash;3</olink> is protected in tunnel mode by an outer IPsec header, and in this case
+ESP, as is
+shown in <olink targetptr="ipsec-ov-fig-6" remap="internal">Figure 19&ndash;6</olink>.</para><figure id="ipsec-ov-fig-6"><title>IPsec Packet Protected in Tunnel Mode</title><mediaobject><imageobject><imagedata entityref="IPsecHdr4.epsi"/>
+</imageobject><textobject><simpara>Diagram shows the ESP header after the IP header and
+before an IP header and a TCP header. The last 2 headers are protected by
+encryption.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The <command>ipsecconf</command> command
+includes keywords to set tunnels in tunnel mode or in transport mode.</para><itemizedlist><listitem><para>For details on per-socket policy, see the <olink targetdoc="refman7" targetptr="ipsec-7p" remap="external"><citerefentry><refentrytitle>ipsec</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>For an example of per-socket policy, see <olink targetptr="ipsec-mgtasks-16" remap="internal">How to Secure a Web Server With IPsec</olink>.</para>
+</listitem><listitem><para>For more information about tunnels, see the <olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</listitem><listitem><para>For an example of tunnel configuration, see <olink targetptr="ipsec-mgtasks-23" remap="internal">How to Protect a VPN With an IPsec Tunnel in
+Tunnel Mode Over IPv4</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="ipsec-ov-15"><title>Virtual Private Networks and IPsec</title><para>A configured tunnel is a point-to-point interface. The tunnel
+enables one IP packet to be encapsulated within another IP packet. A correctly
+configured tunnel requires both a tunnel source and a tunnel destination.
+For more information, see the <olink targetdoc="refman7" targetptr="lc-tun-7m" remap="external"><citerefentry><refentrytitle>tun</refentrytitle><manvolnum>7M</manvolnum></citerefentry></olink> man
+page and <olink targetptr="ipv6-config-tasks-16" remap="internal">Configuring
+Tunnels for IPv6 Support</olink>. </para><para>A tunnel creates an apparent <olink targetptr="glossary-68" remap="internal">physical
+interface</olink> to IP. The physical link's integrity depends on the underlying
+security protocols. If you set up the security associations (SAs) securely,
+then you can trust the tunnel. Packets that exit the tunnel must have originated
+from the peer that was specified in the tunnel destination. If this trust
+exists, you can use per-interface IP forwarding to create a <olink targetptr="glossary-57" remap="internal">virtual private network (VPN)</olink>.</para><para>You can use IPsec to construct a VPN. IPsec secures the connection.
+For example, an organization that uses VPN technology to connect offices with
+separate networks can deploy IPsec to secure traffic between the two offices.</para><para>The following figure illustrates how two offices use the Internet to
+form their VPN with IPsec deployed on their network systems.</para><figure id="ipsec-ov-fig-4"><title>Virtual Private Network</title><mediaobject><imageobject><imagedata entityref="IPsecvpn.epsi"/>
+</imageobject><textobject><simpara>Diagram shows that Offices 1 and 2 use the hme0 interface
+to communicate with each other. Each office uses hme1 for internal communication.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>For a detailed example of the setup procedure, see <olink targetptr="ipsec-mgtasks-23" remap="internal">How to Protect a VPN With an IPsec Tunnel in
+Tunnel Mode Over IPv4</olink>. For IPv6 networks, see <olink targetptr="ipsec-mgtasks-15" remap="internal">How to Protect a VPN With an IPsec Tunnel in
+Tunnel Mode Over IPv6</olink>.</para>
+</sect1><sect1 id="ipsec-ov-24"><title>IPsec and NAT Traversal</title><para>IKE can negotiate IPsec SAs across a <olink targetptr="glossary-140" remap="internal">NAT</olink> box.
+This ability enables systems to securely connect from a remote network, even
+when the systems are behind a NAT device. For example, employees who work
+from home, or who log on from a conference site can protect their traffic
+with IPsec.</para><para>NAT stands for network address translation. A NAT box is used to translate
+a private internal address into a unique Internet address. NATs are very common
+at public access points to the Internet, such as hotels. For a fuller discussion,
+see <olink targetptr="euqfc" remap="internal">Using Solaris IP Filter's NAT Feature</olink>.</para><para>The ability to use IKE when a NAT box is between communicating systems
+is called NAT traversal, or NAT-T. In the Solaris 10 release, NAT-T has the
+following limitations:</para><itemizedlist><listitem><para>NAT-T works on IPv4 networks only.</para>
+</listitem><listitem><para>NAT-T cannot take advantage of the	IPsec ESP acceleration
+provided by the Sun Crypto Accelerator 4000 board. However, IKE acceleration with the Sun Crypto Accelerator 4000 board
+works.</para>
+</listitem><listitem><para>The AH protocol depends on an unchanging IP header, therefore
+AH cannot work with NAT-T. The ESP protocol is used with NAT-T.</para>
+</listitem><listitem><para>The NAT box does not use special processing rules. A NAT box
+with special IPsec processing rules might interfere with the implementation
+of NAT-T.</para>
+</listitem><listitem><para>NAT-T works only when the IKE initiator is the system behind
+the NAT box. An IKE responder cannot be behind a NAT box unless the box has
+been programmed to forward IKE packets to the appropriate individual system
+behind the box.</para>
+</listitem>
+</itemizedlist><para>The following RFCs describe NAT functionality and the limits of NAT-T.
+Copies of the RFCs can be retrieved from <ulink url="http://www.rfc-editor.org" type="url">http://www.rfc-editor.org</ulink>.</para><itemizedlist><listitem><para>RFC 3022, &ldquo;Traditional IP Network Address Translator
+(Traditional NAT),&rdquo; January 2001</para>
+</listitem><listitem><para>RFC 3715, &ldquo;IPsec-Network Address Translation (NAT) Compatibility
+ Requirements,&rdquo; March 2004</para>
+</listitem><listitem><para>RFC 3947, &ldquo;Negotiation of NAT-Traversal in the IKE,&rdquo; January
+2005</para>
+</listitem><listitem><para>RFC 3948, &ldquo;UDP Encapsulation of
+IPsec Packets,&rdquo; January 2005</para>
+</listitem>
+</itemizedlist><para>To use IPsec across a NAT, see <olink targetptr="ike-task-38" remap="internal">Configuring
+IKE for Mobile Systems (Task Map)</olink>.</para>
+</sect1><sect1 id="ipsec-ov-22"><title>IPsec and SCTP</title><para>The Solaris 10 release supports the Streams Control Transmission Protocol
+(SCTP). The use of the SCTP protocol and SCTP port number to specify IPsec
+policy is supported, but is not robust. The IPsec extensions for SCTP as specified
+in RFC 3554 are not yet implemented. These limitations can create complications
+in creating IPsec policy for SCTP.</para><para>SCTP can make use of multiple source and destination addresses in the
+context of a single SCTP association. When IPsec policy is applied to a single
+source or a single destination address, communication can fail when SCTP switches
+the source or the destination address of that association. IPsec policy only
+recognizes the original address. For information about SCTP, read the RFCs
+and <olink targetptr="ermih" remap="internal">SCTP Protocol</olink>.</para>
+</sect1><sect1 id="ipsec-ov-18"><title>IPsec and Solaris Zones</title><para>IPsec is configured from the global zone. The IPsec policy configuration file, <filename>ipsecinit.conf</filename>, exists in the global zone only. The file can have entries that
+apply to non-global zones, as well as entries that apply to the global zone.
+For information on how to use IPsec with zones, see <olink targetptr="ipsec-mgtasks-4" remap="internal">Protecting Traffic With IPsec</olink>. For information
+about zones, see <olink targetdoc="sysadrm" targetptr="zones.intro-1" remap="external">Chapter 16, <citetitle remap="chapter">Introduction to Solaris Zones,</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para>
+</sect1><sect1 id="ipsec-ov-21"><title>IPsec Utilities and Files</title><para><olink targetptr="ipsecref-tbl-1" remap="internal">Table 19&ndash;3</olink> describes the files and
+commands that are used to configure and manage IPsec. For completeness, the
+table includes key management files and commands. </para><itemizedlist><listitem><para>For instructions on implementing IPsec on your network, see <olink targetptr="ipsec-mgtasks-2" remap="internal">Protecting Traffic With IPsec (Task Map)</olink>.</para>
+</listitem><listitem><para>For more details about IPsec utilities and files, see <olink targetptr="ipsecref-1" remap="internal">Chapter&nbsp;21, IP Security Architecture (Reference)</olink>.</para>
+</listitem>
+</itemizedlist><table frame="topbot" pgwide="1" id="ipsecref-tbl-1"><title>List of Selected
+IPsec Files and Commands</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="50.50*"/><colspec colname="colspec1" colwidth="82.92*"/><colspec colname="colspec3" colwidth="27.24*"/><thead><row rowsep="1"><entry><para>IPsec Utility or File</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Man Page</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>/etc/inet/ipsecinit.conf</filename> file</para>
+</entry><entry><para>IPsec policy file. If this file exists, IPsec is activated at
+boot time.</para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>ipsecconf</command> command</para>
+</entry><entry><para>IPsec policy command. The boot scripts use <command>ipsecconf</command> to
+read the <filename>/etc/inet/ipsecinit.conf</filename> file and activate IPsec.
+Useful for viewing and modifying the current IPsec policy, and for testing.</para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="ipsecconf-1m" remap="external"><citerefentry><refentrytitle>ipsecconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>PF_KEY</command> socket interface</para>
+</entry><entry><para>Interface for security associations database (SADB). Handles manual
+key management and automatic key management.</para>
+</entry><entry><para><olink targetdoc="refman7" targetptr="pf-key-7p" remap="external"><citerefentry><refentrytitle>pf_key</refentrytitle><manvolnum>7P</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><command>ipseckey</command> command</para>
+</entry><entry><para>IPsec security associations (SAs) keying command. <command>ipseckey</command> is
+a command-line front end to the <command>PF_KEY</command> interface. <command>ipseckey</command> can create, destroy, or modify SAs.</para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="ipseckey-1m" remap="external"><citerefentry><refentrytitle>ipseckey</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><filename>/etc/inet/secret/ipseckeys</filename> file</para>
+</entry><entry><para>Keys for IPsec SAs. If the <filename>ipsecinit.conf</filename> file
+exists, the <filename>ipseckeys</filename> file is automatically read at boot
+time.</para>
+</entry><entry>
+</entry>
+</row><row><entry><para><command>ipsecalgs</command> command</para>
+</entry><entry><para>IPsec algorithms command. Useful for viewing and modifying the list
+of IPsec algorithms and their properties.</para>
+</entry><entry><para><olink targetdoc="refman1m" targetptr="ipsecalgs-1m" remap="external"><citerefentry><refentrytitle>ipsecalgs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry>
+</row><row><entry><para><filename>/etc/inet/ipsecalgs</filename> file</para>
+</entry><entry><para>Contains the configured IPsec protocols and algorithm definitions. This
+file is managed by the <command>ipsecalgs</command> utility and must never
+be edited manually.</para>
+</entry><entry>
+</entry>
+</row><row><entry><para><filename>/etc/inet/ike/config</filename> file</para>
+</entry><entry><para>IKE configuration and policy file. If this file exists, the IKE
+daemon, <command>in.iked</command>, provides automatic key management. The
+management is based on rules and global parameters in the <filename>/etc/inet/ike/config</filename> file. See <olink targetptr="ike-12" remap="internal">IKE Utilities and Files</olink>.</para>
+</entry><entry><para><olink targetdoc="refman4" targetptr="ike.config-4" remap="external"><citerefentry><refentrytitle>ike.config</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="ipsec-ov-16"><title>Changes to IPsec for the Solaris 10 Release</title><para>For a complete listing of new Solaris features and a description
+of Solaris releases, see <olink targetdoc="solwhatsnew" remap="external"><citetitle remap="book">Solaris Express, Developer Edition What&rsquo;s New</citetitle></olink>. Since
+the Solaris 9 release, IPsec includes the following functionality:</para><itemizedlist><listitem><para>When a Sun Crypto Accelerator 4000 board is attached, the board automatically caches
+IPsec SAs for packets that use the board's Ethernet interface. The board also
+accelerates the processing of the IPsec SAs.</para>
+</listitem><listitem><para>IPsec can take advantage of automatic key management with
+IKE over IPv6 networks. For more information, see <olink targetptr="ike-1" remap="internal">Chapter&nbsp;22,
+Internet Key Exchange (Overview)</olink>.</para><para>For new IKE features,
+see <olink targetptr="ike-10" remap="internal">Changes to IKE for the Solaris 10 Release</olink>.</para>
+</listitem><listitem><para>The parser for the<command>ipseckey</command> command provides
+clearer help. The <command>ipseckey monitor</command> command timestamps each
+event. For details, see the <olink targetdoc="refman1m" targetptr="ipseckey-1m" remap="external"><citerefentry><refentrytitle>ipseckey</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para>
+</listitem><listitem><para>IPsec algorithms now come from a central storage location,
+the Solaris cryptographic framework. The <olink targetdoc="refman1m" targetptr="ipsecalgs-1m" remap="external"><citerefentry><refentrytitle>ipsecalgs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page describes the characteristics
+of the algorithms that are available. The algorithms are optimized for the
+architecture that they run on. For a description of the framework, see <olink targetdoc="sysadv6" targetptr="scf-1" remap="external">Chapter 12, <citetitle remap="chapter">Solaris Cryptographic Framework (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</listitem><listitem><para>IPsec works in the global zone. IPsec policy is managed in
+the global zone for a non-global zone. Keying material is created and is managed
+manually in the global zone for a non-global zone. IKE cannot be used to generate
+keys for a non-global zone. For more information on zones, see <olink targetdoc="sysadrm" targetptr="zones.intro-1" remap="external">Chapter 16, <citetitle remap="chapter">Introduction to Solaris Zones,</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para>
+</listitem><listitem><para>IPsec policy can work with the Streams Control Transmission
+Protocol (SCTP) and SCTP port number. However, the implementation is not complete.
+The IPsec extensions for SCTP that are specified in RFC 3554 are not yet implemented.
+These limitations can cause complications when creating IPsec policy for SCTP.
+For details, consult the RFCs. Also, read <olink targetptr="ipsec-ov-22" remap="internal">IPsec
+and SCTP</olink> and <olink targetptr="ermih" remap="internal">SCTP Protocol</olink>.</para>
+</listitem><listitem><para>IPsec and IKE can protect traffic that originates behind a
+NAT box. For details and limitations, see <olink targetptr="ipsec-ov-24" remap="internal">IPsec
+and NAT Traversal</olink>. For procedures, see <olink targetptr="ike-task-38" remap="internal">Configuring
+IKE for Mobile Systems (Task Map)</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect1>
+</chapter>

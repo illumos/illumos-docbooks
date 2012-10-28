@@ -1,0 +1,222 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>get_peer_label() Label-Aware Function - Solaris Trusted Extensions Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-08-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Trusted Extensions Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="labelprint-4.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="labelprint-15.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="api-intro-1.html">1.&nbsp;&nbsp;Solaris Trusted Extensions APIs and Security Policy</a></p>
+<p class="toc level1 tocsp"><a href="labelapi-1.html">2.&nbsp;&nbsp;Labels and Clearances</a></p>
+<p class="toc level1 tocsp"><a href="labelcode-1.html">3.&nbsp;&nbsp;Label Code Examples</a></p>
+<p class="toc level1 tocsp"><a href="labelprint-1.html">4.&nbsp;&nbsp;Printing and the Label APIs</a></p>
+<p class="toc level2"><a href="labelprint-2.html">Printing Labeled Output</a></p>
+<p class="toc level2"><a href="labelprint-3.html">Designing a Label-Aware Application</a></p>
+<p class="toc level2"><a href="labelprint-4.html">Understanding the Multilevel Printing Service</a></p>
+<div class="onpage">
+<p class="toc level2"><a href=""><tt>get_peer_label()</tt> Label-Aware Function</a></p>
+</div>
+<p class="toc level2"><a href="labelprint-15.html">Validating the Label Request Against the Printer's Label Range</a></p>
+<p class="toc level1 tocsp"><a href="ipcapi-1.html">5.&nbsp;&nbsp;Interprocess Communications</a></p>
+<p class="toc level1 tocsp"><a href="windowapi-1.html">6.&nbsp;&nbsp;Trusted X Window System</a></p>
+<p class="toc level1 tocsp"><a href="lbuilder-1.html">7.&nbsp;&nbsp;Label Builder APIs</a></p>
+<p class="toc level1 tocsp"><a href="webguard.html">8.&nbsp;&nbsp;Trusted Web Guard Prototype</a></p>
+<p class="toc level1 tocsp"><a href="javatxlabelapis.html">9.&nbsp;&nbsp;Experimental Java Bindings for the Solaris Trusted Extensions Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="appa-1.html">A.&nbsp;&nbsp;Programmer's Reference</a></p>
+<p class="toc level1 tocsp"><a href="appb-1.html">B.&nbsp;&nbsp;Solaris Trusted Extensions API Reference</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="labelprint-5"></a><h3><tt>get_peer_label()</tt> Label-Aware Function</h3>
+<a name="indexterm-242"></a><a name="indexterm-243"></a><a name="indexterm-244"></a><a name="indexterm-245"></a><p>The <tt>get_peer_label()</tt> function in the <tt>lp/lib/lp/tx.c</tt> file implements the logic of multilevel
+printing in Trusted Extensions. The following sections describe this function and step
+you through its implementation.</p><p>In Trusted Extensions software, much of the logic for handling labels in
+the printing service is in the <tt>get_peer_label()</tt> function. This function obtains the
+credential of the remote process in a <tt>ucred_t</tt> data structure and extracts
+the label from the credential.</p><p>The following shows the <tt>get_peer_label()</tt> code.</p><pre>int
+get_peer_label(int fd, char **slabel)
+{
+    if (is_system_labeled()) {
+        ucred_t *uc = NULL;
+        m_label_t *sl;
+        char *pslabel = NULL; /* peer's slabel */
+
+        if ((fd &lt; 0) || (slabel == NULL)) {
+            errno = EINVAL;
+            return (-1);
+        }
+    
+        if (getpeerucred(fd, &amp;uc) == -1)
+            return (-1);
+    
+        sl = ucred_getlabel(uc);
+        if (label_to_str(sl, &amp;pslabel, M_INTERNAL, DEF_NAMES) != 0)
+            syslog(LOG_WARNING, "label_to_str(): %m");
+        ucred_free(uc);
+    
+        if (pslabel != NULL) {
+            syslog(LOG_DEBUG, "get_peer_label(%d, %s): becomes %s",
+                fd, (*slabel ? *slabel : "NULL"), pslabel);
+            if (*slabel != NULL)
+                free(*slabel);
+            *slabel = strdup(pslabel);
+        }
+    }
+    
+    return (0);
+}</pre>
+
+<a name="labelprint-7"></a><h4>Determining Whether the Printing Service Is Running in a Labeled Environment</h4>
+<a name="indexterm-246"></a><p>The printing service is designed to work in labeled and unlabeled environments.
+Therefore, the printing application must determine when the label of a remote
+host should be requested and whether the label should be applied. The
+printing process first checks its own environment. Is the process running in
+a label-aware environment?</p><p>Note that the application does not first determine whether the remote request
+is labeled. Instead, the printing application determines if its own environment is
+labeled. If the application is not running on a labeled host, the
+MAC policy prevents the printing application from receiving labeled requests.</p><p>The printing service uses the <tt>is_system_labeled()</tt> function to determine whether the process
+is running in a labeled environment. For information about this function, see
+the <a href="http://docs.sun.com/doc/819-2243/is-system-labeled-3c?a=view"><tt>is_system_labeled</tt>(3C)</a> man page.</p><p>This code excerpt shows how to determine whether the application is running
+in a labeled environment:</p><pre>if (is_system_labeled()) {
+    ucred_t *uc = NULL;
+    m_label_t *sl;
+    char *pslabel = NULL; /* peer's slabel */
+
+    if ((fd &lt; 0) || (slabel == NULL)) {
+        errno = EINVAL;
+        return (-1);
+    }</pre><p><a name="indexterm-247"></a>If the printing adapter process is running on a system configured with
+Trusted Extensions, the <tt>is_system_labeled()</tt> function obtains the <tt>ucred_t</tt> credential abstraction from the
+remote process. The <tt>ucred_t</tt> data structure for the remote process and the
+peer's label are then set to <tt>NULL</tt>. The functions that return values
+for the credential and the peer's label fill the data structures. These
+data structures are discussed in the following sections.</p><p>See <a href=""><tt>get_peer_label()</tt> Label-Aware Function</a> to view the source of the entire <tt>get_peer_label()</tt> routine.</p>
+
+<a name="labelprint-8"></a><h4>Understanding the Remote Host Credential</h4>
+<p><a name="indexterm-248"></a>The Solaris OS network API provides an abstraction of a process's credentials.
+This credentials data is available through a network connection. The credentials are
+represented by the <tt>ucred_t</tt> data structure that was introduced in the Solaris
+10 release. This structure can include the label of a process.</p><p>The <tt>ucred</tt> API provides functions for obtaining the <tt>ucred_t</tt> data structure from
+a remote process. This API also provides functions for extracting the label
+from the <tt>ucred_t</tt> data structure.</p>
+
+<a name="labelprint-9"></a><h4>Obtaining the Credential and Remote Host Label</h4>
+<p><a name="indexterm-249"></a>Obtaining the label of a remote process is a two-step procedure. First,
+you must obtain the credential. Then, you must obtain the label from
+this credential.</p><p>The credential is in the <tt>ucred_t</tt> data structure of the remote process.
+The label is in the <tt>m_label_t</tt> data structure in the credential. After
+obtaining the credential of the remote process, you extract the label information
+from that credential.</p><p>The <tt>getpeerucred()</tt> function obtains the <tt>ucred_t</tt> credential data structure from the remote
+process. The <tt>ucred_getlabel()</tt> function extracts the label from the <tt>ucred_t</tt> data structure.
+In the <tt>get_peer_label()</tt> function, the two-step procedure is coded as follows:</p><pre>if (getpeerucred(fd, &amp;uc) == -1)
+    return (-1);
+
+sl = ucred_getlabel(uc);</pre><p>See <a href=""><tt>get_peer_label()</tt> Label-Aware Function</a> to view the source of the entire <tt>get_peer_label()</tt> routine.</p><p>For information about the two functions, see the <a href="http://docs.sun.com/doc/819-2243/getpeerucred-3c?a=view"><tt>getpeerucred</tt>(3C)</a> and <a href="http://docs.sun.com/doc/819-2243/ucred-getlabel-3c?a=view"><tt>ucred_getlabel</tt>(3C)</a> man
+pages.</p><p>In addition to obtaining a remote host's label, you can obtain a
+remote host's type. To obtain the remote host type, use the <tt>tsol_getrhtype()</tt>
+routine. See <a href="labelapi-22.html#accessingnetworkdbentries">Obtaining the Remote Host Type</a>.</p>
+
+<a name="labelprint-10"></a><h4>Using the <tt>label_to_str()</tt> Function</h4>
+<p>After obtaining the credential and remote host label, an application can call
+<tt>label_to_str()</tt> to convert the label data structure into a string. The string
+form of the label data structure can be used by the application.</p><p>Note that in the Trusted Extensions printing service, the label is returned
+as a string. The <tt>get_peer_label()</tt> function returns the string that is obtained
+by calling <tt>label_to_str()</tt> on the <tt>m_label_t</tt> data structure. This string value is
+returned in the <tt>slabel</tt> parameter of the <tt>get_peer_label()</tt> function, <tt>char** slabel</tt>.</p><p>The following code excerpt shows how the <tt>label_to_str()</tt> function is used:</p><pre>sl = ucred_getlabel(uc);
+if (label_to_str(sl, &amp;pslabel, M_INTERNAL, DEF_NAMES) != 0)
+    syslog(LOG_WARNING, "label_to_str(): %m");
+ucred_free(uc);
+
+if (pslabel != NULL) {
+    syslog(LOG_DEBUG, "get_peer_label(%d, %s): becomes %s",
+        fd, (*slabel ? *slabel : "NULL"), pslabel);
+    if (*slabel != NULL)
+        free(*slabel);
+    *slabel = strdup(pslabel);
+}</pre><p>See <a href=""><tt>get_peer_label()</tt> Label-Aware Function</a> to view the source of the entire <tt>get_peer_label()</tt> routine.</p>
+
+<a name="labelprint-12"></a><h4>Handling Memory Management</h4>
+<p>As shown in <a href=""><tt>get_peer_label()</tt> Label-Aware Function</a>, labels are often dynamically allocated. The functions <tt>str_to_label()</tt>,
+<tt>label_to_str()</tt>, <tt>getdevicerange()</tt>, and other functions allocate memory that must be freed by
+the caller. The following man pages for these functions describe the memory
+allocation requirements:</p>
+<ul><li><p><a href="http://docs.sun.com/doc/819-2248/getdevicerange-3tsol?a=view"><tt>getdevicerange</tt>(3TSOL)</a></p></li>
+<li><p><a href="http://docs.sun.com/doc/819-2248/label-to-str-3tsol?a=view"><tt>label_to_str</tt>(3TSOL)</a></p></li>
+<li><p><a href="http://docs.sun.com/doc/819-2248/m-label-3tsol?a=view"><tt>m_label</tt>(3TSOL)</a></p></li>
+<li><p><a href="http://docs.sun.com/doc/819-2248/str-to-label-3tsol?a=view"><tt>str_to_label</tt>(3TSOL)</a></p></li></ul>
+
+
+<a name="labelprint-14"></a><h4>Using the Returned Label String</h4>
+<p>The <tt>get_peer_label()</tt> function extracts the label from a remote host and returns
+that label as a string. The printing application, as is typical of
+label-aware applications, uses the label for the following purposes:</p>
+<ul><li><p>To make sure that information associated with a label is clearly marked with the correct label. The banner and trailer pages, as well as the header and footer, are marked with the label of the document being printed.</p></li>
+<li><p>To validate that the label of a resource permits a given operation to be performed by another labeled resource. That is, the label of the requesting process permits this printer to accept a request from that requesting process. This permission is based on the range of labels that this printer is assigned.</p></li></ul>
+
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="labelprint-4.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="labelprint-15.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

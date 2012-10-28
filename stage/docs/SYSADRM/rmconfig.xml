@@ -1,0 +1,251 @@
+<chapter id="rmconfig-1"><title>Resource Management
+Configuration Example</title><highlights><para>This chapter reviews the resource management framework and describes a hypothetical
+server consolidation project.</para><para>The following topics are covered in this chapter:</para><itemizedlist><listitem><para><olink targetptr="rmconfig-2" remap="internal">Configuration to Be Consolidated</olink></para>
+</listitem><listitem><para><olink targetptr="rmconfig-3" remap="internal">Consolidation Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="rmconfig-4" remap="internal">Creating the Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="rmconfig-7" remap="internal">Viewing the Configuration</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="rmconfig-2"><title>Configuration to Be Consolidated</title><para>In this example, five applications are being consolidated onto a single system.
+The target applications have resource requirements that vary, different user populations,
+and different architectures. Currently, each application exists on a dedicated server
+that is designed to meet the requirements of the application. The applications and
+their characteristics are identified in the following table.</para><informaltable frame="top"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="40*"/><colspec colwidth="60*"/><thead><row rowsep="1"><entry><para>Application Description</para>
+</entry><entry><para>Characteristics</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Application server</para>
+</entry><entry><para>Exhibits negative scalability beyond 2 CPUs</para>
+</entry>
+</row><row><entry><para>Database instance for application server</para>
+</entry><entry><para>Heavy transaction processing</para>
+</entry>
+</row><row><entry><para>Application server in test and development environment</para>
+</entry><entry><para> GUI-based, with untested code execution</para>
+</entry>
+</row><row><entry><para>Transaction processing server</para>
+</entry><entry><para>Primary concern is response time</para>
+</entry>
+</row><row><entry><para>Standalone database instance</para>
+</entry><entry><para>Processes a large number of transactions and serves multiple time zones</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="rmconfig-3"><title>Consolidation Configuration</title><para>The following configuration is used to consolidate the applications onto a single
+system that has the resource pools and the dynamic resource pools facilities enabled.</para><itemizedlist><listitem><para>The application server has a two&ndash;CPU processor set.</para>
+</listitem><listitem><para>The database instance for the application server and the standalone
+database instance are consolidated onto a single processor set of at least four CPUs.
+The standalone database instance is guaranteed 75 percent of that resource.</para>
+</listitem><listitem><para>The test and development application server requires the IA scheduling
+class to ensure UI responsiveness. Memory limitations are imposed to lessen the effects
+of bad code builds.</para>
+</listitem><listitem><para>The transaction processing server is assigned a dedicated processor
+set of at least two CPUs, to minimize response latency.</para>
+</listitem>
+</itemizedlist><para>This configuration covers known applications that are executing and consuming
+processor cycles in each resource set. Thus, constraints can be established that allow
+the processor resource to be transferred to sets where the resource is required.</para><itemizedlist><listitem><para>The <literal>wt-load</literal> objective is set to allow resource
+sets that are highly utilized to receive greater resource allocations than sets that
+have low utilization.</para>
+</listitem><listitem><para>The <literal>locality</literal> objective is set to <literal>tight</literal>, which is used to maximize processor locality.</para>
+</listitem>
+</itemizedlist><para>An additional constraint to prevent utilization from exceeding 80 percent of
+any resource set is also applied. This constraint ensures that applications get access
+to the resources they require. Moreover, for the transaction processor set, the objective
+of maintaining utilization below 80 percent is twice as important as any other objectives
+that are specified. This importance will be defined in the configuration.</para>
+</sect1><sect1 id="rmconfig-4"><title>Creating the Configuration</title><para>Edit the <filename>/etc/project</filename> database file. Add entries to implement
+the required resource controls and to map users to resource pools, then view the file.</para><screen width="100"># <userinput>cat /etc/project</userinput>
+.
+.
+.
+user.app_server:2001:Production Application Server:::project.pool=appserver_pool
+user.app_db:2002:App Server DB:::project.pool=db_pool;project.cpu-shares=(privileged,1,deny)
+development:2003:Test and development::staff:project.pool=dev_pool;
+process.max-address-space=(privileged,536870912,deny)<lineannotation>keep with previous line</lineannotation>
+user.tp_engine:2004:Transaction Engine:::project.pool=tp_pool
+user.geo_db:2005:EDI DB:::project.pool=db_pool;project.cpu-shares=(privileged,3,deny)
+.
+.
+.</screen><note><para>The development team has to execute tasks in the development project because
+access for this project is based on a user's group ID (GID).</para>
+</note><para>Create an input file named <literal>pool.host</literal>, which will be used
+to configure the required resource pools. View the file.</para><screen width="100"># <userinput>cat pool.host</userinput>
+create system host
+create pset dev_pset (uint pset.min = 0; uint pset.max = 2)
+create pset tp_pset (uint pset.min = 2; uint pset.max=8)
+create pset db_pset (uint pset.min = 4; uint pset.max = 6)
+create pset app_pset (uint pset.min = 1; uint pset.max = 2)
+create pool dev_pool (string pool.scheduler="IA")
+create pool appserver_pool (string pool.scheduler="TS")
+create pool db_pool (string pool.scheduler="FSS")
+create pool tp_pool (string pool.scheduler="TS")
+associate pool dev_pool (pset dev_pset)
+associate pool appserver_pool (pset app_pset)
+associate pool db_pool (pset db_pset)
+associate pool tp_pool (pset tp_pset)
+modify system tester (string system.poold.objectives="wt-load")
+modify pset dev_pset (string pset.poold.objectives="locality tight; utilization &lt; 80")
+modify pset tp_pset (string pset.poold.objectives="locality tight; 2: utilization &lt; 80")
+modify pset db_pset (string pset.poold.objectives="locality tight;utilization &lt; 80")
+modify pset app_pset (string pset.poold.objectives="locality tight; utilization &lt; 80")</screen><para>Update the configuration using the <literal>pool.host</literal> input file.</para><screen># <userinput>poolcfg -f pool.host</userinput></screen><para>Make the configuration active.</para><screen># <userinput>pooladm -c</userinput></screen><para>The framework is now functional on the system.</para><para>Enable DRP.</para><screen># <userinput>svcadm enable pools/dynamic:default</userinput></screen>
+</sect1><sect1 id="rmconfig-7"><title>Viewing the Configuration</title><para>To view the framework configuration, which also contains default elements created
+by the system, type:</para><screen width="100"># <userinput>pooladm</userinput>
+system host
+        string  system.comment
+        int     system.version 1
+        boolean system.bind-default true
+        int     system.poold.pid 177916
+        string  system.poold.objectives wt-load
+
+        pool dev_pool
+                int     pool.sys_id 125
+                boolean pool.default false
+                boolean pool.active true
+                int     pool.importance 1
+                string  pool.comment
+                string  pool.scheduler IA
+                pset    dev_pset
+  
+        pool appserver_pool
+                int     pool.sys_id 124
+                boolean pool.default false
+                boolean pool.active true
+                int     pool.importance 1
+                string  pool.comment
+                string  pool.scheduler TS
+                pset    app_pset
+      
+        pool db_pool
+                int     pool.sys_id 123
+                boolean pool.default false
+                boolean pool.active true
+                int     pool.importance 1
+                string  pool.comment
+                string  pool.scheduler FSS
+                pset    db_pset
+  
+        pool tp_pool
+                int     pool.sys_id 122
+                boolean pool.default false
+                boolean pool.active true
+                int     pool.importance 1
+                string  pool.comment
+                string  pool.scheduler TS
+                pset    tp_pset
+ 
+        pool pool_default
+                int     pool.sys_id 0
+                boolean pool.default true
+                boolean pool.active true
+                int     pool.importance 1
+                string  pool.comment
+                string  pool.scheduler TS
+                pset    pset_default
+
+        pset dev_pset
+                int     pset.sys_id 4
+                string  pset.units population
+                boolean pset.default false
+                uint    pset.min 0
+                uint    pset.max 2
+                string  pset.comment
+                boolean pset.escapable false
+                uint    pset.load 0
+                uint    pset.size 0
+                string  pset.poold.objectives locality tight; utilization &lt; 80
+
+        pset tp_pset
+                int     pset.sys_id 3
+                string  pset.units population
+                boolean pset.default false
+                uint    pset.min 2
+                uint    pset.max 8
+                string  pset.comment
+                boolean pset.escapable false
+                uint    pset.load 0
+                uint    pset.size 0
+                string  pset.poold.objectives locality tight; 2: utilization &lt; 80
+
+                cpu
+                        int     cpu.sys_id 1
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+                cpu
+                        int     cpu.sys_id 2
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+        pset db_pset
+                int     pset.sys_id 2
+                string  pset.units population
+                boolean pset.default false
+                uint    pset.min 4
+                uint    pset.max 6
+                string  pset.comment
+                boolean pset.escapable false
+                uint    pset.load 0
+                uint    pset.size 0
+                string  pset.poold.objectives locality tight; utilization &lt; 80
+
+                cpu
+                        int     cpu.sys_id 3
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+                cpu
+                        int     cpu.sys_id 4
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+                cpu
+                        int     cpu.sys_id 5
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+                cpu
+                        int     cpu.sys_id 6
+                        string  cpu.comment 
+                        string  cpu.status on-line
+        pset app_pset
+                int     pset.sys_id 1
+                string  pset.units population
+                boolean pset.default false
+                uint    pset.min 1
+                uint    pset.max 2
+                string  pset.comment
+                boolean pset.escapable false
+                uint    pset.load 0
+                uint    pset.size 0
+                string  pset.poold.objectives locality tight; utilization &lt; 80
+                cpu
+                        int     cpu.sys_id 7
+                        string  cpu.comment 
+                        string  cpu.status on-line
+
+        pset pset_default
+                int     pset.sys_id -1
+                string  pset.units population
+                boolean pset.default true
+                uint    pset.min 1
+                uint    pset.max 4294967295
+                string  pset.comment
+                boolean pset.escapable false
+                uint    pset.load 0
+                uint    pset.size 0
+
+                cpu
+                        int     cpu.sys_id 0
+                        string  cpu.comment 
+                        string  cpu.status on-line</screen><para>A graphic representation of the framework follows.</para><figure id="rmconfig-fig-6"><title>Server Consolidation Configuration</title><mediaobject><imageobject><imagedata entityref="rmexample"/>
+</imageobject><textobject><simpara>Illustration shows the hypothetical server configuration.</simpara>
+</textobject>
+</mediaobject>
+</figure><note><para>In the pool <literal>db_pool</literal>, the standalone database instance
+ is guaranteed 75 percent of the CPU resource.</para>
+</note>
+</sect1>
+</chapter>

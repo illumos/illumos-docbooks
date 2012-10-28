@@ -1,0 +1,200 @@
+<chapter id="tasks-3"><title>Projects and Tasks</title><highlights><para>The chapter discusses the workload hierarchy and provides information
+about projects and tasks. The following topics are covered:</para><itemizedlist><listitem><para><olink targetptr="tasks-18" remap="internal">Overview of Projects and Tasks</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-11" remap="internal">Project and Task API Functions</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-8" remap="internal">Code Examples for Accessing project
+Database Entries</olink></para>
+</listitem><listitem><para><olink targetptr="tasks-7" remap="internal">Programming Issues Associated With
+Projects and Tasks</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="tasks-18"><title>Overview of Projects and Tasks</title><para>The Solaris Operating System uses the workload hierarchy to organize
+the work being performed on the system. A <emphasis>task</emphasis> is a collection
+of processes that represents a workload component. A <emphasis>project</emphasis> is
+a collection of tasks that represents an entire workload. At any given time,
+a process can be a component of only one task and one project. The relationships
+in the workload hierarchy are illustrated in the following figure.</para><figure id="frjuv"><title>Workload Hierarchy</title><mediaobject><imageobject><imagedata entityref="rmtasktree1"/>
+</imageobject><textobject><simpara>Diagram shows the relationships among projects, tasks,
+and processes.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>A user who is a member of more than one project can run processes in
+multiple projects at the same time. All processes that are started by a process
+inherit the project and task created by the parent process. When you switch
+to a new project in a startup script, all child processes run in the new project.</para><para>An executing user process has an associated user identity (<literal>uid</literal>),
+group identity (<literal>gid</literal>), and project identity (<literal>projid</literal>).
+Process attributes and abilities are inherited from the user, group, and project
+identities to form the execution context for a task.</para><para>For an in-depth discussion of projects and tasks, see <olink targetdoc="sysadrm" targetptr="rmtaskproj-1" remap="external">Chapter 2, <citetitle remap="chapter">Projects and Tasks (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management
+and Solaris Zones</citetitle></olink>. For the administration commands for
+managing projects and tasks, see <olink targetdoc="sysadrm" targetptr="rmtaskproj.task-37" remap="external">Chapter 3, <citetitle remap="chapter">Administering
+Projects and Tasks,</citetitle> in <citetitle remap="book">System Administration
+Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para><sect2 id="tasks-25"><title><filename>/etc/project</filename> File</title><para>The <filename>project</filename> file is the heart of workload hierarchy.
+The <literal>project</literal> database is maintained on a system through
+the <filename>/etc/project</filename> file or over the network through a naming
+service, such as NIS or LDAP. </para><para>The <filename>/etc/project</filename> file contains five standard projects.</para><variablelist><varlistentry><term><literal>system</literal></term><listitem><para>This project is used for all system processes and daemons.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>user.root</literal></term><listitem><para>All root processes spawned by root logins and root <command>cron</command>, <command>at</command>, and <command>batch</command> jobs.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>noproject</literal></term><listitem><para>This special project is for IPQoS.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>default</literal></term><listitem><para>A default project is assigned to every user.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>group.staff</literal></term><listitem><para>This project is used for all users in the group <literal>staff</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>To access the project file programmatically, use the following structure:</para><programlisting>struct project {
+  char      *pj_name;       /* name of the project */
+  projid_t   pj_projid;     /* numerical project ID */
+  char      *pj_comment;    /* project comment */
+  char     **pj_users;      /* vector of pointers to project user names */
+  char     **pj_groups;     /* vector of pointers to project group names */
+  char      *pj_attr;       /* project attributes */
+};</programlisting><para>The <structname>project</structname> structure members include the following:</para><variablelist termlength="wholeline"><varlistentry><term><literal>*pj_name</literal></term><listitem><para>Name of the project.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>pj_projid</literal></term><listitem><para>Project ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>*pj_comment</literal></term><listitem><para>User-supplied project description.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>**pj_users</literal></term><listitem><para>Pointers to project user members.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>**pj_groups</literal></term><listitem><para>Pointers to project group members.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>*pj_attr</literal></term><listitem><para>Project attributes. Use these attributes to set values for
+resource controls and project pools.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>Resource usage can be controlled through project attributes, or, for
+zones, configured through the <command>zonecfg</command> command. Four prefixes
+are used to group the types of resource control attributes:</para><itemizedlist><listitem><para><literal>project.*</literal> &ndash; This prefix denotes attributes
+that are used to control projects. For example, <literal>project.max-locked-memory</literal> indicates the total amount of locked memory allowed, expressed
+as a number of bytes. The <literal>project.pool</literal> attribute binds
+a project to a resource pool. See <olink targetptr="resource-pools-5" remap="internal">Chapter&nbsp;6,
+Resource Pools</olink>.</para>
+</listitem><listitem><para><literal>task.*</literal> &ndash; This prefix is used for
+attributes that are applied to tasks. For example, the <literal>task.max-cpu-time</literal> attribute sets the maximum CPU time that is available to this task's
+processes, expressed as a number of seconds.</para>
+</listitem><listitem><para><literal>process.*</literal> &ndash; This prefix is used for
+process controls. For example, the <literal>process.max-file-size</literal> control
+sets the maximum file offset that is available for writing by this process,
+expressed as a number of bytes.</para>
+</listitem><listitem><para><literal>zone.*</literal> &ndash; The <literal>zone.*</literal> prefix
+indicates a zone-wide resource control applied to projects, tasks, and processes
+in a zone. For example, <literal>zone.max-lwps</literal> prevents too many
+LWPs in one zone from affecting other zones. A zone's total LWPs can be further
+subdivided among projects within the zone within the zone by using <literal>project.max-lwps</literal> entries.</para>
+</listitem>
+</itemizedlist><para>For the complete list of resource controls, see <olink targetdoc="refman5" targetptr="resource-controls-5" remap="external"><citerefentry><refentrytitle>resource_controls</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink>.</para>
+</sect2>
+</sect1><sect1 id="tasks-11"><title>Project and Task API Functions</title><para>The following functions are provided to assist developers in working
+with projects. The functions use entries that describe user projects in the <filename>project</filename> database.</para><variablelist><varlistentry><term><olink targetdoc="refman3e" targetptr="endprojent-3project" remap="external"><citerefentry><refentrytitle>endprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Close the project database and deallocate resources when processing
+is complete.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="fgetprojent-3project" remap="external"><citerefentry><refentrytitle>fgetprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns a pointer to a structure containing an entry in the
+project database. Rather than using <filename>nsswitch.conf</filename>, <function>fgetprojent</function> reads a line from a stream.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="getdefaultproj-3project" remap="external"><citerefentry><refentrytitle>getdefaultproj</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Check the validity of the project keyword, look up the project,
+and return a pointer to the project structure if found.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="getprojbyid-3project" remap="external"><citerefentry><refentrytitle>getprojbyid</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Search the <filename>project</filename> database for an entry
+with the number that specifies the project ID.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="getprojbyname-3project" remap="external"><citerefentry><refentrytitle>getprojbyname</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Search the <filename>project</filename> database for an entry
+with the string that specifies project name.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="getprojent-3project" remap="external"><citerefentry><refentrytitle>getprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Returns a pointer to a structure containing an entry in the
+project database.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="inproj-3project" remap="external"><citerefentry><refentrytitle>inproj</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Check whether the specified user is permitted to use the specified
+project.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="setproject-3project" remap="external"><citerefentry><refentrytitle>setproject</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Calling process joins the target project by creating a new
+task in the target project.</para>
+</listitem>
+</varlistentry><varlistentry><term><olink targetdoc="refman3e" targetptr="setprojent-3project" remap="external"><citerefentry><refentrytitle>setprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></term><listitem><para>Rewind the <filename>project</filename> database to allow
+repeated searches.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect1><sect1 id="tasks-8"><title>Code Examples for Accessing <literal>project</literal> Database
+Entries</title><example><title>Printing the First Three Fields of Each Entry in the <literal>project</literal> Database</title><para>The key points for this example include the following:</para><itemizedlist><listitem><para><function>setprojent</function> rewinds the <literal>project</literal> database
+to start at the beginning.</para>
+</listitem><listitem><para><function>getprojent</function> is called with a conservative
+maximum buffer size that is defined in <filename>project.h</filename>.</para>
+</listitem><listitem><para><function>endprojent</function> closes the <literal>project</literal> database
+and frees resources.</para>
+</listitem>
+</itemizedlist><programlisting>#include &lt;project.h>
+
+struct project projent;
+char buffer[PROJECT_BUFSZ]; /* Use safe buffer size from project.h */
+	...
+struct project *pp;
+
+setprojent();  /* Rewind the project database to start at the beginning */
+
+while (1) {
+   pp = getprojent(&amp;projent, buffer, PROJECT_BUFSZ);
+	  if (pp == NULL)
+          break;
+    printf("%s:%d:%s\n", pp->pj_name, pp->pj_projid, pp->pj_comment);
+		...
+};
+
+endprojent();   /* Close the database and free project resources */</programlisting>
+</example><example><title>Getting a <literal>project</literal> Database Entry That Matches
+the Caller's Project ID</title><para>The following example calls <function>getprojbyid</function> to
+get a project database entry that matches the caller's project ID. The example
+then prints the project name and the project ID.</para><programlisting>#include &lt;project.h>
+
+struct project *pj;
+char buffer[PROJECT_BUFSZ]; /* Use safe buffer size from project.h */
+
+main()
+{
+   projid_t pjid;
+   pjid = getprojid();
+   pj = getprojbyid(pjid, &amp;projent, buffer, PROJECT_BUFSZ);
+   if (pj == NULL) {
+       /* fail; */
+   }
+   printf("My project (name, id) is (%s, %d)\n", pp->pj_name, pp->pj_projid);
+}</programlisting>
+</example>
+</sect1><sect1 id="tasks-7"><title>Programming Issues Associated With Projects and
+Tasks</title><para>Consider the following issues when writing your application:</para><itemizedlist><listitem><para>No function exists to explicitly create a new project.</para>
+</listitem><listitem><para>A user cannot log in if no default project for the user exists
+in the <literal>project</literal> database.</para>
+</listitem><listitem><para>A new task in the user's default project is created when the
+user logs in.</para>
+</listitem><listitem><para>When a process joins a project, the project's resource control
+and pool settings are applied to the process.</para>
+</listitem><listitem><para><function>setproject</function> requires privilege. The <literal>newtask</literal> command does not require privilege if you own the process.
+Either can be used to create a task, but only <literal>newtask</literal> can
+change the project of a running process.</para>
+</listitem><listitem><para>No parent/child relationship exists between tasks.</para>
+</listitem><listitem><para>Finalized tasks can be created by using <literal>newtask -F</literal> or
+by using <function>setproject</function> to associate the caller with a new
+project. Finalized tasks are useful when trying to accurately estimate aggregate
+resource accounting.</para>
+</listitem><listitem><para>The reentrant functions, <function>getprojent</function>,
+ <function>getprojbyname</function>,  <function>getprojbyid</function>,  <function>getdefaultproj</function>, and <function>inproj</function>, use buffers supplied
+by the caller to store returned results. These functions are safe for use
+in both single-threaded applications and multithreaded applications. </para>
+</listitem><listitem><para>Reentrant functions require these additional arguments:  <literal>proj</literal>, <literal>buffer</literal>, and <literal>bufsize</literal>.
+The <literal>proj</literal> argument must be a pointer to a <structname>project</structname> structure
+allocated by the caller. On successful completion, these functions return
+the project entry in this structure. Storage referenced by the <structname>project</structname> structure is allocated from the memory specified by the <literal>buffer</literal> argument. <literal>bufsize</literal> specifies the size in number
+of bytes.</para>
+</listitem><listitem><para>If an incorrect buffer size is used, <function>getprojent</function> returns <literal>NULL</literal> and sets <literal>errno</literal> to <literal>ERANGE</literal>.</para>
+</listitem>
+</itemizedlist>
+</sect1>
+</chapter>

@@ -1,0 +1,275 @@
+<chapter id="rm.rcapd-1"><title>Physical Memory Control Using the Resource
+Capping Daemon (Overview)</title><highlights><para>The resource capping daemon <command>rcapd</command> enables you to
+regulate physical memory consumption by processes running in projects that
+have resource caps defined. If you are running zones on your system, you can
+use <command>rcapd</command> from the global zone to regulate physical memory
+consumption in non-global zones. See <olink targetptr="z.conf.start-1" remap="internal">Chapter&nbsp;18,
+Planning and Configuring Non-Global Zones (Tasks)</olink>.</para><para>The following topics are covered in this chapter.</para><itemizedlist><listitem><para><olink targetptr="rm.rcapd-2" remap="internal">Introduction to the Resource
+Capping Daemon</olink></para>
+</listitem><listitem><para><olink targetptr="rm.rcapd-3" remap="internal">How Resource Capping Works</olink></para>
+</listitem><listitem><para><olink targetptr="rm.rcapd-4" remap="internal">Attribute to Limit Physical
+Memory Usage</olink></para>
+</listitem><listitem><para><olink targetptr="rm.rcapd-19" remap="internal">rcapd Configuration</olink></para>
+</listitem><listitem><para><olink targetptr="rm.rcapd-22" remap="internal">Monitoring Resource Utilization
+With rcapstat</olink></para>
+</listitem><listitem><para><olink targetptr="rm.rcapd-43" remap="internal">Commands Used With rcapd</olink></para>
+</listitem>
+</itemizedlist><para>For procedures using the <command>rcapd</command> feature, see <olink targetptr="rm.rcapd.task-1" remap="internal">Chapter&nbsp;11, Administering the Resource Capping
+Daemon (Tasks)</olink>.</para>
+</highlights><sect1 id="rm.rcapd-2"><title>Introduction to the Resource Capping Daemon</title><para>A resource <emphasis>cap</emphasis> is an upper bound placed on the consumption of a resource,
+such as physical memory. Per-project physical memory caps are supported.</para><para>The resource
+capping daemon and its associated utilities provide mechanisms for physical
+memory resource cap enforcement and administration.</para><para>Like the resource control, the resource cap can be defined by using
+attributes of project entries in the <command>project</command> database.
+However, while resource controls are synchronously enforced by the kernel,
+resource caps are asynchronously enforced at the user level by the resource
+capping daemon. With asynchronous enforcement, a small delay occurs as a result
+of the sampling interval used by the daemon.</para><para>For information about <command>rcapd</command>, see the <olink targetdoc="group-refman" targetptr="rcapd-1m" remap="external"><citerefentry><refentrytitle>rcapd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page. For information
+about projects and the <command>project</command> database, see <olink targetptr="rmtaskproj-1" remap="internal">Chapter&nbsp;2, Projects and Tasks (Overview)</olink> and
+the <olink targetdoc="group-refman" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man
+page. For information about resource controls, see <olink targetptr="rmctrls-1" remap="internal">Chapter&nbsp;6,
+Resource Controls (Overview)</olink>.</para>
+</sect1><sect1 id="rm.rcapd-3"><title>How Resource Capping Works</title><para>The daemon repeatedly samples the resource utilization of projects that
+have physical memory caps. The sampling interval used by the daemon is specified
+by the administrator. See <olink targetptr="rm.rcapd-23" remap="internal">Determining Sample
+Intervals</olink> for additional information. When the system's physical memory
+utilization exceeds the threshold for cap enforcement, and other conditions
+are met, the daemon takes action to reduce the resource consumption of projects
+with memory caps to levels at or below the caps.</para><para>The virtual memory system divides physical memory into segments known
+as pages. Pages are the fundamental unit of physical memory in the Solaris
+memory management subsystem. To read data from a file into memory, the virtual
+memory system reads in one page at a time, or <emphasis>pages in</emphasis> a
+file. To reduce resource consumption, the daemon can <emphasis>page out</emphasis>,
+or relocate, infrequently used pages to a swap device, which is an area outside
+of physical memory.</para><para>The daemon manages physical memory by regulating the size of a project
+workload's resident set relative to the size of its working set. The resident
+set is the set of pages that are resident in physical memory. The working
+set is the set of pages that the workload actively uses during its processing
+cycle. The working set changes over time, depending on the process's mode
+of operation and the type of data being processed. Ideally, every workload
+has access to enough physical memory to enable its working set to remain resident.
+However, the working set can also include the use of secondary disk storage
+to hold the memory that does not fit in physical memory.</para><para>Only one instance of <command>rcapd</command> can run at any given time.</para>
+</sect1><sect1 id="rm.rcapd-4"><title>Attribute to Limit Physical Memory Usage</title><para>To define a physical memory resource cap for a project, establish
+a resident set size (RSS) cap by adding this attribute to the <command>project</command> database
+entry:</para><variablelist><varlistentry><term><literal>rcap.max-rss</literal></term><listitem><para>The total amount of physical memory, in bytes, that is available
+to processes in the project.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For example, the following line in the <filename>/etc/project</filename> file
+sets an RSS cap of 10 Gbytes for a project named <literal>db</literal>.</para><screen>db:100::db,root::rcap.max-rss=10737418240</screen><note><para>The system might round the specified cap value to a page size.</para>
+</note><para>You can also use the <command>projmod</command> command to set the <literal>rcap.max-rss</literal> attribute in the <filename>/etc/project</filename> file.</para><para>For more information, see Setting the Resident Set Size Cap.</para>
+</sect1><sect1 id="rm.rcapd-19"><title><command>rcapd</command> Configuration</title><para>You use the <command>rcapadm</command> command to configure
+the resource capping daemon. You can perform the following actions:</para><itemizedlist><listitem><para>Set the threshold value for cap enforcement</para>
+</listitem><listitem><para>Set intervals for the operations performed by <command>rcapd</command></para>
+</listitem><listitem><para>Enable or disable resource capping</para>
+</listitem><listitem><para>Display the current status of the configured resource capping
+daemon</para>
+</listitem>
+</itemizedlist><para>To configure the daemon, you must have superuser privileges or have
+the Process Management profile in your list of profiles. The System Administrator
+role includes the Process Management profile.</para><para>Configuration changes can be incorporated into <literal>rcapd</literal> according
+to the configuration interval (see <olink targetptr="rm.rcapd-21" remap="internal">rcapd Operation
+Intervals</olink>) or on demand by sending a <literal>SIGHUP</literal> (see
+the <citerefentry><refentrytitle>kill</refentrytitle><manvolnum>1</manvolnum></citerefentry> man page).</para><para>If used without arguments, <command>rcapadm</command> displays the current
+status of the resource capping daemon if it has been configured.</para><para>The following subsections discuss cap enforcement, cap values, and <command>rcapd</command> operation intervals.</para><sect2 id="fpjwn"><title>Using the Resource Capping Daemon on a System With
+Zones Installed</title><para>You can control resident set size (RSS) usage of a zone by setting the <literal>capped-memory</literal> resource when you configure the zone. For more information,
+see <olink targetptr="gejkz" remap="internal">Physical Memory Control and the capped-memory
+Resource</olink>. You can run <command>rcapd</command> <emphasis>in</emphasis> a
+zone, including the global zone, to enforce memory caps on projects in that
+zone.</para><para>If you are using <command>rcapd</command> on a zone to regulate physical
+memory consumption by processes running in projects that have resource caps
+defined, you must configure the daemon in those zones.</para><para>When choosing memory caps for applications in different zones, you generally
+do not have to consider that the applications reside in different zones. The
+exception is per-zone services. Per-zone services consume memory. This memory
+consumption must be considered when determining the amount of physical memory
+for a system, as well as memory caps.</para><note><para>You cannot run <command>rcapd</command> in an <literal>lx</literal> branded
+zone. However, you can use the daemon from the global zone to cap memory in
+the branded zone.</para>
+</note>
+</sect2><sect2 id="rm.rcapd-17"><title>Memory Cap Enforcement Threshold</title><para>The <emphasis>memory cap enforcement threshold</emphasis> is the percentage of physical
+memory utilization on the system that triggers cap enforcement. When the system
+exceeds this utilization, caps are enforced. The physical memory used by applications
+and the kernel is included in this percentage. The percentage of utilization
+determines the way in which memory caps are enforced.</para><para>To enforce caps, memory can be paged out from project workloads.</para><itemizedlist><listitem><para>Memory can be paged out to reduce the size of the portion
+of memory that is over its cap for a given workload.</para>
+</listitem><listitem><para>Memory can be paged out to reduce the proportion of physical
+memory used that is over the memory cap enforcement threshold on the system.</para>
+</listitem>
+</itemizedlist><para>A workload is permitted to use physical memory up to its cap. A workload
+can use additional memory as long as the system's memory utilization stays
+below the memory cap enforcement threshold.</para><para>To set the value for cap enforcement, see <olink targetptr="rm.rcapd.task-3" remap="internal">How to Set the Memory Cap Enforcement Threshold</olink>.</para>
+</sect2><sect2 id="rm.rcapd-25"><title>Determining Cap Values</title><para>If a project cap is set too low, there might not be enough memory for
+the workload to proceed effectively under normal conditions. The paging that
+occurs because the workload requires more memory has a negative effect on
+system performance.</para><para>Projects that have caps set too high can consume available physical
+memory before their caps are exceeded. In this case, physical memory is effectively
+managed by the kernel and not by <literal>rcapd</literal>.</para><para>In determining caps on projects, consider these factors.</para><variablelist><varlistentry><term>Impact on I/O system</term><listitem><para>The daemon can attempt to reduce a project workload's physical
+memory usage whenever the sampled usage exceeds the project's cap. During
+cap enforcement, the swap devices and other devices that contain files that
+the workload has mapped are used. The performance of the swap devices is a
+critical factor in determining the performance of a workload that routinely
+exceeds its cap. The execution of the workload is similar to running it on
+a machine with the same amount of physical memory as the workload's cap.</para>
+</listitem>
+</varlistentry><varlistentry><term>Impact on CPU usage</term><listitem><para>The daemon's CPU usage varies with the number of processes
+in the project workloads it is capping and the sizes of the workloads' address
+spaces.</para><para>A small portion of the daemon's CPU time is spent sampling the usage
+of each workload. Adding processes to workloads increases the time spent sampling
+usage.</para><para>Another portion of the daemon's CPU time is spent enforcing caps when
+they are exceeded. The time spent is proportional to the amount of virtual
+memory involved. CPU time spent increases or decreases in response to corresponding
+changes in the total size of a workload's address space. This information
+is reported in the <literal>vm</literal> column of <command>rcapstat</command> output.
+See <olink targetptr="rm.rcapd-22" remap="internal">Monitoring Resource Utilization With rcapstat</olink> and
+the <olink targetdoc="group-refman" targetptr="rcapstat-1" remap="external"><citerefentry><refentrytitle>rcapstat</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para>
+</listitem>
+</varlistentry><varlistentry><term>Reporting on shared memory</term><listitem><para>The <literal>rcapd</literal> daemon reports the RSS of
+pages of memory that are shared with
+other processes or mapped multiple times within the same process as
+a reasonably accurate estimate. If processes in different projects share
+the same memory, then that memory will be counted towards the RSS total
+for all projects sharing the memory.</para><para>The estimate
+is usable with workloads such as databases, which utilize
+shared memory extensively. For database workloads, you can also sample
+a project's regular usage to determine a suitable initial cap value by
+using output from the <option>J</option> or <option>Z</option> options of
+the <command>prstat</command> command. For more information, see the <olink targetdoc="group-refman" targetptr="prstat-1m" remap="external"><citerefentry><refentrytitle>prstat</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="rm.rcapd-21"><title><literal>rcapd</literal> Operation Intervals</title><para>You can tune the intervals for the periodic operations performed by <literal>rcapd</literal>.</para><para>All intervals are specified in seconds. The <literal>rcapd</literal> operations
+and their default interval values are described in the following table.</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row rowsep="1"><entry><para>Operation</para>
+</entry><entry><para>Default Interval Value in Seconds</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>scan</literal></para>
+</entry><entry><para>15</para>
+</entry><entry><para>Number of seconds between scans for processes that have joined or left
+a project workload. Minimum value is 1 second.</para>
+</entry>
+</row><row><entry><para><literal>sample</literal></para>
+</entry><entry><para>5</para>
+</entry><entry><para>Number of seconds between samplings of resident set size and subsequent
+cap enforcements. Minimum value is 1 second.</para>
+</entry>
+</row><row><entry><para><literal>report</literal></para>
+</entry><entry><para>5 </para>
+</entry><entry><para>Number of seconds between updates to paging statistics. If set to <literal>0</literal>, statistics are not updated, and output from <command>rcapstat</command> is
+not current.</para>
+</entry>
+</row><row><entry><para><literal>config</literal></para>
+</entry><entry><para>60</para>
+</entry><entry><para>Number of seconds between reconfigurations. In a reconfiguration event, <command>rcapadm</command> reads the configuration file for updates, and scans the <literal>project</literal> database for new or revised project caps. Sending a <literal>SIGHUP</literal> to <command>rcapd</command> causes an immediate reconfiguration.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>To tune intervals, see <olink targetptr="rm.rcapd.task-6" remap="internal">How to Set
+Operation Intervals</olink>.</para><sect3 id="rm.rcapd-24"><title>Determining <command>rcapd</command> Scan Intervals</title><para>The scan interval controls how often <command>rcapd</command> looks for new processes. On systems with many processes running,
+the scan through the list takes more time, so it might be preferable to lengthen
+the interval in order to reduce the overall CPU time spent. However, the scan
+interval also represents the minimum amount of time that a process must exist
+to be attributed to a capped workload. If there are workloads that run many
+short-lived processes, <command>rcapd</command> might not attribute the processes
+to a workload if the scan interval is lengthened.</para>
+</sect3><sect3 id="rm.rcapd-23"><title>Determining Sample Intervals</title><para>The sample interval configured with <command>rcapadm</command> is the shortest amount of time <command>rcapd</command> waits between
+sampling a workload's usage and enforcing the cap if it is exceeded. If you
+reduce this interval, <command>rcapd</command> will, under most conditions,
+enforce caps more frequently, possibly resulting in increased I/O due to paging.
+However, a shorter sample interval can also lessen the impact  that a sudden
+increase in a particular workload's physical memory usage might have on other
+workloads. The window between samplings, in which the workload can consume
+memory unhindered and possibly take memory from other capped workloads, is
+narrowed.</para><para>If the sample interval specified to <command>rcapstat</command> is shorter
+than the interval specified to <command>rcapd</command> with <command>rcapadm</command>,
+the output for some intervals can be zero. This situation occurs because <command>rcapd</command> does not update statistics more frequently than the interval
+specified with <command>rcapadm</command>. The interval specified with <command>rcapadm</command> is independent of the sampling interval used by <command>rcapstat</command>.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="rm.rcapd-22"><title>Monitoring Resource Utilization With <command>rcapstat</command></title><para>Use <command>rcapstat</command> to monitor the resource utilization
+of capped projects. To view an example <command>rcapstat</command> report,
+see <olink targetptr="rm.rcapd.task-19" remap="internal">Producing Reports With rcapstat</olink>.</para><para>You can set the sampling interval for the report and specify the number
+of times that statistics are repeated.</para><variablelist><varlistentry><term><replaceable>interval</replaceable></term><listitem><para>Specifies the sampling interval in seconds. The default interval
+is 5 seconds.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>count</replaceable></term><listitem><para>Specifies the number of times that the statistics are repeated.
+By default, <command>rcapstat</command> reports statistics until a termination
+signal is received or until the <command>rcapd</command> process exits.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The paging statistics in the first report issued by <command>rcapstat</command> show
+the activity since the daemon was started. Subsequent reports reflect the
+activity since the last report was issued.</para><para>The following table defines the column headings in an <literal>rcapstat</literal> report.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para><command>rcapstat</command> Column Headings</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>id</literal></para>
+</entry><entry><para>The project ID of the capped project.</para>
+</entry>
+</row><row><entry><para><literal>project</literal></para>
+</entry><entry><para>The project name.</para>
+</entry>
+</row><row><entry><para><literal>nproc</literal></para>
+</entry><entry><para>The number of processes in the project.</para>
+</entry>
+</row><row><entry><para><literal>vm</literal></para>
+</entry><entry><para>The total amount of virtual memory size used by processes in the project,
+including all mapped files and devices, in kilobytes (K), megabytes (M), or
+gigabytes (G).</para>
+</entry>
+</row><row><entry><para><literal>rss</literal></para>
+</entry><entry><para>The estimated amount of the total resident set size (RSS) of the processes
+in the project, in kilobytes (K), megabytes (M), or gigabytes (G), not accounting
+for pages that are shared.</para>
+</entry>
+</row><row><entry><para><literal>cap</literal></para>
+</entry><entry><para>The RSS cap defined for the project. See <olink targetptr="rm.rcapd-4" remap="internal">Attribute
+to Limit Physical Memory Usage</olink> or the <olink targetdoc="group-refman" targetptr="rcapd-1m" remap="external"><citerefentry><refentrytitle>rcapd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page for information
+about how to specify memory caps.</para>
+</entry>
+</row><row><entry><para><literal>at</literal></para>
+</entry><entry><para>The total amount of memory that <command>rcapd</command> attempted to
+page out since the last <command>rcapstat</command> sample.</para>
+</entry>
+</row><row><entry><para><literal>avgat</literal></para>
+</entry><entry><para>The average amount of memory that <command>rcapd</command> attempted
+to page out during  each sample cycle that occurred since the last <command>rcapstat</command> sample. The rate at which <command>rcapd</command> samples collection
+RSS can be set with <command>rcapadm</command>. See <olink targetptr="rm.rcapd-21" remap="internal">rcapd Operation Intervals</olink>.</para>
+</entry>
+</row><row><entry><para><literal>pg</literal></para>
+</entry><entry><para>The total amount of memory that  <command>rcapd</command> successfully
+paged out since the last <command>rcapstat</command> sample.</para>
+</entry>
+</row><row><entry><para><literal>avgpg</literal></para>
+</entry><entry><para>An estimate of the average amount of memory that <command>rcapd</command> successfully
+paged out during each sample cycle that occurred since the last <command>rcapstat</command> sample. The rate at which <command>rcapd</command> samples process
+RSS sizes can be set with <command>rcapadm</command>. See <olink targetptr="rm.rcapd-21" remap="internal">rcapd Operation Intervals</olink>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="rm.rcapd-43"><title>Commands Used With <command>rcapd</command></title><informaltable frame="all"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="30*"/><colspec colwidth="70*"/><thead><row><entry><para>Command Reference</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetdoc="group-refman" targetptr="rcapstat-1" remap="external"><citerefentry><refentrytitle>rcapstat</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Monitors the resource utilization of capped projects.</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="rcapadm-1m" remap="external"><citerefentry><refentrytitle>rcapadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>Configures the resource capping daemon, displays the current status
+of the resource capping daemon if it has been configured, and enables or disables
+resource capping</para>
+</entry>
+</row><row><entry><para><olink targetdoc="group-refman" targetptr="rcapd-1m" remap="external"><citerefentry><refentrytitle>rcapd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</entry><entry><para>The resource capping daemon.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

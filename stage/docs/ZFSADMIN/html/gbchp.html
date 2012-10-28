@@ -1,0 +1,132 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>ZFS Space Accounting - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbcby.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gayql.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level2"><a href="gbcby.html">ZFS File System Granularity</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">ZFS Space Accounting</a></p>
+</div>
+<p class="toc level2"><a href="gayql.html">Mounting ZFS File Systems</a></p>
+<p class="toc level2"><a href="gazcc.html">Traditional Volume Management</a></p>
+<p class="toc level2"><a href="gbcaq.html">New Solaris ACL Model</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbchp"></a><h3>ZFS Space Accounting</h3>
+<p>ZFS is based on a concept of pooled storage. Unlike typical file
+systems, which are mapped to physical storage, all ZFS file systems in a
+pool share the available storage in the pool. So, the available space reported
+by utilities such as <tt>df</tt> might change even when the file system is
+inactive, as other file systems in the pool consume or release space. Note
+that the maximum file system size can be limited by using quotas. For
+information about quotas, see <a href="gazvb.html#gazud">Setting Quotas on ZFS File Systems</a>. Space can be guaranteed to a file system by
+using reservations. For information about reservations, see <a href="gazvb.html#gbdbb">Setting Reservations on ZFS File Systems</a>. This model is very similar
+to the NFS model, where multiple directories are mounted from the same file
+system (consider <tt>/home</tt>).<a name="indexterm-79"></a><a name="indexterm-80"></a></p><p>All metadata in ZFS is allocated dynamically. Most other file systems pre-allocate much
+of their metadata. As a result, an immediate space cost at file system
+creation for this metadata is required. This behavior also means that the total
+number of files supported by the file systems is predetermined. Because ZFS allocates
+its metadata as it needs it, no initial space cost is required, and
+the number of files is limited only by the available space. The output
+from the <tt>df -g</tt> command must be interpreted differently for ZFS than other file
+systems. The <tt>total files</tt> reported is only an estimate based on the amount of
+storage that is available in the pool.</p><p>ZFS is a transactional file system. Most file system modifications are bundled into
+transaction groups and committed to disk asynchronously. Until these modifications are committed to
+disk, they are termed <b>pending changes</b>. The amount of space used, available, and
+referenced by a file or file system does not consider pending changes. Pending
+changes are generally accounted for within a few seconds. Even committing a change
+to disk by using <tt>fsync(3c)</tt> or <tt>O_SYNC</tt> does not necessarily guarantee that the space
+usage information is updated immediately.</p>
+
+<a name="gayra"></a><h4>Out of Space Behavior</h4>
+<p>File system snapshots are inexpensive and easy to create in ZFS. Most likely,
+snapshots will be common in most ZFS environments. For information about ZFS snapshots,
+see <a href="gavvx.html">Chapter&nbsp;6, Working With ZFS Snapshots and Clones</a>.</p><p>The presence of snapshots can cause some unexpected behavior when you attempt to
+free space. Typically, given appropriate permissions, you can remove a file from a
+full file system, and this action results in more space becoming available in
+the file system. However, if the file to be removed exists in a
+snapshot of the file system, then no space is gained from the
+file deletion. The blocks used by the file continue to be referenced from
+the snapshot.<a name="indexterm-81"></a><a name="indexterm-82"></a></p><p>As a result, the file deletion can consume more disk space, because a
+new version of the directory needs to be created to reflect the
+new state of the namespace. This behavior means that you can get an
+unexpected <tt>ENOSPC</tt> or <tt>EDQUOT</tt> when attempting to remove a file.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbcby.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gayql.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

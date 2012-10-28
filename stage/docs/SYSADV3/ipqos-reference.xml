@@ -1,0 +1,737 @@
+<chapter id="ipqos-reference-1"><title>IPQoS in Detail (Reference)</title><highlights><para>This chapter contains reference materials that provide in-depth details
+about the following IPQoS topics:</para><itemizedlist><listitem><para><olink targetptr="ipqos-reference-2" remap="internal">IPQoS Architecture and
+the Diffserv Model</olink></para>
+</listitem><listitem><para><olink targetptr="ipqos-reference-22" remap="internal">IPQoS Configuration
+File</olink></para>
+</listitem><listitem><para><olink targetptr="ipqos-reference-30" remap="internal">ipqosconf Configuration
+Utility</olink></para>
+</listitem>
+</itemizedlist><para>For an overview, refer to <olink targetptr="ipqos-intro-1" remap="internal">Chapter&nbsp;32, Introducing IPQoS (Overview)</olink>. For planning information, refer to <olink targetptr="ipqos-config-planning-1" remap="internal">Chapter&nbsp;33, Planning for an IPQoS-Enabled Network (Tasks)</olink>. For procedures for configuring IPQoS, refer to <olink targetptr="ipqos-policy-planning-1" remap="internal">Chapter&nbsp;34, Creating the IPQoS Configuration File (Tasks)</olink>.</para>
+</highlights><sect1 id="ipqos-reference-2"><title>IPQoS Architecture and the Diffserv Model</title><para>This section describes the IPQoS architecture and how IPQoS implements
+the differentiated services (Diffserv) model that is defined in<ulink url="http://www.ietf.org/rfc/rfc2475.txt?number=2475" type="text_url">RFC
+2475, An Architecture for Differentiated Services</ulink>. The following elements
+of the Diffserv model are included in IPQoS:</para><itemizedlist><listitem><para>Classifier</para>
+</listitem><listitem><para>Meter</para>
+</listitem><listitem><para>Marker</para>
+</listitem>
+</itemizedlist><para>In addition, IPQoS includes the flow-accounting module and the <command>dlcosmk</command> marker for use with virtual local area network (VLAN) devices.</para><sect2 id="ipqos-reference-3"><title>Classifier Module</title><para>In the Diffserv model, the <emphasis>classifier</emphasis> is responsible
+for organizing selected traffic flows into groups on which to apply different
+service levels. The classifiers that are defined in RFC 2475 were originally
+designed for boundary routers. In contrast, the IPQoS classifier <command>ipgpc</command> is
+designed to handle traffic flows on hosts that are internal to the local network.
+Therefore, a network with both IPQoS systems and a Diffserv router can provide
+a greater degree of differentiated services. For a technical description of <command>ipgpc</command>, refer to the <command>ipgpc</command>(7ipp) man page. </para><para>The <command>ipgpc</command> classifier does the following:</para><orderedlist><listitem><para>Selects traffic flows that meet the criteria specified in
+the IPQoS configuration file on the IPQoS-enabled system</para><para>The QoS
+policy defines various criteria that must be present in packet headers. These
+criteria are called <emphasis>selectors</emphasis>. The <command>ipgpc</command> classifier
+compares these selectors against the headers of packets that are received
+by the IPQoS system. <command>ipgpc</command> then selects all matching packets.</para>
+</listitem><listitem><para>Separates the packet flows into <emphasis>classes</emphasis>,
+network traffic with the same characteristics, as defined in the IPQoS configuration
+file</para>
+</listitem><listitem><para>Examines the value in the packet's differentiated service
+(DS) field for the presence of a differentiated services codepoint (DSCP)</para><para>The presence of the  DSCP indicates whether the incoming traffic has
+been marked by the sender with a forwarding behavior.</para>
+</listitem><listitem><para>Determines what further action is specified  in the IPQoS
+configuration file for packets of a particular class</para>
+</listitem><listitem><para>Passes the packets to the next IPQoS module specified in the
+IPQoS configuration file, or returns the packets to the network stream</para>
+</listitem>
+</orderedlist><para>For an overview of the classifier, refer to <olink targetptr="ipqos-intro-17" remap="internal">Classifier (ipgpc) Overview</olink>. For information
+on invoking the classifier in the IPQoS configuration file, refer to <olink targetptr="ipqos-reference-22" remap="internal">IPQoS Configuration File</olink>. </para><sect3 id="ipqos-reference-40"><title>IPQoS Selectors</title><para>The <command>ipgpc</command> classifier supports a variety of selectors
+that you can use in the <literal>filter</literal> clause of the IPQoS configuration
+file. When you define a filter, always use the minimum number of selectors
+that are needed to successfully retrieve traffic of a particular class. The
+number of filters you define can impact IPQoS performance.</para><para>The next table lists the selectors that are available for <command>ipgpc</command>.</para><table frame="topbot" pgwide="100" id="ipqos-reference-tbl-32"><title>Filter
+Selectors for the IPQoS Classifier</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec1" colwidth="44.91*"/><colspec colname="colspec3" colwidth="60.60*"/><colspec colname="colspec2" colwidth="57.32*"/><thead><row rowsep="1"><entry><para>Selector</para>
+</entry><entry><para>Argument</para>
+</entry><entry><para>Information Selected</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>saddr</literal></para>
+</entry><entry><para>IP address number.</para>
+</entry><entry><para>Source address.</para>
+</entry>
+</row><row><entry><para><literal>daddr</literal></para>
+</entry><entry><para>IP address number.</para>
+</entry><entry><para>Destination address.</para>
+</entry>
+</row><row><entry><para><literal>sport</literal></para>
+</entry><entry><para>Either a port number or service name, as defined in <filename>/etc/services</filename>.</para>
+</entry><entry><para>Source port from which a traffic class originated.</para>
+</entry>
+</row><row><entry><para><literal>dport</literal></para>
+</entry><entry><para>Either a port number or service name, as defined in <filename>/etc/services</filename>.</para>
+</entry><entry><para>Destination port to which a traffic class is bound.</para>
+</entry>
+</row><row><entry><para><literal>protocol</literal></para>
+</entry><entry><para>Either a protocol number or protocol name,  as defined in <filename>/etc/protocols</filename>.</para>
+</entry><entry><para>Protocol to be used by this traffic class.</para>
+</entry>
+</row><row><entry><para><literal>dsfield</literal></para>
+</entry><entry><para>DS codepoint (DSCP) with a value of 0&ndash;63.</para>
+</entry><entry><para>DSCP, which defines any forwarding behavior to be applied to the packet.
+If this parameter is specified, the <literal>dsfield_mask</literal> parameter
+must also be specified.</para>
+</entry>
+</row><row><entry><para><literal>dsfield_mask</literal></para>
+</entry><entry><para>Bit mask with a value of 0&ndash;255.</para>
+</entry><entry><para>Used in tandem with the <literal>dsfield</literal> selector. <literal>dsfield_mask</literal> is applied to the <literal>dsfield</literal> selector to determine
+which of its bits to match against.</para>
+</entry>
+</row><row><entry><para><literal>if_name</literal></para>
+</entry><entry><para>Interface name.</para>
+</entry><entry><para>Interface to be used for either incoming or outgoing traffic of a particular
+class.</para>
+</entry>
+</row><row><entry><para><literal>if_groupname</literal></para>
+</entry><entry><para>Interface group name.</para>
+</entry><entry><para>Interface group to be used for either incoming or outgoing traffic of
+a particular class.</para>
+</entry>
+</row><row><entry><para><literal>user</literal></para>
+</entry><entry><para>Number of the UNIX user ID or user name to be selected. If no user ID
+or user name is on the packet, the default &ndash;1 is used.</para>
+</entry><entry><para>User ID that is supplied to an application.</para>
+</entry>
+</row><row><entry><para><literal>projid</literal></para>
+</entry><entry><para>Number of the project ID to be selected.</para>
+</entry><entry><para>Project ID that is supplied to an application.</para>
+</entry>
+</row><row><entry><para><literal>priority</literal></para>
+</entry><entry><para>Priority number. Lowest priority is 0.</para>
+</entry><entry><para>Priority that is given to packets of this class. Priority is used to
+order the importance of filters for the same class.</para>
+</entry>
+</row><row><entry><para><literal>direction</literal></para>
+</entry><entry><para>Argument can be one of the following:</para>
+</entry><entry><para>Direction of packet flow on the IPQoS machine. </para>
+</entry>
+</row><row><entry>
+</entry><entry><para><literal>LOCAL_IN</literal></para>
+</entry><entry><para>Input traffic local to the IPQoS system.</para>
+</entry>
+</row><row><entry>
+</entry><entry><para><literal>LOCAL_OUT</literal></para>
+</entry><entry><para>Output traffic local to the IPQoS system.</para>
+</entry>
+</row><row><entry>
+</entry><entry><para><literal>FWD_IN</literal></para>
+</entry><entry><para>Input traffic to be forwarded.</para>
+</entry>
+</row><row><entry>
+</entry><entry><para><literal>FWD_OUT</literal></para>
+</entry><entry><para>Output traffic to be forwarded.</para>
+</entry>
+</row><row><entry><para><literal>precedence</literal></para>
+</entry><entry><para>Precedence value. Highest precedence is 0.</para>
+</entry><entry><para>Precedence is used to order filters with the same priority.</para>
+</entry>
+</row><row><entry><para><literal>ip_version</literal></para>
+</entry><entry><para><literal>V4</literal> or <literal>V6</literal></para>
+</entry><entry><para>Addressing scheme that is used by the packets, either IPv4 or IPv6.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3>
+</sect2><sect2 id="ipqos-reference-8"><title>Meter Module</title><para>The <emphasis>meter</emphasis> tracks the transmission rate of flows on a per-packet basis. 
+The meter then determines whether the packet conforms to the configured parameters.
+The meter module determines the next action for a packet from a set of actions
+that depend on packet size, configured parameters, and flow rate.</para><para>The meter consists of two metering modules, <literal>tokenmt</literal> and <literal>tswtclmt</literal>, which you configure in the IPQoS configuration file. You
+can configure either module or both modules for a class. </para><para>When you configure a metering module, you can define two parameters
+for rate:</para><itemizedlist><listitem><para><literal>committed-rate</literal> &ndash; Defines the acceptable
+transmission rate in bits per second for packets of a particular class </para>
+</listitem><listitem><para><literal>peak-rate</literal> &ndash; Defines the maximum transmission
+rate in bits per second that is allowable for packets of a particular class</para>
+</listitem>
+</itemizedlist><para>A metering action on a packet can result in one of three outcomes:</para><itemizedlist><listitem><para><literal>green</literal> &ndash; The packet causes the flow
+to remain within its committed rate.</para>
+</listitem><listitem><para><literal>yellow</literal> &ndash; The packet causes the flow
+to exceed its committed rate but not its peak rate.</para>
+</listitem><listitem><para><literal>red</literal> &ndash; The packet causes the flow
+to exceed its peak rate.</para>
+</listitem>
+</itemizedlist><para>You can configure each outcome with different actions in the IPQoS configuration
+file. Committed rate and peak rate are explained in the next section.</para><sect3 id="ipqos-reference-130"><title><command>tokenmt</command> Metering
+Module</title><para>The <command>tokenmt</command> module uses <emphasis>token buckets</emphasis> to
+measure the transmission rate of a flow. You can configure <command>tokenmt</command> to
+operate as a single-rate or two-rate meter. A <command>tokenmt</command> action
+instance maintains two token buckets that determine whether the traffic flow
+conforms to configured parameters. </para><para>The <olink targetdoc="refman7" targetptr="tokenmt-7ipp" remap="external"><citerefentry><refentrytitle>tokenmt</refentrytitle><manvolnum>7ipp</manvolnum></citerefentry></olink> man
+page explains how IPQoS implements the token meter paradigm. You can find
+more general information about token buckets in Kalevi Kilkki's <emphasis>Differentiated
+Services for the Internet</emphasis> and on a number of web sites.</para><para>Configuration parameters for <literal>tokenmt</literal> are as
+follows:</para><itemizedlist><listitem><para><literal>committed_rate</literal> &ndash; Specifies the committed
+rate of the flow in bits per second.</para>
+</listitem><listitem><para><literal>committed_burst</literal> &ndash; Specifies the committed
+burst size in bits. The <literal>committed_burst</literal> parameter defines
+how many outgoing packets of a particular class can pass onto the network
+at the committed rate.</para>
+</listitem><listitem><para><literal>peak_rate</literal> &ndash; Specifies the peak rate
+in bits per second. </para>
+</listitem><listitem><para><literal>peak_burst</literal> &ndash; Specifies the peak or
+excess burst size in bits. The <literal>peak_burst</literal> parameter grants
+to a traffic class a peak-burst size that exceeds the committed rate.</para>
+</listitem><listitem><para><literal>color_aware</literal> &ndash; Turns on awareness
+mode for <command>tokenmt</command>. </para>
+</listitem><listitem><para><literal>color_map</literal> &ndash; Defines an integer array
+that maps DSCP values to green, yellow, or red.</para>
+</listitem>
+</itemizedlist><sect4 id="ipqos-reference-12"><title>Configuring <command>tokenmt</command> as
+a Single-Rate Meter</title><para>To configure <literal>tokenmt</literal> as a single-rate meter,
+do not specify a <literal>peak_rate</literal> parameter for <literal>tokenmt</literal> in
+the IPQoS configuration file. To configure a single-rate <literal>tokenmt</literal> instance
+to have a red, green, or a yellow outcome, you must specify the <literal>peak_burst</literal> parameter. If you do not use the <literal>peak_burst</literal> parameter,
+you can configure <command>tokenmt</command> to have only a red outcome or
+green outcome. For an example of a single-rate <literal>tokenmt</literal> with
+two outcomes, see <olink targetptr="ipqos-policy-planning-ex-96" remap="internal">Example 34&ndash;3</olink>.</para><para>When <command>tokenmt</command> operates as a single-rate meter, the <literal>peak_burst</literal> parameter is actually the excess burst size. <literal>committed_rate</literal>, and either <literal>committed_burst</literal> or <literal>peak_burst</literal>,
+must be nonzero positive integers.</para>
+</sect4><sect4 id="ipqos-reference-13"><title>Configuring <command>tokenmt</command> as
+a Two-Rate Meter</title><para>To configure <command>tokenmt</command> as a two-rate meter, specify
+a <literal>peak_rate</literal> parameter for the <literal>tokenmt</literal> action
+in the IPQoS configuration file. A two-rate <command>tokenmt</command> always
+has the three outcomes, red, yellow, and green. The <literal>committed_rate</literal>, <literal>committed_burst</literal>, and <literal>peak_burst</literal> parameters must
+be nonzero positive integers.</para>
+</sect4><sect4 id="ipqos-reference-14"><title>Configuring <command>tokenmt</command> to
+Be Color Aware</title><para>To configure a two-rate <command>tokenmt</command> to be color
+aware, you must add parameters to specifically add &ldquo;color awareness.&rdquo;
+The following is an example action statement that configures <command>tokenmt</command> to
+be color aware.</para><example id="ipqos-reference-ex-20"><title>Color-Aware <command>tokenmt</command> Action
+for the IPQoS Configuration File</title><programlisting>action {
+    module tokenmt
+    name meter1
+    params {
+	      committed_rate 4000000
+	      peak_rate 8000000
+	      committed_burst 4000000
+	      peak_burst 8000000
+	      global_stats true
+	      red_action_name continue
+	      yellow_action_name continue
+	      green_action_name continue
+	      color_aware true
+	      color_map {0-20,22:GREEN;21,23-42:RED;43-63:YELLOW}
+    }
+}</programlisting>
+</example><para>You turn on color awareness by setting the <literal>color_aware</literal> parameter
+to <literal>true</literal>. As a color-aware meter, <command>tokenmt</command> assumes
+that the packet has already been marked as red, yellow, or green by a previous <command>tokenmt</command> action. Color-aware <command>tokenmt</command> evaluates
+a packet by using the DSCP in the packet header in addition to the parameters
+for a two-rate meter. </para><para>The <literal>color_map</literal> parameter contains an array into
+which the DSCP in the packet header is mapped. Consider the following <literal>color_map</literal> array:</para><programlisting>color_map {0-20,22:GREEN;21,23-42:RED;43-63:YELLOW}</programlisting><para>Packets with a DSCP of 0&ndash;20 and 22 are mapped to green. Packets
+with a DSCP of 21 and 23&ndash;42 are mapped to red. Packets with a DSCP of
+43&ndash;63 are mapped to yellow. <command>tokenmt</command> maintains a default
+color map. However, you can change the default as needed by using the <literal>color_map</literal> parameters.</para><para>In the <replaceable>color</replaceable><literal>_action_name</literal> parameters,
+you can specify <literal>continue</literal> to complete processing of the
+packet. Or, you can add an argument to send the packet to a marker action,
+for example, <literal>yellow_action_name mark22</literal>.</para>
+</sect4>
+</sect3><sect3 id="ipqos-reference-20"><title><command>tswtclmt</command> Metering
+Module</title><para>The <command>tswtclmt</command> metering module estimates average
+bandwidth for a traffic class by using a time-based <emphasis>rate estimator</emphasis>. <command>tswtclmt</command> always operates as a three-outcome meter. The rate estimator
+provides an estimate of the flow's arrival rate. This rate should approximate
+the running average bandwidth of the traffic stream over a specific period
+or time, its <emphasis>time window</emphasis>. The rate estimation algorithm
+is taken from RFC 2859, <emphasis>A Time Sliding Window Three Colour Marker</emphasis>.</para><para>You use the following parameters to configure <command>tswtclmt</command>:</para><itemizedlist><listitem><para><literal>committed_rate</literal> &ndash; Specifies the committed
+rate in bits per second</para>
+</listitem><listitem><para><literal>peak_rate</literal> &ndash; Specifies the peak rate
+in bits per second</para>
+</listitem><listitem><para><literal>window</literal> &ndash; Defines the time window,
+in milliseconds over which history of average bandwidth is kept</para>
+</listitem>
+</itemizedlist><para>For technical details on <command>tswtclmt</command>, refer to the<olink targetdoc="refman7" targetptr="tswtclmt-7ipp" remap="external"><citerefentry><refentrytitle>tswtclmt</refentrytitle><manvolnum>7ipp</manvolnum></citerefentry></olink> man page.
+For general information on rate shapers that are similar to <command>tswtclmt</command>,
+see <ulink url="http://www.ietf.org/rfc/rfc2963.txt?number=2963" type="text_url">RFC 2963, A Rate Adaptive Shaper for Differentiated Services</ulink>.</para>
+</sect3>
+</sect2><sect2 id="ipqos-reference-11"><title>Marker Module</title><para>IPQoS includes
+two marker modules, <command>dscpmk</command> and <command>dlcosmk</command>.
+This section contains information for using both markers. Normally, you should
+use <command>dscpmk</command> because <command>dlcosmk</command> is only available
+for IPQoS systems with VLAN devices.</para><para>For technical information about <command>dscpmk</command>, refer to
+the <command>dscpmk</command>(7ipp) man page. For technical information about <command>dlcosmk</command>, refer to the <command>dlcosmk</command>(7ipp) man page.</para><sect3 id="ipqos-reference-330"><title>Using the <command>dscpmk</command> Marker
+for Forwarding Packets</title><para>The marker receives traffic flows after the flows are processed
+by the classifier or by the metering modules. The marker marks the traffic
+with a forwarding behavior. This forwarding behavior is the action to be taken
+on the flows after the flows leaving the IPQoS system. Forwarding behavior
+to be taken on a traffic class is defined in the <emphasis>per-hop behavior
+(PHB)</emphasis>. The PHB assigns a priority to a traffic class, which indicates
+the precedence flows of that class in relation to other traffic classes. PHBs
+only govern forwarding behaviors on the IPQoS system's contiguous network.
+For more information on PHBs, refer to <olink targetptr="ipqos-intro-10" remap="internal">Per-Hop
+Behaviors</olink>.</para><para><emphasis>Packet forwarding</emphasis> is the process of sending traffic
+of a particular class to its next destination on a network. For a host such
+as an IPQoS system, a packet is forwarded from the host to the local network
+stream. For a Diffserv router, a packet is forwarded from the local network
+to the router's next hop.  </para><para>The marker marks the DS field in the packet header with a well-known
+forwarding behavior that is defined in the IPQoS configuration file. Thereafter,
+the IPQoS system and subsequent Diffserv-aware systems forward the traffic
+as indicated in the DS field until the mark changes. To assign a PHB, the
+IPQoS system marks a value in the DS field of the packet header. This value
+is called the differentiated services codepoint (DSCP). The Diffserv architecture
+defines two types of forwarding behaviors, EF and AF, which use different
+DSCPs. For overview information about DSCPs, refer to <olink targetptr="ipqos-intro-99" remap="internal">DS Codepoint</olink>.</para><para>The IPQoS system reads the DSCP for the traffic flow and evaluates
+the flow's precedence in relation to other outgoing traffic flows. The IPQoS
+system then prioritizes  all concurrent traffic flows and releases each flow
+onto the network by its priority. </para><para>The Diffserv router receives the outgoing traffic flows and reads the
+DS field in the packet headers. The DSCP enables the router to prioritize
+and schedule the concurrent traffic flows. The router  forwards each flow
+by the priority that is indicated by the PHB. Note that the PHB cannot apply
+beyond the boundary router of the network unless Diffserv-aware systems on
+subsequent hops also recognize the same PHB. </para><sect4 id="ipqos-reference-140"><title>Expedited Forwarding (EF) PHB</title><para><emphasis>Expedited forwarding</emphasis> (EF) guarantees that
+packets with the recommended EF codepoint 46 (101110) receive the best treatment
+that is available on release to the network. Expedited forwarding is often
+compared to a leased line. Packets with the 46 (101110) codepoint are guaranteed
+preferential treatment by all Diffserv routers en route to the packets' destination.
+For technical information about EF, refer to RFC 2598, <emphasis>An Expedited
+Forwarding PHB</emphasis>.</para>
+</sect4><sect4 id="ipqos-reference-150"><title>Assured Forwarding (AF) PHB</title><para><emphasis>Assured forwarding</emphasis> (AF) provides four different
+classes of forwarding behaviors that you can specify to the marker. The next
+table shows the classes, the three drop precedences that are provided with
+each class, and the recommended DSCPs that are associated with each precedence.
+Each DSCP is represented by its AF value, its value in decimal, and its value
+in binary.</para><table frame="topbot" pgwide="100" id="ipqos-reference-tbl-16"><title>Assured
+Forwarding Codepoints</title><tgroup cols="5" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="21.86*"/><colspec colname="colspec1" colwidth="15.13*"/><colspec colname="colspec2" colwidth="19.89*"/><colspec colname="colspec3" colwidth="16.46*"/><colspec colname="colspec4" colwidth="26.65*"/><thead><row rowsep="1"><entry><para></para>
+</entry><entry><para>Class 1</para>
+</entry><entry><para>Class 2</para>
+</entry><entry><para>Class 3</para>
+</entry><entry><para>Class 4</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><emphasis role="strong">Low-Drop Precedence</emphasis></para>
+</entry><entry><para>AF11 =</para><para>10 (001010)</para>
+</entry><entry><para>AF21 =</para><para>18 (010010)</para>
+</entry><entry><para>AF31 =</para><para>26 (011010)</para>
+</entry><entry><para>AF41 =</para><para>34 (100010)</para>
+</entry>
+</row><row><entry><para><emphasis role="strong">Medium-Drop Precedence</emphasis></para>
+</entry><entry><para>AF12 =</para><para>12 (001100)</para>
+</entry><entry><para>AF22 =</para><para>20 (010100)</para>
+</entry><entry><para>AF32 =</para><para>28 (011100)</para>
+</entry><entry><para>AF42 = </para><para>36 (100100)</para>
+</entry>
+</row><row><entry><para><emphasis role="strong">High-Drop Precedence</emphasis></para>
+</entry><entry><para>AF13 =</para><para>14 (001110)</para>
+</entry><entry><para>AF23 =</para><para>22 (010110)</para>
+</entry><entry><para>AF33 =</para><para>30 (011110)</para>
+</entry><entry><para>AF43 =</para><para>38 (100110)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>Any Diffserv-aware system can use the AF codepoint as a guide for providing
+differentiated forwarding behaviors to different classes of traffic. </para><para>When these packets reach a Diffserv router, the router evaluates
+the packets' codepoints along with DSCPs of other traffic in the queue. The
+router then forwards or drops packets, depending on the available bandwidth
+and the priorities that are assigned by the packets' DSCPs. Note that packets
+that are marked with the EF PHB are guaranteed bandwidth over packets that
+are marked with the various AF PHBs.</para><para>Coordinate packet marking between any IPQoS systems on your network
+and the Diffserv router to ensure that packets are forwarded as expected.
+For example, suppose IPQoS systems on your network mark packets with AF21
+(010010), AF13 (001110), AF43 (100110), and EF (101110) codepoints. You then
+need to add the AF21, AF13, AF43, and EF DSCPs to the appropriate file on
+the Diffserv router.</para><para>For a technical explanation of the AF codepoint table, refer to RFC
+2597. Router manufacturers Cisco Systems and Juniper Networks have detailed
+information about setting the AF PHB on their web sites. You can use this
+information to define AF PHBs for IPQoS systems as well as routers. Additionally,
+router manufacturers' documentation contains instructions for setting DS codepoints
+on their equipment.</para>
+</sect4><sect4 id="ipqos-reference-500"><title>Supplying a DSCP to the Marker</title><para>The DSCP is 6 bits in length. The DS field is 1 byte long. When
+you define a DSCP, the marker marks the first 6 significant bits of the packet
+header with the DS codepoint. The remaining 2 least-significant bits are unused. </para><para>To define a DSCP, you use the following parameter within a marker
+action statement:</para><screen> dscp_map{0-63:<replaceable>DS_codepoint</replaceable>}</screen><para>The <literal>dscp_map</literal> parameter is a 64-element array, which
+you populate with the (DSCP) value. <literal>dscp_map</literal> is used to
+map incoming DSCPs to outgoing DSCPs that are applied by the <command>dscpmk</command> marker.</para><para>You must specify the DSCP value to <literal>dscp_map</literal> in decimal
+notation. For example, you must translate the EF codepoint of 101110 into
+the decimal value 46, which results in <literal>dscp_map{0-63:46}</literal>.
+For AF codepoints, you must translate the various codepoints that are shown
+in <olink targetptr="ipqos-reference-tbl-16" remap="internal">Table 37&ndash;2</olink> to decimal
+notation for use with <literal>dscp_map.</literal></para>
+</sect4>
+</sect3><sect3 id="ipqos-reference-110"><title>Using the <command>dlcosmk</command> Marker
+With VLAN Devices</title><para>The <command>dlcosmk</command> marker module marks a forwarding
+behavior in the MAC header of a datagram. You can use <command>dlcosmk</command> only
+on an IPQoS system with a VLAN interface.</para><para><command>dlcosmk</command> adds four bytes, which are known as
+the <emphasis>VLAN tag</emphasis>, to the MAC header. The VLAN tag includes
+a 3-bit user-priority value, which is defined by the IEEE 801.D standard.
+Diffserv-aware switches that understand VLAN can read the user-priority field
+in a datagram. The 801.D user priority values implement the class-of-service
+(CoS) marks, which are well known and understood by commercial switches.</para><para>You can use the user-priority values in the <command>dlcosmk</command> marker
+action by defining the class of service marks that are listed in the next
+table.</para><table frame="topbot" id="ipqos-reference-tbl-18"><title>801.D User-Priority
+Values</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para>Class of Service</para>
+</entry><entry><para>Definition</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>0</para>
+</entry><entry><para>Best effort</para>
+</entry>
+</row><row><entry><para>1</para>
+</entry><entry><para>Background</para>
+</entry>
+</row><row><entry><para>2</para>
+</entry><entry><para>Spare</para>
+</entry>
+</row><row><entry><para>3</para>
+</entry><entry><para>Excellent effort</para>
+</entry>
+</row><row><entry><para>4</para>
+</entry><entry><para>Controlled load</para>
+</entry>
+</row><row><entry><para>5</para>
+</entry><entry><para>Video less than 100ms latency</para>
+</entry>
+</row><row><entry><para>6</para>
+</entry><entry><para>Video less than 10ms latency</para>
+</entry>
+</row><row><entry><para>7</para>
+</entry><entry><para>Network control</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>For more information on <command>dlcosmk</command>, refer to the <olink targetdoc="refman7" targetptr="dlcosmk-7ipp" remap="external"><citerefentry><refentrytitle>dlcosmk</refentrytitle><manvolnum>7ipp</manvolnum></citerefentry></olink> man page.</para><sect4 id="ipqos-reference-17"><title>IPQoS Configuration for Systems With
+VLAN Devices</title><para>This section introduces a simple network scenario that shows how to
+implement IPQoS on systems with VLAN devices. The scenario includes two IPQoS
+systems, <literal>machine1</literal> and <literal>machine2</literal>, that
+are connected by a switch. The VLAN device on <literal>machine1</literal> has
+the IP address <literal>10.10.8.1</literal>. The VLAN device on <literal>machine2</literal> has the IP address <literal>10.10.8.3</literal>. </para><para>The following IPQoS configuration file for <literal>machine1</literal> shows
+a simple solution for marking traffic through the switch to <literal>machine2</literal>.</para><example id="ipqos-reference-ex-19"><title>IPQoS Configuration File for a
+System With a VLAN Device</title><programlisting>fmt_version 1.0
+action {
+        module ipgpc
+	      name ipgpc.classify
+
+        filter {
+                name myfilter2
+                daddr 10.10.8.3
+                class myclass
+        }
+
+        class {
+                name myclass
+                next_action mark4
+        }
+}
+
+action {
+        name mark4
+        module dlcosmk
+        params {
+                cos 4
+                next_action continue
+		global_stats true
+        }
+}</programlisting>
+</example><para>In this configuration, all traffic from <literal>machine1</literal> that
+is destined for the VLAN device on <literal>machine2</literal> is passed to
+the <literal>dlcosmk</literal> marker. The <literal>mark4</literal> marker
+action instructs <literal>dlcosmk</literal> to add a VLAN mark to datagrams
+of class <literal>myclass</literal> with a CoS of 4. The user-priority value
+of 4 indicates that the switch between the two machines should give controlled
+load forwarding to <literal>myclass</literal> traffic flows from <literal>machine1</literal>.</para>
+</sect4>
+</sect3>
+</sect2><sect2 id="ipqos-reference-300"><title><command>flowacct</command> Module</title><para>The IPQoS <literal>flowacct</literal> module records information
+about traffic flows, a process that is referred to as <emphasis>flow accounting</emphasis>.
+Flow accounting produces data that can be used for billing customers or for
+evaluating the amount of traffic to a particular class.</para><para>Flow accounting is optional. <command>flowacct</command> is typically
+the final module that metered or marked traffic flows might encounter before
+release onto the network stream. For an illustration of <command>flowacct</command>'s
+position in the Diffserv model, see <olink targetptr="ipqos-intro-fig-2" remap="internal">Figure 32&ndash;1</olink>. For detailed technical information about <command>flowacct</command>,
+refer to the <command>flowacct</command>(7ipp) man page.</para><para>To enable flow accounting, you need to use the Solaris <command>exacct</command> accounting
+facility and the <command>acctadm</command> command, as well as <command>flowacct</command>. For the overall steps in setting up flow accounting, refer to <olink targetptr="ipqos-accounting-3" remap="internal">Setting Up Flow Accounting (Task Map)</olink>.</para><sect3 id="ipqos-reference-5"><title><command>flowacct</command> Parameters</title><para>The <command>flowacct</command> module gathers information about
+flows in a <emphasis>flow table</emphasis> that is composed of <emphasis>flow
+records</emphasis>. Each entry in the table contains one flow record. You
+cannot display a flow table.</para><para>In the IPQoS configuration file, you define the following <command>flowacct</command> parameters to measure flow records and to write the records to
+the flow table:</para><itemizedlist><listitem><para><literal>timer</literal> &ndash; Defines an interval, in milliseconds,
+when timed-out flows are removed from the flow table and written to the file
+that is created by <command>acctadm</command></para>
+</listitem><listitem><para><literal>timeout</literal> &ndash; Defines an interval, in
+milliseconds, which specifies how long a packet flow must be inactive before
+the flow times out</para><note><para>You can configure <literal>timer</literal> and <literal>timeout</literal> to
+have different values.</para>
+</note>
+</listitem><listitem><para><literal>max_limit</literal> &ndash; Places an upper limit
+on the number of flow records that can be stored in the flow table</para>
+</listitem>
+</itemizedlist><para>For an example of how <command>flowacct</command> parameters are used
+in the IPQoS configuration file, refer to <olink targetptr="ipqos-policy-planning-144" remap="internal">How to Configure Flow Control in the
+IPQoS Configuration File</olink>.</para>
+</sect3><sect3 id="ipqos-reference-16"><title>Flow Table</title><para>The <command>flowacct</command> module maintains a flow table
+that records all packet flows that are seen by a <command>flowacct</command> instance.
+A flow is identified by the following parameters, which include the <command>flowacct</command> 8&ndash;tuple:</para><itemizedlist><listitem><para>Source address</para>
+</listitem><listitem><para>Destination address</para>
+</listitem><listitem><para>Source port</para>
+</listitem><listitem><para>Destination port</para>
+</listitem><listitem><para>DSCP</para>
+</listitem><listitem><para>User ID</para>
+</listitem><listitem><para>Project ID</para>
+</listitem><listitem><para>Protocol Number</para>
+</listitem>
+</itemizedlist><para>If all the parameters of the 8&ndash;tuple for a flow remain the same,
+the flow table contains only one entry. The <literal>max_limit</literal> parameter
+determines the number of entries that a flow table can contain.</para><para>The flow table is scanned at the interval that is specified in the IPQoS
+configuration file for the <literal>timer</literal> parameter. The default
+is 15 seconds. A flow &ldquo;times out&rdquo; when its packets are not seen
+by the IPQoS system for at least the <literal>timeout</literal> interval in
+the IPQoS configuration file. The default time out interval is 60 seconds.
+Entries that have timed out are then written to the accounting file that is
+created with the <command>acctadm</command> command.</para>
+</sect3><sect3 id="ipqos-reference-4"><title><command>flowacct</command> Records</title><para>A <command>flowacct</command> record contains the attributes described
+in the following table.</para><table frame="topbot" pgwide="100" id="ipqos-reference-tbl-6"><title>Attributes
+of a <command>flowacct</command> Record</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="25.72*"/><colspec colname="colspec1" colwidth="40.15*"/><colspec colname="colspec2" colwidth="33.12*"/><thead><row rowsep="1"><entry><para>Attribute Name</para>
+</entry><entry><para>Attribute Contents</para>
+</entry><entry><para>Type</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>src-addr-</literal><replaceable>address-type</replaceable><literal></literal></para>
+</entry><entry><para>Source address of the originator. <replaceable>address-type</replaceable> is
+either <literal>v4</literal> for IPv4 or <literal>v6</literal> for IPv6, as
+specified in the IPQoS configuration file.</para>
+</entry><entry><para>Basic </para>
+</entry>
+</row><row><entry><para><literal>dest-addr-</literal><replaceable>address-type</replaceable></para>
+</entry><entry><para>Destination address for the packets. <replaceable>address-type</replaceable> is
+either <literal>v4</literal> for IPv4 or <literal>v6</literal> for IPv6, as
+specified in the IPQoS configuration file.</para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>src-port</literal></para>
+</entry><entry><para>Source port from which the flow originated. </para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>dest-port</literal></para>
+</entry><entry><para>Destination port number to which this flow is bound. </para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>protocol</literal></para>
+</entry><entry><para>Protocol number for the flow. </para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>total-packets</literal></para>
+</entry><entry><para>Number of packets in the flow.</para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>total-bytes</literal></para>
+</entry><entry><para>Number of bytes in the flow.</para>
+</entry><entry><para>Basic </para>
+</entry>
+</row><row><entry><para><literal></literal><replaceable>action-name</replaceable><literal></literal></para>
+</entry><entry><para>Name of the <command>flowacct</command> action that recorded this flow.</para>
+</entry><entry><para>Basic</para>
+</entry>
+</row><row><entry><para><literal>creation-time</literal></para>
+</entry><entry><para>First time that a packet is seen for the flow by <literal>flowacct</literal>.</para>
+</entry><entry><para>Extended only</para>
+</entry>
+</row><row><entry><para><literal>last-seen</literal></para>
+</entry><entry><para>Last time that a packet of the flow was seen.</para>
+</entry><entry><para>Extended only</para>
+</entry>
+</row><row><entry><para><literal>diffserv-field</literal></para>
+</entry><entry><para>DSCP in the outgoing packet headers of the flow.</para>
+</entry><entry><para>Extended only</para>
+</entry>
+</row><row><entry><para><literal>user</literal></para>
+</entry><entry><para>Either a UNIX User ID or user name, which is obtained from the application.</para>
+</entry><entry><para>Extended only</para>
+</entry>
+</row><row><entry><para><literal>projid</literal></para>
+</entry><entry><para>Project ID, which is obtained from the application.</para>
+</entry><entry><para>Extended only</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect3><sect3 id="ipqos-reference-7"><title>Using <literal>acctadm</literal> with
+the <literal>flowacct</literal> Module</title><para>You use the <command>acctadm</command> command to create a file
+in which to store the various flow records that are generated by <command>flowacct</command>. <command>acctadm</command> works in conjunction with the extended
+accounting facility. For technical information about <command>acctadm</command>,
+refer to the <olink targetdoc="refman1m" targetptr="acctadm-1m" remap="external"><citerefentry><refentrytitle>acctadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><para>The <command>flowacct</command> module observes flows and fills the
+flow  table with flow records. <command>flowacct</command> then evaluates
+its parameters and attributes in the interval that is specified by <literal>timer</literal>. When a packet is not seen for at least the <literal>last_seen</literal> plus <literal>timeout</literal> values, the packet times out. All timed-out entries are
+deleted from the flow table. These entries are then written to the accounting
+file each time the interval that is specified in the <literal>timer</literal> parameter
+elapses.</para><para>To invoke <command>acctadm</command> for use with the <literal>flowacct</literal> module,
+use the following syntax:</para><programlisting>acctadm -e <replaceable>file-type</replaceable> -f <replaceable>filename</replaceable> flow</programlisting><variablelist><varlistentry><term><command>acctadm -e</command></term><listitem><para>Invokes <command>acctadm</command> with the <literal>-e</literal> option.
+The -e indicates that a resource list follows.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>file-type</replaceable></term><listitem><para>Specifies the attributes to be gathered. <replaceable>file-type</replaceable> must
+be replaced by either <literal>basic</literal> or <literal>extended</literal>.
+For a list of attributes in each file type, refer to <olink targetptr="ipqos-reference-tbl-6" remap="internal">Table 37&ndash;4</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>-f</command><replaceable>file-name</replaceable></term><listitem><para>Creates the file<replaceable>file-name</replaceable> to hold
+the flow records.</para>
+</listitem>
+</varlistentry><varlistentry><term><command>flow</command></term><listitem><para>Indicates that <command>acctadm</command> is to be run with
+IPQoS. </para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect3>
+</sect2>
+</sect1><sect1 id="ipqos-reference-22"><title>IPQoS Configuration File</title><para>This section contains full details about the parts of the IPQoS
+configuration file. The IPQoS boot-time activated policy is stored in the
+file <filename>/etc/inet/ipqosinit.conf</filename>. Although you can edit
+this file, the best practice for a new IPQoS system is to create a configuration
+file with a different name. Tasks for applying and debugging an IPQoS configuration
+are in <olink targetptr="ipqos-policy-planning-1" remap="internal">Chapter&nbsp;34, Creating the IPQoS Configuration File (Tasks)</olink>.</para><para>The syntax of the IPQoS configuration file is shown in <olink targetptr="ipqos-reference-ex-23" remap="internal">Example 37&ndash;3</olink>. The example
+uses the following conventions:</para><itemizedlist><listitem><para><computeroutput>computer-style type</computeroutput>  &ndash;
+Syntactical information that is provided to explain the parts of the configuration
+file. You do not type any text that appears in computer-style type.</para>
+</listitem><listitem><para><userinput>bold type</userinput> &ndash; Literal text that
+you must type in the IPQoS configuration file. For example, you must always
+begin the IPQoS configuration file with <userinput>fmt_version</userinput>.</para>
+</listitem><listitem><para><replaceable>italic type</replaceable> &ndash; Variable text that
+you replace with descriptive information about your configuration. For example,
+you must always replace <replaceable>action-name</replaceable> or <replaceable>module-name</replaceable> with information that pertains to your configuration.</para>
+</listitem>
+</itemizedlist><example id="ipqos-reference-ex-23"><title>Syntax of the IPQoS Configuration
+File</title><programlisting width="100">file_format_version ::= fmt_version <replaceable>version</replaceable>
+
+action_clause ::= action {
+     name <replaceable>action-name</replaceable>
+     module <replaceable>module-name</replaceable>
+     <replaceable>params-clause</replaceable> |  ""
+     <replaceable>cf-clauses</replaceable>
+}
+action_name ::= <replaceable>string</replaceable>
+module_name ::= ipgpc | dlcosmk | dscpmk | tswtclmt | tokenmt | flowacct 
+
+params_clause ::= params { 
+     <replaceable>parameters</replaceable>
+     <replaceable>params-stats</replaceable> |   ""
+     }
+parameters ::=    <replaceable>prm-name-value parameters</replaceable> |  ""
+prm_name_value ::= <replaceable>param-name param-value</replaceable>
+
+params_stats ::= global-stats <replaceable>boolean</replaceable>
+
+cf_clauses ::= <replaceable>class-clause cf-clauses</replaceable> |
+               <replaceable>filter-clause cf-clauses</replaceable> | ""
+
+class_clause ::= class {
+     name <replaceable>class-name</replaceable>
+     next_action <replaceable>next-action-name</replaceable>
+     <replaceable>class-stats</replaceable> | ""
+                 }
+class_name  ::= <replaceable>string</replaceable>
+next_action_name  ::= <replaceable>string</replaceable>
+class_stats ::= enable_stats <replaceable>boolean</replaceable>
+boolean ::= TRUE | FALSE
+
+filter_clause ::= filter {
+                name <replaceable>filter-name</replaceable>
+                class <replaceable>class&ndash;name</replaceable>
+                <replaceable>parameters</replaceable>
+                }
+filter_name ::= <replaceable>string</replaceable></programlisting>
+</example><para>The remaining text describes each major part of the IPQoS configuration
+file.</para><sect2 id="ipqos-reference-240"><title><command>action</command> Statement</title><para>You use <literal>action</literal> statements to invoke the various
+IPQoS modules that are described in <olink targetptr="ipqos-reference-2" remap="internal">IPQoS
+Architecture and the Diffserv Model</olink>. </para><para>When you create the IPQoS configuration file, you must always begin
+with the version number. Then, you must add the following <literal>action</literal> statement
+to invoke the classifier:</para><screen width="100">fmt_version 1.0
+
+action {
+    module ipgpc
+    name ipgpc.classify
+}</screen><para>Follow the classifier <literal>action</literal> statement with a <literal>params</literal> clause or a <literal>class</literal> clause.</para><para>Use the following syntax for all other <literal>action</literal> statements:</para><programlisting>action {
+name <replaceable>action-name</replaceable>
+module <replaceable>module-name</replaceable>
+<replaceable>params-clause</replaceable> | ""
+<replaceable>cf-clauses</replaceable>
+}</programlisting><variablelist termlength="wide"><varlistentry><term><literal>name</literal> <replaceable>action_name</replaceable></term><listitem><para>Assigns a name to the action.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>module</literal> <replaceable>module_name</replaceable></term><listitem><para>Identifies the IPQoS module to be invoked, which must be one
+of the modules in <olink targetptr="ipqos-reference-tbl-2" remap="internal">Table 37&ndash;5</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>params_clause</replaceable></term><listitem><para>Can be parameters for the classifier to process, such as global
+statistics or the next action to process.</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>cf_clauses</replaceable></term><listitem><para>A set of zero or more <literal>class</literal> clauses or <literal>filter</literal> clauses</para>
+</listitem>
+</varlistentry>
+</variablelist>
+</sect2><sect2 id="ipqos-reference-260"><title>Module Definitions</title><para>The module definition indicates which module is to process the
+parameters in the <literal>action</literal> statement. The IPQoS configuration
+file can include the following modules.</para><table frame="topbot" id="ipqos-reference-tbl-2"><title>IPQoS Modules</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row rowsep="1"><entry><para>Module Name</para>
+</entry><entry><para>Definition</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><command>ipgpc</command></para>
+</entry><entry><para>IP classifier</para>
+</entry>
+</row><row><entry><para><command>dscpmk</command></para>
+</entry><entry><para>Marker to be used to create DSCPs in IP packets</para>
+</entry>
+</row><row><entry><para><command>dlcosmk</command></para>
+</entry><entry><para>Marker to be used with VLAN devices</para>
+</entry>
+</row><row><entry><para><command>tokenmt</command></para>
+</entry><entry><para>Token bucket meter</para>
+</entry>
+</row><row><entry><para><command>tswtclmt</command></para>
+</entry><entry><para>Time-sliding window meter</para>
+</entry>
+</row><row><entry><para><command>flowacct</command></para>
+</entry><entry><para>Flow-accounting module</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="ipqos-reference-270"><title><command>class</command> Clause</title><para>You define a <literal>class</literal> clause for each class of
+traffic. </para><para>Use this syntax to define the remaining classes in the IPQoS configuration:</para><screen>class {
+     
+      name <replaceable>class-name</replaceable>
+      next_action <replaceable>next-action-name</replaceable>
+}      </screen><para>To enable statistics collection on a particular class, you must
+first enable global statistics in the <literal>ipgpc.classify</literal> <literal>action</literal> statement. For more information, refer to <olink targetptr="ipqos-reference-240" remap="internal">action Statement</olink>.</para><para>Use the <literal>enable_stats TRUE</literal> statement whenever
+you want to turn on statistics collection for a class. If you do not need
+to gather statistics for a class, you can specify <literal>enable_stats FALSE</literal>.
+Alternatively, you can eliminate the <literal>enable_stats</literal> statement.</para><para>Traffic on an IPQoS-enabled network that you do not specifically define
+is relegated to the <emphasis>default class</emphasis>.</para>
+</sect2><sect2 id="ipqos-reference-28"><title><command>filter</command> Clause</title><para><emphasis>Filters</emphasis> are made up of selectors that group
+traffic flows into classes. These selectors specifically define the criteria
+to be applied to traffic of the class that was created in the class clause.
+If a packet matches all selectors of the highest-priority filter, the packet
+is considered to be a member of the filter's class. For a complete list of
+selectors that you can use with the <command>ipgpc</command> classifier, refer
+to <olink targetptr="ipqos-reference-tbl-32" remap="internal">Table 37&ndash;1</olink>.</para><para>You define filters in the IPQoS configuration file by using a <emphasis>filter clause</emphasis>, which has the following syntax:</para><programlisting>filter { 
+       name <replaceable>filter-name</replaceable>
+       class <replaceable>class-name</replaceable> 
+       <replaceable>parameters (selectors)</replaceable>
+       }</programlisting>
+</sect2><sect2 id="ipqos-reference-29"><title><command>params</command> Clause</title><para>The <literal>params</literal> clause contains processing instructions
+for the module that is defined in the action statement. Use the following
+syntax for the <literal>params</literal> clause:</para><screen>params {
+           <replaceable>parameters</replaceable>
+           <replaceable>params-stats |</replaceable> ""
+       }</screen><para>In the <literal>params</literal> clause, you use parameters that
+are applicable to the module.</para><para>The <replaceable>params-stats</replaceable> value in the <literal>params</literal> clause
+is either <literal>global_stats TRUE</literal> or <literal>global_stats FALSE</literal>.
+The <literal>global_stats TRUE</literal> instruction turns on UNIX style statistics
+for the <literal>action</literal> statement where global statistics is invoked.
+You can view the statistics by using the <command>kstat</command> command.
+You must enable <literal>action</literal> statement statistics before you
+can enable per-class statistics.</para>
+</sect2>
+</sect1><sect1 id="ipqos-reference-30"><title><command>ipqosconf</command> Configuration
+Utility</title><para>You use the <literal>ipqosconf</literal> utility to read the IPQoS
+configuration file and to configure IPQoS modules in the UNIX kernel. <command>ipqosconf</command> performs the following actions:</para><itemizedlist><listitem><para>Applies the configuration file to the IPQoS kernel modules
+(<command>ipqosconf -a</command> <replaceable>filename</replaceable>)</para>
+</listitem><listitem><para>Lists the IPQoS configuration file currently resident in the
+kernel (<command>ipqosconf -l</command>)</para>
+</listitem><listitem><para>Ensures that the current IPQoS configuration is read and applied
+each time the machine reboots (<command>ipqosconf -c</command>)</para>
+</listitem><listitem><para>Flushes the current IPQoS kernel modules (<command>ipqosconf
+-f</command>)</para>
+</listitem>
+</itemizedlist><para>For technical information, refer to the <olink targetdoc="refman1m" targetptr="ipqosconf-1m" remap="external"><citerefentry><refentrytitle>ipqosconf</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</sect1>
+</chapter>

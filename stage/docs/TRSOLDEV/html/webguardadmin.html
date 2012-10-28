@@ -1,0 +1,343 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Administrative Web Guard Prototype - Solaris Trusted Extensions Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-08-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Solaris Trusted Extensions Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="webguard.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="webguardprog.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="api-intro-1.html">1.&nbsp;&nbsp;Solaris Trusted Extensions APIs and Security Policy</a></p>
+<p class="toc level1 tocsp"><a href="labelapi-1.html">2.&nbsp;&nbsp;Labels and Clearances</a></p>
+<p class="toc level1 tocsp"><a href="labelcode-1.html">3.&nbsp;&nbsp;Label Code Examples</a></p>
+<p class="toc level1 tocsp"><a href="labelprint-1.html">4.&nbsp;&nbsp;Printing and the Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="ipcapi-1.html">5.&nbsp;&nbsp;Interprocess Communications</a></p>
+<p class="toc level1 tocsp"><a href="windowapi-1.html">6.&nbsp;&nbsp;Trusted X Window System</a></p>
+<p class="toc level1 tocsp"><a href="lbuilder-1.html">7.&nbsp;&nbsp;Label Builder APIs</a></p>
+<p class="toc level1 tocsp"><a href="webguard.html">8.&nbsp;&nbsp;Trusted Web Guard Prototype</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Administrative Web Guard Prototype</a></p>
+</div>
+<p class="toc level2"><a href="webguardprog.html">Accessing Lower-Level Untrusted Servers</a></p>
+<p class="toc level1 tocsp"><a href="javatxlabelapis.html">9.&nbsp;&nbsp;Experimental Java Bindings for the Solaris Trusted Extensions Label APIs</a></p>
+<p class="toc level1 tocsp"><a href="appa-1.html">A.&nbsp;&nbsp;Programmer's Reference</a></p>
+<p class="toc level1 tocsp"><a href="appb-1.html">B.&nbsp;&nbsp;Solaris Trusted Extensions API Reference</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="webguardadmin"></a><h3>Administrative Web Guard Prototype</h3>
+<p><a name="indexterm-502"></a>This section provides an example of a safe web browsing prototype that
+isolates a web server and its web content to prevent attacks from
+the Internet. This Web Guard prototype takes advantage of administrative trusted networking
+features to configure a two-stage filter that restricts access to a protected
+web server and web content. This prototype was implemented solely by administrative
+means. No programming was required.</p><p>The following figure shows the configuration of the Web Guard prototype in
+a multilevel environment. The label relationships are shown by how the labels
+are positioned in the figure. Vertical relationships represent label dominance, while horizontal
+relationships represent disjoint labels.</p><a name="webguardconfigfigure"></a><h6>Figure&nbsp;8-1 Web Guard Configuration</h6><img src="figures/webguard.gif" alt="Diagram showing the Web Guard configuration."></img><p>Web requests come in to the web server that is configured in
+the <tt>public</tt> zone and are passed to the web server that is
+configured in the <tt>restricted</tt> zone.</p><p>The <tt>restricted</tt> zone uses a multilevel port (MLP) to listen for requests
+at port <tt>8080</tt> of the <tt>public</tt> zone. This web server passes the
+requests to the <tt>webservice</tt> labeled zone.</p><p>The <tt>webservice</tt> zone also uses an MLP to listen for requests at
+port <tt>80</tt> of the <tt>restricted</tt> zone and reads content from the <tt>webcontent</tt>
+labeled zone.</p><p>The <tt>webcontent</tt> zone is in the ready state and has its web
+content stored in the <tt>/export/home</tt> file system, which is automatically mounted in
+all other labeled zones. When a zone is in the ready state,
+no processes run in that zone. Thus, the zone is essentially a
+disk drive attached directly to the <tt>webservice</tt> zone.</p><p>You configure the Web Guard prototype by performing these high-level tasks:</p>
+<ol><li><p>Modifying the <tt>label_encodings</tt> file to configure the labels in your safe web browsing environment</p><p>The default <tt>label_encodings</tt> file is updated to configure two new labels: <tt>WEB GUARD SERVICE</tt> and <tt>WEB GUARD CONTENT</tt>. See <a href="#modifylabelencodings">Modifying the <tt>label_encodings</tt> File</a>.</p></li>
+<li><p>Configuring trusted networking</p><p>The private IP addresses and MLPs are configured on the <tt>restricted</tt> and <tt>webservice</tt> labeled zones. See <a href="#configuretrustednetwork">Configuring Trusted Networking</a>.</p></li>
+<li><p>Configuring the Apache web servers</p><p>The <tt>public</tt>, <tt>restricted</tt>, and <tt>webservice</tt> zones all have web servers configured. In this example, the web server used is Apache. See <a href="#configureapache">Configuring the Apache Web Servers</a>.</p></li></ol>
+
+
+<a name="modifylabelencodings"></a><h4>Modifying the <tt>label_encodings</tt> File</h4>
+<p>The default <tt>label_encodings</tt> file is updated to configure two new labels: <tt>WEB GUARD SERVICE</tt>
+and <tt>WEB GUARD CONTENT</tt>. The <tt>SANDBOX</tt> label, which is part of the default file,
+is modified to serve as the <tt>WEB GUARD CONTENT</tt> label. The <tt>WEB GUARD SERVICE</tt> label is
+added.</p><p>You must install the <tt>label_encodings</tt> file in the <tt>/etc/security/tsol</tt> directory. You can
+install this file on top of an existing Trusted Extensions installation.</p><p>After you install the updated file in the <tt>/etc/security/tsol</tt> directory, activate the
+new <tt>label_encodings</tt> file:</p><pre># <tt><b>svcadm restart svc:/system/labeld</b></tt></pre><p>The following shows the <tt>label_encodings</tt> file used in this Web Guard prototype.</p><pre>* ident    "@(#)label_encodings.simple    5.15    05/08/09 SMI"
+*
+* Copyright 2005 Sun Microsystems, Inc.  All rights reserved.
+* Use is subject to license terms.
+*
+* This example shows how to specify labels that meet an actual 
+* site's legal information  protection requirements for 
+* labeling email and printer output. These labels may also
+* be used to enforce mandatory access control checks based on user 
+* clearance labels and sensitivity labels on files and directories.  
+
+VERSION= Sun Microsystems, Inc. Example Version - 6.0. 2/15/05
+
+CLASSIFICATIONS:
+
+name= PUBLIC; sname= PUB; value= 2; initial compartments= 4;
+name= CONFIDENTIAL; sname= CNF; value= 4; initial compartments= 4;
+name= WEB GUARD; sname= WEB; value= 5; initial compartments= 0;
+name= MAX LABEL; sname= MAX; value= 10; initial compartments= 0 4 5;
+
+INFORMATION LABELS:
+
+WORDS:
+
+name= :; prefix;
+
+name= INTERNAL USE ONLY; sname= INTERNAL; compartments= 1 ~2; minclass= CNF; 
+name= NEED TO KNOW; sname= NEED TO KNOW; compartments= 1-2 ~3; minclass= CNF; 
+name= RESTRICTED; compartments= 1-3; minclass= CNF; 
+name= CONTENT; compartments= 0 ~1 ~2 ~3; minclass= WEB; 
+name= SERVICE; compartments= 5; minclass= WEB; 
+
+REQUIRED COMBINATIONS:
+
+COMBINATION CONSTRAINTS:
+
+SENSITIVITY LABELS:
+
+WORDS:
+
+name= :; prefix;
+
+name= INTERNAL USE ONLY; sname= INTERNAL; compartments= 1 ~2; minclass= CNF;
+prefix= :
+
+name= NEED TO KNOW; sname= NEED TO KNOW; compartments= 1-2 ~3; minclass= CNF;
+prefix= :
+
+name= RESTRICTED; compartments= 1-3; minclass= CNF; prefix= :
+
+name= CONTENT; compartments= 0 ~1 ~2 ~3; minclass= WEB;
+
+name= SERVICE; compartments= 5; minclass= WEB;
+
+REQUIRED COMBINATIONS:
+
+COMBINATION CONSTRAINTS:
+
+CLEARANCES:
+
+WORDS:
+
+name= INTERNAL USE ONLY; sname= INTERNAL; compartments= 1 ~2; minclass= CNF;
+name= NEED TO KNOW; sname= NEED TO KNOW; compartments= 1-2 ~3; minclass= CNF;
+name= RESTRICTED; sname= RESTRICTED; compartments= 1-3; minclass= CNF;
+name= CONTENT; compartments= 0 ~1 ~2 ~3; minclass= WEB; 
+name= SERVICE; compartments= 5; minclass= WEB;
+
+REQUIRED COMBINATIONS:
+
+COMBINATION CONSTRAINTS:
+
+CHANNELS:
+
+WORDS:
+
+PRINTER BANNERS:
+
+WORDS:
+
+ACCREDITATION RANGE:
+
+classification= PUB; all compartment combinations valid;
+classification= WEB; all compartment combinations valid;
+classification= CNF; all compartment combinations valid except: CNF
+
+minimum clearance= PUB;
+minimum sensitivity label= PUB;
+minimum protect as classification= PUB;
+
+* Local site definitions and locally configurable options.
+
+LOCAL DEFINITIONS:
+
+default flags= 0x0;
+forced flags= 0x0;
+ 
+Default Label View is Internal;
+ 
+Classification Name= Classification;
+Compartments Name= Sensitivity;
+
+Default User Sensitivity Label= PUB;
+Default User Clearance= CNF NEED TO KNOW;
+ 
+COLOR NAMES:
+
+    label= Admin_Low;           color= #bdbdbd;
+
+    label= PUB;                 color= blue violet;
+    label= WEB SERVICE;         color= yellow;
+    label= CNF;                 color= navy blue;
+    label= CNF : INTERNAL USE ONLY;  color= blue;
+    label= CNF : NEED TO KNOW;  color= #00bfff;
+    label= CNF : RESTRICTED;    color= #87ceff;
+ 
+    label= Admin_High;          color= #636363;
+ 
+* End of local site definitions</pre><p>For more information about the <tt>label_encodings</tt> file, see <a href="http://docs.sun.com/doc/819-7308"><i>Solaris Trusted Extensions Label Administration</i></a>.</p>
+
+<a name="configuretrustednetwork"></a><h4>Configuring Trusted Networking</h4>
+<p>The <tt>restricted</tt> and <tt>webservice</tt> zones are assigned a private IP address in
+addition to the IP address that they already share. Each private IP
+address has a multilevel port configured and is associated with a restricted
+label set.</p><p>The following table shows the network configuration for each of the labeled
+zones.</p><table><col width="16%"><col width="16%"><col width="16%"><col width="16%"><col width="16%"><col width="16%"><tr><th align="left" valign="top" scope="column"><p>Zone Name</p></th>
+<th align="left" valign="top" scope="column"><p>Zone Label</p></th>
+<th align="left" valign="top" scope="column"><p>Local IP Address</p></th>
+<th align="left" valign="top" scope="column"><p>Host Name</p></th>
+<th align="left" valign="top" scope="column"><p>Multilevel Port</p></th>
+<th align="left" valign="top" scope="column"><p>Security Label Set</p></th>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>restricted</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>CONFIDENTIAL : RESTRICTED</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>10.4.5.6</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>proxy</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>8080/</tt>tcp</p></td>
+<td align="left" valign="top" scope="row"><p><tt>PUBLIC</tt></p></td>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>webservice</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>WEB GUARD SERVICE</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>10.1.2.3</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>webservice</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>80/</tt>tcp</p></td>
+<td align="left" valign="top" scope="row"><p><tt>CONFIDENTIAL : RESTRICTED</tt></p></td>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>webcontent</tt></p></td>
+<td align="left" valign="top" scope="row"><p><tt>WEB GUARD CONTENT</tt></p></td>
+<td align="left" valign="top" scope="row"><p>None</p></td>
+<td align="left" valign="top" scope="row"><p></p></td>
+<td align="left" valign="top" scope="row"><p></p></td>
+<td align="left" valign="top" scope="row"><p></p></td>
+</tr>
+</table><p>First, you must create the new zones. You can clone an existing
+zone, such as the <tt>public</tt> zone. After these zones are created, use
+the <tt>zonecfg</tt> command to add a network (with the address specified in
+the table) and your local interface name.</p><p>For example, the following command associates the <tt>10.4.5.6</tt> IP address and the
+<tt>bge0</tt> interface with the <tt>restricted</tt> zone:</p><pre># <tt><b>zonecfg -z restricted add net set address=10.4.5.6 set physical=bge0 end exit</b></tt></pre><p>After you specify the IP address and network interface for each labeled
+zone, you use the Solaris Management Console to configure the remaining values
+in the table. When using this tool, make sure that you select
+the tool box with <tt>Scope=Files</tt> and <tt>Policy=TSOL</tt>.</p><p>Follow these steps to finish the zone configuration:</p>
+<ol><li><p>Start the Solaris Management Console as superuser.</p><pre># <tt><b>smc &amp;</b></tt></pre></li>
+<li><p>From the Navigation panel, select This Computer, and then click the System Configuration icon.</p></li>
+<li><p>Click the Computers and Network icon.</p></li>
+<li><p>Click the Computers icon, and then choose Add Computer from the Action menu.</p></li>
+<li><p>Add the host names and IP addresses for the <tt>proxy</tt> host and the <tt>webeservice</tt> host.</p></li>
+<li><p>From the Navigation panel, select Trusted Network Zones.</p><p>You might need to expand the columns. If the zone names do not appear in the list, choose Add Zone Configuration from the Action menu.</p></li>
+<li><p>Assign each zone its label and specify the appropriate port and protocol in the MLP Configuration for Local IP Addresses field.</p></li>
+<li><p>From the Navigation panel, click the Security Families icon and choose Add Template from the Action menu.</p><p>Add templates for the <tt>proxy</tt> host name and the <tt>webservices</tt> host name based on the information in the table.</p>
+<ol><li><p>Specify the corresponding host name for the template name.</p></li>
+<li><p>Specify CIPSO in the Host Type field.</p></li>
+<li><p>Specify the corresponding zone label in the Minimum Label and Maximum Label fields.</p></li>
+<li><p>Specify the corresponding security label in the Security Label Set field.</p></li>
+<li><p>Click the Hosts Explicitly Assigned tab.</p></li>
+<li><p>In the Add an Entry section, add the corresponding local IP address to each template.</p></li></ol>
+</li>
+<li><p>Exit the Solaris Management Console.</p></li></ol>
+<p>After you exit the Solaris Management Console, start or restart the affected
+zones. In the global zone, add routes for the new addresses, where
+<i>shared-IP-addr</i> is the shared IP address.</p><pre># <tt><b>route add proxy </tt><i>shared-IP-addr</i><tt></b></tt>
+# <tt><b>route add webservice </tt><i>shared-IP-addr</i><tt></b></tt></pre>
+
+<a name="configureapache"></a><h4>Configuring the Apache Web Servers</h4>
+<p>An instance of the Apache web server runs in the <tt>public</tt> zone,
+the <tt>restricted</tt> zone, and the <tt>webservice</tt> zone. The <tt>/etc/apache/httpd.conf</tt> file is updated
+in each of the zones as follows:</p>
+<ul><li><p><tt>public</tt> <b>zone &ndash;</b> Specify the IP address or host name of the server for the <tt>ServerName</tt> keyword, and update the proxy configuration as follows:</p><pre>ServerName myserver
+
+ProxyRequests Off
+ProxyPass /demo http://proxy:8080/demo
+ProxyPassReverse /demo http://proxy:8080/demo</pre></li>
+<li><p><tt>restricted</tt> <b>zone &ndash;</b> Specify the listen proxy port and the port. Then, specify the IP address or host name of this zone for the <tt>ServerName</tt> keyword, and update the proxy configuration as follows:</p><pre>Listen proxy:8080
+Port 8080
+
+ServerName proxy
+
+ProxyRequests Off
+ProxyPass /demo http://webservice
+ProxyPassReverse /demo http://webservice</pre><p>You might also want to set up some filtering of the web requests, such as dirty word filters, or other filters to restrict the types of requests for web content.</p></li>
+<li><p><tt>webservice</tt> <b>zone &ndash;</b> Specify the IP address or host name of this zone for the <tt>ServerName</tt> keyword, and point to the location of the web content directory in the <tt>DocumentRoot</tt> keyword and the <tt>&lt;Directory&gt;</tt> element as follows:</p><pre>ServerName webservice
+
+DocumentRoot "/zone/webcontent/export/home/www/htdocs"
+&lt;Directory "/zone/webcontent/export/home/www/htdocs"&gt;</pre></li></ul>
+<p>After you have updated the Apache web server configuration files for each
+labeled zone, store your web content in the <tt>/export/home/www/htdocs</tt> directory of the
+<tt>webcontent</tt> zone.</p><p>Create the <tt>demo</tt> directory in the <tt>/export/home/www/htdocs</tt> directory, and then create an
+<tt>index.html</tt> file in the <tt>demo</tt> directory to use for testing.</p><p>The <tt>/export/home</tt> directory is automatically mounted by using <tt>lofs</tt> into the <tt>webservice</tt>
+zone when it is booted. The <tt>webcontent</tt> zone only needs to brought
+up to the ready state.</p><pre># <tt><b>zoneadm -z webcontent ready</b></tt></pre><p>When a zone is in the ready state, no processes are running
+in that zone. The zone's file system can be mounted read-only by
+the <tt>webservice</tt> zone. Accessing the web content in this way ensures that
+the content cannot be changed.</p>
+
+<a name="rundemo"></a><h4>Running the Trusted Web Guard Demonstration</h4>
+<p>From your browser in the <tt>public</tt> zone or from a remote browser
+running at the <tt>PUBLIC</tt> label, type the following URL:</p><pre>http://<i>server-name</i>/demo</pre><p>The browser should show the default <tt>index.html</tt> file from the <tt>webcontent</tt> zone.</p><p>Note that the Web Guard flow cannot by bypassed. The web server
+in the <tt>webservice</tt> zone cannot receive packets from the <tt>public</tt> zone or
+from any remote host. The web content cannot be changed because the
+<tt>webcontent</tt> zone is in the ready state.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="webguard.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="webguardprog.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

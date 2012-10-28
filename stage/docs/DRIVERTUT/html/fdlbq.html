@@ -1,0 +1,108 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Device Driver Testing Tips - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="fdlbn.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="fdlbo.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level2"><a href="fdlbn.html">Device Driver Coding Tips</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Device Driver Testing Tips</a></p>
+</div>
+<p class="toc level2"><a href="fdlbo.html">Device Driver Debugging and Tuning Tips</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="fdlbq"></a><h3>Device Driver Testing Tips</h3>
+<a name="indexterm-560"></a><a name="indexterm-561"></a><p>Testing a device driver can cause the system to panic and can
+harm the kernel.</p><p>The following tips can help you avoid problems when testing your driver:</p>
+<ul><li><p><a name="indexterm-562"></a><a name="indexterm-563"></a><a name="indexterm-564"></a><a name="indexterm-565"></a><a name="indexterm-566"></a><a name="indexterm-567"></a><a name="indexterm-568"></a>Install the driver in a temporary location.</p><p>Install drivers in the <tt>/tmp</tt> directory until you are finished modifying and testing the <tt>_info()</tt>, <tt>_init()</tt>, and <tt>attach()</tt> routines. Copy the driver binary to the <tt>/tmp</tt> directory. Link to the driver from the kernel driver directory.</p><p>If a driver has an error in its <tt>_info()</tt>, <tt>_init()</tt>, or <tt>attach()</tt> function, your machine could get into a state of infinite panic. The Solaris OS automatically reboots itself after a panic. The Solaris OS loads any drivers it can during boot. If you have an error in your <tt>attach()</tt> function that panics the system when you load the driver, then the system will panic again when it tries to reboot after the panic. The system will continue the cycle of panic, reboot, panic as it attempts to reload the faulty driver every time it reboots after panic.</p><p>To avoid an infinite panic, keep the driver in the <tt>/tmp</tt> area until it is well tested. Link to the driver in the <tt>/tmp</tt> area from the kernel driver area. The Solaris OS removes all files from the <tt>/tmp</tt> area every time the system reboots. If your driver causes a panic, the Solaris OS reboots successfully because the driver has been removed automatically from the <tt>/tmp</tt> area. The link in the kernel driver area points to nothing. The faulty driver did not get loaded, so the system does not go back into a panic. You can modify the driver, copy it again to the <tt>/tmp</tt> area, and continue testing and developing. When the driver is well tested, copy it to the <tt>/usr/kernel/drv</tt> area so that it will remain available after a reboot.</p><p>The following example shows you where to link the driver for a 32-bit platform. For other architectures, see the instructions in <a href="frymm.html#fsfqv">Installing a Driver</a>.</p><pre># <tt><b>cp mydriver /tmp</b></tt>
+# <tt><b>ln -s /tmp/mydriver /usr/kernel/drv/mydriver</b></tt></pre></li>
+<li><p><a name="indexterm-569"></a><a name="indexterm-570"></a><a name="indexterm-571"></a>Enable the deadman feature to avoid a hard hang.</p><p>If your system is in a hard hang, then you cannot break into the debugger. If you enable the deadman feature, the system panics instead of hanging indefinitely. You can then use the <a href="http://docs.sun.com/doc/819-2239/kmdb-1?a=view"><tt>kmdb</tt>(1)</a> kernel debugger to analyze your problem.</p><p>The deadman feature checks every second whether the system clock is updating. If the system clock is not updating, then you are in an indefinite hang. If the system clock has not been updated for 50 seconds, the deadman feature induces a panic and puts you in the debugger.</p><p>Take the following steps to enable the deadman feature:</p>
+<ol><li><p>Make sure you are capturing crash images with <a href="http://docs.sun.com/doc/819-2240/dumpadm-1m?a=view"><tt>dumpadm</tt>(1M)</a>.</p></li>
+<li><p>Set the <tt>snooping</tt> variable in the <tt>/etc/system</tt> file.</p><pre>set snooping=1</pre></li>
+<li><p>Reboot the system so that the <tt>/etc/system</tt> file is read again and the <tt>snooping</tt> setting takes effect.</p></li></ol>
+<p>Note that any zones on your system inherit the deadman setting as well.</p><p>If your system hangs while the deadman feature is enabled, you should see output similar to the following example on your console:</p><pre>panic[cpu1]/thread=30018dd6cc0: deadman: timed out after 9 seconds of
+clock inactivity
+
+panic: entering debugger (continue to save dump)</pre><p>Inside the debugger, use the <tt>::cpuinfo</tt> command to investigate why the clock interrupt was not able to fire and advance the system time.</p></li>
+<li><p><a name="indexterm-572"></a>Use a serial connection to control your test machine from a separate host system.</p><p>This technique is explained in <a href="http://docs.sun.com/doc/819-3196/debug-62?a=view">Testing With a Serial Connection in <i>Writing Device Drivers</i></a>.</p></li>
+<li><p><a name="indexterm-573"></a>Use an alternate kernel.</p><p>Booting from a copy of the kernel and the associated binaries rather than from the default kernel avoids inadvertently rendering the system inoperable.</p></li>
+<li><p><a name="indexterm-574"></a>Use an additional kernel module to experiment with different kernel variable settings.</p><p>This approach isolates experiments with the kernel variable settings. See <a href="http://docs.sun.com/doc/819-3196/eupvl?a=view">Setting Up Test Modules in <i>Writing Device Drivers</i></a>.</p></li>
+<li><p><a name="indexterm-575"></a>Make contingency plans for potential data loss on a test system.</p><p>If your test system is set up as a client of a server, then you can boot from the network if problems occur. You could also create a special partition to hold a copy of a bootable root file system. See <a href="http://docs.sun.com/doc/819-3196/debug-70?a=view">Avoiding Data Loss on a Test System in <i>Writing Device Drivers</i></a>.</p></li>
+<li><p><a name="indexterm-576"></a><a name="indexterm-577"></a>Capture system crash dumps if your test system panics.</p></li>
+<li><p><a name="indexterm-578"></a><a name="indexterm-579"></a>Use <a href="http://docs.sun.com/doc/819-2240/fsck-1m?a=view"><tt>fsck</tt>(1M)</a> to repair the damaged root file system temporarily if your system crashes during the <a href="http://docs.sun.com/doc/819-2255/attach-9e?a=view"><tt>attach</tt>(9E)</a> process so that any crash dumps can be salvaged. See <a href="http://docs.sun.com/doc/819-3196/debug-74?a=view">Recovering the Device Directory in <i>Writing Device Drivers</i></a>.</p></li>
+<li><p>Install drivers in the <tt>/tmp</tt> directory until you are finished modifying and testing the <tt>_info()</tt>, <tt>_init()</tt>, and <tt>attach()</tt> routines.</p><p>Keep a driver in the <tt>/tmp</tt> directory until the driver has been well tested. If a panic occurs, the driver will be removed from <tt>/tmp</tt> directory and the system will reboot successfully.</p></li></ul>
+
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="fdlbn.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="fdlbo.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

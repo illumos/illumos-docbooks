@@ -1,0 +1,479 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Accommodating Relocation - Application Packaging Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-09-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Application Packaging Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-33.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-10.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-10.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="ch1designpkg-51728.html">1.&nbsp;&nbsp;Designing  a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch2buildpkg-22939.html">2.&nbsp;&nbsp;Building a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch3enhancepkg-11350.html">3.&nbsp;&nbsp;Enhancing the Functionality of a Package (Tasks)</a></p>
+<p class="toc level1 tocsp"><a href="ch4verifypkg-18395.html">4.&nbsp;&nbsp;Verifying and Transferring a Package</a></p>
+<p class="toc level1 tocsp"><a href="ch5pkgcasestudies-80583.html">5.&nbsp;&nbsp;Case Studies of Package Creation</a></p>
+<p class="toc level1 tocsp"><a href="ch6advtech-96543.html">6.&nbsp;&nbsp;Advanced Techniques for Creating Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-33.html">Specifying the Base Directory</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Accommodating Relocation</a></p>
+</div>
+<p class="toc level2"><a href="ch6advtech-10.html">Supporting Relocation in a Heterogeneous Environment</a></p>
+<p class="toc level2"><a href="ch6advtech-9.html">Making Packages Remotely Installable</a></p>
+<p class="toc level2"><a href="ch6advtech-41.html">Patching Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-49.html">Upgrading Packages</a></p>
+<p class="toc level2"><a href="ch6advtech-87.html">Creating Class Archive Packages</a></p>
+<p class="toc level1 tocsp"><a href="gloss-1.html">Glossary</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="ch6advtech-53"></a><h3>Accommodating Relocation</h3>
+<p>While you can select base directories for various packages that are guaranteed unique
+to an architecture and version, this leads to unnecessary levels of directory hierarchy.
+For example, for a product designed for SPARC and x86 based processors, you
+could organize the base directories by processor and version as shown below.</p><table><col width="50%"><col width="50%"><tr><th align="left" valign="top" scope="column"><p>Base Directory</p></th>
+<th align="left" valign="top" scope="column"><p>Version
+and Processor</p></th>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>/opt/SUNWstuf/sparc/1.0</tt></p></td>
+<td align="left" valign="top" scope="row"><p>Version 1.0, SPARC</p></td>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>/opt/SUNWstuf/sparc/1.2</tt></p></td>
+<td align="left" valign="top" scope="row"><p>Version 1.2, SPARC</p></td>
+</tr>
+<tr><td align="left" valign="top" scope="row"><p><tt>/opt/SUNWstuf/x86/1.0</tt></p></td>
+<td align="left" valign="top" scope="row"><p>Version 1.0, x86</p></td>
+</tr>
+</table><p>This is okay and it does work, but you are treating names
+and numbers as though they mean something to the administrator. A better approach
+is to do this automatically <b>after</b> explaining it to the administrator and obtaining permission.</p><p>This means that you can do the whole job in the package
+without requiring the administrator to do it manually. You can assign the base
+directory arbitrarily and then transparently establish the appropriate client links in a <tt>postinstall</tt>
+script. You can also use the <tt>pkgadd</tt> command to install all or part
+of the package to the clients in the <tt>postinstall</tt> script. You can
+even ask the administrator which users or clients need to know about this
+package and automatically update <tt>PATH</tt> environment variables and <tt>/etc</tt> files. This is completely
+acceptable as long as whatever the package does upon installation, it undoes upon
+removal. </p>
+
+<a name="ch6advtech-59"></a><h4>Walking Base Directories</h4>
+<p><a name="indexterm-268"></a><a name="indexterm-269"></a>You can take advantage of two methods for controlling the base directory at
+install time. The first is best for new packages that will install only
+to Solaris 2.5 and compatible releases; it provides very useful data for the
+administrator and supports multiple installed versions and architectures and requires minimal special work. The
+second method can be used by any package and makes use of the
+<tt>request</tt> script's inherent control over build parameters to ensure successful installations. </p>
+
+<a name="ch6advtech-79"></a><h5>Using the <tt>BASEDIR</tt> Parameter</h5>
+<p><a name="indexterm-270"></a>The <tt>checkinstall</tt> script can select the appropriate base directory at install time, which
+means that the base directory can be placed very low in the directory
+tree. This example increments the base directory sequentially, leading to directories of the
+form <tt>/opt/SUNWstuf</tt>, <tt>/opt/SUNWstuf.1</tt>, and <tt>/opt/SUNWstuf.2</tt>. The administrator can use the <tt>pkginfo</tt> command to
+determine which architecture and version are installed in each base directory. </p><p>If the <tt>SUNWstuf</tt> package (containing a set of utilities that do stuff) uses
+this method, its <tt>pkginfo</tt> and <tt>pkgmap</tt> files would look like this.</p>
+
+<a name="ch6advtech-80"></a><h5>The <tt>pkginfo</tt> File</h5>
+<a name="indexterm-271"></a><pre># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt/SUNWstuf
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none daemon
+PSTAMP=hubert990707141632</pre>
+
+<a name="ch6advtech-81"></a><h5>The <tt>pkgmap</tt> File</h5>
+<a name="indexterm-272"></a><pre>: 1 1758
+1 d none EZstuf 0775 root bin
+1 f none EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none HRDstuf 0775 root bin
+1 f none HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc    ? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 f daemon /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865
+1 i i.daemon 509 39560 752978103
+1 i r.daemon 320 24573 742152591</pre>
+
+<a name="ch6advtech-71"></a><h5>Example&mdash;Analysis Scripts That Walk a <tt>BASEDIR</tt></h5>
+<p>Assume that the x86 version of <tt>SUNWstuf</tt> is already installed on the server
+in <tt>/opt/SUNWstuf</tt>. When the administrator uses the <tt>pkgadd</tt> command to install the SPARC
+version, the <tt>request</tt> script needs to detect the existence of the x86
+version and interact with the administrator regarding the installation. </p>
+<hr><p><b>Note - </b>The base directory could be walked without administrator interaction in a <tt>checkinstall</tt> script,
+but if arbitrary operations like this happen too often, administrators lose confidence in
+the process. </p>
+<hr>
+<p>The <tt>request</tt> script and <tt>checkinstall</tt> script for a package that handle this situation
+might look like this. </p>
+
+<a name="ch6advtech-72"></a><h5>The <tt>request</tt> Script</h5>
+<a name="indexterm-273"></a><a name="indexterm-274"></a><pre># request script
+for SUNWstuf to walk the BASEDIR parameter.
+ 
+PATH=/usr/sadm/bin:${PATH}    # use admin utilities
+ 
+GENMSG="The base directory $LOCAL_BASE already contains a \
+different architecture or version of $PKG."
+ 
+OLDMSG="If the option \"-a none\" was used, press the  \
+key and enter an unused base directory when it is requested."
+ 
+OLDPROMPT="Do you want to overwrite this version? "
+ 
+OLDHELP="\"y\" will replace the installed package, \"n\" will \
+stop the installation."
+ 
+SUSPEND="Suspending installation at user request using error \
+code 1."
+ 
+MSG="This package could be installed at the unused base directory $WRKNG_BASE."
+ 
+PROMPT="Do you want to use to the proposed base directory? "
+ 
+HELP="A response of \"y\" will install to the proposed directory and continue,
+\"n\" will request a different directory. If the option \"-a none\" was used,
+press the  key and enter an unused base directory when it is requested."
+ 
+DIRPROMPT="Select a preferred base directory ($WRKNG_BASE) "
+ 
+DIRHELP="The package $PKG will be installed at the location entered."
+ 
+NUBD_MSG="The base directory has changed. Be sure to update \
+any applicable search paths with the actual location of the \
+binaries which are at $WRKNG_BASE/EZstuf and $WRKNG_BASE/HRDstuf."
+ 
+OldSolaris=""
+Changed=""
+Suffix="0"
+ 
+#
+# Determine if this product is actually installed in the working
+# base directory.
+#
+Product_is_present () {
+      if [ -d $WRKNG_BASE/EZstuf -o -d $WRKNG_BASE/HRDstuf ]; then
+            return 1
+      else
+            return 0
+      fi
+}
+ 
+if [ ${BASEDIR} ]; then
+      # This may be an old version of Solaris. In the latest Solaris
+      # CLIENT_BASEDIR won't be defined yet. In older version it is.
+      if [ ${CLIENT_BASEDIR} ]; then
+            LOCAL_BASE=$BASEDIR
+            OldSolaris="true"
+      else    # The base directory hasn't been processed yet
+            LOCAL_BASE=${PKG_INSTALL_ROOT}$BASEDIR
+fi
+ 
+WRKNG_BASE=$LOCAL_BASE
+ 
+    # See if the base directory is already in place and walk it if
+    # possible
+while [ -d ${WRKNG_BASE} -a Product_is_present ]; do
+         # There is a conflict
+         # Is this an update of the same arch &amp; version?
+         if [ ${UPDATE} ]; then
+               exit 0    # It's out of our hands.
+         else
+               # So this is a different architecture or
+               # version than what is already there.
+               # Walk the base directory
+               Suffix=`expr $Suffix + 1`
+               WRKNG_BASE=$LOCAL_BASE.$Suffix
+               Changed="true"
+         fi
+done
+ 
+    # So now we can propose a base directory that isn't claimed by
+    # any of our other versions.
+if [ $Changed ]; then
+         puttext "$GENMSG"
+         if [ $OldSolaris ]; then
+               puttext "$OLDMSG"
+               result=`ckyorn -Q -d "a" -h "$OLDHELP" -p "$OLDPROMPT"`
+               if [ $result="n" ]; then
+                     puttext "$SUSPEND"
+                     exit 1    # suspend installation
+               else
+                     exit 0
+               fi
+         else    # The latest functionality is available
+               puttext "$MSG"
+               result=`ckyorn -Q -d "a" -h "$HELP" -p "$PROMPT"`
+               if [ $? -eq 3]; then
+                     echo quitinstall &gt;&gt; $1
+                     exit 0
+               fi
+ 
+               if [ $result="n" ]; then
+                     WRKNG_BASE=`ckpath -ayw -d "$WRKNG_BASE" \
+                     -h "$DIRHELP" -p "$DIRPROMPT"`
+               else if [ $result="a" ]
+                     exit 0
+               fi
+            fi
+            echo "BASEDIR=$WRKNG_BASE" &gt;&gt; $1
+            puttext "$NUBD_MSG"
+      fi
+fi
+exit 0</pre>
+
+<a name="ch6advtech-73"></a><h5>The <tt>checkinstall</tt> Script</h5>
+<pre># checkinstall
+script for SUNWstuf to politely suspend
+ 
+grep quitinstall $1
+if [ $? -eq 0 ]; then
+    exit 3        # politely suspend installation
+fi
+ 
+exit 0</pre><p><a name="indexterm-275"></a>This approach would not work very well if the base directory was simply
+<tt>/opt</tt>. This package has to call out the <tt>BASEDIR</tt> more precisely since <tt>/opt</tt>
+would be difficult to walk. In fact, depending on the mount scheme, it
+may not be possible. The example walks the base directory by creating a
+new directory under <tt>/opt</tt>, which does not introduce any problems. </p><p>This example uses a <tt>request</tt> script and a <tt>checkinstall</tt> script even though
+versions of Solaris prior to the 2.5 release cannot run a <tt>checkinstall</tt> script.
+The <tt>checkinstall</tt> script in this example is used for the purpose of
+politely halting the installation in response to a private message in the form
+of the string &ldquo;quitinstall.&rdquo; If this script executes under the Solaris 2.3 release,
+the <tt>checkinstall</tt> script is ignored and the <tt>request</tt> script halts the installation with
+an error message. </p><p>Remember that prior to the Solaris 2.5 and compatible releases, the <tt>BASEDIR</tt>
+parameter is a read-only parameter and cannot be changed by the <tt>request</tt> script.
+For this reason, if an old version of the SunOS operating system is
+detected (by testing for a conditioned <tt>CLIENT_BASEDIR</tt> environment variable), the <tt>request</tt> script
+has only two options&mdash;continue or quit. </p>
+
+<a name="ch6advtech-76"></a><h5>Using Relative Parametric Paths</h5>
+<p><a name="indexterm-276"></a>If your software product might be installed on older versions of the SunOS
+operating system, the <tt>request</tt> script needs to do all the necessary work. This approach
+can also be used to manipulate multiple directories. If additional directories are required,
+they still need to be included under a single base directory in order
+to provide an easily administrable product. While the <tt>BASEDIR</tt> parameter does not provide
+the level of granularity available in the latest Solaris release, your package can
+still walk the base directory by using the <tt>request</tt> script to manipulate parametric paths.
+This is how the <tt>pkginfo</tt> and <tt>pkgmap</tt> files might look.</p>
+
+<a name="ch6advtech-78"></a><h5>The <tt>pkginfo</tt> File</h5>
+<a name="indexterm-277"></a><pre># pkginfo file
+PKG=SUNWstuf
+NAME=software stuff 
+ARCH=sparc
+VERSION=1.0.0,REV=1.0.5
+CATEGORY=application
+DESC=a set of utilities that do stuff
+BASEDIR=/opt
+SUBBASE=SUNWstuf
+VENDOR=Sun Microsystems, Inc.
+HOTLINE=Please contact your local service provider
+EMAIL=
+MAXINST=1000
+CLASSES=none daemon
+PSTAMP=hubert990707141632</pre>
+
+<a name="ch6advtech-77"></a><h5>The <tt>pkgmap</tt> File</h5>
+<pre>: 1 1758
+1 d none $SUBBASE/EZstuf 0775 root bin
+1 f none $SUBBASE/EZstuf/dirdel 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/EZstuf/usrdel 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/EZstuf/filedel 0555 bin bin 40 773 751310229
+1 d none $SUBBASE/HRDstuf 0775 root bin
+1 f none $SUBBASE/HRDstuf/mksmart 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mktall 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mkcute 0555 bin bin 40 773 751310229
+1 f none $SUBBASE/HRDstuf/mkeasy 0555 bin bin 40 773 751310229
+1 d none /etc    ? ? ?
+1 d none /etc/rc2.d ? ? ?
+1 f daemon /etc/rc2.d/S70dostuf 0744 root sys 450 223443
+1 i pkginfo 348 28411 760740163
+1 i postinstall 323 26475 751309908
+1 i postremove 402 33179 751309945
+1 i preinstall 321 26254 751310019
+1 i preremove 320 26114 751309865
+1 i i.daemon 509 39560 752978103
+1 i r.daemon 320 24573 742152591</pre><p><a name="indexterm-278"></a>This example is not perfect. A <tt>pkginfo -r</tt> command returns <tt>/opt</tt> for the installation base,
+which is pretty ambiguous. Many packages are in <tt>/opt</tt>, but at least
+it is a meaningful directory. Just like the previous example, this next example
+fully supports multiple architectures and versions. The <tt>request</tt> script can be tailored to
+the needs of the specific package and resolve whatever dependencies are applicable. </p>
+
+<a name="ch6advtech-70"></a><h5>Example&mdash;A <tt>request</tt> Script That Walks a Relative Parametric Path</h5>
+<a name="indexterm-279"></a><pre># request script
+for SUNWstuf to walk a parametric path
+ 
+PATH=/usr/sadm/bin:${PATH}    # use admin utilities
+ 
+MSG="The target directory $LOCAL_BASE already contains \
+different architecture or version of $PKG. This package \
+could be installed at the unused target directory $WRKNG_BASE."
+ 
+PROMPT="Do you want to use to the proposed directory? "
+ 
+HELP="A response of \"y\" will install to the proposed directory \
+and continue, \"n\" will request a different directory. If \
+the option \"-a none\" was used, press the &lt;RETURN&gt; key and \
+enter an unused base directory when it is requested."
+ 
+DIRPROMPT="Select a relative target directory under $BASEDIR/"
+ 
+DIRHELP="The package $PKG will be installed at the location entered."
+ 
+SUSPEND="Suspending installation at user request using error \
+code 1."
+ 
+NUBD_MSG="The location of this package is not the default. Be \
+sure to update any applicable search paths with the actual \
+location of the binaries which are at $WRKNG_BASE/EZstuf \
+and $WRKNG_BASE/HRDstuf."
+ 
+Changed=""
+Suffix="0"
+ 
+#
+# Determine if this product is actually installed in the working
+# base directory.
+#
+Product_is_present () {
+      if [ -d $WRKNG_BASE/EZstuf -o -d $WRKNG_BASE/HRDstuf ]; then
+            return 1
+      else
+            return 0
+ 
+      fi
+}
+ 
+if [ ${BASEDIR} ]; then
+      # This may be an old version of Solaris. In the latest Solaris
+      # CLIENT_BASEDIR won't be defined yet. In older versions it is.
+      if [ ${CLIENT_BASEDIR} ]; then
+            LOCAL_BASE=$BASEDIR/$SUBBASE
+      else    # The base directory hasn't been processed yet
+            LOCAL_BASE=${PKG_INSTALL_ROOT}$BASEDIR/$SUBBASE
+      fi
+ 
+WRKNG_BASE=$LOCAL_BASE
+ 
+# See if the base directory is already in place and walk it if
+# possible
+while [ -d ${WRKNG_BASE} -a Product_is_present ]; do
+         # There is a conflict
+         # Is this an update of the same arch &amp; version?
+         if [ ${UPDATE} ]; then
+               exit 0    # It's out of our hands.
+         else
+               # So this is a different architecture or
+               # version than what is already there.
+               # Walk the base directory
+               Suffix=`expr $Suffix + 1`
+               WRKNG_BASE=$LOCAL_BASE.$Suffix
+               Changed="true"
+         fi
+done
+ 
+# So now we can propose a base directory that isn't claimed by
+# any of our other versions.
+if [ $Changed ]; then
+         puttext "$MSG"
+         result=`ckyorn -Q -d "a" -h "$HELP" -p "$PROMPT"`
+         if [ $? -eq 3 ]; then
+               puttext "$SUSPEND"
+               exit 1
+         fi
+ 
+         if [ $result="n" ]; then
+               WRKNG_BASE=`ckpath -lyw -d "$WRKNG_BASE" -h "$DIRHELP" \
+               -p "$DIRPROMPT"`
+ 
+            elif [ $result="a" ]; then
+                   exit 0
+            else
+                   exit 1
+            fi
+            echo SUBBASE=$SUBBASE.$Suffix &gt;&gt; $1
+            puttext "$NUBD_MSG"
+      fi
+fi
+exit 0</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="ch6advtech-33.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="ch6advtech-10.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

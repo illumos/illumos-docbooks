@@ -1,0 +1,749 @@
+<chapter id="sysresacctref-14910"><title>System Accounting
+(Reference)</title><highlights><para>This chapter provides reference information about system accounting.</para><itemizedlist><para>This is a list of the reference information in this chapter.</para><listitem><para><olink targetptr="sysresacctref-41757" remap="internal">runacct Script</olink></para>
+</listitem><listitem><para><olink targetptr="sysresacctref-15489" remap="internal">Daily Accounting Reports</olink></para>
+</listitem><listitem><para><olink targetptr="sysresacctref-24103" remap="internal">System Accounting Files</olink></para>
+</listitem>
+</itemizedlist><para>For more information about system accounting tasks, see <olink targetptr="sysresacctsetup-78801" remap="internal">Chapter&nbsp;9, Managing System Accounting
+(Tasks)</olink>.</para>
+</highlights><sect1 id="sysresacctref-41757"><title><command>runacct</command> Script</title><para>The
+main daily accounting script, <command>runacct</command>, is normally invoked
+by the <command>cron</command> command outside of normal business hours. The <command>runacct</command> script processes connect, fee, disk, and process accounting
+files. This script also prepares daily and cumulative summary files for use
+by the <command>prdaily</command> and <command>monacct</command> scripts for
+billing purposes.       </para><para>The <command>runacct</command> script takes care not
+to damage files if errors occur. </para><itemizedlist><para>A series of protection mechanisms that are used to perform the following
+tasks:</para><listitem><para>Recognize an error</para>
+</listitem><listitem><para>Provide intelligent diagnostics</para>
+</listitem><listitem><para>Complete processing in such a way that the <command>runacct</command> script
+can be restarted with minimal intervention</para>
+</listitem>
+</itemizedlist><para>This script records its progress by writing descriptive messages to
+the <filename>active</filename> file. Files used by the <command>runacct</command> script
+are assumed to be in the <filename>/var/adm/acct/nite</filename> directory,
+unless otherwise noted. All diagnostic output during the execution of the <command>runacct</command> script is written to the <filename>fd2log</filename> file. </para><para>When the <command>runacct</command> script is invoked, it creates
+the <filename>lock</filename> and <filename>lock1</filename> files. These
+files are used to prevent simultaneous execution of the <command>runacct</command> script.
+The <command>runacct</command> program prints an error message if these files
+exist when it is invoked. The <filename>lastdate</filename> file contains
+the month and day the <command>runacct</command> script was last invoked,
+and is used to prevent more than one execution per day. </para><itemizedlist><para>If the <command>runacct</command> script detects an error, the following
+occurs: </para><listitem><para>A message is written to the console</para>
+</listitem><listitem><para>Email is sent to <literal>root</literal> and <literal>adm</literal></para>
+</listitem><listitem><para>Locks might be removed</para>
+</listitem><listitem><para>Diagnostics are saved</para>
+</listitem><listitem><para>Execution is ended</para>
+</listitem>
+</itemizedlist><para>For instructions on how to restart the <command>runacct</command> script,
+see <olink targetptr="sysresacctsetup-92960" remap="internal">How to Restart the runacct Script</olink>.</para><para>To allow the <command>runacct</command> script to be restarted, processing is broken down into separate
+re-entrant states. The <filename>statefile</filename> file is used to track
+the last state completed. When each state is completed, the <filename>statefile</filename> file
+is updated to reflect the next state. After processing for the state is complete,
+the <filename>statefile</filename> file is read and the next state is processed.
+When the <command>runacct</command> script reaches the <literal>CLEANUP</literal> state,
+it removes the locks and ends. States are executed as shown in the following
+table.                                                    </para><table frame="topbot" id="sysresacctref-24627"><title>States of the <command>runacct</command> Script</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="264*"/><thead><row rowsep="1"><entry><para>State</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>SETUP</literal></para>
+</entry><entry><para>The <command>turnacct</command> <command>switch</command> command is
+executed to create a new <filename>pacct</filename> file. The <filename>/var/adm/pacct</filename><replaceable>n</replaceable> process accounting files (except for
+the <filename>pacct</filename> file) are moved to the <filename>/var/adm/Spacct</filename><replaceable>n.MMDD</replaceable> files. The <filename>/var/adm/wtmpx</filename> file is
+moved to the <filename>/var/adm/acct/nite/wtmp.</filename><replaceable>MMDD</replaceable> file
+(with the current time record added on the end) and a new <filename>/var/adm/wtmp</filename> file is created. The <filename>closewtmp</filename> and <filename>utmp2wtmp</filename> programs add records to the <filename>wtmp</filename>.<replaceable>MMDD</replaceable> file and the new <filename>wtmpx</filename> file to account
+for users who are currently logged in. </para>
+</entry>
+</row><row><entry><para><literal>WTMPFIX</literal> </para>
+</entry><entry><para>The <command>wtmpfix</command> program checks the <filename>wtmp.</filename><replaceable>MMDD</replaceable> file in the <filename>nite</filename> directory for accuracy.
+Because some date changes cause the <command>acctcon</command> program to
+fail, the <command>wtmpfix</command> program attempts to adjust the time stamps
+in the <filename>wtmpx</filename> file if a record of a date change appears.
+This program also deletes any corrupted entries from the <filename>wtmpx</filename> file.
+The fixed version of the <filename>wtmp.</filename><replaceable>MMDD</replaceable> file
+is written to the <filename>tmpwtmp</filename> file. </para>
+</entry>
+</row><row><entry><para><literal>CONNECT</literal></para>
+</entry><entry><para>The <command>acctcon</command> program is used to record connect accounting
+records in the file <filename>ctacct.</filename><replaceable>MMDD</replaceable>.
+These records are in <filename>tacct.h</filename> format. In addition, the <command>acctcon</command> program creates the <filename>lineuse</filename> and <filename>reboots</filename> files. The <filename>reboots</filename> file records all
+the boot records found in the <filename>wtmpx</filename> file. </para>
+</entry>
+</row><row><entry><para><literal>PROCESS</literal> </para>
+</entry><entry><para>The <command>acctprc</command> program is used to convert the <filename>/var/adm/Spacct</filename><replaceable>n.MMDD</replaceable> process accounting files into
+complete accounting records in the <filename>ptacct</filename><replaceable>n.MMDD</replaceable> files. The <filename>Spacct</filename> and <filename>ptacct</filename> files
+are correlated by number so that if the <command>runacct</command> script
+fails, the <filename>Spacct</filename> files are not processed. </para>
+</entry>
+</row><row><entry><para><literal>MERGE</literal></para>
+</entry><entry><para>The <command>acctmerg</command> program merges the process accounting
+records with the connect accounting records to form the <filename>daytacct</filename> file.</para>
+</entry>
+</row><row><entry><para><literal>FEES</literal></para>
+</entry><entry><para>The <command>acctmerg</command> program merges ASCII <filename>tacct</filename> records
+from the <filename>fee</filename> file into the <filename>daytacct</filename> file. </para>
+</entry>
+</row><row><entry><para><literal>DISK</literal> </para>
+</entry><entry><para>The <command>dodisk</command> script produces the <filename>disktacct</filename> file.
+If the <command>dodisk</command> script has been run, which produces the <filename>disktacct</filename> file, the <command>DISK</command> program merges the
+file into the <filename>daytacct</filename> file and moves the <filename>disktacct</filename> file to the <filename>/tmp/disktacct.</filename><replaceable>MMDD</replaceable> file. </para>
+</entry>
+</row><row><entry><para><literal>MERGETACCT</literal></para>
+</entry><entry><para>The <command>acctmerg</command> program merges the <filename>daytacct</filename> file
+with the <filename>sum/tacct</filename> file, the cumulative total accounting
+file. Each day, the <filename>daytacct</filename> file is saved in the <filename>sum/tacct.</filename><replaceable>MMDD</replaceable> file so that the <filename>sum/tacct</filename> file can be re-created if it is corrupted or lost. </para>
+</entry>
+</row><row><entry><para><literal>CMS</literal></para>
+</entry><entry><para>The <command>acctcms</command> program is run several times. This program
+is first run to generate the command summary by using the <filename>Spacct</filename><replaceable>n</replaceable> files and write the data to the <filename>sum/daycms</filename> file.
+The <command>acctcms</command> program is then run to merge the <filename>sum/daycms</filename> file with the <filename>sum/cms</filename> cumulative command
+summary file. Finally, the <command>acctcms</command> program is run to produce <filename>nite/daycms</filename> and <filename>nite/cms</filename>, the ASCII command
+summary files from the <filename>sum/daycms</filename> and <filename>sum/cms</filename> files,
+respectively. The <command>lastlogin</command> program is used to create the <filename>/var/adm/acct/sum/loginlog</filename> log file. This file reports when each
+user last logged in. If the <command>runacct</command> script is run after
+midnight, the dates showing the time last logged in by some users will be
+incorrect by one day. </para>
+</entry>
+</row><row><entry><para><literal>USEREXIT</literal></para>
+</entry><entry><para>Any installation-dependent (local) accounting program can be run at
+this point. The <command>runacct</command> script expects this program to
+be called the <command>/usr/lib/acct/runacct.local</command> program. </para>
+</entry>
+</row><row><entry><para><literal>CLEANUP</literal></para>
+</entry><entry><para>This state cleans up temporary files, runs the <command>prdaily</command> script
+and saves its output in the <filename>sum/rpt.</filename><replaceable>MMDD</replaceable> file,
+removes the locks, and then exits. </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><caution><para>When restarting the <command>runacct</command> script in the <literal>CLEANUP</literal> state, remove the
+last <filename>ptacct</filename> file because this file will not be complete. </para>
+</caution>
+</sect1><sect1 id="sysresacctref-15489"><title>Daily Accounting Reports</title><para>The <command>runacct</command> shell script generates five basic
+reports upon each invocation. The following table describes these reports.</para><table frame="topbot" id="sysresacctref-37391"><title>Daily Accounting Reports</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="118*"/><colspec colname="column2" colwidth="241*"/><thead><row rowsep="1"><entry><para>Report Type</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><olink targetptr="sysresacctref-2" remap="internal">Daily Report</olink></para>
+</entry><entry><para>Shows terminal line utilization by <literal>tty</literal> number.</para>
+</entry>
+</row><row><entry><para><olink targetptr="sysresacctref-3" remap="internal">Daily Usage Report</olink></para>
+</entry><entry><para>Indicates usage of system resources by users (listed in order of user
+ID).</para>
+</entry>
+</row><row><entry><para><olink targetptr="sysresacctref-78581" remap="internal">Daily Command Summary</olink></para>
+</entry><entry><para>Indicates usage of system resources by commands, listed in descending
+order of memory use. In other words, the command that used the most memory
+is listed first. This same information is reported for the month in the monthly
+command summary. </para>
+</entry>
+</row><row><entry><para><olink targetptr="sysresacctref-4" remap="internal">Monthly Command Summary</olink></para>
+</entry><entry><para>A cumulative summary that reflects the data accumulated since the last
+invocation of the <command>monacct</command> program.</para>
+</entry>
+</row><row><entry><para><olink targetptr="sysresacctref-5" remap="internal">Last Login Report</olink></para>
+</entry><entry><para>Shows the last time each user logged in (listed in chronological order).</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="sysresacctref-2"><title>Daily Report</title><para>This report gives information
+about each terminal line used. The following is a sample Daily Report.    </para><screen>Jan 16 02:30 2004  DAILY REPORT FOR venus Page 1
+
+
+from Mon Jan 15 02:30:02 2004
+to   Tue Oan 16 02:30:01 2004
+1       runacct
+1       acctcon
+
+TOTAL DURATION IS 1440 MINUTES
+LINE         MINUTES  PERCENT  # SESS  # ON  # OFF
+console      868      60       1       1     2
+TOTALS       868      --       1       1     2</screen><para>The <filename>from</filename> and <filename>to</filename> lines
+specify the time period reflected in the report. This time period covers the
+time the last Daily Report was generated to the time the current Daily Report
+was generated. Then, the report presents a log of system reboots, shutdowns,
+power failure recoveries, and any other record written to the <filename>/var/adm/wtmpx</filename> file by the <command>acctwtmp</command> program. For more information,
+see the <olink targetdoc="refman" targetptr="acct-1m" remap="external"><citerefentry><refentrytitle>acct</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><para>The second part of the report is a breakdown of terminal line utilization.
+The <literal>TOTAL</literal> <literal>DURATION</literal> tells how long the
+system was in multiuser mode (accessible through the terminal lines). The
+following table describes the data provided by the Daily Report.</para><table frame="topbot" id="sysresacctref-42173"><title>Daily Report Data</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="270*"/><thead><row rowsep="1"><entry><para>Column</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>LINE</literal></para>
+</entry><entry><para>The terminal line or access port. </para>
+</entry>
+</row><row><entry><para><literal>MINUTES</literal></para>
+</entry><entry><para>The number of minutes that the line was in use during the accounting
+period. </para>
+</entry>
+</row><row><entry><para><literal>PERCENT</literal> </para>
+</entry><entry><para>The <literal>TOTAL</literal> <literal>DURATION</literal> divided by
+the number of <literal>MINUTES</literal>.</para>
+</entry>
+</row><row><entry><para><literal># SESS</literal> </para>
+</entry><entry><para>The number of times this line or port was accessed for a login session.</para>
+</entry>
+</row><row><entry><para><literal># ON</literal> </para>
+</entry><entry><para>Same as <literal>SESS</literal>. (This column no longer has meaning.
+Previously, this column listed the number of times that a line or port was
+used to log in a user.)</para>
+</entry>
+</row><row><entry><para><literal># OFF</literal></para><para>T</para>
+</entry><entry><para>The
+number of times a user logs out and any interrupts that occur on that line.
+Generally, interrupts occur on a port when <command>ttymon</command> is first
+invoked after the system is brought to multiuser mode. If the <literal># OFF</literal> exceeds
+the <literal># SESS</literal> by a large factor,  the multiplexer, modem,
+or cable is probably going bad. Or, a bad connection exists somewhere. The
+most common cause is an unconnected cable dangling from the multiplexer. 
+ </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>During real time, you should monitor the <filename>/var/adm/wtmpx</filename> file
+because it is the file from which the connect accounting is derived. If the <filename>wtmpx</filename> file grows rapidly, execute the following command to see
+which <literal>tty</literal> line is the noisiest.</para><screen># <userinput>/usr/lib/acct/acctcon -l</userinput> <replaceable>file</replaceable> &lt; /var/adm/wtmpx</screen><para>If  interruption is occurring frequently, general system performance
+will be affected. Additionally, the <filename>wtmp</filename> file might become
+corrupted. To correct this problem, see <olink targetptr="sysresacctsetup-90762" remap="internal">How to Fix a Corrupted wtmpx File</olink>.        </para>
+</sect2><sect2 id="sysresacctref-3"><title>Daily Usage Report</title><para>The Daily Usage Report breaks down system resource utilization
+by user. A sample of this report follows.     </para><screen width="100">Jan 16 02:30 2004  DAILY USAGE REPORT FOR skisun Page 1
+
+
+     LOGIN  CPU  (MINS)  KCORE-   MINS    CONNECT  (MINS) DISK   # OF   # OF  # DISK  FEE
+UID  NAME   PRIME NPRIME PRIME    NPRIME  PRIME    NPRIME BLOCKS PROCS  SESS  SAMPLES
+0    TOTAL  72    148    11006173 51168   26230634 57792  539    330    0     2150    1
+0    root   32    76     11006164 33664   26230616 22784  0      0      0     127     0
+4    adm    0     0      22       51      0        0      0      420    0     0       0
+101  rimmer 39    72     894385   1766020 539      330    0      1603   1     0       0</screen><para>The following table describes the data provided by the Daily Usage Report.</para><table frame="topbot" id="sysresacctref-40931"><title>Daily Usage Report Data</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="99*"/><colspec colname="column2" colwidth="259*"/><thead><row rowsep="1"><entry><para>Column</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>UID</literal> </para>
+</entry><entry><para>User ID number.</para>
+</entry>
+</row><row><entry><para><literal>LOGIN NAME</literal> </para>
+</entry><entry><para>Login (or user) name of the user. Identifies a user who has multiple
+login names. </para>
+</entry>
+</row><row><entry><para><literal>CPU (MINS)</literal>   </para>
+</entry><entry><para>Amount of time, in minutes, that the user's process used the central
+processing unit. Divided into <literal>PRIME</literal> and <literal>NPRIME</literal> (nonprime)
+utilization. The accounting system's version of this data is located in the <filename>/etc/acct/holidays</filename> file. </para>
+</entry>
+</row><row><entry><para><literal>KCORE-MINS</literal> </para>
+</entry><entry><para>A cumulative measure of the amount of memory in Kbyte segments per minute
+that a process uses while running. Divided into <literal>PRIME</literal> and <literal>NPRIME</literal> utilization.</para>
+</entry>
+</row><row><entry><para><literal>CONNECT (MINS)</literal>  </para>
+</entry><entry><para>Amount of time, in minutes, that the a user was logged in to the system,
+or &ldquo;real time.&rdquo; Divided into <literal>PRIME</literal> and <literal>NPRIME</literal> utilization. If these numbers are high while the <literal># OF
+PROCS</literal> is low, you can conclude that the user logs in first thing
+in the morning and hardly touches the terminal the rest of the day. </para>
+</entry>
+</row><row><entry><para><literal>DISK BLOCKS</literal>    </para>
+</entry><entry><para>Output from the <command>acctdusg</command> program,
+which runs the disk accounting programs and merges the accounting records
+(<filename>daytacct</filename>). For accounting purposes, a block is 512 bytes.</para>
+</entry>
+</row><row><entry><para><literal># OF PROCS</literal> </para>
+</entry><entry><para>Number of processes invoked by the user. If large numbers appear, a
+user might have a shell procedure that has run out of control.</para>
+</entry>
+</row><row><entry><para><literal>#
+OF SESS</literal>  </para>
+</entry><entry><para>Number of times that a user logged in to the system.</para>
+</entry>
+</row><row><entry><para><literal># DISK SAMPLES</literal> </para>
+</entry><entry><para>Number of times that disk accounting was run to obtain the average number
+of <literal>DISK BLOCKS</literal>.</para>
+</entry>
+</row><row><entry><para><literal>FEE</literal>     </para>
+</entry><entry><para>Often unused field that represents the total accumulation of units
+charged against the user by the <command>chargefee</command> script.     </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="sysresacctref-78581"><title>Daily Command Summary</title><para>The Daily Command
+Summary report shows the system resource utilization by command. With this
+report, you can identify the most heavily used commands. Based on how those
+commands use system resources, you can then gain insight on how best to tune
+the system.   </para><para>These reports are sorted by <literal>TOTAL</literal> <literal>KCOREMIN</literal>,
+which is an arbitrary gauge but often useful for calculating drain on a system.</para><para>A sample Daily Command Summary follows. </para><screen width="100">								TOTAL COMMAND SUMMARY
+COMMAND   NUMBER      TOTAL   TOTAL     TOTAL   MEAN    MEAN     HOG   CHARS   BLOCKS
+NAME        CMDS    KCOREMIN CPU-MIN REAL-MIN  SIZE-K  CPU-MIN  FACTOR TRNSFD  READ
+
+TOTALS      2150  1334999.75  219.59 724258.50 6079.48   0.10   0.00   397338982 419448
+
+netscape      43  2456898.50   92.03  54503.12 26695.51  2.14   0.00   947774912 225568
+adeptedi       7    88328.22    4.03    404.12 21914.95  0.58   0.01    93155160   8774
+dtmail         1    54919.17    5.33  17716.57 10308.94  5.33   0.00   213843968  40192
+acroread       8    31218.02    2.67  17744.57 11682.66  0.33   0.00   331454464  11260
+dtwm           1    16252.93    2.53  17716.57 6416.05   2.53   0.00   158662656  12848
+dtterm         5     4762.71    1.30  76300.29 3658.93   0.26   0.00    33828352  11604
+dtaction      23     1389.72    0.33      0.60 4196.43   0.01   0.55    18653184    539
+dtsessio       1     1174.87    0.24  17716.57 4932.97   0.24   0.00    23535616   5421
+dtcm           1      866.30    0.18  17716.57 4826.21   0.18   0.00     3012096   6490</screen><para>The following table describes the data provided by the Daily Command
+Summary.</para><table frame="topbot" id="sysresacctref-53520"><title>Daily Command Summary
+Data</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="118*"/><colspec colname="column2" colwidth="241*"/><thead><row rowsep="1"><entry><para>Column</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>COMMAND NAME</literal> </para>
+</entry><entry><para>Name of the command. All shell procedures are lumped together under
+the name <command>sh</command> because only object modules are reported by
+the process accounting system. You should monitor the frequency of programs
+called <filename>a.out</filename> or <filename>core</filename>, or any other
+unexpected name. You can use the <command>acctcom</command> program to determine
+who executed an oddly named command and if superuser privileges were used. </para>
+</entry>
+</row><row><entry><para><literal>NUMBER CMDS</literal> </para>
+</entry><entry><para>Total number of times this command was run. </para>
+</entry>
+</row><row><entry><para><literal>TOTAL KCOREMIN</literal>  </para>
+</entry><entry><para>Total cumulative measurement of the Kbyte segments of memory used by
+a process per minute of run time. </para>
+</entry>
+</row><row><entry><para><literal>TOTAL CPU-MIN</literal>  </para>
+</entry><entry><para>Total processing time this program accumulated. </para>
+</entry>
+</row><row><entry><para><literal>TOTAL REAL-MIN</literal> </para>
+</entry><entry><para>Total real-time (wall-clock) minutes this program accumulated. </para>
+</entry>
+</row><row><entry><para><literal>MEAN SIZE-K</literal> </para>
+</entry><entry><para>Mean (average) of the <literal>TOTAL</literal> <literal>KCOREMIN</literal> over
+the number of invocations reflected by the <literal>NUMBER</literal> <literal>CMDS</literal>. </para>
+</entry>
+</row><row><entry><para><literal>MEAN CPU-MIN</literal></para>
+</entry><entry><para>Mean (average) derived from the <literal>NUMBER</literal> <literal>CMDS</literal> and
+the <literal>TOTAL  CPU-MIN</literal>.</para>
+</entry>
+</row><row><entry><para><literal>HOG FACTOR</literal> </para>
+</entry><entry><para>Total CPU time divided by elapsed time. Shows the ratio of system availability
+to system utilization, providing a relative measure of total available CPU
+time consumed by the process during its execution. </para>
+</entry>
+</row><row><entry><para><literal>CHARS TRNSFD</literal> </para>
+</entry><entry><para>Total number of characters transferred by the read and write system
+calls. Might be negative due to overflow.</para>
+</entry>
+</row><row><entry><para><literal>BLOCKS READ</literal></para>
+</entry><entry><para>Total number of the physical block reads and writes that a process performed. </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2><sect2 id="sysresacctref-4"><title>Monthly Command Summary</title><para>The format of the Daily Command Summary and the Monthly Command Summary
+reports are virtually the same. However, the daily summary reports only on
+the current accounting period while the monthly summary reports on the start
+of the fiscal period to the current date. In other words, the monthly report
+is a cumulative summary that reflects the data accumulated since the last
+invocation of the <command>monacct</command> program.</para><para>A
+sample Monthly Command Summary follows.    </para><screen width="100">Jan 16 02:30 2004  MONTHLY TOTAL COMMAND SUMMARY Page 1
+
+
+                                     TOTAL COMMAND SUMMARY
+COMMAND   NUMBER      TOTAL   TOTAL     TOTAL   MEAN     MEAN    HOG      CHARS    BLOCKS
+NAME        CMDS    KCOREMIN CPU-MIN  REAL-MIN  SIZE-K   CPU-MIN FACTOR  TRNSFD    READ
+
+TOTALS     42718  4398793.50  361.92  956039.00 12154.09 0.01    0.00  16100942848 825171
+
+netscape     789  3110437.25  121.03   79101.12 25699.58 0.15    0.00   3930527232 302486
+adeptedi      84  1214419.00   50.20    4174.65 24193.62 0.60    0.01    890216640 107237
+acroread     145   165297.78    7.01   18180.74 23566.84 0.05    0.00   1900504064  26053
+dtmail         2    64208.90    6.35   20557.14 10112.43 3.17    0.00    250445824  43280
+dtaction     800    47602.28   11.26      15.37  4226.93 0.01    0.73    640057536   8095
+soffice.      13    35506.79    0.97       9.23 36510.84 0.07    0.11    134754320   5712
+dtwm           2    20350.98    3.17   20557.14  6419.87 1.59    0.00    190636032  14049</screen><para>For a description of the data provided by the Monthly Command Summary,
+see <olink targetptr="sysresacctref-78581" remap="internal">Daily Command Summary</olink>.</para>
+</sect2><sect2 id="sysresacctref-5"><title>Last Login Report</title><para>This report gives the date when a particular
+login was last used. You can use this information to find unused logins and
+login directories that can be archived and deleted. A Last Login Report follows.</para><screen>Jan 16 02:30 2004  LAST LOGIN Page 1
+
+
+01-06-12  kryten         01-09-08  protoA      01-10-14  ripley
+01-07-14  lister         01-09-08  protoB      01-10-15  scutter1
+01-08-16  pmorph         01-10-12  rimmer      01-10-16  scutter2</screen>
+</sect2><sect2 id="sysresacctref-6"><title>Examining the <filename>pacct</filename> File
+With <command>acctcom</command></title><para>At any time, you can examine the contents of the <filename>/var/adm/pacct</filename><replaceable>n</replaceable> files, or any file with records in
+the <filename>acct.h</filename> format, by using the <command>acctcom</command> program.
+If you do not specify any files and do not provide any standard input when
+you run this command, the <command>acctcom</command> command reads the <filename>pacct</filename> file. Each record read by the <command>acctcom</command> command
+represents information about a terminated process. Active processes can be
+examined by running the <command>ps</command> command. </para><para>The default output of the <command>acctcom</command> command provides
+the following information:</para><screen># <userinput>acctcom</userinput>
+COMMAND                           START    END          REAL     CPU    MEAN
+NAME       USER     TTYNAME       TIME     TIME       (SECS)  (SECS) SIZE(K)
+#accton    root      ?            02:30:01 02:30:01     0.03    0.01  304.00
+turnacct   adm       ?            02:30:01 02:30:01     0.42    0.01  320.00
+mv         adm       ?            02:30:01 02:30:01     0.07    0.01  504.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.03    0.01  712.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.01    0.01  824.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.01    0.01  912.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.01    0.01  920.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.01    0.01 1136.00
+utmp_upd   adm       ?            02:30:01 02:30:01     0.01    0.01  576.00
+closewtm   adm       ?            02:30:01 02:30:01     0.10    0.01  664.00</screen><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="50*"/><colspec colwidth="50*"/><thead><row><entry><para>Field</para>
+</entry><entry><para>Explanation</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>COMMAND NAME</literal></para>
+</entry><entry><para>Command name (pound (#) sign if the command was executed with superuser
+privileges)</para>
+</entry>
+</row><row><entry><para><literal>USER</literal></para>
+</entry><entry><para>User name</para>
+</entry>
+</row><row><entry><para><literal>TTYNAME</literal></para>
+</entry><entry><para><literal>tty</literal> name (listed as <literal>?</literal> if unknown)</para>
+</entry>
+</row><row><entry><para><literal>START TIME</literal></para>
+</entry><entry><para>Command execution starting time</para>
+</entry>
+</row><row><entry><para><literal>END TIME</literal></para>
+</entry><entry><para>Command execution ending time</para>
+</entry>
+</row><row><entry><para><literal>REAL (SECS)</literal></para>
+</entry><entry><para>Real time (in seconds)</para>
+</entry>
+</row><row><entry><para><literal>CPU (SECS)</literal></para>
+</entry><entry><para>CPU time (in seconds)</para>
+</entry>
+</row><row><entry><para><literal>MEAN SIZE (K)</literal></para>
+</entry><entry><para>Mean size (in Kbytes)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><itemizedlist><para>You can obtain the following information by using <command>acctcom</command> command
+options.</para><listitem><para>State of the <literal>fork/exec</literal> flag
+(1 for <literal>fork</literal> without <literal>exec</literal>)</para>
+</listitem><listitem><para>System exit status</para>
+</listitem><listitem><para>Hog factor</para>
+</listitem><listitem><para>Total <literal>kcore</literal> minutes</para>
+</listitem><listitem><para>CPU factor</para>
+</listitem><listitem><para>Characters transferred</para>
+</listitem><listitem><para>Blocks read</para>
+</listitem>
+</itemizedlist><para>The following table describes the <command>acctcom</command> command
+options.</para><table frame="topbot" id="sysresacctref-54291"><title>Options for the <command>acctcom</command> Command</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="269*"/><thead><row rowsep="1"><entry><para>Option</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><option>a</option></para>
+</entry><entry><para>Shows average statistics about the processes selected. The statistics
+are printed after the output is recorded.</para>
+</entry>
+</row><row><entry><para><option>b</option></para>
+</entry><entry><para>Reads the files backward, showing latest commands first. This option
+has no effect if reading standard input.</para>
+</entry>
+</row><row><entry><para><option>f</option> </para>
+</entry><entry><para>Prints the <literal>fork/exec</literal> flag and system exit status
+columns. The output is an octal number.</para>
+</entry>
+</row><row><entry><para><option>h</option> </para>
+</entry><entry><para>Instead of mean memory size, shows the hog factor, which is the fraction
+of total available CPU time consumed by the process during its execution.
+Hog factor = <emphasis>total-CPU-time/elapsed-time</emphasis>. </para>
+</entry>
+</row><row><entry><para><option>i</option></para>
+</entry><entry><para>Prints columns that contains the I/O counts in the output. </para>
+</entry>
+</row><row><entry><para><option>k</option> </para>
+</entry><entry><para>Shows total <literal>kcore</literal> <literal>minutes</literal> instead
+of memory size. </para>
+</entry>
+</row><row><entry><para><option>m</option> </para>
+</entry><entry><para>Shows mean core size. This size is the default. </para>
+</entry>
+</row><row><entry><para><option>q</option></para>
+</entry><entry><para>Prints average statistics, not output records.</para>
+</entry>
+</row><row><entry><para><option>r</option> </para>
+</entry><entry><para>Shows CPU factor: <replaceable>user-time</replaceable>/(<replaceable>system-time
++ user-time)</replaceable>. </para>
+</entry>
+</row><row><entry><para><option>t</option></para>
+</entry><entry><para>Shows separate system and user CPU times. </para>
+</entry>
+</row><row><entry><para><option>v</option></para>
+</entry><entry><para>Excludes column headings from the output. </para>
+</entry>
+</row><row><entry><para><option>C</option> <replaceable>sec</replaceable></para>
+</entry><entry><para>Shows only processes with total CPU time (system plus user) that exceeds <replaceable>sec</replaceable> seconds. </para>
+</entry>
+</row><row><entry><para><option>e</option> <replaceable>time</replaceable></para>
+</entry><entry><para>Shows processes existing at or before <replaceable>time</replaceable>,
+given in the format <emphasis>hr[:min[:sec]]</emphasis></para>
+</entry>
+</row><row><entry><para><option>E</option> <replaceable>time</replaceable></para>
+</entry><entry><para>Shows processes starting at or before <replaceable>time</replaceable>,
+given in the format <emphasis>hr[:min[:sec]]</emphasis>. Using the same time
+for both <option>S</option> and <option>E</option>, shows processes that existed
+at the time. </para>
+</entry>
+</row><row><entry><para><option>g</option> <replaceable>group</replaceable></para>
+</entry><entry><para>Shows only processes that belong to <replaceable>group</replaceable>. </para>
+</entry>
+</row><row><entry><para><option>H</option> <replaceable>factor</replaceable></para>
+</entry><entry><para>Shows only processes that exceed <replaceable>factor</replaceable>,
+where <replaceable>factor</replaceable> is the &ldquo;hog factor&rdquo; (see
+the <option>h</option> option). </para>
+</entry>
+</row><row><entry><para><option>I</option> <replaceable>chars</replaceable> </para>
+</entry><entry><para>Shows only processes that transferred more characters than the cutoff
+number specified by <replaceable>chars</replaceable>. </para>
+</entry>
+</row><row><entry><para><option>l</option> <replaceable>line</replaceable></para>
+</entry><entry><para>Show only processes that belong to the terminal <filename>/dev/</filename><replaceable>line</replaceable>. </para>
+</entry>
+</row><row><entry><para><option>n</option> <replaceable>pattern</replaceable></para>
+</entry><entry><para>Shows only commands that match <replaceable>pattern</replaceable> (a
+regular expression except that &ldquo;<literal>+</literal>&rdquo; means one
+or more occurrences). </para>
+</entry>
+</row><row><entry><para><option>o</option> <replaceable>ofile</replaceable></para>
+</entry><entry><para>Instead of printing the records, copies them in <filename>acct.h</filename> format
+to <replaceable>ofile</replaceable>. </para>
+</entry>
+</row><row><entry><para><option>O</option> <replaceable>sec</replaceable> </para>
+</entry><entry><para>Shows only processes with CPU system time that exceeds <replaceable>sec</replaceable> seconds. </para>
+</entry>
+</row><row><entry><para><option>s</option> <replaceable>time</replaceable></para>
+</entry><entry><para>Show processes existing at or after <replaceable>time</replaceable>,
+given in the format <replaceable>hr</replaceable>[:<replaceable>min</replaceable>[:<replaceable>sec</replaceable>]]. </para>
+</entry>
+</row><row><entry><para><option>S</option> <replaceable>time</replaceable></para>
+</entry><entry><para>Show processes starting at or after <replaceable>time</replaceable>,
+given in the format <replaceable>hr</replaceable>[:<replaceable>min</replaceable>[:<replaceable>sec</replaceable>]]. </para>
+</entry>
+</row><row><entry><para><option>u</option> <replaceable>user</replaceable></para>
+</entry><entry><para>Shows only processes that belong to <replaceable>user</replaceable>. </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1><sect1 id="sysresacctref-24103"><title>System Accounting Files</title><para>The <filename>/var/adm</filename> directory contains
+the active data collection files. The following table describes the accounting
+files in this directory.        </para><table frame="topbot" id="sysresacctref-tbl-7"><title>Files in the <filename>/var/adm</filename> Directory</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="270*"/><thead><row rowsep="1"><entry><para>File</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>dtmp</filename></para>
+</entry><entry><para>Output from the <command>acctdusg</command> program </para>
+</entry>
+</row><row><entry><para><filename>fee</filename> </para>
+</entry><entry><para>Output from the <command>chargefee</command> program, which are the
+ASCII <command>tacct</command> records </para>
+</entry>
+</row><row><entry><para><filename>pacct</filename></para>
+</entry><entry><para>Active process accounting file </para>
+</entry>
+</row><row><entry><para><filename>pacct</filename><replaceable>n</replaceable> </para>
+</entry><entry><para>Process accounting files that are switched by running the <command>turnacct</command> script</para>
+</entry>
+</row><row><entry><para><filename>Spacct</filename><replaceable>n</replaceable>.<replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Process accounting files for <replaceable>MMDD</replaceable> during
+execution of the <command>runacct</command> script</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <filename>/var/adm/acct</filename> directory contains the <filename>nite</filename>, <filename>sum</filename>,
+and <filename>fiscal</filename> directories. These directories contain the
+actual data collection files. For example, the <filename>nite</filename> directory
+contains files that are reused daily by the <command>runacct</command> script.
+A brief summary of the files in the <filename>/var/adm/acct/nite</filename> directory
+follows.                             </para><table frame="topbot" id="sysresacctref-tbl-8"><title>Files in the <filename>/var/adm/acct/nite</filename> Directory</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="270*"/><thead><row rowsep="1"><entry><para>File</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>active</filename> </para>
+</entry><entry><para>Used by the <command>runacct</command> script to record progress and
+print warning and error messages</para>
+</entry>
+</row><row><entry><para><filename>active</filename>.<replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Same as the <filename>active</filename> file after the <command>runacct</command> script
+detects an error </para>
+</entry>
+</row><row><entry><para><filename>cms</filename> </para>
+</entry><entry><para>ASCII total command summary used by the <command>prdaily</command> script</para>
+</entry>
+</row><row><entry><para><filename>ctacct.</filename><replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Connect accounting records in <filename>tacct.h</filename> format </para>
+</entry>
+</row><row><entry><para><filename>ctmp</filename> </para>
+</entry><entry><para>Output of <command>acctcon1</command> program, which consists of connect
+session records in <filename>ctmp.h</filename> format (<command>acctcon1</command> and <command>acctcon2</command> are provided for compatibility purposes) </para>
+</entry>
+</row><row><entry><para><filename>daycms</filename> </para>
+</entry><entry><para>ASCII daily command summary used by the <command>prdaily</command> script</para>
+</entry>
+</row><row><entry><para><filename>daytacct</filename> </para>
+</entry><entry><para>Total accounting records for one day in <filename>tacct.h</filename> format </para>
+</entry>
+</row><row><entry><para><filename>disktacct</filename> </para>
+</entry><entry><para>Disk accounting records in <filename>tacct.h</filename> format, created
+by the <command>dodisk</command> script</para>
+</entry>
+</row><row><entry><para><filename>fd2log</filename> </para>
+</entry><entry><para>Diagnostic output during execution of the <command>runacct</command> script</para>
+</entry>
+</row><row><entry><para><filename>lastdate</filename> </para>
+</entry><entry><para>Last day the <command>runacct</command> script executed (in <command>date
++%m%d</command> format) </para>
+</entry>
+</row><row><entry><para><filename>lineuse</filename></para>
+</entry><entry><para><literal>tty</literal> line usage report used by the <command>prdaily</command> script</para>
+</entry>
+</row><row><entry><para><filename>lock</filename> </para>
+</entry><entry><para>Used to control serial use of the <command>runacct</command> script</para>
+</entry>
+</row><row><entry><para><filename>log</filename> </para>
+</entry><entry><para>Diagnostic output from the <command>acctcon</command> program</para>
+</entry>
+</row><row><entry><para><filename>log</filename><replaceable>.MMDD</replaceable> </para>
+</entry><entry><para>Same as the <filename>log</filename> file after the <command>runacct</command> script
+detects an error </para>
+</entry>
+</row><row><entry><para><filename>owtmpx</filename> </para>
+</entry><entry><para>Previous day's <command>wtmpx</command> file </para>
+</entry>
+</row><row><entry><para><filename>reboots</filename> </para>
+</entry><entry><para>Beginning and ending dates from the <filename>wtmpx</filename> file,
+and a listing of reboots </para>
+</entry>
+</row><row><entry><para><filename>statefile</filename> </para>
+</entry><entry><para>Used to record current state during execution of the <command>runacct</command> script</para>
+</entry>
+</row><row><entry><para><filename>tmpwtmp</filename> </para>
+</entry><entry><para><filename>wtmpx</filename> file corrected by the <command>wtmpfix</command> program</para>
+</entry>
+</row><row><entry><para><filename>wtmperror</filename> </para>
+</entry><entry><para>Contains <command>wtmpfix</command> error messages</para>
+</entry>
+</row><row><entry><para><filename>wtmperror</filename> <replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Same as the <filename>wtmperror</filename> file after the <command>runacct</command> script
+detects an error </para>
+</entry>
+</row><row><entry><para><filename>wtmp</filename><replaceable>MMDD</replaceable>  </para>
+</entry><entry><para>The <command>runacct</command> script's copy of the <filename>wtmpx</filename> file </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <filename>sum</filename> directory
+contains the cumulative summary files updated by the <command>runacct</command> script
+and used by the <command>monacct</command> script. The following table summarizes
+the files in the <filename>/var/adm/acct/sum</filename> directory.       
+   </para><table frame="topbot" id="sysresacctref-65833"><title>Files in the <filename>/var/adm/acct/sum</filename> Directory</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="270*"/><thead><row rowsep="1"><entry><para>File</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>cms</filename> </para>
+</entry><entry><para>Total command summary file for current fiscal period in binary format </para>
+</entry>
+</row><row><entry><para><filename>cmsprev</filename> </para>
+</entry><entry><para>Command summary file without latest update </para>
+</entry>
+</row><row><entry><para><filename>daycms</filename> </para>
+</entry><entry><para>Command summary file for the day's usage in internal summary format </para>
+</entry>
+</row><row><entry><para><filename>loginlog</filename> </para>
+</entry><entry><para>Record of last date each user logged in; created by the <command>lastlogin</command> script
+and used in the <command>prdaily</command> script</para>
+</entry>
+</row><row><entry><para><filename>rprt.</filename><replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Saved output of <command>prdaily</command> script</para>
+</entry>
+</row><row><entry><para><filename>tacct</filename> </para>
+</entry><entry><para>Cumulative total accounting file for current fiscal period </para>
+</entry>
+</row><row><entry><para><filename>tacctprev</filename></para>
+</entry><entry><para>Same as the <filename>tacct</filename> file without latest update </para>
+</entry>
+</row><row><entry><para><filename>tacct.</filename><replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Total accounting file for <replaceable>MMDD</replaceable> </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The fiscal directory contains periodic summary files
+that are created by the <command>monacct</command> script. The following table
+summarizes the files in the <filename>/var/adm/acct/fiscal</filename> directory.
+               </para><table frame="topbot" id="sysresacctref-75194"><title>Files in the <filename>/var/adm/acct/fiscal</filename> Directory</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="87*"/><colspec colname="column2" colwidth="272*"/><thead><row rowsep="1"><entry><para>File</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>cms</filename><replaceable>n</replaceable> </para>
+</entry><entry><para>Total command summary file for fiscal period <replaceable>n</replaceable> in
+internal summary format</para>
+</entry>
+</row><row><entry><para><filename>fiscrpt</filename><replaceable>n</replaceable></para>
+</entry><entry><para>Report similar to <filename>rprt</filename><replaceable>n</replaceable> for
+fiscal period <replaceable>n</replaceable> </para>
+</entry>
+</row><row><entry><para><filename>tacct</filename><replaceable>n</replaceable> </para>
+</entry><entry><para>Total accounting file for fiscal period <replaceable>n</replaceable> </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="sysresacctref-9"><title>Files Produced by the <command>runacct</command> Script</title><para>The following table summarizes the most useful files
+produced by the <command>runacct</command> script. These files are found in
+the <filename>/var/adm/acct</filename> directory.             </para><table frame="topbot" id="sysresacctref-31080"><title>Files Created by the <command>runacct</command> Script</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="99*"/><colspec colname="column2" colwidth="260*"/><thead><row rowsep="1"><entry><para>File </para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>nite/daytacct</filename> </para>
+</entry><entry><para>The total accounting file for the day in <filename>tacct.h</filename> format.</para>
+</entry>
+</row><row><entry><para><filename>nite/lineuse</filename> </para>
+</entry><entry><para>The <command>runacct</command> script calls the <command>acctcon</command> program
+to gather data on terminal line usage from the <filename>/var/adm/acct/nite/tmpwtmp</filename> file and writes the data to the <filename>/var/adm/acct/nite/lineuse</filename> file.
+The <command>prdaily</command> script uses this data to report line usage.
+This report is especially useful for detecting bad lines. If the ratio between
+the number of logouts to logins is greater than three to one, the line is
+very likely failing. </para>
+</entry>
+</row><row><entry><para><filename>sum/cms</filename> </para>
+</entry><entry><para>This file is the accumulation of each day's command summaries. The accumulation
+restarts when the <filename>monacct</filename> script is executed. The ASCII
+version is the <filename>nite/cms</filename> file. </para>
+</entry>
+</row><row><entry><para><filename>sum/daycms</filename> </para>
+</entry><entry><para>The <command>runacct</command> script calls the <command>acctcms</command> program
+to process the commands used during the day to create the Daily Command Summary
+report and stores the data in the <filename>/var/adm/acct/sum/daycms</filename> file.
+The ASCII version is the <filename>/var/adm/acct/nite/daycms</filename> file.</para>
+</entry>
+</row><row><entry><para><filename>sum/loginlog</filename> </para>
+</entry><entry><para>The <command>runacct</command> script calls the <command>lastlogin</command> script
+to update the last date logged in for the logins in the <filename>/var/adm/acct/sum/loginlog</filename> file. The <command>lastlogin</command> command also removes from
+this file any logins that are no longer valid.</para>
+</entry>
+</row><row><entry><para><filename>sum/rprt.</filename><replaceable>MMDD</replaceable> </para>
+</entry><entry><para>Each execution of the <command>runacct</command> script saves a copy
+of the daily report that was printed by the <command>prdaily</command> script. </para>
+</entry>
+</row><row><entry><para><filename>sum/tacct</filename> </para>
+</entry><entry><para>Contains the accumulation of each day's <filename>nite/daytacct</filename> data
+and is used for billing purposes. The <command>monacct</command> script restarts
+accumulating this data each month or fiscal period.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect2>
+</sect1>
+</chapter>

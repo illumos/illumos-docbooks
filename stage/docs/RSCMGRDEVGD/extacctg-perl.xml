@@ -1,0 +1,725 @@
+<chapter id="extacctg-perl-1"><title>Using the Perl Interface
+to Extended Accounting</title><highlights><para>The Perl interface provides a Perl binding to the extended accounting
+tasks and projects. The interface allows the accounting files produced by
+the <literal>exacct</literal> framework to be read by Perl scripts. The interface
+also allows the writing of <literal>exacct</literal> files by Perl scripts.</para><para>This chapter includes the following topics:</para><itemizedlist><listitem><para><olink targetptr="extacctg-perl-66" remap="internal">Extended Accounting Overview</olink></para>
+</listitem><listitem><para><olink targetptr="extacctg-perl-20" remap="internal">Perl Code Examples</olink></para>
+</listitem><listitem><para><olink targetptr="extacctg-perl-21" remap="internal">Output From dump Method</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="extacctg-perl-66"><title>Extended Accounting Overview</title><para>The <literal>exacct</literal> is a new accounting framework for the
+Solaris operating system provides additional functionality to that provided
+by the traditional SVR4 accounting mechanism. Traditional SVR4 accounting
+has these drawbacks:</para><itemizedlist><listitem><para>The data collected by SVR4 accounting cannot be modified.</para><para>The type or quantity of statistics SVR4 accounting gathers cannot be
+customized for each application. Changes to the data SVR4 accounting collects
+would not work with all of the existing applications that use the accounting
+files.</para>
+</listitem><listitem><para>The SVR4 accounting mechanism is not open.</para><para>Applications
+cannot embed their own data in the system accounting data stream.</para>
+</listitem><listitem><para>The SVR4 accounting mechanism has no aggregation facilities.</para><para>The Solaris Operating system writes an individual record for each process
+that exists. No facilities are provided for grouping sets of accounting records
+into higher-level aggregates. </para>
+</listitem>
+</itemizedlist><para>The <literal>exacct</literal> framework addresses the limitations of
+SVR4 accounting and provides a configurable, open, and extensible framework
+for the collection of accounting data. </para><itemizedlist><listitem><para>The data that is collected can be configured using the <literal>exacct</literal> API.</para>
+</listitem><listitem><para>Applications can either embed their own data inside the system
+accounting files, or create and manipulate their own custom accounting files.</para>
+</listitem><listitem><para>The lack of data aggregation facilities in the traditional
+accounting mechanism are addressed by <emphasis>tasks</emphasis> and <emphasis>projects</emphasis>. Tasks identify a set of processes that are to be considered as
+a unit of work. Projects allow the processes executed by a set of users to
+be aggregated into a higher-level entity. See the<olink targetdoc="refman4" targetptr="project-4" remap="external"><citerefentry><refentrytitle>project</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page for more details
+about tasks and projects.</para>
+</listitem>
+</itemizedlist><para>For a more extensive overview of extended accounting, see <olink targetdoc="sysadrm" targetptr="rmacct-1" remap="external">Chapter 4, <citetitle remap="chapter">Extended Accounting (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Solaris Containers-Resource Management and Solaris Zones</citetitle></olink>.</para>
+</sect1><sect1 id="feaem"><title>Perl Interface to <literal>libexacct</literal></title><sect2 id="extacctg-perl-6"><title>Object Model</title><para>The <literal>Sun::Solaris::Exacct</literal> module is the parent of
+all the classes provided by <literal>libexacct</literal>(3LIB) library. <literal>libexacct</literal>(3LIB) provides operations on types of entities: <literal>exacct</literal> format files, <literal>catalog</literal> tags and <literal>exacct</literal> objects. <literal>exacct</literal> objects are subdivided into two types.</para><itemizedlist><listitem><para>Items</para><para>Single data values</para>
+</listitem><listitem><para>Groups</para><para>Lists of items</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="extacctg-perl-3"><title>Benefits of Using the Perl Interface to <literal>libexacct</literal></title><para>The Perl extensions to extended accounting provide a Perl interface
+to the underlying <literal>libexacct</literal>(3LIB) API and offer the following
+enhancements. </para><itemizedlist><listitem><para>Full equivalence to C API provide a Perl interface that is
+functionally equivalent to the underlying C API.</para><para>The interface
+provides a mechanism for accessing <literal>exacct</literal> files that does
+not require C coding. All the functionality that is available from C is also
+available by using the Perl interface.</para>
+</listitem><listitem><para>Ease of use.</para><para>Data obtained from the underlying
+C API is presented as Perl data types. Perl data types ease access to the
+data and remove the need for buffer pack and unpack operations.</para>
+</listitem><listitem><para>Automated memory management.</para><para>The C API requires
+that the programmer take responsibility for managing memory when accessing <literal>exacct</literal> files. Memory management takes the form of passing the appropriate
+flags to functions, such as <literal>ea_unpack_object</literal>(3EXACCT),
+and explicitly allocating buffers to pass to the API. The Perl API removes
+these requirements, as all memory management is performed by the Perl library.</para>
+</listitem><listitem><para>Prevent incorrect use of API.</para><para>The <structname>ea_object_t</structname> structure provides the in-memory representation of <literal>exacct</literal> records.
+The <structname>ea_object_t</structname> structure is a union type that is
+used for manipulating both Group and Item records. As a result, an incorrectly
+typed structure can be passed to some of the API functions. The addition of
+a class hierarchy prevents this type of programming error.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="extacctg-perl-64"><title>Perl Double-Typed Scalars</title><para>The modules described in this document make extensive use of the Perl
+double-typed scalar facility. The <emphasis>double-typed scalar</emphasis> facility
+allows a scalar value to behave either as an integer or as a string, depending
+upon the context. This behavior is the same as exhibited by the <literal>$!</literal> Perl
+variable (<literal>errno</literal>). The double-typed scalar facility avoids
+the need to map from an integer value into the corresponding string in order
+to display a value. The following example illustrates the use of double-typed
+scalars.</para><programlisting># Assume $obj is a Sun::Solaris::Item
+my $type = $obj->type();
+
+# prints out "2 EO_ITEM"
+printf("%d %s\n", $type, $type);
+
+# Behaves as an integer, $i == 2
+my $i = 0 + $type;
+
+# Behaves as a string, $s = "abc EO_ITEM xyx"
+my $s = "abc $type xyz";</programlisting>
+</sect2>
+</sect1><sect1 id="extacctg-perl-5"><title>Perl Modules</title><para>The various project, task and <literal>exacct</literal>-related
+functions have been separated into groups, and each group is placed in a separate
+Perl module. Each function has the Sun Microsystems standard <literal>Sun::Solaris::</literal> Perl package prefix.</para><table frame="topbot" id="extacctg-perl-tbl-10"><title>Perl Modules</title><tgroup cols="2" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="54.56*"/><colspec colname="colspec1" colwidth="45.44*"/><thead><row><entry colsep="0" rowsep="1"><para>Module</para>
+</entry><entry colsep="0" rowsep="1"><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-11" remap="internal">Sun::Solaris::Project Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides functions to access the project manipulation functions: <literal>getprojid</literal>(2), <literal>setproject</literal>(3PROJECT), <literal>project_walk</literal>(3PROJECT), <literal>getprojent</literal>(3PROJECT), <literal>getprojbyname</literal>(3PROJECT), <literal>getprojbyid</literal>(3PROJECT), <literal>getdefaultproj</literal>(3PROJECT), <literal>inproj</literal>(3PROJECT), <literal>getprojidbyname</literal>(3PROJECT), <literal>setprojent</literal>(3PROJECT), <literal>endprojent</literal>(3PROJECT), <literal>fgetprojent</literal>(3PROJECT). </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-12" remap="internal">Sun::Solaris::Task Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides functions to access the task manipulation functions <literal>settaskid</literal>(2) and <literal>gettaskid</literal>(2). </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-13" remap="internal">Sun::Solaris::Exacct Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Top-level <literal>exacct</literal> module. Functions in this module
+access both the <literal>exacct</literal>-related system calls <literal>getacct</literal>(2), <literal>putacct</literal>(2), and <literal>wracct</literal>(2) as well as the <literal>libexacct</literal>(3LIB) library function <literal>ea_error</literal>(3EXACCT). This
+module contains constants for all the various <literal>exacct</literal> <literal>EO_*</literal>, <literal>EW_*</literal>, <literal>EXR_*</literal>, <literal>P_*</literal> and <literal>TASK_*</literal> macros. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-14" remap="internal">Sun::Solaris::Exacct::Catalog Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides object-oriented methods to access the bitfields within an <literal>exacct</literal> catalog tag as well as the <literal>EXC_*</literal>, <literal>EXD_*</literal> and <literal>EXD_*</literal> macros. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-15" remap="internal">Sun::Solaris::Exacct::File Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides object-oriented methods to access the <literal>libexacct</literal>(3LIB)
+accounting file functions: <literal>ea_open</literal>(3EXACCT), <literal>ea_close</literal>(3EXACCT), <literal>ea_get_creator</literal>(3EXACCT), <literal>ea_get_hostname</literal>(3EXACCT), <literal>ea_next_object</literal>(3XACCT), <literal>ea_previous_object</literal>(3EXACCT), <literal>ea_write_object</literal>(3EXACCT). </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-16" remap="internal">Sun::Solaris::Exacct::Object Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides object-oriented methods to access the individual <literal>exacct</literal> accounting
+file object. An <literal>exacct</literal> object is represented as an opaque
+reference that is blessed into the appropriate <literal>Sun::Solaris::Exacct::Object</literal> subclass. This module is further subdivided into the two types
+of possible object: Item and Group. Methods are also provided to access the <literal>ea_match_object_catalog</literal>(3EXACCT), <literal>ea_attach_to_object</literal>(3EXACCT)
+functions. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-17" remap="internal">Sun::Solaris::Exacct::Object::Item
+Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides object-oriented methods to access an individual <literal>exacct</literal> accounting
+file Item. Objects of this type inherit from <literal>Sun::Solaris::Exacct::Object</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-18" remap="internal">Sun::Solaris::Exacct::Object::Group
+Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Provides object-oriented methods to access an individual <literal>exacct</literal> accounting
+file Group. Objects of this type inherit from <literal>Sun::Solaris::Exacct::Object</literal>, and provide access to the <literal>ea_attach_to_group</literal>(3EXACCT)
+function. The Items contained within the Group are presented as a perl array. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><olink targetptr="extacctg-perl-19" remap="internal">Sun::Solaris::Exacct::Object::_Array
+Module</olink></para>
+</entry><entry colsep="0" rowsep="0"><para>Private array type, used as the type of the array within a <literal>Sun::Solaris::Exacct::Object::Group</literal>. </para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="extacctg-perl-11"><title><literal>Sun::Solaris::Project</literal> Module</title><para>The <literal>Sun::Solaris::Project</literal> module provides wrappers
+for the project-related system calls and the <literal>libproject</literal>(3LIB)
+library. </para><sect3 id="extacctg-perl-25"><title><literal>Sun::Solaris::Project</literal> Constants</title><para>The <literal>Sun::Solaris::Project</literal> module uses constants from
+the project-related header files.</para><simplelist><member><literal>MAXPROJID</literal></member><member><literal>PROJNAME_MAX</literal></member><member><literal>PROJF_PATH</literal></member><member><literal>PROJECT_BUFSZ</literal></member><member><literal>SETPROJ_ERR_TASK</literal></member><member><literal>SETPROJ_ERR_POOL</literal></member>
+</simplelist>
+</sect3><sect3 id="extacctg-perl-26"><title><literal>Sun::Solaris::Project</literal> Functions,
+Class Methods, and Object Methods</title><para>The perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following functions for projects.</para><simplelist><member><olink targetdoc="refman3e" targetptr="setproject-3project" remap="external"><citerefentry><refentrytitle>setproject</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="setprojent-3project" remap="external"><citerefentry><refentrytitle>setprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="getdefaultproj-3project" remap="external"><citerefentry><refentrytitle>getdefaultproj</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="inproj-3project" remap="external"><citerefentry><refentrytitle>inproj</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="getprojent-3project" remap="external"><citerefentry><refentrytitle>getprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="fgetprojent-3project" remap="external"><citerefentry><refentrytitle>fgetprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="getprojbyname-3project" remap="external"><citerefentry><refentrytitle>getprojbyname</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="getprojbyid-3project" remap="external"><citerefentry><refentrytitle>getprojbyid</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="getprojbyname-3project" remap="external"><citerefentry><refentrytitle>getprojbyname</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="endprojent-3project" remap="external"><citerefentry><refentrytitle>endprojent</refentrytitle><manvolnum>3PROJECT</manvolnum>
+</citerefentry></olink></member>
+</simplelist><para>The <literal>Sun::Solaris::Project</literal> module has no class methods.</para><para>The <literal>Sun::Solaris::Project</literal> module has no object methods. </para>
+</sect3><sect3 id="extacctg-perl-28"><title><literal>Sun::Solaris::Project</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants and functions defined in this
+module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="27.48*"/><colspec colwidth="72.52*"/><thead><row><entry colsep="0" rowsep="1"><para>Tag</para>
+</entry><entry colsep="0" rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>:SYSCALLS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><function>getprojid</function></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:LIBCALLS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><function>setproject</function>, <function>activeprojects</function>, <function>getprojent</function>, <function>setprojent</function>, <function>endprojent</function>, <function>getprojbyname</function>, <function>getprojbyid</function>, <function>getdefaultproj</function>, <function>fgetprojent</function>, <function>inproj</function>, <function>getprojidbyname</function></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>MAXPROJID_TASK</literal>, <literal>PROJNAME_MAX</literal>, <literal>PROJF_PATH</literal>, <literal>PROJECT_BUFSZ</literal>, <literal>SETPROJ_ERR</literal>, <literal>SETPROJ_ERR_POOL</literal></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:ALL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>:SYSCALLS</literal>, <literal>:LIBCALLS</literal>, <literal>:CONSTANTS</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3>
+</sect2><sect2 id="extacctg-perl-12"><title><literal>Sun::Solaris::Task</literal> Module</title><para>The <literal>Sun::Solaris::Task</literal> module provides wrappers for
+the <literal>settaskid</literal>(2) and <literal>gettaskid</literal>(2) system
+calls.</para><sect3 id="extacctg-perl-29"><title><literal>Sun::Solaris::Task</literal> Constants</title><para>The <literal>Sun::Solaris::Task</literal> module uses the following
+constants.</para><simplelist><member><literal>TASK_NORMAL</literal></member><member><literal>TASK_FINAL</literal></member>
+</simplelist>
+</sect3><sect3 id="extacctg-perl-30"><title><literal>Sun::Solaris::Task</literal> Functions,
+Class Methods, and Object Methods</title><para>The perl extensions to the <literal>libexacct</literal>(3LIB) API provides
+the following functions for tasks.</para><simplelist><member><olink targetdoc="refman2" targetptr="settaskid-2" remap="external"><citerefentry><refentrytitle>settaskid</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman2" targetptr="gettaskid-2" remap="external"><citerefentry><refentrytitle>gettaskid</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member>
+</simplelist><para>The <literal>Sun::Solaris::Task</literal> module has no class methods.</para><para>The <literal>Sun::Solaris::Task</literal> module has no object methods. </para>
+</sect3><sect3 id="extacctg-perl-32"><title><literal>Sun::Solaris::Task</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants and functions defined in this
+module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colname="colspec0" colwidth="27.48*"/><colspec colname="colspec1" colwidth="72.52*"/><thead><row><entry colsep="0" rowsep="1"><para>Tag</para>
+</entry><entry colsep="0" rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>:SYSCALLS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><function>settaskid</function>, <function>gettaskid</function></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>TASK_NORMAL</literal> and <literal>TASK_FINAL</literal></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:ALL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>:SYSCALLS</literal> and <literal>:CONSTANTS</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3>
+</sect2><sect2 id="extacctg-perl-13"><title><literal>Sun::Solaris::Exacct</literal> Module</title><para>The <literal>Sun::Solaris::Exacct</literal> module provides wrappers
+for the <literal>ea_error</literal>(3EXACCT) function, and for all the <literal>exacct</literal> system calls.</para><sect3 id="extacctg-perl-33"><title><literal>Sun::Solaris::Exacct</literal> Constants</title><para>The <literal>Sun::Solaris::Exacct</literal> module provides constants
+from the various <literal>exacct</literal> header files. The <literal>P_PID</literal>, <literal>P_TASKID</literal>, <literal>P_PROJID</literal> and all the <literal>EW_*</literal>, <literal>EP_*</literal>, <literal>EXR_*</literal> macros are extracted during the module
+build process. The macros are extracted from the <literal>exacct</literal> header
+files under <filename>/usr/include</filename> and provided as Perl constants.
+Constants passed to the <literal>Sun::Solaris::Exacct</literal> functions
+can either be an integer value such as. <literal>EW_FINAL</literal> or a string
+representation of the same variable such as. <literal>&ldquo;EW_FINAL&rdquo;</literal>.</para>
+</sect3><sect3 id="extacctg-perl-34"><title><literal>Sun::Solaris::Exacct</literal> Functions,
+Class Methods, and Object Methods</title><para>The perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following functions for the <literal>Sun::Solaris::Exacct</literal> module.</para><simplelist><member><olink targetdoc="refman2" targetptr="getacct-2" remap="external"><citerefentry><refentrytitle>getacct</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman2" targetptr="putacct-2" remap="external"><citerefentry><refentrytitle>putacct</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman2" targetptr="wracct-2" remap="external"><citerefentry><refentrytitle>wracct</refentrytitle><manvolnum>2</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-error-3exacct" remap="external"><citerefentry><refentrytitle>ea_error</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><literal>ea_error_str</literal></member><member><literal>ea_register_catalog</literal></member><member><literal>ea_new_file</literal></member><member><literal>ea_new_item</literal></member><member><literal>ea_new_group</literal></member><member><literal>ea_dump_object</literal></member>
+</simplelist><note><para><function>ea_error_str</function>  is provided as a convenience,
+so that repeated blocks of code like the following can be avoided:</para><programlisting>if (ea_error() == EXR_SYSCALL_FAIL) {
+        print("error: $!\n");
+} else {
+        print("error: ", ea_error(), "\n");
+}</programlisting>
+</note><para>The <literal>Sun::Solaris::Exacct</literal> module has no class methods.</para><para>The <literal>Sun::Solaris::Exacct</literal> module has no object methods. </para>
+</sect3><sect3 id="extacctg-perl-35"><title><literal>Sun::Solaris::Exacct</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants and functions defined in this
+module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec2" colwidth="27.48*"/><colspec colname="colspec3" colwidth="72.52*"/><thead><row><entry rowsep="1"><para>Tag</para>
+</entry><entry rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>:SYSCALLS</literal></para>
+</entry><entry><para><function>getacct</function>, <function>putacct</function>, <function>wracct</function></para>
+</entry>
+</row><row><entry><para><literal>:LIBCALLS</literal></para>
+</entry><entry><para><function>ea_error</function>, <function>ea_error_str</function></para>
+</entry>
+</row><row><entry><para><literal>:CONSTANTS</literal></para>
+</entry><entry><para><literal>P_PID</literal>, <literal>P_TASKID</literal>, <literal>P_PROJID</literal></para><para>, <literal>EW_*</literal>, <literal>EP_*</literal>, <literal>EXR_*</literal></para>
+</entry>
+</row><row><entry><para><literal>:SHORTAND</literal></para>
+</entry><entry><para><function>ea_register_catalog</function>, <function>ea_new_catalog</function>, <function>ea_new_file</function>, <function>ea_new_item</function>, <function>ea_new_group</function>, <function>ea_dump_object</function> </para>
+</entry>
+</row><row><entry><para><literal>:ALL</literal></para>
+</entry><entry><para><literal>:SYSCALLS</literal>, <literal>:LIBCALLS</literal>, <literal>:CONSTANTS</literal> and <literal>:SHORTHAND</literal></para>
+</entry>
+</row><row><entry><para><literal>:EXACCT_CONSTANTS</literal></para>
+</entry><entry><para><literal>:CONSTANTS</literal>, plus the <literal>:CONSTANTS</literal> tags
+for <literal>Sun::Solaris::Catalog</literal>, <literal>Sun::Solaris::File</literal>, <literal>Sun::Solaris::Object</literal></para>
+</entry>
+</row><row><entry><para><literal>:EXACCT_ALL</literal></para>
+</entry><entry><para><literal>:ALL</literal>, plus the <literal>:ALL</literal> tags for <literal>Sun::Solaris::Catalog</literal>, <literal>Sun::Solaris::File</literal>, <literal>Sun::Solaris::Object</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3>
+</sect2><sect2 id="extacctg-perl-14"><title><literal>Sun::Solaris::Exacct::Catalog</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::Catalog</literal> module provides
+a wrapper around the 32-bit integer used as a catalog tag. The catalog tag
+is represented as a Perl object blessed into the <literal>Sun::Solaris::Exacct::Catalog</literal> class. Methods can be used to manipulate fields in a catalog tag. </para><sect3 id="extacctg-perl-37"><title><literal>Sun::Solaris::Exacct::Catalog</literal> Constants</title><para>All the <literal>EXT_*</literal>, <literal>EXC_*</literal> and <literal>EXD_*</literal> macros are extracted during the module build process from the <filename>/usr/include/sys/exact_catalog.h</filename> file and are provided as constants.
+Constants passed to the <literal>Sun::Solaris::Exacct::Catalog</literal> methods
+can either be an integer value, such as <literal>EXT_UINT8</literal>, or the
+string representation of the same variable, such as <literal>&ldquo;EXT_UINT8&rdquo;</literal>. </para>
+</sect3><sect3 id="extacctg-perl-38"><title><literal>Sun::Solaris::Exacct::Catalog</literal> Functions,
+Class Methods, and Object Methods</title><para>The Perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following class methods for<literal>Sun::Solaris::Exacct::Catalog</literal>. <olink targetdoc="refman3e" targetptr="exacct-3perl" remap="external"><citerefentry><refentrytitle>Exacct</refentrytitle><manvolnum>3PERL</manvolnum></citerefentry></olink> and<olink targetdoc="refman3e" targetptr="exacct--catalog-3perl" remap="external"><citerefentry><refentrytitle>Exacct::Catalog</refentrytitle><manvolnum>3PERL</manvolnum></citerefentry></olink></para><simplelist><member><literal>register</literal></member><member><literal>new</literal></member>
+</simplelist><para>The Perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following object methods for <literal>Sun::Solaris::Exacct::Catalog</literal>.</para><simplelist><member><literal>value</literal></member><member><literal>type</literal></member><member><literal>catalog</literal></member><member><literal>id</literal></member><member><literal>type_str</literal></member><member><literal>catalog_str</literal></member><member><literal>id_str</literal></member>
+</simplelist>
+</sect3><sect3 id="extacctg-perl-57"><title><literal>Sun::Solaris::Exacct::Catalog</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants and functions defined in this
+module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colname="colspec4" colwidth="27.48*"/><colspec colname="colspec5" colwidth="72.52*"/><thead><row><entry colsep="0" rowsep="1"><para>Tag</para>
+</entry><entry colsep="0" rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>EXT_*</literal>, <literal>EXC_*</literal> and <literal>EXD_*</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:ALL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Additionally, any constants defined with the <function>register</function> function
+can optionally be exported into the caller's package. </para>
+</sect3>
+</sect2><sect2 id="extacctg-perl-15"><title><literal>Sun::Solaris::Exacct::File</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::File</literal> module provides wrappers
+for the <literal>exacct</literal> functions that manipulate accounting files.
+The interface is object-oriented, and allows the creation and reading of <literal>exacct</literal> files. The C library calls that are wrapped by this module
+are: </para><simplelist><member><olink targetdoc="refman3e" targetptr="ea-open-3exacct" remap="external"><citerefentry><refentrytitle>ea_open</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-close-3exacct" remap="external"><citerefentry><refentrytitle>ea_close</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-next-object-3exacct" remap="external"><citerefentry><refentrytitle>ea_next_object</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-previous-object-3exacct" remap="external"><citerefentry><refentrytitle>ea_previous_object</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-write-object-3exacct" remap="external"><citerefentry><refentrytitle>ea_write_object</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-get-object-3exacct" remap="external"><citerefentry><refentrytitle>ea_get_object</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-get-creator-3exacct" remap="external"><citerefentry><refentrytitle>ea_get_creator</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member><member><olink targetdoc="refman3e" targetptr="ea-get-hostname-3exacct" remap="external"><citerefentry><refentrytitle>ea_get_hostname</refentrytitle><manvolnum>3EXACCT</manvolnum>
+</citerefentry></olink></member>
+</simplelist><para>The file read and write methods operate on <literal>Sun::Solaris::Exacct::Object</literal> objects. These methods perform all the necessary memory management,
+packing, unpacking and structure conversions that are required.</para><sect3 id="extacctg-perl-41"><title><literal>Sun::Solaris::Exacct::File</literal> Constants</title><para><literal>Sun::Solaris::Exacct::File</literal> provides the <literal>EO_HEAD</literal>, <literal>EO_TAIL</literal>, <literal>EO_NO_VALID_HDR</literal>, <literal>EO_POSN_MSK</literal> and <literal>EO_VALIDATE_MSK</literal> constants. Other
+constants that are needed by the <function>new</function> method are in the
+standard Perl <literal>Fcntl</literal> module. <olink targetptr="extacctg-perl-tbl-58" remap="internal">Table 4&ndash;2</olink> describes the action
+of <function>new</function> for various values of <literal>$oflags</literal> and <literal>$aflags</literal>.</para>
+</sect3><sect3 id="extacctg-perl-42"><title><literal>Sun::Solaris::Exacct::File</literal> Functions,
+Class Methods, and Object Methods</title><para>The <literal>Sun::Solaris::Exacct::File</literal> module has no functions.</para><para>The Perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following class method for<literal>Sun::Solaris::Exacct::File</literal>.</para><simplelist><member><literal>new</literal></member>
+</simplelist><para>The following table describes the <function>new</function> action for
+combinations of the <literal>$oflags</literal> and <literal>$aflags</literal> parameters.</para><table frame="topbot" id="extacctg-perl-tbl-58"><title><literal>$oflags</literal> and <literal>$aflags</literal> Parameters</title><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="27.30*"/><colspec colwidth="27.65*"/><colspec colwidth="44.05*"/><thead><row><entry colsep="0" rowsep="1"><para>$oflags</para>
+</entry><entry colsep="0" rowsep="1"><para>$aflags</para>
+</entry><entry colsep="0" rowsep="1"><para>Action</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>O_RDONLY</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Absent or <literal>EO_HEAD</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Open for reading at the start of the file.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>O_RDONLY</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>EO_TAIL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Open for reading at the end of the file.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>O_WRONLY</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Ignored</para>
+</entry><entry colsep="0" rowsep="0"><para>File must exist, open for writing at the end of the file.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>O_WRONLY | O_CREAT</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Ignored</para>
+</entry><entry colsep="0" rowsep="0"><para>Create file if the file does not exist. Otherwise, truncate, and open
+for writing.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>O_RDWR</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Ignored</para>
+</entry><entry colsep="0" rowsep="0"><para>File must exist, open for reading or writing, at the end of the file.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>O_RDWR | O_CREAT</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>Ignored</para>
+</entry><entry colsep="0" rowsep="0"><para>Create file if the file does not exist. Otherwise, truncate, and open
+for reading or writing.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><note><para>The only valid values for <literal>$oflags</literal> are the combinations
+of <literal>O_RDONLY</literal>, <literal>O_WRONLY</literal>, <literal>O_RDWR</literal> or <literal>O_CREAT</literal>. <literal>$aflags</literal> describes the required positioning
+in the file for <literal>O_RDONLY</literal>. Either <literal>EO_HEAD</literal> or <literal>EO_TAIL</literal> are allowed. If absent, <literal>EO_HEAD</literal> is assumed.</para>
+</note><para>The perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following object methods for<literal>Sun::Solaris::Exacct::File</literal>.</para><simplelist><member><literal>creator</literal></member><member><literal>hostname</literal></member><member><literal>next</literal></member><member><literal>previous</literal></member><member><literal>get</literal></member><member><literal>write</literal></member>
+</simplelist><note><para>Close a <literal>Sun::Solaris::Exacct::File</literal>.  There
+is no explicit <function>close</function> method for a <literal>Sun::Solaris::Exacct::File</literal>. The file is closed when the filehandle object is undefined or
+reassigned.</para>
+</note>
+</sect3><sect3 id="extacctg-perl-59"><title><literal>Sun::Solaris::Exacct::File</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants that are defined in this module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colname="colspec6" colwidth="21.63*"/><colspec colname="colspec7" colwidth="78.37*"/><thead><row><entry colsep="0" rowsep="1"><para>Tag</para>
+</entry><entry colsep="0" rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>EO_HEAD</literal>, <literal>EO_TAIL</literal>, <literal>EO_NO_VALID_HDR</literal>, <literal>EO_POSN_MSK</literal>, <literal>EO_VALIDATE_MSK</literal>. </para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:ALL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>:<literal>CONSTANTS</literal> and <literal>Fcntl</literal><literal>(:DEFAULT)</literal>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3>
+</sect2><sect2 id="extacctg-perl-16"><title><literal>Sun::Solaris::Exacct::Object</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::Object</literal> module serves as
+a parent of the two possible types of <literal>exacct</literal> objects: Items
+and Groups. An <literal>exacct</literal>  <literal>Item</literal> is  a single
+data value, an embedded <literal>exacct</literal> object, or a block of raw
+data. An example of a single data value is the number of seconds of user CPU
+time consumed by a process. An <literal>exacct</literal>  <literal>Group</literal> is
+an ordered collection of <literal>exacct</literal> Items such as all of the
+resource usage values for a particular process or task. If Groups need to
+be nested within each other, the inner Groups can be stored as embedded <literal>exacct</literal> objects inside the enclosing Group.</para><para>The <literal>Sun::Solaris::Exacct::Object</literal> module contains
+methods that are common to both <literal>exacct</literal> Items and Groups.
+Note that the attributes of <literal>Sun::Solaris::Exacct::Object</literal> and
+all classes derived from it are read-only after initial creation via <function>new</function>. The attributes made read-only prevents the inadvertent modification
+of the attributes which could give rise to inconsistent catalog tags and data
+values. The only exception to the read-only attributes is the array used to
+store the Items inside a Group object. This array can be modified using the
+normal perl array operators. </para><sect3 id="extacctg-perl-45"><title><literal>Sun::Solaris::Exacct::Object</literal> Constants</title><para><literal>Sun::Solaris::Exacct::Object</literal> provides the <literal>EO_ERROR</literal>, <literal>EO_NONE</literal>, <literal>EO_ITEM</literal> and <literal>EO_GROUP</literal> constants.</para>
+</sect3><sect3 id="extacctg-perl-46"><title><literal>Sun::Solaris::Exacct::Object</literal> Functions,
+Class Methods, and Object Methods</title><para>The <literal>Sun::Solaris::Exacct::Object</literal> module has no functions.</para><para>The Perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following class method for<literal>Sun::Solaris::Exacct::Object</literal>.</para><simplelist><member><literal>dump</literal></member>
+</simplelist><para>The Perl extensions to the <literal>libexacct</literal>(3LIB) API provide
+the following object methods for<literal>Sun::Solaris::Exacct::Object</literal>.</para><simplelist><member><literal>type</literal></member><member><literal>catalog</literal></member><member><literal>match_catalog</literal></member><member><literal>value</literal></member>
+</simplelist>
+</sect3><sect3 id="extacctg-perl-60"><title><literal>Sun::Solaris::Exacct::Object</literal> Exports</title><para>By default, nothing is exported from this module. The following tags
+can be used to selectively import constants and functions defined in this
+module.</para><informaltable frame="topbot"><tgroup cols="2" colsep="1" rowsep="1"><colspec colname="colspec8" colwidth="27.75*"/><colspec colname="colspec9" colwidth="72.25*"/><thead><row><entry colsep="0" rowsep="1"><para>Tag</para>
+</entry><entry colsep="0" rowsep="1"><para>Constant or Function</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>EO_ERROR</literal>, <literal>EO_NONE</literal>, <literal>EO_ITEM</literal> and <literal>EO_GROUP</literal></para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>:ALL</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>:CONSTANTS</literal></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect3>
+</sect2><sect2 id="extacctg-perl-17"><title><literal>Sun::Solaris::Exacct::Object::Item</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::Object::Item</literal> module is
+used for <literal>exacct</literal> data Items. An <literal>exacct</literal> data
+Item is represented as an opaque reference, blessed into the <literal>Sun::Solaris::Exacct::Object::Item</literal> class, which is a subclass of the <literal>Sun::Solaris::Exacct::Object</literal> class. The underlying <literal>exacct</literal> data types are
+mapped onto Perl types as follows.</para><table frame="topbot" id="extacctg-perl-tbl-49"><title><literal>exacct</literal> Data
+Types Mapped to Perl Data Types</title><tgroup cols="2" colsep="1" rowsep="1"><colspec colwidth="27.48*"/><colspec colwidth="72.52*"/><thead><row><entry colsep="0" rowsep="1"><para><literal>exacct</literal> type</para>
+</entry><entry colsep="0" rowsep="1"><para>Perl internal type</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="0"><para><literal>EXT_UINT8</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>IV (integer)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_UINT16</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>IV (integer)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_UINT32</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>IV (integer)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_UINT64</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>IV (integer)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_DOUBLE</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>NV (double)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_STRING</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>PV (string)</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_EXACCT_OBJECT</literal></para>
+</entry><entry colsep="0" rowsep="0"><para><literal>Sun::Solaris::Exacct::Object</literal> subclass</para>
+</entry>
+</row><row><entry colsep="0" rowsep="0"><para><literal>EXT_RAW</literal></para>
+</entry><entry colsep="0" rowsep="0"><para>PV (string)</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect3 id="extacctg-perl-50"><title><literal>Sun::Solaris::Exacct::Object::Item</literal> Constants</title><para><literal>Sun::Solaris::Exacct::Object::Item</literal> has no constants.</para>
+</sect3><sect3 id="extacctg-perl-51"><title><literal>Sun::Solaris::Exacct::Object::Item</literal> Functions,
+Class Methods, and Object Methods</title><para><literal>Sun::Solaris::Exacct::Object::Item</literal> has no functions.</para><para><literal>Sun::Solaris::Exacct::Object::Item</literal> inherits all class
+methods from the <literal>Sun::Solaris::Exacct::Object</literal> base class,
+plus the <function>new</function> class method.</para><simplelist><member><literal>new</literal></member>
+</simplelist><para><literal>Sun::Solaris::Exacct::Object::Item</literal> inherits all object
+methods from the <literal>Sun::Solaris::Exacct::Object</literal> base class.</para>
+</sect3><sect3 id="extacctg-perl-61"><title><literal>Sun::Solaris::Exacct::Object::Item</literal> Exports</title><para><literal>Sun::Solaris::Exacct::Object::Item</literal> has no exports.</para>
+</sect3>
+</sect2><sect2 id="extacctg-perl-18"><title><literal>Sun::Solaris::Exacct::Object::Group</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::Object::Group</literal> module is
+used for <literal>exacct</literal> Group objects. An <literal>exacct</literal> Group
+object is represented as an opaque reference, blessed into the <literal>Sun::Solaris::Exacct::Object::Group</literal> class, which is a subclass of the <literal>Sun::Solaris::Exacct::Object</literal> class. The Items within a Group are stored inside a Perl array,
+and a reference to the array can be accessed via the inherited <function>value</function> method.
+This means that the individual Items within a Group can be manipulated with
+the normal Perl array syntax and operators. All data elements of the array
+must be derived from the <literal>Sun::Solaris::Exacct::Object</literal> class.
+Group objects can also be nested inside each other merely by adding an existing
+Group as a data Item. </para><sect3 id="extacctg-perl-53"><title><literal>Sun::Solaris::Exacct::Object::Group</literal> Constants</title><para><literal>Sun::Solaris::Exacct::Object::Group</literal> has no constants.</para>
+</sect3><sect3 id="extacctg-perl-54"><title><literal>Sun::Solaris::Exacct::Object::Group</literal> Functions,
+Class Methods, and Object Methods</title><para><literal>Sun::Solaris::Exacct::Object::Group</literal> has no functions.</para><para><literal>Sun::Solaris::Exacct::Object::Group</literal> inherits all
+class methods from the <literal>Sun::Solaris::Exacct::Object</literal> base
+class, plus the <function>new</function> class method.</para><simplelist><member><literal>new</literal></member>
+</simplelist><para><literal>Sun::Solaris::Exacct::Object::Group</literal> inherits all
+object methods from the <literal>Sun::Solaris::Exacct::Object</literal> base
+class, plus the <function>new</function> class method.</para><simplelist><member><literal>as_hash</literal></member><member>as_hashlist</member>
+</simplelist>
+</sect3><sect3 id="extacctg-perl-62"><title><literal>Sun::Solaris::Exacct::Object::Group</literal> Exports</title><para><literal>Sun::Solaris::Exacct::Object::Group</literal> has no exports.</para>
+</sect3>
+</sect2><sect2 id="extacctg-perl-19"><title><literal>Sun::Solaris::Exacct::Object::_Array</literal> Module</title><para>The <literal>Sun::Solaris::Exacct::Object::_Array</literal> class is
+used internally for enforcing type checking of the data Items that are placed
+in an <literal>exacct</literal> Group. <literal>Sun::Solaris::Exacct::Object::_Array</literal> should not be created directly by the user.</para><sect3 id="extacctg-perl-67"><title><literal>Sun::Solaris::Exacct::Object::_Array</literal> Constants</title><para><literal>Sun::Solaris::Exacct::Object::_Array</literal> has no constants.</para>
+</sect3><sect3 id="extacctg-perl-68"><title><literal>Sun::Solaris::Exacct::Object::_Array</literal> Functions, Class Methods, and Object Methods</title><para><literal>Sun::Solaris::Exacct::Object::_Array</literal> has no functions.</para><para><literal>Sun::Solaris::Exacct::Object::_Array</literal> has internal-use
+class methods.</para><para><literal>Sun::Solaris::Exacct::Object::_Array</literal> uses perl <literal>TIEARRAY</literal> methods.</para>
+</sect3><sect3 id="extacctg-perl-69"><title><literal>Sun::Solaris::Exacct::Object::_Array</literal> Exports</title><para><literal>Sun::Solaris::Exacct::Object::_Array</literal> has no exports.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="extacctg-perl-20"><title>Perl Code Examples</title><para>This section shows perl code examples for accessing <literal>exacct</literal> files.</para><example><title>Using the Pseudocode Prototype</title><para>In typical use the Perl <literal>exacct</literal> library reads existing <literal>exacct</literal> files. Use pseudocode to show the relationships of the various
+Perl <literal>exacct</literal> classes. Illustrate in pseudocode the process
+of opening and scanning an <literal>exacct</literal> file, and processing
+objects of interest. In the following pseudocode, the &lsquo;convenience&rsquo;
+functions are used in the interest of clarity.</para><programlisting>-- Open the exacct file ($f is a Sun::Solaris::Exacct::File)
+my $f = ea_new_file(...)
+
+-- While not EOF ($o is a Sun::Solaris::Exacct::Object)
+while (my $o = $f->get())
+
+        -- Check to see if object is of interest
+        if ($o->type() == &amp;EO_ITEM)
+             ...
+
+        -- Retrieve the catalog ($c is a Sun::Solaris::Exacct::Catalog)
+        $c = $o->catalog()
+
+        -- Retrieve the value
+        $v = $o->value();
+
+        -- $v is a reference to a Sun::Solaris::Exacct::Group for a Group
+        if (ref($v))
+              ....
+
+        -- $v is perl scalar for Items
+        else</programlisting>
+</example><example><title>Recursively dumping an <literal>exacct</literal> Object</title><programlisting>sub dump_object
+{
+    my ($obj, $indent) = @_;
+    my $istr = '  ' x $indent;
+
+    #
+    # Retrieve the catalog tag.  Because we are doing this in an array
+    # context, the catalog tag will be returned as a (type, catalog, id) 
+    # triplet, where each member of the triplet will behave as an integer
+    # or a string, depending on context.  If instead this next line provided
+    # a scalar context, e.g.
+    #    my $cat  = $obj->catalog()->value();
+    # then $cat would be set to the integer value of the catalog tag.
+    #
+    my @cat = $obj->catalog()->value();
+
+    #
+    # If the object is a plain item
+    #
+    if ($obj->type() == &amp;EO_ITEM) {
+          #
+          # Note:  The '%s' formats provide s string context, so the
+          # components of the catalog tag will be displayed as the
+          # symbolic values.  If we changed the '%s' formats to '%d',
+          # the numeric value of the components would be displayed.
+          #
+          printf("%sITEM\n%s  Catalog = %s|%s|%s\n", 
+              $istr, $istr, @cat);
+          $indent++;
+
+          #
+          # Retrieve the value of the item.  If the item contains in 
+          # turn a nested exacct object (i.e. a item or group), then 
+          # the value method will return a reference to the appropriate 
+          # sort of perl object (Exacct::Object::Item or 
+          # Exacct::Object::Group). We could of course figure out that 
+          # the item contained a nested item or group by examining 
+          # the catalog tag in @cat and looking for a type of 
+          # EXT_EXACCT_OBJECT or EXT_GROUP.
+          my $val = $obj->value();
+          if (ref($val)) {
+             # If it is a nested object, recurse to dump it.
+             dump_object($val, $indent);
+          } else {
+             # Otherwise it is just a 'plain' value, so display it.
+             printf("%s  Value = %s\n", $istr, $val);
+          }
+
+        #
+        # Otherwise we know we are dealing with a group.  Groups represent
+        # contents as a perl list or array (depending on context), so we 
+        # can process the contents of the group with a 'foreach' loop, which
+        # provides a list context.  In a list context the value method 
+        # returns the content of the group as a perl list, which is the 
+        # quickest mechanism, but doesn't allow the group to be modified. 
+        # If we wanted to modify the contents of the group we could do so 
+        # like this:
+        #    my $grp = $obj->value();   # Returns an array reference
+        #    $grp->[0] = $newitem;
+        # but accessing the group elements this way is much slower.
+        #
+        } else {
+                printf("%sGROUP\n%s  Catalog = %s|%s|%s\n",
+                    $istr, $istr, @cat);
+                $indent++;
+                # 'foreach' provides a list context.
+                foreach my $val ($obj->value()) {
+                        dump_object($val, $indent);
+                }
+                printf("%sENDGROUP\n", $istr);
+        }
+}</programlisting>
+</example><example><title>Creating a New Group Record and Writing to a File</title><programlisting># Prototype list of catalog tags and values.
+my @items = (
+   [ &amp;EXT_STRING | &amp;EXC_DEFAULT | &amp;EXD_CREATOR      => "me"         ],
+   [ &amp;EXT_UINT32 | &amp;EXC_DEFAULT | &amp;EXD_PROC_PID     => $$           ],
+   [ &amp;EXT_UINT32 | &amp;EXC_DEFAULT | &amp;EXD_PROC_UID     => $&lt;           ],
+   [ &amp;EXT_UINT32 | &amp;EXC_DEFAULT | &amp;EXD_PROC_GID     => $(           ],
+   [ &amp;EXT_STRING | &amp;EXC_DEFAULT | &amp;EXD_PROC_COMMAND => "/bin/stuff" ],
+);
+
+# Create a new group catalog object.
+my $cat = new_catalog(&amp;EXT_GROUP | &amp;EXC_DEFAULT | &amp;EXD_NONE);
+
+# Create a new Group object and retrieve its data array.
+my $group = new_group($cat);
+my $ary = $group->value();
+
+# Push the new Items onto the Group array.
+foreach my $v (@items) {
+        push(@$ary, new_item(new_catalog($v->[0]), $v->[1]));
+}
+
+# Nest the group within itself (performs a deep copy).
+push(@$ary, $group);
+
+# Dump out the group.
+dump_object($group);</programlisting>
+</example><example><title>Dumping an <literal>exacct</literal> File</title><programlisting>#!/usr/bin/perl
+
+use strict;
+use warnings;
+use blib;
+use Sun::Solaris::Exacct qw(:EXACCT_ALL);
+
+die("Usage is dumpexacct 
+
+# Open the exact file and display the header information.
+my $ef = ea_new_file($ARGV[0], &amp;O_RDONLY) || die(error_str());
+printf("Creator:  %s\n", $ef->creator());
+printf("Hostname: %s\n\n", $ef->hostname());
+
+# Dump the file contents
+while (my $obj = $ef->get()) {
+        ea_dump_object($obj);
+}
+
+# Report any errors
+if (ea_error() != EXR_OK &amp;&amp; ea_error() != EXR_EOF)  {
+       printf("\nERROR: %s\n", ea_error_str());
+       exit(1);
+}
+exit(0);</programlisting>
+</example>
+</sect1><sect1 id="extacctg-perl-21"><title>Output From <literal>dump</literal> Method</title><para>This example shows the formatted output of the <literal>Sun::Solaris::Exacct::Object->dump()</literal> method.</para><programlisting>GROUP
+  Catalog = EXT_GROUP|EXC_DEFAULT|EXD_GROUP_PROC_PARTIAL
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_PID
+    Value = 3
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_UID
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_GID
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_PROJID
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_TASKID
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CPU_USER_SEC
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CPU_USER_NSEC
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CPU_SYS_SEC
+    Value = 890
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CPU_SYS_NSEC
+    Value = 760000000
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_START_SEC
+    Value = 1011869897
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_START_NSEC
+    Value = 380771911
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_FINISH_SEC
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_FINISH_NSEC
+    Value = 0
+  ITEM
+    Catalog = EXT_STRING|EXC_DEFAULT|EXD_PROC_COMMAND
+    Value = fsflush
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_TTY_MAJOR
+    Value = 4294967295
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_TTY_MINOR
+    Value = 4294967295
+  ITEM
+    Catalog = EXT_STRING|EXC_DEFAULT|EXD_PROC_HOSTNAME
+    Value = mower
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_FAULTS_MAJOR
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_FAULTS_MINOR
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_MESSAGES_SND
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_MESSAGES_RCV
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_BLOCKS_IN
+    Value = 19
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_BLOCKS_OUT
+    Value = 40833
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CHARS_RDWR
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CONTEXT_VOL
+    Value = 129747
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_CONTEXT_INV
+    Value = 79
+  ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_SIGNALS
+    Value = 0
+    ITEM
+    Catalog = EXT_UINT64|EXC_DEFAULT|EXD_PROC_SYSCALLS
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_ACCT_FLAGS
+    Value = 1
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_ANCPID
+    Value = 0
+  ITEM
+    Catalog = EXT_UINT32|EXC_DEFAULT|EXD_PROC_WAIT_STATUS
+    Value = 0
+ENDGROUP</programlisting>
+</sect1>
+</chapter>

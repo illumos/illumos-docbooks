@@ -1,0 +1,443 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Examples of API Usage - Memory and Thread Placement Optimization Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-06-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Memory and Thread Placement Optimization Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-32.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gevrx.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="geshf.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="lgroups-1.html">1.&nbsp;&nbsp;Locality Group APIs</a></p>
+<p class="toc level2"><a href="lgroups-2.html">Locality Groups Overview</a></p>
+<p class="toc level2"><a href="lgroups-27.html">Verifying the Interface Version</a></p>
+<p class="toc level2"><a href="lgroups-4.html">Initializing the Locality Group Interface</a></p>
+<p class="toc level2"><a href="lgroups-29.html">Locality Group Hierarchy</a></p>
+<p class="toc level2"><a href="lgroups-30.html">Locality Group Contents</a></p>
+<p class="toc level2"><a href="lgroups-31.html">Locality Group Characteristics</a></p>
+<p class="toc level2"><a href="lgroups-32.html">Locality Groups and Thread and Memory Placement</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Examples of API Usage</a></p>
+</div>
+<p class="toc level1 tocsp"><a href="gevrx.html">2.&nbsp;&nbsp;MPO Observability Tools</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="lgroups-33"></a><h3>Examples of API Usage</h3>
+<p>This section contains code for example tasks that use the APIs that are
+described in this chapter.</p><a name="lgroups-ex-47"></a>Example&nbsp;1-7 Move Memory to a Thread<p>The following code sample moves the memory in the address range between
+<i>addr</i> and <i>addr</i>+<i>len</i> near the next thread to touch that range.</p><pre>#include &lt;stdio.h>
+#include &lt;sys/mman.h>
+#include &lt;sys/types.h>
+
+
+
+/*
+ * Move memory to thread
+ */
+void
+mem_to_thread(caddr_t addr, size_t len)
+{
+    if (madvise(addr, len, MADV_ACCESS_LWP) &lt; 0)
+        perror("madvise");
+}</pre><a name="lgroups-ex-48"></a>Example&nbsp;1-8 Move a Thread to Memory<p>This sample code uses the <tt>meminfo()</tt> function to determine the lgroup of the
+physical memory backing the virtual page at the given address. The sample code
+then sets a strong affinity for that lgroup in an attempt to move
+the current thread near that memory.</p><pre>#include &lt;stdio.h>
+#include &lt;sys/lgrp_user.h>
+#include &lt;sys/mman.h>
+#include &lt;sys/types.h>
+
+
+/*
+ * Move a thread to memory
+ */
+int
+thread_to_memory(caddr_t va)
+{
+    uint64_t    addr;
+    ulong_t     count;
+    lgrp_id_t   home;
+    uint64_t    lgrp;
+    uint_t      request;
+    uint_t      valid;
+
+    addr = (uint64_t)va;
+    count = 1;
+    request = MEMINFO_VLGRP;
+    if (meminfo(&amp;addr, 1, &amp;request, 1, &amp;lgrp, &amp;valid) != 0) {
+        perror("meminfo");
+        return (1);
+    }
+
+    if (lgrp_affinity_set(P_LWPID, P_MYID, lgrp, LGRP_AFF_STRONG) != 0) {
+        perror("lgrp_affinity_set");
+        return (2);
+    }
+
+    home = lgrp_home(P_LWPID, P_MYID);
+    if (home == -1) {
+        perror ("lgrp_home");
+        return (3);
+    }
+
+    if (home != lgrp)
+        return (-1);
+
+    return (0);
+}</pre><a name="lgroups-ex-49"></a>Example&nbsp;1-9 Walk the lgroup Hierarchy<p>The following sample code walks through and prints out the lgroup hierarchy.</p><pre>#include &lt;stdio.h>
+#include &lt;stdlib.h>
+#include &lt;sys/lgrp_user.h>
+#include &lt;sys/types.h>
+
+
+/*
+ * Walk and print lgroup hierarchy from given lgroup
+ * through all its descendants
+ */
+int
+lgrp_walk(lgrp_cookie_t cookie, lgrp_id_t lgrp, lgrp_content_t content)
+{
+    lgrp_affinity_t    aff;
+    lgrp_id_t          *children;
+    processorid_t      *cpuids;
+    int                i;
+    int                ncpus;
+    int                nchildren;
+    int                nparents;
+    lgrp_id_t          *parents;
+    lgrp_mem_size_t    size;
+
+    /*
+     * Print given lgroup, caller's affinity for lgroup,
+     * and desired content specified
+     */
+    printf("LGROUP #%d:\n", lgrp);
+
+    aff = lgrp_affinity_get(P_LWPID, P_MYID, lgrp);
+    if (aff == -1)
+        perror ("lgrp_affinity_get");
+    printf("\tAFFINITY: %d\n", aff);
+
+    printf("CONTENT %d:\n", content);
+
+    /*
+     * Get CPUs
+     */
+    ncpus = lgrp_cpus(cookie, lgrp, NULL, 0, content);
+    printf("\t%d CPUS: ", ncpus);
+    if (ncpus == -1) {
+        perror("lgrp_cpus");
+        return (-1);
+    } else if (ncpus > 0) {
+        cpuids = malloc(ncpus * sizeof (processorid_t));
+        ncpus = lgrp_cpus(cookie, lgrp, cpuids, ncpus, content);
+                if (ncpus == -1) {
+            free(cpuids);
+                           perror("lgrp_cpus");
+            return (-1);
+        }
+        for (i = 0; i &lt; ncpus; i++)
+            printf("%d ", cpuids[i]);
+        free(cpuids);
+    }
+    printf("\n");
+
+    /*
+     * Get memory size
+     */
+    printf("\tMEMORY: ");
+    size = lgrp_mem_size(cookie, lgrp, LGRP_MEM_SZ_INSTALLED, content);
+    if (size == -1) {
+        perror("lgrp_mem_size");
+        return (-1);
+    }
+    printf("installed bytes 0x%llx, ", size);
+    size = lgrp_mem_size(cookie, lgrp, LGRP_MEM_SZ_FREE, content);
+        if (size == -1) {
+        perror("lgrp_mem_size");
+        return (-1);
+    }
+    printf("free bytes 0x%llx\n", size);
+
+    /*
+     * Get parents
+     */
+    nparents = lgrp_parents(cookie, lgrp, NULL, 0);
+    printf("\t%d PARENTS: ", nparents);
+    if (nparents == -1) {
+        perror("lgrp_parents");
+        return (-1);
+    } else if (nparents > 0) {
+        parents = malloc(nparents * sizeof (lgrp_id_t));
+        nparents = lgrp_parents(cookie, lgrp, parents, nparents);
+                   if (nparents == -1) {
+            free(parents);
+                        perror("lgrp_parents");
+            return (-1);
+                   }
+        for (i = 0; i &lt; nparents; i++)
+            printf("%d ", parents[i]);
+        free(parents);
+    }
+    printf("\n");
+
+    /*
+     * Get children
+     */
+    nchildren = lgrp_children(cookie, lgrp, NULL, 0);
+    printf("\t%d CHILDREN: ", nchildren);
+    if (nchildren == -1) {
+        perror("lgrp_children");
+        return (-1);
+    } else if (nchildren > 0) {
+        children = malloc(nchildren * sizeof (lgrp_id_t));
+        nchildren = lgrp_children(cookie, lgrp, children, nchildren);
+                   if (nchildren == -1) {
+            free(children);
+                        perror("lgrp_children");
+            return (-1);
+                   }
+        printf("Children: ");
+        for (i = 0; i &lt; nchildren; i++)
+            printf("%d ", children[i]);
+        printf("\n");
+
+        for (i = 0; i &lt; nchildren; i++)
+            lgrp_walk(cookie, children[i], content);
+
+        free(children);
+    }
+    printf("\n");
+
+    return (0);
+}</pre><a name="lgroups-ex-50"></a>Example&nbsp;1-10 Find the Closest lgroup With Available Memory Outside a Given lgroup<pre>#include &lt;stdio.h>
+#include &lt;stdlib.h>
+#include &lt;sys/lgrp_user.h>
+#include &lt;sys/types.h>
+
+
+#define    INT_MAX    2147483647
+
+
+/*
+ * Find next closest lgroup outside given one with available memory
+ */
+lgrp_id_t
+lgrp_next_nearest(lgrp_cookie_t cookie, lgrp_id_t from)
+{
+    lgrp_id_t          closest;
+    int                i;
+    int                latency;
+    int                lowest;
+    int                nparents;
+    lgrp_id_t          *parents;
+    lgrp_mem_size_t    size;
+
+
+    /*
+     * Get number of parents
+     */
+    nparents = lgrp_parents(cookie, from, NULL, 0);
+    if (nparents == -1) {
+        perror("lgrp_parents");
+        return (LGRP_NONE);
+    }
+
+    /*
+     * No parents, so current lgroup is next nearest
+     */
+    if (nparents == 0) {
+        return (from);
+    }
+
+    /*
+     * Get parents
+     */
+    parents = malloc(nparents * sizeof (lgrp_id_t));
+    nparents = lgrp_parents(cookie, from, parents, nparents);
+    if (nparents == -1) {
+        perror("lgrp_parents");
+        free(parents);
+        return (LGRP_NONE);
+        }
+
+    /*
+     * Find closest parent (ie. the one with lowest latency)
+     */
+    closest = LGRP_NONE;
+    lowest = INT_MAX;
+    for (i = 0; i &lt; nparents; i++) {
+        lgrp_id_t    lgrp;
+
+        /*
+         * See whether parent has any free memory
+         */
+        size = lgrp_mem_size(cookie, parents[i], LGRP_MEM_SZ_FREE,
+            LGRP_CONTENT_ALL);
+        if (size > 0)
+            lgrp = parents[i];
+        else {
+            if (size == -1)
+                perror("lgrp_mem_size");
+
+            /*
+             * Find nearest ancestor if parent doesn't
+             * have any memory
+             */
+            lgrp = lgrp_next_nearest(cookie, parents[i]);
+            if (lgrp == LGRP_NONE)
+                continue;
+        }
+
+        /*
+         * Get latency within parent lgroup
+         */
+        latency = lgrp_latency_cookie(lgrp, lgrp);
+        if (latency == -1) {
+            perror("lgrp_latency_cookie");
+            continue;
+        }
+
+        /*
+         * Remember lgroup with lowest latency
+         */
+        if (latency &lt; lowest) {
+            closest = lgrp;
+            lowest = latency;
+        }
+    }
+
+    free(parents);
+    return (closest);
+}
+
+
+/*
+ * Find lgroup with memory nearest home lgroup of current thread
+ */
+lgrp_id_t
+lgrp_nearest(lgrp_cookie_t cookie)
+{
+    lgrp_id_t    home;
+    longlong_t    size;
+
+    /*
+     * Get home lgroup
+     */
+    home = lgrp_home(P_LWPID, P_MYID);
+
+    /*
+     * See whether home lgroup has any memory available in its hierarchy
+     */
+    size = lgrp_mem_size(cookie, home, LGRP_MEM_SZ_FREE,
+        LGRP_CONTENT_ALL);
+    if (size == -1)
+        perror("lgrp_mem_size");
+
+    /*
+     * It does, so return the home lgroup.
+     */
+    if (size > 0)
+        return (home);
+
+    /*
+     * Otherwise, find next nearest lgroup outside of the home.
+     */
+    return (lgrp_next_nearest(cookie, home));
+}</pre><a name="lgroups-ex-51"></a>Example&nbsp;1-11 Find Nearest lgroup With Free Memory<p>This example code finds the nearest lgroup with free memory to a
+given thread's home lgroup.</p><pre>lgrp_id_t
+lgrp_nearest(lgrp_cookie_t cookie)
+{
+        lgrp_id_t         home;
+        longlong_t        size;
+
+        /*
+         * Get home lgroup
+         */
+
+        home = lgrp_home();
+
+        /*
+         * See whether home lgroup has any memory available in its hierarchy
+         */
+
+        if (lgrp_mem_size(cookie, lgrp, LGRP_MEM_SZ_FREE,
+            LGRP_CONTENT_ALL, &amp;size) == -1)
+                perror("lgrp_mem_size");
+
+        /*
+         * It does, so return the home lgroup.
+         */
+
+        if (size > 0)
+                return (home);
+
+        /*
+         * Otherwise, find next nearest lgroup outside of the home.
+         */
+
+        return (lgrp_next_nearest(cookie, home));
+}</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-32.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gevrx.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

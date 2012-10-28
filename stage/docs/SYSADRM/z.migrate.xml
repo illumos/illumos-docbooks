@@ -1,0 +1,194 @@
+<chapter id="gcgnc"><title>Moving and Migrating Non-Global Zones (Tasks)</title><highlights><para>This chapter describes how to:</para><itemizedlist><listitem><para>Move an existing non-global zone to a new location on the
+same machine</para>
+</listitem><listitem><para>Validate what will happen in a non-global zone migration before
+the actual migration is performed.</para>
+</listitem><listitem><para>Migrate an existing non-global zone to a new machine</para>
+</listitem>
+</itemizedlist><para>For information on moving and migrating <literal>lx</literal> branded
+zones, see <olink targetptr="gdqnv" remap="internal">Chapter&nbsp;35, Moving and Migrating
+lx Branded Zones (Tasks)</olink>.</para>
+</highlights><sect1 id="gbwym"><title>Moving a Non-Global Zone</title><para>This procedure is used to move the zone to a new location on the same
+system by changing the <literal>zonepath</literal>. The zone must be halted.
+The new <literal>zonepath</literal> must be on a local file system. The normal <literal>zonepath</literal> criteria described in <olink targetptr="z.config.ov-16" remap="internal">Resource
+and Property Types</olink> apply.</para><task id="gbwls"><title>How to Move a Zone</title><tasksummary><para>You must be the global administrator in the global zone to perform this
+procedure.</para>
+</tasksummary><procedure><step id="gbwlv"><para>Become superuser, or assume the Primary Administrator
+role.</para><para>To create the role and assign the role to a user, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step><para>Halt the zone to be moved, <literal>db-zone</literal> in this
+procedure.</para><screen>global# <userinput>zoneadm -z db-zone halt</userinput></screen>
+</step><step><para>Use the <command>zoneadm</command> command with the <literal>move</literal> subcommand
+to move the zone to a new <literal>zonepath</literal>, <literal>/export/zones/db-zone</literal>.</para><screen>global# <userinput>zoneadm -z db-zone move /export/zones/db-zone</userinput></screen>
+</step><step><para>Verify the path.</para><screen>ID  NAME     STATUS       PATH                           BRAND      IP
+ 0  global   running      /                              native     shared
+ -  my-zone  installed    /export/home/my-zone           native     shared
+ -  db-zone  installed    /export/zones/db-zone          native     shared</screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1><title>Migrating a Non-Global Zone to a Different Machine</title><para>Note that you can do a trial run of a zone migration before you actually
+move the zone to a different machine. For more information, see <olink targetptr="gcxfx" remap="internal">About Validating a Zone Migration Before the Migration Is
+ Performed</olink>.</para><sect2 id="gcxgj"><title>About Migrating a Zone</title><para>The <command>zonecfg</command> and <command>zoneadm</command> commands can be used to migrate
+an existing non-global zone from one system to another. The zone is halted
+and detached from its current host. The <literal>zonepath</literal> is moved
+to the target host, where it is attached.</para><para>The following requirements apply to zone migration:</para><itemizedlist><listitem><para>The global zone on the target system must be running the same
+Solaris release as the original host.</para>
+</listitem><listitem><para>To ensure that the zone will run properly, the target system
+must have the same or later versions of the following required operating system
+packages and patches as those installed on the original host.</para><itemizedlist><listitem><para>Packages that deliver files under an <literal>inherit-pkg-dir</literal> resource</para>
+</listitem><listitem><para>Packages where <literal>SUNW_PKG_ALLZONES=true</literal></para>
+</listitem>
+</itemizedlist><para>Other packages and patches, such as those for third-party products,
+can be different.</para>
+</listitem><listitem><para>If the new host has later versions of the zone-dependent packages
+or their associated patches, using <command>zoneadm</command> <literal>attach</literal> with
+the <option>u</option> option updates those packages within the zone to match
+the new host.</para>
+</listitem><listitem><para>The host and target systems must have the same machine architecture.</para>
+</listitem>
+</itemizedlist><para>To verify the Solaris release and the machine architecture, type:</para><screen>#<userinput>uname -m</userinput></screen><para>The <command>zoneadm</command> <literal>detach</literal> process creates
+the information necessary to attach the zone on a different system. The <command>zoneadm</command> <literal>attach</literal> process verifies that the target
+machine has the correct configuration to host the zone.</para><para>Because there are several ways to make the <literal>zonepath</literal> available
+on the new host, the actual movement of the <literal>zonepath</literal> from
+one system to another is a manual process that is performed by the global
+administrator.</para><para>When attached to the new system, the zone is in the installed state.</para>
+</sect2><task id="gcghu"><title>How to Migrate A Non-Global Zone</title><tasksummary><para>You must be the global administrator in the global zone to perform this
+procedure.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para><para>To create the role and assign the role to a user, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step><para>Halt the zone to be migrated, <literal>my-zone</literal> in this
+procedure.</para><screen>host1# <userinput>zoneadm -z my-zone halt</userinput></screen>
+</step><step><para>Detach the zone.</para><screen>host1# <userinput>zoneadm -z my-zone detach</userinput></screen><para>The detached zone is now in the configured state.</para>
+</step><step><para>Move the <literal>zonepath</literal> for <literal>my-zone</literal> to
+the new host.</para><para>See <olink targetptr="gcglo" remap="internal">How to Move the zonepath
+to a new Host</olink> for more information.</para>
+</step><step><para>On the new host, configure the zone.</para><screen>host2# <userinput>zonecfg -z my-zone</userinput></screen><para>You will see the following system message:</para><screen>my-zone: No such zone configured
+Use 'create' to begin configuring a new zone.</screen>
+</step><step><para>To create the zone <literal>my-zone</literal> on the new host,
+use the <command>zonecfg</command> command with the <option>a</option> option
+and the <literal>zonepath</literal> on the new host.</para><screen>zonecfg:my-zone> <userinput>create -a /export/zones/my-zone</userinput></screen>
+</step><step><para>(Optional) View the configuration.</para><screen>zonecfg:my-zone> <userinput>info</userinput>
+zonename: my-zone
+zonepath: /export/zones/my-zone
+autoboot: false
+pool:
+inherit-pkg-dir:
+         dir: /lib
+inherit-pkg-dir:
+         dir: /platform
+inherit-pkg-dir:
+         dir: /sbin
+inherit-pkg-dir:
+         dir: /usr
+net:
+         address: 192.168.0.90
+         physical: bge0</screen>
+</step><step><para>Make any required adjustments to the configuration.</para><para>For
+example, the network physical device is different on the new host, or devices
+that are part of the configuration might have different names on the new host.</para><screen>zonecfg:my-zone> <userinput>select net physical=bge0</userinput>
+zonecfg:my-zone:net> <userinput>set physical=e1000g0</userinput>
+zonecfg:my-zone:net> <userinput>end</userinput></screen>
+</step><step><para>Commit the configuration and exit.</para><screen>zonecfg:my-zone> <userinput>commit</userinput>
+zonecfg:my-zone> <userinput>exit</userinput></screen>
+</step><step><para>Attach the zone on the new host.</para><stepalternatives><step><para>Attach the zone with a validation check.</para><screen>host2# <userinput>zoneadm -z my-zone attach</userinput></screen><para>The system administrator is notified of required actions to be taken
+if either or both of the following conditions are present:</para><itemizedlist><listitem><para>Required packages and patches are not present on the new machine.</para>
+</listitem><listitem><para>The software levels are different between machines.</para>
+</listitem>
+</itemizedlist>
+</step><step><para>Update a zone to match a host running later versions of the dependent
+packages upon attach.</para><screen>host2# <userinput>zoneadm -z my-zone attach -u</userinput></screen><tip><para>If the source system is running an older version of the Solaris
+system, it might not generate a correct list of packages when the zone is
+detached. To ensure that the correct package list is generated on the destination,
+you can remove the <literal>SUNWdetached.xml</literal> file from the <literal>zonepath</literal>.  Removing this file will cause a new package list to be generated
+by the destination system.</para>
+</tip>
+</step><step><para>Force the attach operation without performing the
+validation.</para><screen>host2# <userinput>zoneadm -z my-zone attach -F</userinput></screen><caution><para>The <option>F</option> option allows you to force the <literal>attach</literal> with no validation performed. This is useful in certain cases,
+such as in a clustered environment or for backup and restore operations, but
+it does require that the system be properly configured to host the zone. An
+incorrect configuration could result in undefined behavior later.</para>
+</caution>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="gcglo"><title>How to Move the <literal>zonepath</literal> to a new
+Host</title><tasksummary><para>There are many ways to create an archive of the <literal>zonepath</literal>.
+For example, you can use the <command>cpio</command> or <command>pax</command> commands
+described in the <olink targetdoc="group-refman" targetptr="cpio-1" remap="external"><citerefentry><refentrytitle>cpio</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>)
+and <olink targetdoc="group-refman" targetptr="pax-1" remap="external"><citerefentry><refentrytitle>pax</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+pages.</para><para>There are also several ways to transfer the archive to the new host.
+The mechanism used to transfer the <literal>zonepath</literal> from the source
+host to the destination depends on the local configuration. In some cases,
+such as a SAN, the <literal>zonepath</literal> data might not actually move.
+The SAN might simply be reconfigured so the <literal>zonepath</literal> is
+visible on the new host.  In other cases, the <literal>zonepath</literal> might
+be written to tape, and the tape mailed to a new site.</para><para>For these reasons, this step is not automated. The system administrator
+must choose the most appropriate technique to move the <literal>zonepath</literal> to
+the new host.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para><para>To create the role and assign the role to a user, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step><para>Move the <literal>zonepath</literal> to the new host. You can
+use the method described in this procedure, or use another method of your
+choice.</para>
+</step>
+</procedure><example id="gchct"><title>Archiving and Moving the <literal>zonepath</literal> Using the <command>tar</command> Command</title><orderedlist><listitem><para>Create a <command>tar</command> file of the <literal>zonepath</literal> on <literal>host1</literal> and transfer it to <literal>host2</literal> by using the <command>sftp</command> command.</para><screen>host1# <userinput>cd /export/zones</userinput>
+host1# <userinput>tar cf my-zone.tar my-zone</userinput>
+host1# <userinput>sftp host2</userinput>
+Connecting to host2...
+Password:
+sftp> <userinput>cd /export/zones</userinput>
+sftp> <userinput>put my-zone.tar</userinput>
+Uploading my-zone.tar to /export/zones/my-zone.tar
+sftp> <userinput>quit</userinput></screen>
+</listitem><listitem><para>On <literal>host2</literal>, unpack the <command>tar</command> file.</para><screen>host2# cd <userinput>/export/zones</userinput>
+host2# <userinput>tar xf my-zone.tar</userinput></screen>
+</listitem>
+</orderedlist><para>For more information, see <olink targetdoc="group-refman" targetptr="sftp-1" remap="external"><citerefentry><refentrytitle>sftp</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="tar-1" remap="external"><citerefentry><refentrytitle>tar</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para>
+</example><taskrelated role="troubleshooting"><para>See <olink targetptr="gchbp" remap="internal">Resolving Problems With a zoneadm attach
+Operation</olink> for troubleshooting information on the following:</para><itemizedlist><listitem><para>Patches and packages are out of sync.</para>
+</listitem><listitem><para>Operating system releases do not match.</para>
+</listitem>
+</itemizedlist>
+</taskrelated><taskrelated role="additional-action"><para>If you have copied the data instead of reconfiguring a SAN, then the <literal>zonepath</literal> data will still be visible on the source host even though
+the zone is now in the configured state. You can either manually remove the <literal>zonepath</literal> from the source host after you have finished moving the
+data to the new host, or you can reattach the zone to the source host and
+use the <command>zoneadm</command> <literal>uninstall</literal> command to
+remove the <literal>zonepath</literal>.</para>
+</taskrelated>
+</task><sect2 id="gcxfx"><title>About Validating a Zone Migration Before the Migration
+Is  Performed</title><para>You
+can perform a trial run before the zone is moved to the new machine by using
+the &ldquo;no execute&rdquo; option,<option>n</option>.</para><para>The <command>zoneadm</command> <literal>detach</literal> subcommand
+is used with the <option>n</option> option to generate a manifest on a running
+zone without actually detaching the zone. The state of the zone on the originating
+system is not changed. The zone manifest is sent to <literal>stdout</literal>.
+The global administrator can direct this output to a file or pipe it to a
+remote command to be immediately validated on the target host. The <command>zoneadm</command> <literal>attach</literal> subcommand is used with the <option>n</option> option
+to read this manifest and verify that the target machine has the correct configuration
+to host the zone without actually doing an attach.</para><para>The zone on the target system does <emphasis>not</emphasis> have to
+be configured on the new host before doing a trial-run attach.</para>
+</sect2><task id="gcxgo"><title>How to Validate a Zone Migration Before the Migration
+Is  Performed</title><tasksummary><para>You must be the global administrator in the global zone to perform this
+procedure.</para>
+</tasksummary><procedure><step><para>Become superuser, or assume the Primary Administrator role.</para><para>To create the role and assign the role to a user, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step><para>Use one of the following methods.</para><stepalternatives><step><para>Generate the manifest on a source host named <literal>my-zone</literal> and
+pipe the output to a remote command that will  immediately validate the target
+host:</para><screen>global# <userinput>zoneadm -z my-zone detach -n | ssh remotehost zoneadm attach -n -</userinput></screen><para>The hyphen (<literal>&mdash;</literal>) at the end of the line specifies <literal>stdin</literal> for the path.</para>
+</step><step><para>Generate the manifest on a source host named <literal>my-zone</literal> and
+direct the output to a file:</para><screen>global# <userinput>zoneadm -z my-zone detach -n </userinput></screen><para><emphasis role="strong">Copy the manifest to the new host system as
+described in </emphasis><olink targetptr="gcglo" remap="internal">How to Move the zonepath
+to a new Host</olink><emphasis role="strong">, and perform the validation:</emphasis></para><screen>global# <userinput>zoneadm attach -n path_to_manifest</userinput></screen><para>The path can be <literal>&mdash;</literal> to specify <literal>stdin</literal>.</para>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="gepwx"><title>Migrating a Zone From a Machine That Is not Usable</title><para>A machine that hosts a native Solaris zone
+can become unusable. However, if the storage the zone lives on, such as a
+SAN, is still usable, it might still be possible to migrate the zone to a
+new host successfully. You can move the <literal>zonepath</literal> for the
+zone to the new host. In some cases, such as a SAN, the <literal>zonepath</literal> data
+might not actually move. The SAN might simply be re-configured so the <literal>zonepath</literal> is visible on the new host. Since the zone was not properly detached,
+you will have to first create the zone on the new host using the <command>zonecfg</command> command. Once this has been done, attach the zone on the new host.
+Although the new host will tell you the zone was not properly detached, the
+system will attempt the attach anyway.</para><para>The procedure for this task is described in steps 4 through 8 of <olink targetptr="gcghu" remap="internal">How to Migrate A Non-Global Zone</olink>. Also see <olink targetptr="gcglo" remap="internal">How to Move the zonepath to a new Host</olink>.</para>
+</sect1>
+</chapter>

@@ -1,0 +1,182 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html lang="en-US">
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Displaying Data Stored in Kernel Memory - Device Driver Tutorial</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-12-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo">
+      <a href="http://www.opensolaris.org"><img border="0" src="graphics/header.png"></img></a>
+   </div>
+   <div class="Title">Device Driver Tutorial</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="faatl.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="dataondemand.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="drivertutp.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="drivertut1.html">1.&nbsp;&nbsp;Introduction to Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="eoqrt.html">2.&nbsp;&nbsp;Template Driver Example</a></p>
+<p class="toc level1 tocsp"><a href="faatl.html">3.&nbsp;&nbsp;Reading and Writing Data in Kernel Memory</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Displaying Data Stored in Kernel Memory</a></p>
+</div>
+<p class="toc level2"><a href="dataondemand.html">Displaying Data on Demand</a></p>
+<p class="toc level2"><a href="ffdqq.html">Modifying Data Stored in Kernel Memory</a></p>
+<p class="toc level1 tocsp"><a href="eoqrv.html">4.&nbsp;&nbsp;Tips for Developing Device Drivers</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="fahrt"></a><h3>Displaying Data Stored in Kernel Memory</h3>
+<p>The pseudo device driver presented in this section writes a constant string to
+a system log when the driver is loaded.</p><p>This first version of the Quote Of The Day driver (<tt>qotd_1</tt>) is even
+more simple than the <tt>dummy</tt> driver from the previous chapter. The <tt>dummy</tt> driver
+includes all functions that are required to drive hardware. This <tt>qotd_1</tt> driver includes only
+the bare minimum functions it needs to make a string available to
+a user command. For example, this <tt>qotd_1</tt> driver has no <tt>cb_ops</tt>(9S) structure. Therefore, this
+driver defines no <tt>open</tt>(9E), <tt>close</tt>(9E), <tt>read</tt>(9E), or <tt>write</tt>(9E) function. If you examine
+the <a href="http://docs.sun.com/doc/819-2257/dev-ops-9s?a=view"><tt>dev_ops</tt>(9S)</a> structure for this <tt>qotd_1</tt> driver, you see that no <tt>getinfo</tt>(9E), <tt>attach</tt>(9E), or
+<tt>detach</tt>(9E) function is defined. This driver contains no function declarations because all the
+functions that are defined in this driver are declared in the <tt>modctl.h</tt> header
+file. You must include the <tt>modctl.h</tt> header file in your <tt>qotd_1.c</tt> file.</p><p><a name="indexterm-334"></a><a name="indexterm-335"></a>This <tt>qotd_1</tt> driver defines a global variable to hold its text data. The
+<a href="http://docs.sun.com/doc/819-2255/u-init-9e?a=view"><tt>_init</tt>(9E)</a> entry point for this driver uses the <a href="http://docs.sun.com/doc/819-2256/cmn-err-9f?a=view"><tt>cmn_err</tt>(9F)</a> function to write the string
+to a system log. The <tt>dummy</tt> driver also uses the <tt>cmn_err</tt>(9F) function to
+display messages. The <tt>qotd_1</tt> driver is different from the <tt>dummy</tt> driver because the
+<tt>qotd_1</tt> driver stores its string in kernel memory.</p>
+
+<a name="fcajm"></a><h4>Writing Quote Of The Day Version 1</h4>
+<p>Enter the source code shown in the following example into a text
+file named <tt>qotd_1.c</tt>.</p><a name="fcajp"></a><h6>Example&nbsp;3-1 Quote Of The Day Version 1 Source File</h6><pre>#include &lt;sys/modctl.h&gt;
+#include &lt;sys/conf.h&gt;
+#include &lt;sys/devops.h&gt;
+#include &lt;sys/cmn_err.h&gt;
+#include &lt;sys/ddi.h&gt;
+#include &lt;sys/sunddi.h&gt;
+
+#define QOTD_MAXLEN     128
+
+static const char qotd[QOTD_MAXLEN]
+        = "Be careful about reading health books. \
+You may die of a misprint. - Mark Twain\n";
+
+static struct dev_ops qotd_dev_ops = {
+        DEVO_REV,               /* devo_rev */
+        0,                      /* devo_refcnt */
+        ddi_no_info,            /* devo_getinfo */
+        nulldev,                /* devo_identify */
+        nulldev,                /* devo_probe */
+        nulldev,                /* devo_attach */
+        nulldev,                /* devo_detach */
+        nodev,                  /* devo_reset */
+        (struct cb_ops *)NULL,  /* devo_cb_ops */
+        (struct bus_ops *)NULL, /* devo_bus_ops */
+        nulldev,                /* devo_power */
+        ddi_quiesce_not_needed, /* devo_quiesce */
+};
+
+static struct modldrv modldrv = {
+        &amp;mod_driverops,
+        "Quote of the Day 1.0",
+        &amp;qotd_dev_ops};
+
+static struct modlinkage modlinkage = {
+        MODREV_1,
+        (void *)&amp;modldrv,
+        NULL
+};
+
+int
+_init(void)
+{
+        cmn_err(CE_CONT, "QOTD: %s\n", qotd);
+        return (mod_install(&amp;modlinkage));
+}
+
+int
+_info(struct modinfo *modinfop)
+{
+        return (mod_info(&amp;modlinkage, modinfop));
+}
+int
+_fini(void)
+{
+        return (mod_remove(&amp;modlinkage));
+}</pre><p>Enter the configuration information shown in the following example into a text file
+named <tt>qotd_1.conf</tt>.</p><a name="fcajq"></a><h6>Example&nbsp;3-2 Quote Of The Day Version 1 Configuration File</h6><pre>name="qotd_1" parent="pseudo" instance=0;</pre>
+
+<a name="fcajo"></a><h4>Building, Installing, and Using Quote Of The Day Version&nbsp;1</h4>
+<p>Compile and link the driver. Use the <tt>-D_KERNEL</tt> option to indicate that this
+code defines a kernel module. The following example shows compiling and linking for
+a 32-bit architecture using the Sun Studio C compiler:</p><pre>% <tt><b>cc -D_KERNEL -c qotd_1.c</b></tt>
+% <tt><b>ld -r -o qotd_1 qotd_1.o</b></tt></pre><p>Note that the name of the driver, <tt>qotd_1</tt>, must match the <tt>name</tt> property
+in the configuration file.</p><p>Make sure you are user <tt>root</tt> when you install the driver.</p><p>Copy the driver binary to the <tt>/tmp</tt> directory as discussed in <a href="fdlbq.html">Device Driver Testing Tips</a>.</p><pre># <tt><b>cp qotd_1 /tmp</b></tt>
+# <tt><b>ln -s /tmp/qotd_1 /usr/kernel/drv/qotd_1</b></tt></pre><p>Copy the configuration file to the kernel driver area of the system.</p><pre># <tt><b>cp qotd_1.conf /usr/kernel/drv</b></tt></pre><p><a name="indexterm-336"></a><a name="indexterm-337"></a><a name="indexterm-338"></a><a name="indexterm-339"></a>This <tt>qotd_1</tt> driver writes a message to a system log each time the
+driver is loaded. The <a href="http://docs.sun.com/doc/819-2256/cmn-err-9f?a=view"><tt>cmn_err</tt>(9F)</a> function writes low priority messages such as the
+message defined in this <tt>qotd_1</tt> driver to <tt>/dev/log</tt>. The <a href="http://docs.sun.com/doc/819-2240/syslogd-1m?a=view"><tt>syslogd</tt>(1M)</a> daemon reads messages
+from <tt>/dev/log</tt> and writes low priority messages to <tt>/var/adm/messages</tt>.</p><p>To test this driver, watch for the message in <tt>/var/adm/messages</tt>. In a separate
+window, enter the following command:</p><pre>% <tt><b>tail -f /var/adm/messages</b></tt></pre><p>Make sure you are user <tt>root</tt> when you load the driver. Use the
+<a href="http://docs.sun.com/doc/819-2240/add-drv-1m?a=view"><tt>add_drv</tt>(1M)</a> command to load the driver:</p><pre># <tt><b>add_drv qotd_1</b></tt></pre><p>You should see the following messages in the window where you are
+viewing <tt>/var/adm/messages</tt>:</p><pre><i>date</i> <i>time</i> <i>machine</i> pseudo: [ID 129642 kern.info] pseudo-device: devinfo0
+<i>date</i> <i>time</i> <i>machine</i> genunix: [ID 936769 kern.info] devinfo0 is /pseudo/devinfo@0
+<i>date</i> <i>time</i> <i>machine</i> qotd: [ID 197678 kern.notice] QOTD_1: Be careful about
+reading health books. You may die of a misprint. - Mark Twain</pre><p>This last line is the content of the variable output by the
+<a href="http://docs.sun.com/doc/819-2256/cmn-err-9f?a=view"><tt>cmn_err</tt>(9F)</a> function in the <a href="http://docs.sun.com/doc/819-2255/u-init-9e?a=view"><tt>_init</tt>(9E)</a> entry point. The <tt>_init</tt>(9E) entry point is called when
+the driver is loaded.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="faatl.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="dataondemand.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

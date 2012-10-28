@@ -1,0 +1,232 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Repairing Damaged Data - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbvf.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbwc.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level2"><a href="gbbth.html">ZFS Failure Modes</a></p>
+<p class="toc level2"><a href="gbbwa.html">Checking ZFS Data Integrity</a></p>
+<p class="toc level2"><a href="gbbuw.html">Identifying Problems in ZFS</a></p>
+<p class="toc level2"><a href="gbbve.html">Repairing a Damaged ZFS Configuration</a></p>
+<p class="toc level2"><a href="gbbvb.html">Repairing a Missing Device</a></p>
+<p class="toc level2"><a href="gbbvf.html">Repairing a Damaged Device</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Repairing Damaged Data</a></p>
+</div>
+<p class="toc level2"><a href="gbbwc.html">Repairing an Unbootable System</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbbwl"></a><h3>Repairing Damaged Data</h3>
+<p>The following sections describe how to identify the type of data corruption and
+how to repair the data, if possible.</p>
+<ul><li><p><a href="#gbcuz">Identifying the Type of Data Corruption</a></p></li>
+<li><p><a href="#gbctx">Repairing a Corrupted File or Directory</a></p></li>
+<li><p><a href="#gbctt">Repairing ZFS Storage Pool-Wide Damage</a></p></li></ul>
+<p>ZFS uses checksumming, redundancy, and self-healing data to minimize the chances of data
+corruption. Nonetheless, data corruption can occur if the pool isn't redundant, if corruption
+occurred while the pool was degraded, or an unlikely series of events conspired
+to corrupt multiple copies of a piece of data. Regardless of the source,
+the result is the same: The data is corrupted and therefore no longer
+accessible. The action taken depends on the type of data being corrupted, and
+its relative value. Two basic types of data can be corrupted:</p>
+<ul><li><p>Pool metadata &ndash; ZFS requires a certain amount of data to be parsed to open a pool and access datasets. If this data is corrupted, the entire pool or complete portions of the dataset hierarchy will become unavailable.</p></li>
+<li><p>Object data &ndash; In this case, the corruption is within a specific file or directory. This problem might result in a portion of the file or directory being inaccessible, or this problem might cause the object to be broken altogether.</p></li></ul>
+<p>Data is verified during normal operation as well as through scrubbing. For more
+information about how to verify the integrity of pool data, see <a href="gbbwa.html">Checking ZFS Data Integrity</a>.</p>
+
+<a name="gbcuz"></a><h4>Identifying the Type of Data Corruption</h4>
+<p>By default, the <tt>zpool status</tt> command shows only that corruption has occurred, but not
+where this corruption occurred. For example:<a name="indexterm-651"></a><a name="indexterm-652"></a><a name="indexterm-653"></a></p><pre># <tt><b>zpool status tank -v</b></tt>
+   pool: tank
+     state: ONLINE
+    status: One or more devices has experienced an error resulting in data
+             corruption.  Applications may be affected.
+    action: Restore the file in question if possible.  Otherwise restore the
+             entire pool from backup.
+       see: http://www.sun.com/msg/ZFS-8000-8A
+     scrub: none requested
+    config:
+
+        NAME         STATE     READ WRITE CKSUM
+        tank         ONLINE       1     0     0
+          mirror     ONLINE       1     0     0
+            c2t0d0   ONLINE       2     0     0
+            c1t1d0   ONLINE       2     0     0
+
+    errors: The following persistent errors have been detected:
+
+          DATASET  OBJECT  RANGE
+          tank     6       0-512</pre><pre># <tt><b>zpool status</b></tt>
+   pool: monkey
+state: ONLINE
+status: One or more devices has experienced an error resulting in data
+         corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+         entire pool from backup.
+    see: http://www.sun.com/msg/ZFS-8000-8A
+scrub: none requested
+config:
+
+         NAME        STATE     READ WRITE CKSUM
+         monkey      ONLINE       0     0     0
+           c1t1d0s6  ONLINE       0     0     0
+           c1t1d0s7  ONLINE       0     0     0
+
+errors: 8 data errors, use '-v' for a list </pre><p>Each error indicates only that an error occurred at the given point in
+time. Each error is not necessarily still present on the system. Under normal
+circumstances, this situation is true. Certain temporary outages might result in data corruption
+that is automatically repaired once the outage ends. A complete scrub of the
+pool is guaranteed to examine every active block in the pool, so the
+error log is reset whenever a scrub finishes. If you determine that the
+errors are no longer present, and you don't want to wait for
+a scrub to complete, reset all errors in the pool by using the
+<tt>zpool online</tt> command.</p><p>If the data corruption is in pool-wide metadata, the output is slightly different.
+For example:</p><pre># <tt><b>zpool status -v morpheus</b></tt>
+  pool: morpheus
+    id: 1422736890544688191
+ state: FAULTED
+status: The pool metadata is corrupted.
+action: The pool cannot be imported due to damaged devices or data.
+   see: http://www.sun.com/msg/ZFS-8000-72
+config:
+
+        morpheus    FAULTED   corrupted data
+          c1t10d0   ONLINE</pre><p>In the case of pool-wide corruption, the pool is placed into the
+<tt>FAULTED</tt> state, because the pool cannot possibly provide the needed redundancy level.</p>
+
+<a name="gbctx"></a><h4>Repairing a Corrupted File or Directory</h4>
+<p>If a file or directory is corrupted, the system might still be
+able to function depending on the type of corruption. Any damage is effectively unrecoverable
+if no good copies of the data exist anywhere on the system. If
+the data is valuable, you have no choice but to restore the
+affected data from backup. Even so, you might be able to recover from
+this corruption without restoring the entire pool.<a name="indexterm-654"></a><a name="indexterm-655"></a><a name="indexterm-656"></a></p><p>If the damage is within a file data block, then the file
+can safely be removed, thereby clearing the error from the system. Use the
+<tt>zpool status</tt> <tt>-v</tt> command to display a list of filenames with persistent errors. For
+example:</p><pre># <tt><b>zpool status -v</b></tt>
+   pool: monkey
+state: ONLINE
+status: One or more devices has experienced an error resulting in data
+         corruption.  Applications may be affected.
+action: Restore the file in question if possible.  Otherwise restore the
+         entire pool from backup.
+    see: http://www.sun.com/msg/ZFS-8000-8A
+scrub: none requested
+config:
+
+         NAME        STATE     READ WRITE CKSUM
+         monkey      ONLINE       0     0     0
+           c1t1d0s6  ONLINE       0     0     0
+           c1t1d0s7  ONLINE       0     0     0
+
+errors: Permanent errors have been detected in the following files: 
+
+/monkey/a.txt
+/monkey/bananas/b.txt
+/monkey/sub/dir/d.txt
+/monkey/ghost/e.txt
+/monkey/ghost/boo/f.txt</pre><p>The preceding output is described as follows:</p>
+<ul><li><p>If the full path to the file is found and the dataset is mounted, the full path to the file is displayed. For example:</p><pre>/monkey/a.txt</pre></li>
+<li><p>If the full path to the file is found, but the dataset is not mounted, then the dataset name with no preceding slash (/), followed by the path within the dataset to the file, is displayed. For example:</p><pre>monkey/ghost:/e.txt</pre></li>
+<li><p>If the object number to a file path cannot be successfully translated, either due to an error or because the object doesn't have a real file path associated with it , as is the case for a <tt>dnode_t</tt>, then the dataset name followed by the object's number is displayed. For example:</p><pre>monkey/dnode:&lt;0x0></pre></li>
+<li><p>If an object in the meta-object set (MOS) is corrupted, then a special tag of <tt>&lt;metadata></tt>, followed by the object number, is displayed.</p></li></ul>
+<p>If the damage is within a file data block, then the file can
+safely be removed, thereby clearing the error from the system. The first step
+is to try to locate the file by using the <tt>find</tt> command
+and specify the object number that is identified in the <tt>zpool status</tt> output under
+<tt>DATASET/OBJECT/RANGE</tt> output as the inode number to find. For example:</p><pre># <tt><b>find -inum 6</b></tt></pre><p>Then, try removing the file with the <tt>rm</tt> command. If this command doesn't
+work, the corruption is within the file's metadata, and ZFS cannot determine which
+blocks belong to the file in order to remove the corruption.</p><p>If the corruption is within a directory or a file's metadata, the
+only choice is to move the file elsewhere. You can safely move any
+file or directory to a less convenient location, allowing the original object to
+be restored in place.</p>
+
+<a name="gbctt"></a><h4>Repairing ZFS Storage Pool-Wide Damage</h4>
+<p>If the damage is in pool metadata that damage prevents the pool
+from being opened, then you must restore the pool and all its data
+from backup. The mechanism you use varies widely by the pool configuration and
+backup strategy. First, save the configuration as displayed by <tt>zpool status</tt> so that you can
+recreate it once the pool is destroyed. Then, use <tt>zpool destroy</tt> <tt>-f</tt> to
+destroy the pool. Also, keep a file describing the layout of the datasets
+and the various locally set properties somewhere safe, as this information will become
+inaccessible if the pool is ever rendered inaccessible. With the pool configuration and
+dataset layout, you can reconstruct your complete configuration after destroying the pool. The data
+can then be populated by using whatever backup or restoration strategy you use.<a name="indexterm-657"></a><a name="indexterm-658"></a><a name="indexterm-659"></a></p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbvf.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbwc.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

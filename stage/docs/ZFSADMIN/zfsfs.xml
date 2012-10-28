@@ -1,0 +1,1224 @@
+<chapter id="gavwq"><title>Managing
+ZFS File Systems</title><highlights><para>This chapter provides detailed information about managing <trademark>Solaris</trademark> ZFS file systems. Concepts such as hierarchical file system layout,
+property inheritance, and automatic mount point management and share interactions
+are included in this chapter.</para><para>A ZFS file system is a lightweight POSIX file system that is built on
+top of a storage pool. File systems can be dynamically created and destroyed
+without requiring you to allocate or format any underlying space. Because
+file systems are so lightweight and because they are the central point of
+administration in ZFS, you are likely to create many of them.</para><para>ZFS file systems are administered by using the <command>zfs</command> command.
+The <command>zfs</command> command provides a set of subcommands that perform
+specific operations on file systems. This chapter describes these subcommands
+in detail. Snapshots, volumes, and clones are also managed by using this command,
+but these features are only covered briefly in this chapter. For detailed
+information about snapshots and clones, see <olink targetptr="gavvx" remap="internal">Chapter&nbsp;6,
+Working With ZFS Snapshots and Clones</olink>. For detailed information about
+emulated volumes, see <olink targetptr="gaypf" remap="internal">ZFS Volumes</olink>.</para><note><para>The term <emphasis>dataset</emphasis> is used in this chapter
+as a generic term to refer to a file system, snapshot, clone, or volume.</para>
+</note><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gamnq" remap="internal">Creating and Destroying ZFS File
+Systems</olink></para>
+</listitem><listitem><para><olink targetptr="gazss" remap="internal">Introducing ZFS Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gazsu" remap="internal">Querying ZFS File System Information</olink></para>
+</listitem><listitem><para><olink targetptr="gayns" remap="internal">Managing ZFS Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gaynd" remap="internal">Mounting and Sharing ZFS File Systems</olink></para>
+</listitem><listitem><para><olink targetptr="gazvb" remap="internal">ZFS Quotas and Reservations</olink></para>
+</listitem><listitem><para><olink targetptr="gbchx" remap="internal">Saving and Restoring ZFS Data</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gamnq"><title>Creating and Destroying ZFS File Systems</title><para>ZFS file systems can be created and destroyed by using the <command>zfs
+create</command> and <command>zfs destroy</command> commands.</para><itemizedlist><listitem><para><olink targetptr="gazsf" remap="internal">Creating a ZFS File System</olink></para>
+</listitem><listitem><para><olink targetptr="gammq" remap="internal">Destroying a ZFS File System</olink></para>
+</listitem><listitem><para><olink targetptr="gamnn" remap="internal">Renaming a ZFS File System</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gazsf"><title>Creating a ZFS File System</title><para>ZFS file systems are created by using the <command>zfs create</command> command.
+The <command>create</command> subcommand takes a single argument: the name
+of the file system to create. The file system name is specified as a path
+name starting from the name of the pool:</para><para><replaceable>pool-name/[filesystem-name/]filesystem-name</replaceable></para><para>The pool name and initial file system names in the path identify the
+location in the hierarchy where the new file system will be created. All the
+intermediate file system names must already exist in the pool. The last name
+in the path identifies the name of the file system to be created. The file
+system name must satisfy the naming conventions defined in <olink targetptr="gbcpt" remap="internal">ZFS Component Naming Requirements</olink>.</para><para>In the following example, a file system named <filename>bonwick</filename> is
+created in the <filename>tank/home</filename> file system.</para><screen># <userinput>zfs create tank/home/bonwick</userinput></screen><para>ZFS automatically mounts the newly created file system if it is created
+successfully. By default, file systems are mounted as <replaceable>/dataset</replaceable>,
+using the path provided for the file system name in the <command>create</command> subcommand.
+In this example, the newly created <filename>bonwick</filename> file system
+is at <filename>/tank/home/bonwick</filename>. For more information about
+automanaged mount points, see <olink targetptr="gaztn" remap="internal">Managing ZFS Mount
+Points</olink>.</para><para>For more information about the <command>zfs create</command> command,
+see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><para>You can set file system properties when the file system is created.</para><para>In the following example, a mount point of <filename>/export/zfs</filename> is
+specified and is created for the <literal>tank/home</literal> file system.</para><screen># <userinput>zfs create -o mountpoint=/export/zfs tank/home</userinput></screen><para>For more information about file system properties, see <olink targetptr="gazss" remap="internal">Introducing ZFS Properties</olink>.</para>
+</sect2><sect2 id="gammq"><title>Destroying a ZFS File System</title><para>To destroy a ZFS file system, use the <command>zfs destroy</command> command.
+The destroyed file system is automatically unmounted and unshared. For more
+information about automatically managed mounts or automatically managed shares,
+see <olink targetptr="gbala" remap="internal">Automatic Mount Points</olink>.</para><para>In the following example, the <filename>tabriz</filename> file system
+is destroyed.</para><screen># <userinput>zfs destroy tank/home/tabriz</userinput></screen><caution><para>No confirmation prompt appears with the <command>destroy</command> subcommand.
+Use it with extreme caution.</para>
+</caution><para>If the file system to be destroyed is busy and so cannot be unmounted,
+the <command>zfs destroy</command> command fails. To destroy an active file
+system, use the <option>f</option> option. Use this option with caution as
+it can unmount, unshare, and destroy active file systems, causing unexpected
+application behavior.</para><screen># <userinput>zfs destroy tank/home/ahrens</userinput>
+cannot unmount 'tank/home/ahrens': Device busy
+
+# <userinput>zfs destroy -f tank/home/ahrens</userinput></screen><para>The <command>zfs destroy</command> command also fails if a file system
+has children. To recursively destroy a file system and all its descendents,
+use the <option>r</option> option. Note that a recursive destroy also destroys
+snapshots so use this option with caution.</para><screen># <userinput>zfs destroy tank/ws</userinput>
+cannot destroy 'tank/ws': filesystem has children
+use '-r' to destroy the following datasets:
+tank/ws/billm
+tank/ws/bonwick
+tank/ws/maybee
+
+# <userinput>zfs destroy -r tank/ws</userinput></screen><para>If the file system to be destroyed has indirect dependents, even the
+recursive destroy command described above fails. To force the destruction
+of <emphasis>all</emphasis> dependents, including cloned file systems outside
+the target hierarchy, the <option>R</option> option must be used. Use extreme
+caution with this option.</para><screen># <userinput>zfs destroy -r tank/home/schrock</userinput>
+cannot destroy 'tank/home/schrock': filesystem has dependent clones
+use '-R' to destroy the following datasets:
+tank/clones/schrock-clone
+
+# <userinput>zfs destroy -R tank/home/schrock</userinput></screen><caution><para>No confirmation prompt appears with the <option>f</option>, <option>r</option>, or <option>R</option> options so use these options carefully.</para>
+</caution><para>For more information about snapshots and clones, see <olink targetptr="gavvx" remap="internal">Chapter&nbsp;6, Working With ZFS Snapshots and Clones</olink>.</para>
+</sect2><sect2 id="gamnn"><title>Renaming a ZFS File System</title><para>File systems can be renamed by using the <command>zfs rename</command> command.
+Using the <command>rename</command> subcommand can perform the following operations:</para><itemizedlist><listitem><para>Change the name of a file system </para>
+</listitem><listitem><para>Relocate the file system to a new location within the ZFS
+hierarchy</para>
+</listitem><listitem><para>Change the name of a file system and relocate it with the
+ZFS hierarchy</para>
+</listitem>
+</itemizedlist><para>The following example uses the <command>rename</command> subcommand
+to do a simple rename of a file system:</para><screen># <userinput>zfs rename tank/home/kustarz tank/home/kustarz_old</userinput></screen><para>This example renames the <filename>kustarz</filename> file system to <filename>kustarz_old</filename>. </para><para>The following example shows how to use <command>zfs rename</command> to
+relocate a file system.</para><screen># <userinput>zfs rename tank/home/maybee tank/ws/maybee</userinput></screen><para>In this example, the <filename>maybee</filename> file system is relocated
+from <filename>tank/home</filename> to <filename>tank/ws</filename>. When
+you relocate a file system through rename, the new location must be within
+the same pool and it must have enough space to hold this new file system.
+If the new location does not have enough space, possibly because it has reached
+its quota, the rename will fail.</para><para>For more information about quotas, see <olink targetptr="gazvb" remap="internal">ZFS
+Quotas and Reservations</olink>.</para><para>The rename operation attempts an unmount/remount sequence for the file
+system and any descendent file systems. The rename fails if the operation
+is unable to unmount an active file system. If this problem occurs, you will
+need to force unmount the file system.</para><para>For information about renaming snapshots, see <olink targetptr="gbion" remap="internal">Renaming
+ZFS Snapshots</olink>.</para>
+</sect2>
+</sect1><sect1 id="gazss"><title>Introducing ZFS Properties</title><para>Properties are the main mechanism that you use to control the behavior
+of file systems, volumes, snapshots, and clones. Unless stated otherwise,
+the properties defined in the section apply to all the dataset types.</para><itemizedlist><listitem><para><olink targetptr="gazsy" remap="internal">ZFS Read-Only Native Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gazsd" remap="internal">Settable ZFS Native Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gdrcw" remap="internal">ZFS User Properties</olink></para>
+</listitem>
+</itemizedlist><para>Properties are divided into two types, native properties and user defined
+properties. Native properties either export internal statistics or control
+ZFS file system behavior. In addition, native properties are either settable
+or read-only. User properties have no effect on ZFS file system behavior,
+but you can use them to annotate datasets in a way that is meaningful in your
+environment. For more information on user properties, see <olink targetptr="gdrcw" remap="internal">ZFS User Properties</olink>.</para><para>Most settable properties are also inheritable. An inheritable property
+is a property that, when set on a parent, is propagated down to all of its
+descendents.</para><para>All inheritable properties have an associated source. The source indicates
+how a property was obtained. The source of a property can have the following
+values:</para><variablelist><varlistentry><term><literal>local</literal></term><listitem><para>A <literal>local</literal> source indicates that the property
+was explicitly set on the dataset by using the <command>zfs set</command> command
+as described in <olink targetptr="gazsp" remap="internal">Setting ZFS Properties</olink>.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>inherited from</literal> <replaceable>dataset-name</replaceable></term><listitem><para>A value of <literal>inherited from</literal> <replaceable>dataset-name</replaceable> means that the property was inherited from the named ancestor.</para>
+</listitem>
+</varlistentry><varlistentry><term><literal>default</literal></term><listitem><para>A value of <literal>default</literal> means that the property
+setting was not inherited or set locally. This source is a result of no ancestor
+having the property as source <literal>local</literal>.</para>
+</listitem>
+</varlistentry>
+</variablelist><para>The following table identifies both read-only and settable native ZFS
+file system properties. Read-only native properties are identified as such.
+All other native properties listed in this table are settable. For information
+about user properties, see <olink targetptr="gdrcw" remap="internal">ZFS User Properties</olink>.</para><table frame="topbot" id="gcfgr"><title>ZFS Native Property Descriptions</title><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="16.17*"/><colspec colwidth="11.73*"/><colspec colwidth="13.42*"/><colspec colwidth="58.65*"/><thead><row rowsep="1"><entry><para>Property Name</para>
+</entry><entry><para>Type</para>
+</entry><entry><para>Default Value</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry colsep="0" rowsep="1"><para><literal>aclinherit</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>secure</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls how ACL entries are inherited when files and directories are
+created. The values are <literal>discard</literal>, <literal>noallow</literal>, <literal>secure</literal>, and <literal>passthrough</literal>. For a description of
+these values, see <olink targetptr="gbaaz" remap="internal">ACL Property Modes</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>aclmode</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>groupmask</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls how an ACL entry is modified during a <literal>chmod</literal> operation.
+The values are <literal>discard</literal>, <literal>groupmask</literal>, and <literal>passthrough</literal>. For a description of these values, see <olink targetptr="gbaaz" remap="internal">ACL Property Modes</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>atime</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>on</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether the access time for files is updated when they are
+read. Turning this property off avoids producing write traffic when reading
+files and can result in significant performance gains, though it might confuse
+mailers and other similar utilities.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>available</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the amount of space available to
+the dataset and all its children, assuming no other activity in the pool.
+ Because space is shared within a pool, available space can be limited by
+various factors including physical pool size, quotas, reservations, or other
+datasets within the pool.</para><para>This property can also be referenced by its shortened column name, <literal>avail</literal>.</para><para>For more information about space accounting, see <olink targetptr="gbchp" remap="internal">ZFS
+Space Accounting</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>canmount</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>on</para>
+</entry><entry rowsep="1"><para>Controls whether the given file system can be mounted with the <command>zfs</command> <command>mount</command> command. This property can be set on any
+file system and the property itself is not inheritable. However, when this
+property is set, a mountpoint can be inherited to descendent file systems,
+but the file system itself is never mounted. For more information, see <olink targetptr="gdrcf" remap="internal">The canmount Property</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>casesensitivity</literal></para>
+</entry><entry rowsep="1"><para>String</para>
+</entry><entry rowsep="1"><para><literal>sensitive</literal></para>
+</entry><entry rowsep="1"><para>This
+property indicates whether the file name matching algorithm used by the file
+system should be <literal>casesensitive</literal>,<literal> caseinsensitive</literal>,
+or allow a combination of both styles of matching (<literal>mixed</literal>).
+The default value for this property is <literal>sensitive</literal>. Traditionally,
+UNIX and  POSIX file systems have case-sensitive file names.</para><para>The <literal>mixed</literal> value for this property indicates the file system can support
+requests for both case-sensitive and case-insensitive matching behavior. Currently,
+case-insensitive matching behavior on a file system that supports mixed behavior
+is limited to the Solaris CIFS server product. For more information about
+using the <literal>mixed</literal> value, see <olink targetptr="gftgr" remap="internal">The
+casesensitivity Property</olink>.</para><para>Regardless of the <literal>casesensitivity</literal> property setting, the file system preserves the case of the name
+specified to create a  file. This property cannot be changed after the file
+system is created.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>checksum</property></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>on</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls the checksum used to verify data integrity. The default value
+is <literal>on</literal>, which automatically selects an appropriate algorithm,
+currently <literal>fletcher2</literal>. The values are <literal>on, off, fletcher2</literal>, <literal>fletcher4</literal>, and <literal>sha256</literal>. A
+value of <literal>off</literal> disables integrity checking on user data.
+A value of <literal>off</literal> is not recommended.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>compression</property></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>off</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls the compression algorithm used for this dataset. Currently,
+you can select <literal>lzjb</literal>, <literal>gzip</literal>, or <literal>gzip-</literal><replaceable>N</replaceable>. Enabling compression on a file system
+with existing data only compresses new data. Existing data remains uncompressed.</para><para>This property can also be referred to by its shortened column name, <literal>compress</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>compressratio</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the compression ratio achieved for
+this dataset, expressed as a multiplier. Compression can be turned on by running <literal>zfs set compression=on</literal> <replaceable>dataset</replaceable>.</para><para>Calculated from the logical size of all files and the amount of referenced
+physical data. Includes explicit savings through the use of the <property>compression</property> property.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>copies</literal></para>
+</entry><entry rowsep="1"><para>Number</para>
+</entry><entry rowsep="1"><para>1</para>
+</entry><entry rowsep="1"><para>Sets the number of copies of user data per file system. Available values
+are 1, 2 or 3. These copies are in addition to any pool-level redundancy.
+Space used by multiple copies of user data is charged to the corresponding
+file and dataset and counts against quotas and reservations. In addition,
+the <property>used</property> property is updated when multiple copies are
+enabled. Consider setting this property when the file system is created because
+changing this property on an existing file system only affects newly written
+data.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>creation</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the date and time that this dataset
+was created.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>devices</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>on</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls the ability to open device files in the file system.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>exec</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>on</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether programs within this file system are allowed to be
+executed. Also, when set to <literal>off</literal>, <command>mmap(2)</command> calls
+with <literal>PROT_EXEC</literal> are disallowed.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>mounted</property></para>
+</entry><entry colsep="0" rowsep="1"><para>boolean</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that indicates whether this file system, clone, or
+snapshot is currently mounted. This property does not apply to volumes. Value
+can be either yes or no.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>mountpoint</property></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Controls the mount point used for this file system. When the <property>mountpoint</property> property is changed for a file system, the file system and any
+children that inherit the mount point are unmounted. If the new value is <literal>legacy</literal>, then they remain unmounted. Otherwise, they are automatically
+remounted in the new location if the property was previously <literal>legacy</literal> or <literal>none</literal>, or if they were mounted before the property was changed. In
+addition, any shared file systems are unshared and shared in the new location.</para><para>For more information about using this property, see <olink targetptr="gaztn" remap="internal">Managing ZFS Mount Points</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>nbmand</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>off</para>
+</entry><entry rowsep="1"><para>Controls whether the file system should be mounted  with <literal>nbmand</literal> 
+(Non-blocking  mandatory) locks. This property is for CIFS clients only. Changes
+to this property only take effect when the file system is unmounted
+and remounted. </para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>normalization</literal></para>
+</entry><entry rowsep="1"><para>String</para>
+</entry><entry rowsep="1"><para>None</para>
+</entry><entry rowsep="1"><para>This property indicates whether a file system should perform a unicode
+  normalization of file names whenever two file names are compared,   and
+which normalization algorithm should be used. File names are   always stored
+unmodified, names are normalized as part of any   comparison process. If this
+property is set to a legal value other  than <literal>none</literal>, and
+the <literal>utf8only</literal> property was left unspecified, the <literal>utf8only</literal> property is automatically set to <literal>on</literal>. The default
+ value of the <literal>normalization</literal> property is <literal>none</literal>.
+This property cannot be changed after the file system is created.     </para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>origin</property></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property for cloned file systems or volumes that identifies
+the snapshot from which the clone was created. The origin cannot be destroyed
+(even with the <option>r</option> or <option>f</option> options) as long as
+a clone exists.</para><para>Non-cloned file systems have an origin of none.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>quota</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number (or <literal>none</literal>)</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>none</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Limits the amount of space a dataset and its descendents can consume.
+This property enforces a hard limit on the amount of space used, including
+all space consumed by descendents, including file systems and snapshots. Setting
+a quota on a descendent of a dataset that already has a quota does not override
+the ancestor's quota, but rather imposes an additional limit. Quotas cannot
+be set on volumes, as the <property>volsize</property> property acts as an
+implicit quota.</para><para>For information about setting quotas, see <olink targetptr="gazud" remap="internal">Setting
+Quotas on ZFS File Systems</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>readonly</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>off</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether this dataset can be modified. When set to <literal>on</literal>,
+no modifications can be made to the dataset.</para><para>This property can also be referred to by its shortened column name, <literal>rdonly</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>recordsize</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>128K</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Specifies a suggested block size for files in the file system.</para><para>This property can also be referred to by its shortened column name, <property>recsize</property>. For a detailed description, see <olink targetptr="gcfgv" remap="internal">The
+recordsize Property</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>referenced</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the amount of data accessible by
+this dataset, which might or might not be shared with other datasets in the
+pool.</para><para>When a snapshot or clone is created, it initially references the same
+amount of space as the file system or snapshot it was created from, because
+its contents are identical.</para><para>This property can also be referred to by its shortened column name, <property>refer</property>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>refquota</literal></para>
+</entry><entry rowsep="1"><para>Number
+(or none)</para>
+</entry><entry rowsep="1"><para>none</para>
+</entry><entry rowsep="1"><para>Sets
+the amount of space that a dataset can consume. This property enforces a hard
+limit on the amount of space used. This hard limit does not  include space
+used  by descendents, such as snapshots and clones.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>refreservation</literal></para>
+</entry><entry rowsep="1"><para>Number
+(or none)</para>
+</entry><entry rowsep="1"><para><literal>none</literal></para>
+</entry><entry rowsep="1"><para>Sets
+the minimum amount of space that is guaranteed to a dataset, not including
+descendents, such as snapshots and clones. When the amount of space that is
+used is below this value, the dataset is treated as if it were taking up the
+amount of space specified  by <literal>refreservation</literal>. The   <literal>refreservation</literal> reservation is accounted for in the parent datasets' space used,
+and  counts against the parent datasets' quotas and  reservations.</para><para>If <literal>refreservation</literal> is set, a snapshot is only allowed if
+enough free pool space is available outside of this reservation to accommodate
+the current number of <emphasis>referenced</emphasis> bytes in the dataset.</para><para>This property can also be referred to by its shortened column name, <literal>refreserv</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>reservation</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number (or none)</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>none</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>The minimum amount of space guaranteed to a dataset and its descendents.
+When the amount of space used is below this value, the dataset is treated
+as if it were using the amount of space specified by its reservation. Reservations
+are accounted for in the parent datasets' space used, and count against the
+parent datasets' quotas and reservations.</para><para>This property can also be referred to by its shortened column name, <property>reserv</property>.</para><para>For more information, see <olink targetptr="gbdbb" remap="internal">Setting Reservations
+on ZFS File Systems</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><property>setuid</property></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para><literal>on</literal></para>
+</entry><entry rowsep="1"><para>Controls whether the <literal>setuid</literal> bit is honored in the
+file system.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>sharenfs</property></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>off</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether the file system is available over NFS, and what options
+are used.  If set to <literal>on</literal>, the <command>zfs share</command> command
+is invoked with no options.  Otherwise, the <command>zfs share</command> command
+is invoked with options equivalent to the contents of this property.  If set
+to <literal>off</literal>, the file system is managed by using the legacy <command>share</command> and <command>unshare</command> commands and the <filename>dfstab</filename> file.</para><para>For more information on sharing ZFS file systems, see <olink targetptr="gamnd" remap="internal">Sharing and Unsharing ZFS File Systems</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>sharesmb</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>off</para>
+</entry><entry rowsep="1"><para>Controls whether the file system is shared by using the Solaris CIFS
+service, and what options are to be used. A file system with the  <literal>sharesmb</literal> property set to <literal>off</literal> is managed through traditional
+tools, such as the <command>sharemgr</command> command. Otherwise, the file
+system is automatically shared and unshared by using the <command>zfs share</command> and <command>zfs unshare</command> commands.</para><para>If the property is set to <literal>on</literal>,  the <command>sharemgr</command> command
+ is invoked with no options. Otherwise, the <command>sharemgr</command> command
+ is  invoked with options  that are equivalent  to  the contents of this property.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>snapdir</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para><literal>hidden</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Controls whether the <filename>.zfs</filename> directory is hidden or
+visible in the root of the file system. For more information on using snapshots,
+see <olink targetptr="gbciq" remap="internal">Overview of ZFS Snapshots</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>type</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>String</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the dataset type as <literal>filesystem</literal> (file
+system or clone), <literal>volume</literal>, or <literal>snapshot</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>used</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Read-only property that identifies the amount of space consumed by the
+dataset and all its descendents.</para><para>For a detailed description, see <olink targetptr="gcfgz" remap="internal">The used Property</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>utf8only</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>Off</para>
+</entry><entry rowsep="1"><para>This property indicates whether a file system should reject file names
+  that include characters that are not present in the UTF-8 character code
+set. If this property is explicitly set to <literal>off</literal>, the <literal>normalization</literal>  property must either not be explicitly set or be set to <literal>none</literal>. The default value for the <literal>utf8only</literal> property
+is <literal>off</literal>. This property cannot be changed after the file system is created.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>volsize</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>For volumes, specifies the logical size of the volume.</para><para>For a detailed description, see <olink targetptr="gcfhk" remap="internal">The volsize
+Property</olink>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><literal>volblocksize</literal></para>
+</entry><entry colsep="0" rowsep="1"><para>Number</para>
+</entry><entry colsep="0" rowsep="1"><para>8 Kbytes</para>
+</entry><entry colsep="0" rowsep="1"><para>For volumes, specifies the block size of the volume. The block size
+cannot be changed once the volume has been written, so set the block size
+at volume creation time. The default block size for volumes is 8 Kbytes. Any
+power of 2 from 512 bytes to 128 Kbytes is valid.</para><para>This property can also be referred to by its shortened column name, <property>volblock</property>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>vscan</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para>Off</para>
+</entry><entry rowsep="1"><para>Controls whether regular files should be scanned for viruses when a
+file is opened and closed. In addition to enabling this property, a virus scanning service must also be
+enabled for virus scanning to occur. The default value is <literal>off</literal>.</para>
+</entry>
+</row><row><entry colsep="0" rowsep="1"><para><property>zoned</property></para>
+</entry><entry colsep="0" rowsep="1"><para>Boolean</para>
+</entry><entry colsep="0" rowsep="1"><para>N/A</para>
+</entry><entry colsep="0" rowsep="1"><para>Indicates whether this dataset has been added to a non-global zone.
+If this property is set, then the mount point is not honored in the global
+zone, and ZFS cannot mount such a file system when requested. When a zone
+is first installed, this property is set for any added file systems.</para><para>For more information about using ZFS with zones installed, see <olink targetptr="gayov" remap="internal">Using ZFS on a Solaris System With Zones Installed</olink>.</para>
+</entry>
+</row><row><entry rowsep="1"><para><literal>xattr</literal></para>
+</entry><entry rowsep="1"><para>Boolean</para>
+</entry><entry rowsep="1"><para><literal>on</literal></para>
+</entry><entry rowsep="1"><para>Indicates whether extended attributes are enabled or disabled for this
+file system. The default value is <literal>on</literal>.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><sect2 id="gazsy"><title>ZFS Read-Only Native Properties</title><para>Read-only native properties are properties that can be retrieved but
+cannot be set. Read-only native properties are not inherited. Some native
+properties are specific to a particular type of dataset. In such cases, the
+particular dataset type is mentioned in the description in <olink targetptr="gcfgr" remap="internal">Table&nbsp;5&ndash;1</olink>.</para><para>The read-only native properties are listed here and are described in <olink targetptr="gcfgr" remap="internal">Table&nbsp;5&ndash;1</olink>.</para><itemizedlist><listitem><para><property>available</property></para>
+</listitem><listitem><para><property>creation</property> </para>
+</listitem><listitem><para><property>mounted</property></para>
+</listitem><listitem><para><property>origin</property></para>
+</listitem><listitem><para><property>compressratio</property></para>
+</listitem><listitem><para><property>referenced</property> </para>
+</listitem><listitem><para><property>type</property></para>
+</listitem><listitem><para><property>used</property></para><para>For detailed information,
+see <olink targetptr="gcfgz" remap="internal">The used Property</olink>.</para>
+</listitem>
+</itemizedlist><para>For more information on space accounting, including the <property>used</property>, <property>referenced</property>, and <property>available</property> properties, see <olink targetptr="gbchp" remap="internal">ZFS Space Accounting</olink>.</para><sect3 id="gcfgz"><title>The <property>used</property> Property</title><para>The amount of space consumed by this dataset and all its descendents.
+This value is checked against the dataset's quota and reservation. The space
+used does not include the dataset's reservation, but does consider the reservation
+of any descendent datasets. The amount of space that a dataset consumes from
+its parent, as well as the amount of space that is freed if the dataset is
+recursively destroyed, is the greater of its space used and its reservation.</para><para>When snapshots are created, their space is initially shared between
+the snapshot and the file system, and possibly with previous snapshots. As
+the file system changes, space that was previously shared becomes unique to
+the snapshot, and counted in the snapshot's space used. Additionally, deleting
+snapshots can increase the amount of space unique to (and used by) other snapshots.
+For more information about snapshots and space issues, see <olink targetptr="gayra" remap="internal">Out of Space Behavior</olink>.</para><para>The amount of space used, available, or referenced does not take into
+account pending changes. Pending changes are generally accounted for within
+a few seconds. Committing a change to a disk using <literal>fsync(3c)</literal> or <literal>O_SYNC</literal> does not necessarily guarantee that the space usage information
+will be updated immediately.</para>
+</sect3>
+</sect2><sect2 id="gazsd"><title>Settable ZFS Native Properties</title><para>Settable native properties are properties whose values can be both retrieved
+and set. Settable native properties are set by using the <command>zfs set</command> command,
+as described in <olink targetptr="gazsp" remap="internal">Setting ZFS Properties</olink> or
+by using the <command>zfs create</command> command as described in <olink targetptr="gazsf" remap="internal">Creating a ZFS File System</olink>. With the exceptions
+of quotas and reservations, settable native properties are inherited. For
+more information about quotas and reservations, see <olink targetptr="gazvb" remap="internal">ZFS
+Quotas and Reservations</olink>.</para><para>Some settable native properties are specific to a particular type of
+dataset. In such cases, the particular dataset type is mentioned in the description
+ in <olink targetptr="gcfgr" remap="internal">Table&nbsp;5&ndash;1</olink>. If not specifically
+mentioned, a property applies to all dataset types: file systems, volumes,
+clones, and snapshots.</para><para>The settable properties are listed here and are described in <olink targetptr="gcfgr" remap="internal">Table&nbsp;5&ndash;1</olink>.</para><itemizedlist><listitem><para><property>aclinherit</property></para><para>For a detailed
+description, see <olink targetptr="gbaaz" remap="internal">ACL Property Modes</olink>.</para>
+</listitem><listitem><para><property>aclmode</property></para><para>For a detailed description,
+see <olink targetptr="gbaaz" remap="internal">ACL Property Modes</olink>.</para>
+</listitem><listitem><para><property>atime</property></para>
+</listitem><listitem><para><property>canmount</property></para>
+</listitem><listitem><para><property>casesensitivity</property></para>
+</listitem><listitem><para><property>checksum</property></para>
+</listitem><listitem><para><property>compression</property></para>
+</listitem><listitem><para><property>copies</property></para>
+</listitem><listitem><para><property>devices</property></para>
+</listitem><listitem><para><property>exec</property></para>
+</listitem><listitem><para><property>mountpoint</property> </para>
+</listitem><listitem><para><property>nbmand</property></para>
+</listitem><listitem><para><property>normalization</property></para>
+</listitem><listitem><para><property>quota</property></para>
+</listitem><listitem><para><property>readonly</property></para>
+</listitem><listitem><para><property>recordsize</property></para><para>For a detailed
+description, see <olink targetptr="gcfgv" remap="internal">The recordsize Property</olink>.</para>
+</listitem><listitem><para><property>refquota</property></para>
+</listitem><listitem><para><property>refreservation</property></para>
+</listitem><listitem><para><property>reservation</property></para>
+</listitem><listitem><para><property>sharenfs</property></para>
+</listitem><listitem><para><property>sharesmb</property></para>
+</listitem><listitem><para><property>setuid</property></para>
+</listitem><listitem><para><property>snapdir</property></para>
+</listitem><listitem><para><property>vscan</property></para>
+</listitem><listitem><para><property>utf8only</property></para>
+</listitem><listitem><para><property>volsize</property></para><para>For a detailed description,
+see <olink targetptr="gcfhk" remap="internal">The volsize Property</olink>.</para>
+</listitem><listitem><para><property>volblocksize</property></para>
+</listitem><listitem><para><property>zoned</property></para>
+</listitem>
+</itemizedlist><sect3 id="gdrcf"><title>The <command>canmount</command> Property</title><para>If this property is set to no, the file system cannot be mounted by
+using the <command>zfs mount</command> or <command>zfs mount</command> <option>a</option> commands.
+This property is similar to setting the <property>mountpoint</property> property
+to <literal>none</literal>, except that the dataset still has a normal <property>mountpoint</property>  property that can be inherited. For example, you can
+set this property to no, establish inheritable properties for descendent file
+systems, but the file system itself is never mounted nor it is accessible
+to users. In this case, the parent file system with this property set to no
+is serving as a <emphasis>container</emphasis> so that you can set attributes
+on the container, but the container itself is never accessible.</para><para>In the following example, <filename>userpool</filename> is created and
+the <property>canmount</property> property is set to off. Mount points for
+descendent user file systems are set to one common mount point, <filename>/export/home</filename>. Properties that are set on the parent file system are inherited
+by descendent file systems, but the parent file system itself is never mounted.</para><screen># <userinput>zpool create userpool mirror c0t5d0 c1t6d0</userinput>
+# <userinput>zfs set canmount=off userpool</userinput>
+# <userinput>zfs set mountpoint=/export/home userpool</userinput>
+# <userinput>zfs set compression=on userpool</userinput>
+# <userinput>zfs create userpool/user1</userinput>
+# <userinput>zfs create userpool/user2</userinput>
+# <userinput>zfs list -r userpool</userinput>
+NAME             USED  AVAIL  REFER  MOUNTPOINT
+userpool         140K  8.24G  24.5K  /export/home
+userpool/user1  24.5K  8.24G  24.5K  /export/home/user1
+userpool/user2  24.5K  8.24G  24.5K  /export/home/user2</screen>
+</sect3><sect3 id="gftgr"><title>The <property>casesensitivity</property> Property</title><para>This property indicates whether the file name matching algorithm used
+by the file system should be <literal>casesensitive</literal>, <literal>caseinsensitive</literal>, or allow a combination of both styles of matching (<literal>mixed</literal>).</para><para>When a case-insensitive matching request is made of a <emphasis>mixed</emphasis> sensitivity
+file system, the behavior is generally the same as would  be expected of a
+purely case-insensitive file system. The difference is that a mixed sensitivity
+file system might contain directories with multiple names that are unique
+from a case-sensitive perspective, but not unique from the case-insensitive
+perspective.</para><para>For example, a directory might contain files <filename>foo</filename>,
+ <filename>Foo</filename>, and <filename>FOO</filename>. If a request is made
+to case-insensitively match any of the possible forms of <filename>foo</filename>,
+(for example <filename>foo</filename>, <filename>FOO</filename>,  <filename>FoO</filename>, <filename>fOo</filename>, and so on) one of the three existing files is chosen as the
+match by the matching algorithm. Exactly which file the algorithm chooses
+as a match is not guaranteed, but what is  guaranteed is that the same file
+is chosen as a match for any of the forms of <filename>foo</filename>. The
+file chosen as a case-insensitive match for <filename>foo</filename>, <filename>FOO</filename>, <filename>foO</filename>, <filename>Foo</filename>, and so on,
+is always the same, so long as the directory remains unchanged.</para><para>The <literal>utf8only</literal>, <literal>normalization</literal>, and <literal>casesensitivity</literal> properties are also new permissions that can be
+assigned to non-privileged users by using ZFS delegated administration. For
+more information, see <olink targetptr="gfkco" remap="internal">Delegating ZFS Permissions</olink>.</para>
+</sect3><sect3 id="gcfgv"><title>The <property>recordsize</property> Property</title><para>Specifies a suggested block size for files in the file system.</para><para>This property is designed solely for use with database workloads that
+access files in fixed-size records. ZFS automatically adjust block sizes according
+to internal algorithms optimized for typical access patterns. For databases
+that create very large files but access the files in small random chunks,
+these algorithms may be suboptimal. Specifying a <property>recordsize</property> greater
+than or equal to the record size of the database can result in significant
+performance gains. Use of this property for general purpose file systems is
+strongly discouraged, and may adversely affect performance. The size specified
+must be a power of two greater than or equal to 512 and less than or equal
+to 128 Kbytes. Changing the file system's <literal>recordsize</literal> only
+affects files created afterward. Existing files are unaffected.</para><para>This property can also be referred to by its shortened column name, <property>recsize</property>.</para>
+</sect3><sect3 id="gfwpk"><title>The <literal>sharesmb</literal> Property</title><para>This property enabled sharing of ZFS file systems with the Solaris CIFS
+service, and identifies options to be used. </para><para>Because SMB shares requires a resource  name, a unique resource name
+is constructed from the dataset name. The constructed name is a copy of the
+dataset  name except that the characters in the dataset name, which would
+be illegal in the resource name, are replaced with underscore (_) characters.
+A pseudo property <replaceable>name</replaceable> is also           supported
+that allows you to replace the dataset name with a specific name. The specific
+name is then used to replace the prefix dataset in  the case of  inheritance.</para><para>For example,  if the dataset, <filename>data/home/john</filename>, is
+set to <filename>name=john</filename>, then <filename> data/home/john</filename> has
+a resource name of <literal>john</literal>. If a child dataset of <filename>data/home/john/backups</filename> exists,  it  has a resource name of <filename>john_backups</filename>.
+ When the <literal>sharesmb</literal> property is changed for a dataset, the
+dataset and any children inheriting the property are  re-shared with the new
+options, only if the property was previously  set  to <literal>off</literal>,
+or if they were shared before the property was changed. If the new property
+is set  to <literal>off</literal>, the file systems are unshared.</para><para>For examples of using the <literal>sharesmb</literal> property, see <olink targetptr="gfwqv" remap="internal">Sharing ZFS Files in a Solaris CIFS Environment</olink>.</para>
+</sect3><sect3 id="gcfhk"><title>The <property>volsize</property> Property</title><para>The logical size of the volume. By default, creating a volume establishes
+a reservation for the same amount. Any changes to <property>volsize</property> are
+reflected in an equivalent change to the reservation. These checks are used
+to prevent unexpected behavior for users. A volume that contains less space
+than it claims is available can result in undefined behavior or data corruption,
+depending on how the volume is used. These effects can also occur when the
+volume size is changed while it is in use, particularly when you shrink the
+size. Extreme care should be used when adjusting the volume size.</para><para>Though not recommended, you can create a sparse volume by specifying
+the <option>s</option> flag to <command>zfs create -V</command>, or by changing
+the reservation once the volume has been created. A <emphasis>sparse volume</emphasis> is
+defined as a volume where the reservation is not equal to the volume size.
+ For a sparse volume, changes to <property>volsize</property> are not reflected
+in the reservation.</para><para>For more information about using volumes, see <olink targetptr="gaypf" remap="internal">ZFS
+Volumes</olink>.</para>
+</sect3>
+</sect2><sect2 id="gdrcw"><title>ZFS User Properties</title><para>In addition to the standard native properties, ZFS supports arbitrary
+user properties. User properties have no effect on ZFS behavior, but you can
+use them to annotate datasets with information that is meaningful in your
+environment.</para><para>User property names must conform to the following characteristics:</para><itemizedlist><listitem><para>Contain a colon (':') character to distinguish them from native
+properties.</para>
+</listitem><listitem><para>Contain lowercase letters, numbers, and the following punctuation
+characters: ':', + ,'.', '_'.  </para>
+</listitem><listitem><para>Maximum user property name is 256 characters.</para>
+</listitem>
+</itemizedlist><para>The expected convention is that the property name is divided into the
+following two components but this namespace is not enforced by ZFS:</para><screen><replaceable>module:property</replaceable></screen><para>When making programmatic use of user properties, use a reversed DNS
+domain name for the <replaceable>module</replaceable> component of property
+names to reduce the chance that two independently-developed packages will
+use the same property name for different purposes. Property names that begin
+with "com.sun." are reserved for use by Sun Microsystems.</para><para>The values of user properties have the following characteristics:</para><itemizedlist><listitem><para>Arbitrary strings that are always inherited and are never
+validated.</para>
+</listitem><listitem><para>Maximum user property value is 1024 characters.</para>
+</listitem>
+</itemizedlist><para>For example:</para><screen># <userinput>zfs set dept:users=finance userpool/user1</userinput>
+# <userinput>zfs set dept:users=general userpool/user2</userinput>
+# <userinput>zfs set dept:users=itops userpool/user3</userinput></screen><para>All of the commands that operate on properties, such as <command>zfs
+list</command>, <command>zfs get</command>, <command>zfs set</command>, and
+so on, can be used to manipulate both native properties and user properties.</para><para>For example:</para><screen><userinput>zfs get -r dept:users userpool</userinput>
+NAME            PROPERTY    VALUE           SOURCE
+userpool        dept:users  all             local
+userpool/user1  dept:users  finance         local
+userpool/user2  dept:users  general         local
+userpool/user3  dept:users  itops           local</screen><para>To clear a user property, use the <command>zfs inherit</command> command.
+ For example:</para><screen># <userinput>zfs inherit -r dept:users userpool</userinput></screen><para>If the property is not defined in any parent dataset, it is removed
+entirely.</para>
+</sect2>
+</sect1><sect1 id="gazsu"><title>Querying ZFS File System Information</title><para>The <command>zfs list</command> command provides an extensible mechanism
+for viewing and querying dataset information. Both basic and complex queries
+are explained in this section.</para><sect2 id="gaztd"><title>Listing Basic ZFS Information</title><para>You can list basic dataset information by using the <command>zfs list</command> command
+with no options. This command displays the names of all datasets on the system
+including their <property>used</property>, <property>available</property>, <property>referenced</property>, and <property>mountpoint</property> properties. For
+more information about these properties, see <olink targetptr="gazss" remap="internal">Introducing
+ZFS Properties</olink>.</para><para>For example:</para><screen># <userinput>zfs list</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+pool                   476K  16.5G    21K  /pool
+pool/clone              18K  16.5G    18K  /pool/clone
+pool/home              296K  16.5G    19K  /pool/home
+pool/home/marks        277K  16.5G   277K  /pool/home/marks
+pool/home/marks@snap      0      -   277K  -
+pool/test               18K  16.5G    18K  /test</screen><para>You can also use this command to display specific datasets by providing
+the dataset name on the command line. Additionally, use the <option>r</option> option
+to recursively display all descendents of that dataset. For example:</para><screen># <userinput>zfs list -r pool/home/marks</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+pool/home/marks        277K  16.5G   277K  /pool/home/marks
+pool/home/marks@snap      0      -   277K  -</screen><para>You use <command>zfs list</command> command with absolute pathnames
+for datasets, snapshots, and volumes. For example:</para><screen># <userinput>zfs list /pool/home/marks</userinput>
+NAME              USED  AVAIL  REFER  MOUNTPOINT
+pool/home/marks   277K  16.5G   277K  /pool/home/marks</screen><para>The following example shows how to display <filename>tank/home/chua</filename> and
+all of its descendent datasets.</para><screen># <userinput>zfs list -r tank/home/chua</userinput>
+NAME                        USED  AVAIL  REFER  MOUNTPOINT 
+tank/home/chua		          26.0K  4.81G  10.0K  /tank/home/chua 
+tank/home/chua/projects       16K  4.81G   9.0K  /tank/home/chua/projects
+tank/home/chua/projects/fs1    8K  4.81G     8K  /tank/home/chua/projects/fs1 
+tank/home/chua/projects/fs2    8K  4.81G     8K  /tank/home/chua/projects/fs2</screen><para>For additional information about the <command>zfs list</command> command,
+see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="gazsh"><title>Creating Complex ZFS Queries</title><para>The <command>zfs list</command> output can be customized by using of
+the <option>o</option>, <option>f</option>, and <option>H</option> options.</para><para>You can customize property value output by using the <option>o</option> option
+and a comma-separated list of desired properties. Supply any dataset property
+as a valid value.  For a list of all supported dataset properties, see <olink targetptr="gazss" remap="internal">Introducing ZFS Properties</olink>. In addition to the properties
+defined there, the <option>o</option> option list can also contain the literal <literal>name</literal> to indicate that the output should include the name of the
+dataset. </para><para>The following example uses <command>zfs list</command> to display the
+dataset name, along with the <property>sharenfs</property> and <property>mountpoint</property> properties.</para><screen># zfs list -o name,sharenfs,mountpoint
+NAME                   SHARENFS         MOUNTPOINT
+tank                   off              /tank
+tank/home              on               /tank/home
+tank/home/ahrens       on               /tank/home/ahrens
+tank/home/bonwick      on               /tank/home/bonwick
+tank/home/chua         on               /tank/home/chua
+tank/home/eschrock     on               legacy
+tank/home/moore        on               /tank/home/moore
+tank/home/tabriz       ro               /tank/home/tabriz</screen><para>You can use the <option>t</option> option to specify the types of datasets
+to display. The valid types are described in the following table.</para><table frame="topbot" id="gbaje"><title>Types of ZFS Datasets</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="29.53*"/><colspec colwidth="70.47*"/><thead><row rowsep="1"><entry><para>Type</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>filesystem</literal></para>
+</entry><entry><para>File systems and clones</para>
+</entry>
+</row><row><entry><para><literal>volume</literal></para>
+</entry><entry><para>Volumes</para>
+</entry>
+</row><row><entry><para><literal>snapshot</literal></para>
+</entry><entry><para>Snapshots</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The <option>t</option> options takes a comma-separated list of the types
+of datasets to be displayed. The following example uses the <option>t</option> and <option>o</option> options simultaneously to show the name and <property>used</property> property
+for all file systems:</para><screen># <userinput>zfs list -t filesystem -o name,used</userinput>
+NAME              USED
+pool              476K
+pool/clone         18K
+pool/home         296K
+pool/home/marks   277K
+pool/test          18K</screen><para>You can use the <option>H</option> option to omit the <command>zfs list</command> header
+from the generated output. With the <option>H</option> option, all white space
+is output as tabs. This option can be useful when you need parseable output,
+for example, when scripting. The following example shows the output generated
+from using the <command>zfs list</command> command with the <option>H</option> option:</para><screen># <userinput>zfs list -H -o name</userinput>
+pool
+pool/clone
+pool/home
+pool/home/marks
+pool/home/marks@snap
+pool/test</screen>
+</sect2>
+</sect1><sect1 id="gayns"><title>Managing ZFS Properties</title><para>Dataset properties are managed through the <command>zfs</command> command's <command>set</command>, <command>inherit</command>, and <command>get</command> subcommands.</para><itemizedlist><listitem><para><olink targetptr="gazsp" remap="internal">Setting ZFS Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gazup" remap="internal">Inheriting ZFS Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gazuk" remap="internal">Querying ZFS Properties</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gazsp"><title>Setting ZFS Properties</title><para>You can use the <command>zfs set</command> command to modify any settable
+dataset property.  Or, you can use the <command>zfs create</command> command
+to set properties when the dataset is created. For a list of settable dataset
+properties, see <olink targetptr="gazsd" remap="internal">Settable ZFS Native Properties</olink>.
+The <command>zfs set</command> command takes a property/value sequence in
+the format of <replaceable>property</replaceable>=<replaceable>value</replaceable> and
+a dataset name.</para><para>The following example sets the <property>atime</property> property to <literal>off</literal> for <filename>tank/home</filename>. Only one property can be
+set or modified during each <command>zfs set</command> invocation.</para><screen># <userinput>zfs set atime=off tank/home</userinput></screen><para>In addition, any file system property can be set when the file system
+is created. For example:</para><screen># <userinput>zfs create -o atime=off tank/home</userinput></screen><para>You can specify numeric properties by using the following easy to understand
+suffixes (in order of magnitude): <literal>BKMGTPEZ</literal>.  Any of these
+suffixes can be followed by an optional <literal>b</literal>, indicating bytes,
+with the exception of the <literal>B</literal> suffix, which already indicates
+bytes. The following four invocations of <command>zfs set</command> are equivalent
+numeric expressions indicating that the <property>quota</property> property
+be set to the value of 50 Gbytes on the <filename>tank/home/marks</filename> file
+system:</para><screen># <userinput>zfs set quota=50G tank/home/marks</userinput>
+# <userinput>zfs set quota=50g tank/home/marks</userinput>
+# <userinput>zfs set quota=50GB tank/home/marks</userinput>
+# <userinput>zfs set quota=50gb tank/home/marks</userinput></screen><para>Values of non-numeric properties are case-sensitive and must be lowercase,
+with the exception of <property>mountpoint</property> and  <property>sharenfs</property>.
+The values of these properties can have mixed upper and lower case letters.</para><para>For more information about the <command>zfs set</command> command, see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="gazup"><title>Inheriting ZFS Properties</title><para>All settable properties, with the exception of quotas and reservations,
+inherit their value from their parent, unless a quota or reservation is explicitly
+set on the child. If no ancestor has an explicit value set for an inherited
+property, the default value for the property is used. You can use the <command>zfs
+inherit</command> command to clear a property setting, thus causing the setting
+to be inherited from the parent.</para><para>The following example uses the <command>zfs set</command> command to
+turn on compression for the <filename>tank/home/bonwick</filename> file system.
+Then, <command>zfs inherit</command> is used to unset the <property>compression</property> property,
+thus causing the property to inherit the default setting of <literal>off</literal>.
+Because neither <filename>home</filename> nor <filename>tank</filename> have
+the <property>compression</property> property set locally, the default value
+is used. If both had compression on, the value set in the most immediate ancestor
+would be used (<filename>home</filename> in this example).</para><screen># <userinput>zfs set compression=on tank/home/bonwick</userinput>
+# <userinput>zfs get -r compression tank</userinput>
+NAME             PROPERTY      VALUE                    SOURCE
+tank             compression   off                      default
+tank/home        compression   off                      default
+tank/home/bonwick compression   on                      local
+# <userinput>zfs inherit compression tank/home/bonwick</userinput>
+# <userinput>zfs get -r compression tank</userinput>
+NAME             PROPERTY      VALUE                    SOURCE
+tank             compression   off                      default
+tank/home        compression   off                      default
+tank/home/bonwick compression  off                      default</screen><para>The <command>inherit</command> subcommand is applied recursively when
+the <option>r</option> option is specified. In the following example, the
+command causes the value for the <property>compression</property> property
+to be inherited by <filename>tank/home</filename> and any descendents it might
+have.</para><screen># <userinput>zfs inherit -r compression tank/home</userinput></screen><note><para>Be aware that the use of the <option>r</option> option clears
+the current property setting for all descendent datasets.</para>
+</note><para>For more information about the <command>zfs</command> command, see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="gazuk"><title>Querying ZFS Properties</title><para>The simplest way to query property values is by using the <command>zfs
+list</command> command. For more information, see <olink targetptr="gaztd" remap="internal">Listing
+Basic ZFS Information</olink>. However, for complicated queries and for scripting,
+use the <command>zfs get</command> command to provide more detailed information
+in a customized format.</para><para>You can use the <command>zfs get</command> command to retrieve any dataset
+property. The following example shows how to retrieve a single property on
+a dataset:</para><screen># <userinput>zfs get checksum tank/ws</userinput>
+NAME             PROPERTY       VALUE                      SOURCE
+tank/ws          checksum       on                         default</screen><para>The fourth column, <literal>SOURCE</literal>, indicates where this property
+value has been set from. The following table defines the meaning of the possible
+source values. </para><table frame="topbot" id="gbavh"><title>Possible <literal>SOURCE</literal> Values
+(<command>zfs get</command>)</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colwidth="35.30*"/><colspec colwidth="64.70*"/><thead><row rowsep="1"><entry><para>Source Value</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>default</literal></para>
+</entry><entry><para>This property was never explicitly set for this dataset or any of its
+ancestors. The default value for this property is being used.</para>
+</entry>
+</row><row><entry><para><literal>inherited from</literal> <replaceable>dataset-name</replaceable></para>
+</entry><entry><para>This property value is being inherited from the parent as specified
+by <replaceable>dataset-name</replaceable>.</para>
+</entry>
+</row><row><entry><para><literal>local</literal></para>
+</entry><entry><para>This property value was explicitly set for this dataset by using <command>zfs
+set</command>.</para>
+</entry>
+</row><row><entry><para><literal>temporary</literal></para>
+</entry><entry><para>This property value was set by using the <command>zfs mount</command> <option>o</option> option and is only valid for the lifetime of the mount. For more
+information about temporary mount point properties, see <olink targetptr="gamnt" remap="internal">Using Temporary Mount Properties</olink>.</para>
+</entry>
+</row><row><entry><para>- (none)</para>
+</entry><entry><para>This property is a read-only property. Its value is generated by ZFS.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>You can use the special keyword <literal>all</literal> to retrieve all
+dataset properties. The following example uses the <literal>all</literal> keyword
+to retrieve all existing dataset properties:</para><screen># <userinput>zfs get all tank</userinput>
+NAME  PROPERTY         VALUE                  SOURCE
+tank  type             filesystem             -
+tank  creation         Wed Jan 23  9:57 2008  -
+tank  used             120K                   -
+tank  available        33.1G                  -
+tank  referenced       24.0K                  -
+tank  compressratio    1.00x                  -
+tank  mounted          yes                    -
+tank  quota            none                   default
+tank  reservation      none                   default
+tank  recordsize       128K                   default
+tank  mountpoint       /tank                  default
+tank  sharenfs         off                    default
+tank  checksum         on                     default
+tank  compression      off                    default
+tank  atime            on                     default
+tank  devices          on                     default
+tank  exec             on                     default
+tank  setuid           on                     default
+tank  readonly         off                    default
+tank  zoned            off                    default
+tank  snapdir          hidden                 default
+tank  aclmode          groupmask              default
+tank  aclinherit       secure                 default
+tank  canmount         on                     default
+tank  shareiscsi       off                    default
+tank  xattr            on                     default
+tank  copies           1                      default
+tank  version          3                      -
+tank  utf8only         off                    -
+tank  normalization    none                   -
+tank  casesensitivity  sensitive              -
+tank  vscan            off                    default
+tank  nbmand           off                    default
+tank  sharesmb         off                    default
+tank  refquota         none                   default
+tank  refreservation   none                   default</screen><para>The <option>s</option> option to <command>zfs get</command> enables
+you to specify, by source value, the type of properties to display. This option
+takes a comma-separated list indicating the desired source types. Only properties
+with the specified source type are displayed. The valid source types are <literal>local</literal>, <literal>default</literal>, <literal>inherited</literal>, <literal>temporary</literal>, and <literal>none</literal>. The following example shows
+all properties that have been locally set on <literal>pool</literal>.</para><screen># <userinput>zfs get -s local all pool</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+pool             compression   on                         local</screen><para>Any of the above options can be combined with the <option>r</option> option
+to recursively display the specified properties on all children of the specified
+dataset. In the following example, all temporary properties on all datasets
+within <literal>tank</literal> are recursively displayed:</para><screen># <userinput>zfs get -r -s temporary all tank</userinput>
+NAME             PROPERTY       VALUE                      SOURCE
+tank/home          atime          off                      temporary
+tank/home/bonwick  atime          off                      temporary
+tank/home/marks    atime          off                      temporary</screen><para>A recent feature enables you to make queries with the <command>zfs get</command> command
+without specifying a target file system, which means it operates on all pools
+or file systems. For example:</para><screen># <userinput>zfs get -s local all</userinput>
+tank/home               atime          off                    local
+tank/home/bonwick       atime          off                    local
+tank/home/marks         quota          50G                    local</screen><para>For more information about the <command>zfs get</command> command, see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para><sect3 id="gazum"><title>Querying ZFS Properties for Scripting</title><para>The <command>zfs get</command> command supports the <option>H</option> and <option>o</option> options, which are designed for scripting. The <option>H</option> option
+indicates that any header information should be omitted and that all white
+space should come in the form of tab. Uniform white space allows for easily
+parseable data. You can use the <option>o</option> option to customize the
+output. This option takes a comma-separated list of values to be output. All
+properties defined in <olink targetptr="gazss" remap="internal">Introducing ZFS Properties</olink>,
+along with the literals <literal>name</literal>, <literal>value</literal>, <literal>property</literal> and <literal>source</literal> can be supplied in the <option>o</option> list.</para><para>The following example shows how to retrieve a single value by using
+the <option>H</option> and <option>o</option> options of <command>zfs get</command>.</para><screen># <userinput>zfs get -H -o value compression tank/home</userinput>
+on</screen><para>The <option>p</option> option reports numeric values as their exact
+values. For example, 1 Mbyte would be reported as 1000000. This option can
+be used as follows:</para><screen># <userinput>zfs get -H -o value -p used tank/home</userinput>
+182983742</screen><para>You can use the <option>r</option> option along with any of the above
+options to recursively retrieve the requested values for all descendents.
+The following example uses the <option>r</option>, <option>o</option>, and <option>H</option> options to retrieve the dataset name and the value of the <property>used</property> property for <filename>export/home</filename> and its descendents,
+while omitting any header output:</para><screen># <userinput>zfs get -H -o name,value -r used export/home</userinput>
+export/home     5.57G
+export/home/marks       1.43G
+export/home/maybee      2.15G</screen>
+</sect3>
+</sect2>
+</sect1><sect1 id="gaynd"><title>Mounting and Sharing ZFS File Systems</title><para>This section describes how mount points and shared file systems are
+managed in ZFS.</para><itemizedlist><listitem><para><olink targetptr="gaztn" remap="internal">Managing ZFS Mount Points</olink></para>
+</listitem><listitem><para><olink targetptr="gamns" remap="internal">Mounting ZFS File Systems</olink></para>
+</listitem><listitem><para><olink targetptr="gamnt" remap="internal">Using Temporary Mount Properties</olink></para>
+</listitem><listitem><para><olink targetptr="gamnr" remap="internal">Unmounting ZFS File Systems</olink></para>
+</listitem><listitem><para><olink targetptr="gamnd" remap="internal">Sharing and Unsharing ZFS File Systems</olink></para>
+</listitem>
+</itemizedlist><sect2 id="gaztn"><title>Managing ZFS Mount Points</title><para>By default, all ZFS file systems are mounted by ZFS at boot by using
+SMF's <filename>svc://system/filesystem/local</filename> service. File systems
+are mounted under <replaceable>/path</replaceable>, where <replaceable>path</replaceable> is
+the name of the file system.</para><para>You can override the default mount point by setting the <property>mountpoint</property> property to a specific path by using the <command>zfs set</command> command.
+ZFS automatically creates this mount point, if needed, and automatically mounts
+this file system when the <command>zfs mount -a</command> command is invoked,
+without requiring you to edit the <filename>/etc/vfstab</filename> file.</para><para>The  <literal>mountpoint</literal> property is inherited. For example,
+if <filename>pool/home</filename> has <property>mountpoint</property> set
+to <filename>/export/stuff</filename>, then <filename>pool/home/user</filename> inherits <filename>/export/stuff/user</filename> for its <property>mountpoint</property> property.</para><para>The <property>mountpoint</property> property can be set to <literal>none</literal> to
+prevent the file system from being mounted. In addition, the <property>canmount</property> property
+is available for determining whether a file system can be mounted. For more
+information about the <property>canmount</property> property, see <olink targetptr="gdrcf" remap="internal">The canmount Property</olink>.</para><para>If desired, file systems can also be explicitly managed through legacy
+mount interfaces by setting the <property>mountpoint</property> property to <property>legacy</property> by using <command>zfs set</command>. Doing so prevents ZFS
+from automatically mounting and managing this file system. Legacy tools including
+the <command>mount</command> and <command>umount</command> commands, and the <filename>/etc/vfstab</filename> file must be used instead. For more information about
+legacy mounts, see <olink targetptr="gbaln" remap="internal">Legacy Mount Points</olink>.</para><para>When changing mount point management strategies, the following behaviors
+apply:</para><itemizedlist><listitem><para>Automatic mount point behavior</para>
+</listitem><listitem><para>Legacy mount point behavior</para>
+</listitem>
+</itemizedlist><sect3 id="gbala"><title>Automatic Mount Points</title><itemizedlist><listitem><para>When changing from <literal>legacy</literal> or <literal>none</literal>,
+ZFS automatically mounts the file system.</para>
+</listitem><listitem><para>If ZFS is currently managing the file system but it is currently
+unmounted, and the <property>mountpoint</property> property is changed, the
+file system remains unmounted.</para>
+</listitem>
+</itemizedlist><para>You can also set the default mount point for the root dataset at creation
+time by using <command>zpool create</command>'s <option>m</option> option.
+For more information about creating pools, see <olink targetptr="gaynr" remap="internal">Creating
+a ZFS Storage Pool</olink>.</para><para>Any dataset whose <property>mountpoint</property> property is not <literal>legacy</literal> is managed by ZFS. In the following example, a dataset is
+created whose mount point is automatically managed by ZFS.</para><screen># <userinput>zfs create pool/filesystem</userinput>
+# <userinput>zfs get mountpoint pool/filesystem</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+pool/filesystem  mountpoint    /pool/filesystem           default
+# <userinput>zfs get mounted pool/filesystem</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+pool/filesystem  mounted       yes                        -</screen><para>You can also explicitly set the <property>mountpoint</property> property
+as shown in the following example:</para><screen># <userinput>zfs set mountpoint=/mnt pool/filesystem</userinput>
+# <userinput>zfs get mountpoint pool/filesystem</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+pool/filesystem  mountpoint    /mnt                       local
+# <userinput>zfs get mounted pool/filesystem</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+pool/filesystem  mounted       yes                        -</screen><para>When the <property>mountpoint</property> property is changed, the file
+system is automatically unmounted from the old mount point and remounted to
+the new mount point. Mount point directories are created as needed. If ZFS
+is unable to unmount a file system due to it being active, an error is reported
+and a forced manual unmount is necessary.</para>
+</sect3><sect3 id="gbaln"><title>Legacy Mount Points</title><para>You can manage ZFS file systems with legacy tools by setting the <property>mountpoint</property> property to <property>legacy</property>. Legacy file
+systems must be managed through the <command>mount</command> and <command>umount</command> commands
+and the <filename>/etc/vfstab</filename> file. ZFS does not automatically
+mount legacy file systems on boot, and the ZFS <command>mount</command> and <command>umount</command> command do not operate on datasets of this type. The following
+examples show how to set up and manage a ZFS dataset in legacy mode:</para><screen># <userinput>zfs set mountpoint=legacy tank/home/eschrock</userinput>
+# <userinput>mount -F zfs tank/home/eschrock /mnt</userinput></screen><para>In
+addition, you must mount them by creating entries in the <filename>/etc/vfstab</filename> file.
+Otherwise, the <filename>system/filesystem/local</filename> service enters
+maintenance mode when the system boots.</para><para>To automatically mount a legacy file system on boot, you must add an
+entry to the <filename>/etc/vfstab</filename> file. The following example
+shows what the entry in the <filename>/etc/vfstab</filename> file might look
+like:</para><screen>#device         device        mount           FS      fsck    mount   mount
+#to mount       to fsck       point           type    pass    at boot options
+#
+
+tank/home/eschrock -		/mnt		   zfs		-		yes		-	</screen><para>Note that the <literal>device to fsck</literal> and <literal>fsck pass</literal> entries
+are set to <literal>-</literal>. This syntax is because the <command>fsck</command> command
+is not applicable to ZFS file systems. For more information regarding data
+integrity and the lack of need for <command>fsck</command> in ZFS, see <olink targetptr="gaypi" remap="internal">Transactional Semantics</olink>.</para>
+</sect3>
+</sect2><sect2 id="gamns"><title>Mounting ZFS File Systems</title><para>ZFS automatically mounts file systems when file systems are created
+or when the system boots. Use of the <command>zfs mount</command> command
+is necessary only when changing mount options or explicitly mounting or unmounting
+file systems.</para><para>The <command>zfs mount</command> command with no arguments shows all
+currently mounted file systems that are managed by ZFS. Legacy managed mount
+points are not displayed. For example:</para><screen># <userinput>zfs mount</userinput>
+tank                            /tank
+tank/home                       /tank/home
+tank/home/bonwick               /tank/home/bonwick
+tank/ws                         /tank/ws</screen><para>You can use the <option>a</option> option to mount all ZFS managed file
+systems. Legacy managed file systems are not mounted. For example:</para><screen># <userinput>zfs mount -a</userinput></screen><para>By default, ZFS does not allow mounting on top of a nonempty directory.
+To force a mount on top of a nonempty directory, you must use the <option>O</option> option.
+For example:</para><screen># <userinput>zfs mount tank/home/lalt</userinput>
+cannot mount '/export/home/lalt': directory is not empty
+use legacy mountpoint to allow this behavior, or use the -O flag
+# <userinput>zfs mount -O tank/home/lalt</userinput></screen><para>Legacy mount points must be managed through legacy tools. An attempt
+to use ZFS tools results in an error. For example:</para><screen># <userinput>zfs mount pool/home/billm</userinput>
+cannot mount 'pool/home/billm': legacy mountpoint
+use mount(1M) to mount this filesystem
+# <userinput>mount -F zfs tank/home/billm</userinput></screen><para>When a file system is mounted, it uses a set of mount options based
+on the property values associated with the dataset.  The correlation between
+properties and mount options is as follows:</para><variablelist><varlistentry><term>Property</term><listitem><para>Mount Options</para>
+</listitem>
+</varlistentry><varlistentry><term><property>devices</property></term><listitem><para><literal>devices/nodevices</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><property>exec</property></term><listitem><para><literal>exec/noexec</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><property>readonly</property></term><listitem><para><literal>ro/rw</literal></para>
+</listitem>
+</varlistentry><varlistentry><term><property>setuid</property></term><listitem><para><literal>setuid/nosetuid</literal></para>
+</listitem>
+</varlistentry>
+</variablelist><para>The mount option <literal>nosuid</literal> is an alias for  <literal>nodevices,nosetuid</literal>.</para><para>You
+can use the NFSv4 mirror mount features to help you better manage NFS-mounted
+ZFS home directories. For a description of mirror mounts, see <olink targetptr="gfwqw" remap="internal">ZFS and File System Mirror Mounts</olink>.</para>
+</sect2><sect2 id="gamnt"><title>Using Temporary Mount Properties</title><para>If any of the above options are set explicitly by using the<option>o</option> option
+with the <command>zfs mount</command> command, the associated property value
+is temporarily overridden. These property values are reported as <literal>temporary</literal> by the <command>zfs get</command> command and revert back to their
+original settings when the file system is unmounted. If a property value is
+changed while the dataset is mounted, the change takes effect immediately,
+overriding any temporary setting.</para><para>In the following example, the read-only mount option is temporarily
+set on the <filename>tank/home/perrin</filename> file system:</para><screen># <userinput>zfs mount -o ro tank/home/perrin</userinput></screen><para>In this example, the file system is assumed to be unmounted. To temporarily
+change a property on a file system that is currently mounted, you must use
+the special <literal>remount</literal> option. In the following example, the <property>atime</property> property is temporarily changed to <literal>off</literal> for
+a file system that is currently mounted:</para><screen># <userinput>zfs mount -o remount,noatime tank/home/perrin</userinput>
+# <userinput>zfs get atime tank/home/perrin</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+tank/home/perrin atime         off                        temporary</screen><para>For more information about the <command>zfs mount</command> command,
+see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="gamnr"><title>Unmounting ZFS File Systems</title><para>You can unmount file systems by using the <command>zfs unmount</command> subcommand.
+The <command>unmount</command> command can take either the mount point or
+the file system name as arguments.</para><para>In the following example, a file system is unmounted by file system
+name:</para><screen># <userinput>zfs unmount tank/home/tabriz</userinput></screen><para>In the following example, the file system is unmounted by mount point:</para><screen># <userinput>zfs unmount /export/home/tabriz</userinput></screen><para>The <command>unmount</command> command fails if the file system is active
+or busy. To forceably unmount a file system, you can use the <option>f</option> option.
+Be cautious when forceably unmounting a file system, if its contents are actively
+being used. Unpredictable application behavior can result.</para><screen># <userinput>zfs unmount tank/home/eschrock</userinput>
+cannot unmount '/export/home/eschrock': Device busy
+# <userinput>zfs unmount -f tank/home/eschrock</userinput></screen><para>To provide for backwards compatibility, the legacy <command>umount</command> command
+can be used to unmount ZFS file systems. For example:</para><screen># <userinput>umount /export/home/bob</userinput></screen><para>For more information about the <command>zfs umount</command> command,
+see <olink targetdoc="refman1m" targetptr="zfs-1m" remap="external"><citerefentry><refentrytitle>zfs</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>.</para>
+</sect2><sect2 id="gamnd"><title>Sharing and Unsharing ZFS File Systems</title><para>Similar to mount points, ZFS can automatically share file systems by
+using the <property>sharenfs</property> property. Using this method, you do
+not have to modify the <filename>/etc/dfs/dfstab</filename> file when a new
+file system is added. The <property>sharenfs</property> property is a comma-separated
+list of options to pass to the <command>share</command> command. The special
+value <literal>on</literal> is an alias for the default share options, which
+are <literal>read/write</literal> permissions for anyone. The special value <literal>off</literal> indicates that the file system is not managed by ZFS and can
+be shared through traditional means, such as the <filename>/etc/dfs/dfstab</filename> file.
+All file systems whose <property>sharenfs</property> property is not <literal>off</literal> are shared during boot.</para><sect3 id="gbdxz"><title>Controlling Share Semantics</title><para>By default, all file systems are unshared. To share a new file system,
+use <command>zfs set</command> syntax similar to the following:</para><screen># <userinput>zfs set sharenfs=on tank/home/eschrock</userinput></screen><para>The property is inherited, and file systems are automatically shared
+on creation if their inherited property is not <literal>off</literal>. For
+example:</para><screen># <userinput>zfs set sharenfs=on tank/home</userinput>
+# <userinput>zfs create tank/home/bricker</userinput>
+# <userinput>zfs create tank/home/tabriz</userinput>
+# <userinput>zfs set sharenfs=ro tank/home/tabriz</userinput></screen><para>Both <filename>tank/home/bricker</filename> and <filename>tank/home/tabriz</filename> are
+initially shared writable because they inherit the <property>sharenfs</property> property
+from <filename>tank/home</filename>. Once the property is set to <literal>ro</literal> (readonly), <filename>tank/home/tabriz</filename> is shared read-only regardless of the <property>sharenfs</property> property that is set for <filename>tank/home</filename>.</para>
+</sect3><sect3 id="gbdze"><title>Unsharing ZFS File Systems</title><para>While most file systems are automatically shared and unshared during
+boot, creation, and destruction, file systems sometimes need to be explicitly
+unshared. To do so, use the <command>zfs unshare</command> command. For example:</para><screen># <userinput>zfs unshare tank/home/tabriz</userinput></screen><para>This command unshares the <filename>tank/home/tabriz</filename> file
+system. To unshare all ZFS file systems on the system, you need to use the <option>a</option> option.</para><screen># <userinput>zfs unshare -a</userinput></screen>
+</sect3><sect3 id="gbdxw"><title>Sharing ZFS File Systems</title><para>Most of the time the automatic behavior of ZFS, sharing on boot and
+creation, is sufficient for normal operation. If, for some reason, you unshare
+a file system, you can share it again by using the <command>zfs share</command> command.
+For example:</para><screen># <userinput>zfs share tank/home/tabriz</userinput></screen><para>You can also share all ZFS file systems on the system by using the <option>a</option> option.</para><screen># <userinput>zfs share -a</userinput></screen>
+</sect3><sect3 id="gbdxq"><title>Legacy Share Behavior</title><para>If the <property>sharenfs</property> property is <literal>off</literal>,
+then ZFS does not attempt to share or unshare the file system at any time.
+This setting enables you to administer through traditional means such as the <filename>/etc/dfs/dfstab</filename> file.</para><para>Unlike the traditional <command>mount</command> command, the traditional <command>share</command> and <command>unshare</command> commands can still function
+on ZFS file systems. As a result, you can manually share a file system with
+options that are different from the settings of the <literal>sharenfs</literal> property.
+This administrative model is discouraged. Choose to either manage NFS shares
+completely through ZFS or completely through the <filename>/etc/dfs/dfstab</filename> file.
+The ZFS administrative model is designed to be simpler and less work than
+the traditional model. However, in some cases, you might still want to control
+file system sharing behavior through the familiar model.</para>
+</sect3>
+</sect2><sect2 id="gfwqv"><title>Sharing
+ZFS Files in a Solaris CIFS Environment</title><para>The <literal>sharesmb</literal> property is provided to share ZFS files
+by using the Solaris CIFS software product. When this property is set on a
+ZFS file system, these shares are visible to CIFS client systems. For more
+information about using the CIFS software product, see the <citetitle>System
+Administration Guide: Windows Interoperability</citetitle>.</para><para>For a detailed description of the <literal>sharesmb</literal> property,
+see <olink targetptr="gfwpk" remap="internal">The sharesmb Property</olink>.</para><example id="gfwqk"><title>Example&mdash;Sharing ZFS File Systems (<literal>sharesmb</literal>)</title><para>In this example, a ZFS file system <filename>sandbox/fs1</filename> is
+created and shared with the <literal>sharesmb</literal> property. If necessary,
+enable the SMB services.</para><screen remap="wide"># svcadm enable -r smb/server
+svcadm: svc:/milestone/network depends on svc:/network/physical, which has multiple instances.
+# svcs | grep smb
+online         10:47:15 svc:/network/smb/server:default</screen><screen># <userinput>zpool create sandbox mirror c0t2d0 c0t4d0</userinput>
+# <userinput>zfs create sandbox/fs1</userinput>
+# <userinput>zfs set sharesmb=on sandbox/fs1</userinput></screen><para>The <literal>sharesmb</literal> property is set for <filename>sandbox/fs1</filename> and
+its descendents.</para><para>Verify that the file system was shared. For example:</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+zfs nfs=()
+    zfs/sandbox/fs1 smb=()
+          sandbox_fs1=/sandbox/fs1</screen><para>A default SMB resource name, <filename>sandbox_fs1</filename>, is assigned
+automatically.</para><para>In this example, another file system is created, <filename>sandbox/fs2</filename>,
+and shared with a resource name, <literal>myshare</literal>.</para><screen># <userinput>zfs create sandbox/fs2</userinput>
+# <userinput>zfs set sharesmb=name=myshare sandbox/fs2</userinput>
+# <userinput>sharemgr show -vp</userinput>
+default nfs=()
+zfs nfs=()
+    zfs/sandbox/fs1 smb=()
+          sandbox_fs1=/sandbox/fs1
+    zfs/sandbox/fs2 smb=()
+          myshare=/sandbox/fs2</screen><para>The <filename>sandbox/fs2/fs2_sub1</filename> file system is created
+and is automatically shared. The inherited resource name is <literal>myshare_fs2_sub1</literal>.</para><screen># <userinput>zfs create sandbox/fs2/fs2_sub1</userinput>
+# <userinput>sharemgr show -vp</userinput>
+default nfs=()
+zfs nfs=()
+    zfs/sandbox/fs1 smb=()
+          sandbox_fs1=/sandbox/fs1
+    zfs/sandbox/fs2 smb=()
+          myshare=/sandbox/fs2
+          myshare_fs2_sub1=/sandbox/fs2/fs2_sub1</screen><para>Disable SMB sharing for <filename>sandbox/fs2</filename> and its descendents.</para><screen># <userinput>zfs set sharesmb=off sandbox/fs2</userinput>
+# <userinput>sharemgr show -vp</userinput>
+default nfs=()
+zfs nfs=()
+    zfs/sandbox/fs1 smb=()
+          sandbox_fs1=/sandbox/fs1</screen>
+</example><para>In this example, the <literal>sharesmb</literal> property is set on
+the pool's top-level file system. The descendent file systems are automatically
+shared.</para><screen># <userinput>zpool create sandbox mirror c0t2d0 c0t4d0</userinput>
+# <userinput>zfs set sharesmb=on sandbox</userinput>
+# <userinput>zfs create sandbox/fs1</userinput>
+# <userinput>zfs create sandbox/fs2</userinput></screen><para>The top-level file system has a resource name of <literal>sandbox</literal>,
+but the descendents have their dataset name appended to the resource name.</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+zfs nfs=()
+    zfs/sandbox smb=()
+          sandbox=/sandbox
+          sandbox_fs1=/sandbox/fs1       smb=()
+          sandbox_fs2=/sandbox/fs2       smb=()</screen>
+</sect2>
+</sect1><sect1 id="gazvb"><title>ZFS Quotas and Reservations</title><para>ZFS supports quotas and reservations at the file system level. You can
+use the <property>quota</property> property to set a limit on the amount of
+space a file system can use. In addition, you can use the <property>reservation</property> property
+to guarantee that some amount of space is available to a file system. Both
+properties apply to the dataset they are set on and all descendents of that
+dataset.</para><para>That is, if a quota is set on the <filename>tank/home</filename> dataset,
+the total amount of space used by <filename>tank/home</filename> <emphasis>and
+all of its descendents</emphasis> cannot exceed the quota. Similarly, if <filename>tank/home</filename> is given a reservation, <filename>tank/home</filename> <emphasis>and all of its descendents</emphasis> draw from that reservation. The amount
+of space used by a dataset and all of its descendents is reported by the <property>used</property> property.</para><para>In addition to the <literal>quota</literal> and <literal>reservation</literal> property, the <literal>refquota</literal> and <literal>refreservation</literal> properties are available
+to manage file system space without accounting for space consumed by descendents,
+such as snapshots and clones.</para><para>Consider the following points to determine
+which quota and reservations features might better manage your file systems:</para><itemizedlist><listitem><para>The <literal>quota</literal> and <literal>reservation</literal> properties
+are convenient for managing space consumed by datasets.</para>
+</listitem><listitem><para>The <literal>refquota</literal> and <literal>refreservation</literal> properties
+are appropriate for managing space consumed by datasets and snapshots. </para>
+</listitem><listitem><para>Setting <literal>refquota</literal> or <literal>refreservation</literal> higher
+than quota or reservation have no effect. If you set the <literal>quota</literal> or <literal>refquota</literal> properties, operations that try to exceed either value
+fail.  It is possible to a exceed a <literal>quota</literal> that is greater
+than <literal>refquota</literal>. If some snapshot blocks are dirtied, you
+might actually exceed the <literal>quota</literal> before you exceed the <literal>refquota</literal>.</para>
+</listitem>
+</itemizedlist><para>For more information, see the examples below.</para><sect2 id="gazud"><title>Setting Quotas on ZFS File Systems</title><para>ZFS quotas can be set and displayed by using the <command>zfs set</command> and <command>zfs get</command> commands. In the following example, a quota of 10 Gbytes
+is set on <filename>tank/home/bonwick</filename>.</para><screen># <userinput>zfs set quota=10G tank/home/bonwick</userinput>
+# <userinput>zfs get quota tank/home/bonwick</userinput>
+NAME              PROPERTY      VALUE                      SOURCE
+tank/home/bonwick quota         10.0G                      local</screen><para>ZFS quotas also impact the output of the <command>zfs list</command> and <command>df</command> commands. For example:</para><screen># <userinput>zfs list</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/home             16.5K  33.5G  8.50K  /export/home
+tank/home/bonwick     15.0K  10.0G  8.50K  /export/home/bonwick
+tank/home/bonwick/ws  6.50K  10.0G  8.50K  /export/home/bonwick/ws
+# <userinput>df -h /export/home/bonwick</userinput>
+Filesystem             size   used  avail capacity  Mounted on
+tank/home/bonwick       10G     8K    10G     1%    /export/home/bonwick</screen><para>Note that although <filename>tank/home</filename> has 33.5 Gbytes of
+space available, <filename>tank/home/bonwick</filename> and <filename>tank/home/bonwick/ws</filename> only have 10 Gbytes of space available, due to the quota on <filename>tank/home/bonwick</filename>.</para><para>You cannot set a quota to an amount less than is currently being used
+by a dataset. For example:</para><screen># <userinput>zfs set quota=10K tank/home/bonwick</userinput>
+cannot set quota for 'tank/home/bonwick': size is less than current used or 
+reserved space</screen><para>You can set a <literal>refquota</literal> on a dataset that limits the amount of space that the dataset
+can consume. This hard limit does not include space that is consumed by snapshots
+and clones. For example:</para><screen># <userinput>zfs set refquota=10g students/studentA</userinput>
+# <userinput>zfs list</userinput>
+NAME                USED  AVAIL  REFER  MOUNTPOINT
+profs               106K  33.2G    18K  /profs
+students           57.7M  33.2G    19K  /students
+students/studentA  57.5M  9.94G  57.5M  /students/studentA
+# <userinput>zfs snapshot students/studentA@today</userinput>
+# <userinput>zfs list</userinput>
+NAME                      USED  AVAIL  REFER  MOUNTPOINT
+profs                     106K  33.2G    18K  /profs
+students                 57.7M  33.2G    19K  /students
+students/studentA        57.5M  9.94G  57.5M  /students/studentA
+students/studentA@today      0      -  57.5M  -</screen><para>For additional
+convenience, you can set another quota on a dataset to help manage the space
+that is consumed by snapshots. For example:</para><screen># <userinput>zfs set quota=20g students/studentA</userinput>
+# <userinput>zfs list</userinput>
+NAME                      USED  AVAIL  REFER  MOUNTPOINT
+profs                     106K  33.2G    18K  /profs
+students                 57.7M  33.2G    19K  /students
+students/studentA        57.5M  9.94G  57.5M  /students/studentA
+students/studentA@today      0      -  57.5M  -</screen><para>In this scenario, <literal>studentA</literal> can bump into the refquota (10 Gbytes) hard limit and remove files
+to recover even if snapshots exist.</para><para>In the above example, the
+smaller of the two quotas (10 Gbytes versus 20 Gbytes) is displayed in the <command>zfs list</command> output. To see the value of both quotas, use the <command>zfs
+get</command> command. For example:</para><screen># <userinput>zfs get refquota,quota students/studentA</userinput>
+NAME               PROPERTY  VALUE              SOURCE
+students/studentA  refquota  10G                local
+students/studentA  quota     20G                local</screen>
+</sect2><sect2 id="gbdbb"><title>Setting Reservations on ZFS File Systems</title><para>A ZFS <emphasis>reservation</emphasis> is an allocation of space from
+the pool that is guaranteed to be available to a dataset. As such, you cannot
+reserve space for a dataset if that space is not currently available in the
+pool. The total amount of all outstanding unconsumed reservations cannot exceed
+the amount of unused space in the pool. ZFS reservations can be set and displayed
+by using the <command>zfs set</command> and <command>zfs get</command> commands.
+For example:</para><screen># <userinput>zfs set reservation=5G tank/home/moore</userinput>
+# <userinput>zfs get reservation tank/home/moore</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+tank/home/moore  reservation   5.00G                      local</screen><para>ZFS reservations can affect the output of the <command>zfs list</command> command.
+For example:</para><screen># <userinput>zfs list</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank/home             5.00G  33.5G  8.50K  /export/home
+tank/home/moore       15.0K  10.0G  8.50K  /export/home/moore</screen><para>Note that <filename>tank/home</filename> is using 5 Gbytes of space,
+although the total amount of space referred to by <filename>tank/home</filename> and
+its descendents is much less than 5 Gbytes. The used space reflects the space
+reserved for <filename>tank/home/moore</filename>. Reservations are considered
+in the used space of the parent dataset and do count against its quota, reservation,
+or both.</para><screen># <userinput>zfs set quota=5G pool/filesystem</userinput>
+# <userinput>zfs set reservation=10G pool/filesystem/user1</userinput>
+cannot set reservation for 'pool/filesystem/user1': size is greater than 
+available space</screen><para>A dataset can use more space than its reservation, as long as space
+is available in the pool that is unreserved and the dataset's current usage
+is below its quota. A dataset cannot consume space that has been reserved
+for another dataset.</para><para>Reservations are not cumulative. That is, a second invocation of <command>zfs
+set</command> to set a reservation does not add its reservation to the existing
+reservation. Rather, the second reservation replaces the first reservation.</para><screen># <userinput>zfs set reservation=10G tank/home/moore</userinput>
+# <userinput>zfs set reservation=5G tank/home/moore</userinput>
+# <userinput>zfs get reservation tank/home/moore</userinput>
+NAME             PROPERTY      VALUE                      SOURCE
+tank/home/moore  reservation   5.00G                      local</screen><para>You
+can set a <literal>refreservation</literal> to guarantee space for a dataset
+that does not include space consumed by snapshots and clones. The <literal>refreservation</literal> reservation is accounted for in the parent datasets' space used,
+and counts against the parent datasets' quotas and reservations. For example:</para><screen># <userinput>zfs set refreservation=10g profs/prof1</userinput>
+# <userinput>zfs list</userinput>
+NAME                      USED  AVAIL  REFER  MOUNTPOINT
+profs                    10.0G  23.2G    19K  /profs
+profs/prof1                10G  33.2G    18K  /profs/prof1</screen><para>You
+can also set a reservation on the same dataset to guarantee dataset space
+and snapshot space. For example:</para><screen># <userinput>zfs set reservation=20g profs/prof1</userinput>
+# <userinput>zfs list</userinput>
+NAME                      USED  AVAIL  REFER  MOUNTPOINT
+profs                    20.0G  13.2G    19K  /profs
+profs/prof1                10G  33.2G    18K  /profs/prof1</screen><para>Regular
+reservations are accounted for in the parent's used space.</para><para>In
+the above example, the smaller of the two quotas (10 Gbytes versus 20 Gbytes)
+is displayed in the <command>zfs list</command> output. To see the value of
+both quotas, use the <command>zfs get</command> command. For example:</para><screen># <userinput>zfs get reservation,refreserv profs/prof1</userinput>
+NAME         PROPERTY        VALUE        SOURCE
+profs/prof1  reservation     20G          local
+profs/prof1  refreservation  10G          local</screen><para>If <literal>refreservation</literal> is set, a snapshot is only allowed if enough free pool space exists
+outside of this reservation to accommodate the current number of <emphasis>referenced</emphasis> bytes in the dataset.</para>
+</sect2>
+</sect1>
+</chapter>

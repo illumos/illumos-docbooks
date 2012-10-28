@@ -1,0 +1,311 @@
+<chapter id="ftyxh"><title>ZFS
+Advanced Topics</title><highlights><para>This chapter describes ZFS volumes, using ZFS on a Solaris system with
+zones installed, ZFS alternate root pools, and ZFS rights profiles.</para><para>The following sections are provided in this chapter:</para><itemizedlist><listitem><para><olink targetptr="gaypf" remap="internal">ZFS Volumes</olink></para>
+</listitem><listitem><para><olink targetptr="gayov" remap="internal">Using ZFS on a Solaris System With
+Zones Installed</olink></para>
+</listitem><listitem><para><olink targetptr="gbcgl" remap="internal">Using ZFS Alternate Root Pools</olink></para>
+</listitem><listitem><para><olink targetptr="gbfvq" remap="internal">ZFS Rights Profiles</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gaypf"><title>ZFS Volumes</title><para>A ZFS volume is a dataset that represents a block device and can be
+used like any block device. ZFS volumes are identified as devices in the <filename>/dev/zvol/{dsk,rdsk}/path</filename> directory.</para><para>In the following example, 5-Gbyte ZFS volume, <filename>tank/vol</filename>,
+is created:</para><screen># <userinput>zfs create -V 5gb tank/vol</userinput></screen><para>When you create a volume, a reservation is automatically set to the
+initial size of the volume. The reservation size continues to equal the size
+of the volume so that unexpected behavior doesn't occur. For example, if the
+size of the volume shrinks, data corruption might occur. You must be careful
+when changing the size of the volume.</para><para>In addition, if you create a snapshot of a volume that changes in size,
+you might introduce file system inconsistencies if you attempt to rollback
+the snapshot or create a clone from the snapshot.</para><para>For information about file system properties that can be applied to
+volumes, see <olink targetptr="gcfgr" remap="internal">Table&nbsp;5&ndash;1</olink>.</para><para>If you are using a Solaris system with zones installed, you cannot create
+or clone a ZFS volume in a non-global zone.  Any attempt to create or clone
+a volume from within a non-global zone will fail. For information about using
+ZFS volumes in a global zone, see <olink targetptr="gbebi" remap="internal">Adding ZFS Volumes
+to a Non-Global Zone</olink>.</para><sect2 id="gbfvg"><title>Using a ZFS Volume as a Swap or Dump Device</title><para>To set up a swap area, create a ZFS volume of a specific size and then
+enable swap on that device. Do not swap to a file on a ZFS file system. A
+ZFS swap file configuration is not supported.</para><para>In the following example, the 5-Gbyte <filename>tank/vol</filename> volume
+is added as a swap device.</para><screen># <userinput>swap -a /dev/zvol/dsk/tank/vol</userinput>
+# <userinput>swap -l</userinput>
+swapfile                 dev  swaplo blocks   free
+/dev/dsk/c0t0d0s1      32,33      16 1048688  1048688
+/dev/zvol/dsk/tank/vol 254,1      16 10485744 10485744</screen><para>Using a ZFS volume as a dump device is not supported. Use the <command>dumpadm</command> command to set up a dump device.</para>
+</sect2><sect2 id="gechv"><title>Using a ZFS Volume as a Solaris iSCSI Target</title><para>Solaris iSCSI targets and initiators are supported in the Solaris release.</para><para>In addition, you can easily create a ZFS volume as a iSCSI target by
+setting the <literal>shareiscsi</literal> property on the volume. For example:</para><screen># <userinput>zfs create -V 2g tank/volumes/v2</userinput>
+# <userinput>zfs set shareiscsi=on tank/volumes/v2</userinput>
+# <userinput>iscsitadm list target</userinput>
+Target: tank/volumes/v2
+    iSCSI Name: iqn.1986-03.com.sun:02:984fe301-c412-ccc1-cc80-cf9a72aa062a
+    Connections: 0</screen><para>After the iSCSI target is created, set up the iSCSI  initiator. For
+more information about Solaris iSCSI targets and initiators, see <olink targetdoc="sagdfs" targetptr="fmvcd" remap="external">Chapter 14, <citetitle remap="chapter">Configuring Solaris iSCSI Targets and Initiators (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Devices and File Systems</citetitle></olink>.</para><note><para>Solaris iSCSI targets can also be created and managed with <command>iscsitadm</command> command. If you set the <literal>shareiscsi</literal> property
+on a ZFS volume, do not use the <command>iscsitadm</command> command to also
+create the same target device. Otherwise, you will end up with duplicate target
+information for the same device.</para>
+</note><para>A ZFS volume as an iSCSI target is managed just like another ZFS dataset.
+However, the rename, export, and import operations work a little differently
+for iSCSI targets.</para><itemizedlist><listitem><para>When you rename a ZFS volume, the iSCSI target name remains
+the same. For example:</para><screen># <userinput>zfs rename tank/volumes/v2 tank/volumes/v1</userinput>
+# <userinput>iscsitadm list target</userinput>
+Target: tank/volumes/v1
+    iSCSI Name: iqn.1986-03.com.sun:02:984fe301-c412-ccc1-cc80-cf9a72aa062a
+    Connections: 0</screen>
+</listitem><listitem><para>Exporting a pool that contains a shared ZFS volume causes
+the target to be removed. Importing a pool that contains a shared ZFS volume
+causes the target to be shared. For example:</para><screen># <userinput>zpool export tank</userinput>
+# <userinput>iscsitadm list target</userinput>
+# <userinput>zpool import tank</userinput>
+# <userinput>iscsitadm list target</userinput>
+Target: tank/volumes/v1
+    iSCSI Name: iqn.1986-03.com.sun:02:984fe301-c412-ccc1-cc80-cf9a72aa062a
+    Connections: 0</screen>
+</listitem>
+</itemizedlist><para>All iSCSI target configuration information is stored within the dataset.
+Like an NFS shared file system, an iSCSI target that is imported on a different
+system is shared appropriately.</para>
+</sect2>
+</sect1><sect1 id="gayov"><title>Using ZFS on a Solaris System With Zones Installed</title><para>The following sections describe how to use ZFS on a system with Solaris
+zones.</para><itemizedlist><listitem><para><olink targetptr="gbbrq" remap="internal">Adding ZFS File Systems to a Non-Global
+Zone</olink></para>
+</listitem><listitem><para><olink targetptr="gbbst" remap="internal">Delegating Datasets to a Non-Global
+Zone</olink></para>
+</listitem><listitem><para><olink targetptr="gbebi" remap="internal">Adding ZFS Volumes to a Non-Global
+Zone</olink></para>
+</listitem><listitem><para><olink targetptr="gbbso" remap="internal">Using ZFS Storage Pools Within a
+Zone</olink></para>
+</listitem><listitem><para><olink targetptr="gbbsn" remap="internal">Managing ZFS Properties Within a
+Zone</olink></para>
+</listitem><listitem><para><olink targetptr="gbbre" remap="internal">Understanding the zoned Property</olink></para>
+</listitem>
+</itemizedlist><para>Keep the following points in mind when associating ZFS datasets with
+zones:</para><itemizedlist><listitem><para>You can add a ZFS file system or a ZFS clone to a non-global
+with or without delegating administrative control.</para>
+</listitem><listitem><para>You can add a ZFS volume as a device to non-global zones</para>
+</listitem><listitem><para>You cannot associate ZFS snapshots with zones at this time</para>
+</listitem><listitem><para>Do not use a ZFS file system for a global zone root path or
+a non-global zone root path in the Solaris 10 releases. You can use ZFS as
+a zone root path in the Solaris Express releases, but keep in mind that patching
+or upgrading these zones is not supported.</para>
+</listitem>
+</itemizedlist><para>In the sections below, a ZFS dataset refers to a file system or clone.</para><para>Adding a dataset allows the non-global zone to share space with the
+global zone, though the zone administrator cannot control properties or create
+new file systems in the underlying file system hierarchy. This is identical
+to adding any other type of file system to a zone, and should be used when
+the primary purpose is solely to share common space.</para><para>ZFS also allows datasets to be delegated to a non-global zone, giving
+complete control over the dataset and all its children to the zone administrator.
+The zone administrator can create and destroy file systems or clones within
+that dataset, and modify properties of the datasets. The zone administrator
+cannot affect datasets that have not been added to the zone, and cannot exceed
+any top-level quotas set on the exported dataset.</para><para>Consider the following interactions when working with ZFS on a system
+with Solaris zones installed:</para><itemizedlist><listitem><para>A ZFS file system that is added to a non-global zone must
+have its <command>mountpoint</command> property set to legacy.</para>
+</listitem><listitem><para>When a
+source <literal>zonepath</literal> and the target <literal>zonepath</literal> both
+reside on ZFS and are in the same pool, <command>zoneadm clone</command> will
+now automatically use ZFS clone to clone a zone. The <command>zoneadm clone</command> command
+will take a ZFS snapshot of the source <literal>zonepath</literal> and  set
+up the target <literal>zonepath</literal>. You cannot use the <command>zfs
+clone</command> command to clone a zone. For more information, see <olink targetdoc="sysadrm" targetptr="zone" remap="external">Part&nbsp;II, <citetitle remap="chapter">Zones,</citetitle> in <citetitle remap="book">System Administration Guide:  Virtualization Using the Solaris Operating System</citetitle></olink>.</para>
+</listitem>
+</itemizedlist><sect2 id="gbbrq"><title>Adding ZFS File Systems to a Non-Global Zone</title><para>You can add a ZFS file system as a generic file system when the goal
+is solely to share space with the global zone. A ZFS file system that is added
+to a non-global zone must have its <literal>mountpoint</literal> property
+set to legacy.</para><para>You can add a ZFS file system to a non-global zone by using the <command>zonecfg</command> command's <literal>add fs</literal> subcommand. For example:</para><para>In the following example, a ZFS file system is added to a non-global
+zone by a global administrator in the global zone.</para><screen># <userinput>zonecfg -z zion</userinput>
+zonecfg:zion> <userinput>add fs</userinput>
+zonecfg:zion:fs> <userinput>set type=zfs</userinput>
+zonecfg:zion:fs> <userinput>set special=tank/zone/zion</userinput>
+zonecfg:zion:fs> <userinput>set dir=/export/shared</userinput>
+zonecfg:zion:fs> <userinput>end</userinput></screen><para>This syntax adds the ZFS file system, <filename>tank/zone/zion</filename>,
+to the already configured <literal>zion</literal> zone, mounted at <filename>/export/shared</filename>. The <property>mountpoint</property> property of the file system
+must be set to <property>legacy</property>, and the file system cannot already
+be mounted in another location. The zone administrator can create and destroy
+files within the file system. The file system cannot be remounted in a different
+location, nor can the zone administrator change properties on the file system
+such as atime, readonly, compression, and so on.  The
+global zone administrator is responsible for setting and controlling properties
+of the file system.</para><para>For more information about the <command>zonecfg</command> command and
+about configuring resource types with <command>zonecfg</command>, see <olink targetdoc="sysadrm" targetptr="zone" remap="external">Part&nbsp;II, <citetitle remap="chapter">Zones,</citetitle> in <citetitle remap="book">System Administration Guide:  Virtualization Using the Solaris Operating System</citetitle></olink>.</para>
+</sect2><sect2 id="gbbst"><title>Delegating Datasets to a Non-Global Zone</title><para>If the primary goal is to delegate the administration of storage to
+a zone, then ZFS supports adding datasets to a non-global zone through use
+of the <command>zonecfg</command> command's <literal>add dataset</literal> subcommand.</para><para>In the following example, a ZFS file system is delegated to a non-global
+zone by a global administrator in the global zone.</para><screen># <userinput>zonecfg -z zion</userinput>
+zonecfg:zion> <userinput>add dataset</userinput>
+zonecfg:zion:dataset> <userinput>set name=tank/zone/zion</userinput>
+zonecfg:zion:dataset> <userinput>end</userinput></screen><para>Unlike adding a file system, this syntax causes the ZFS file system <filename>tank/zone/zion</filename> to be visible within the already configured <literal>zion</literal> zone. The zone administrator can set file system properties, as
+well as create children. In addition, the zone administrator can take snapshots,
+create clones, and otherwise control the entire file system hierarchy.</para><para>For more information about what actions are allowed within zones, see <olink targetptr="gbbsn" remap="internal">Managing ZFS Properties Within a Zone</olink>.</para>
+</sect2><sect2 id="gbebi"><title>Adding ZFS Volumes to a Non-Global Zone</title><para>ZFS volumes cannot be added to a non-global zone by using the <command>zonecfg</command> command's <literal>add dataset</literal> subcommand. If an attempt
+to add an ZFS volume is detected, the zone cannot boot. However, volumes can
+be added to a zone by using the <command>zonecfg</command> command's <literal>add
+device</literal> subcommand.</para><para>In the following example, a ZFS volume is added to a non-global zone
+by a global administrator in the global zone:</para><screen># <userinput>zonecfg -z zion</userinput>
+zion: No such zone configured
+Use 'create' to begin configuring a new zone.
+zonecfg:zion> <userinput>create</userinput>
+zonecfg:zion> <userinput>add device</userinput>
+zonecfg:zion:device> <userinput>set match=/dev/zvol/dsk/tank/vol</userinput>
+zonecfg:zion:device> <userinput>end</userinput></screen><para>This syntax exports the <literal>tank/vol</literal> volume to the zone.
+Note that adding a raw volume to a zone has implicit security risks, even
+if the volume doesn't correspond to a physical device. In particular, the
+zone administrator could create malformed file systems that would panic the
+system when a mount is attempted. For more information about adding devices
+to zones and the related security risks, see <olink targetptr="gbbre" remap="internal">Understanding
+the zoned Property</olink>.</para><para>For more information about adding devices to zones, see <olink targetdoc="sysadrm" targetptr="zone" remap="external">Part&nbsp;II, <citetitle remap="chapter">Zones,</citetitle> in <citetitle remap="book">System Administration Guide:  Virtualization Using the Solaris Operating System</citetitle></olink>.</para>
+</sect2><sect2 id="gbbso"><title>Using ZFS Storage Pools Within a Zone</title><para>ZFS storage pools cannot be created or modified within a zone. The delegated
+administration model centralizes control of physical storage devices within
+the global zone and control of virtual storage to non-global zones. While
+a pool-level dataset can be added to a zone, any command that modifies the
+physical characteristics of the pool, such as creating, adding, or removing
+devices, is not allowed from within a zone. Even if physical devices are added
+to a zone by using the <command>zonecfg</command> command's <literal>add device</literal> subcommand,
+or if files are used, the <command>zpool</command> command does not allow
+the creation of any new pools within the zone.</para>
+</sect2><sect2 id="gbbsn"><title>Managing ZFS Properties Within a Zone</title><para>After a dataset is added to a zone, the zone administrator can control
+specific dataset properties. When a dataset is added to a zone, all its ancestors
+are visible as read-only datasets, while the dataset itself is writable as
+are all of its children. For example, consider the following configuration:</para><screen>global# <userinput>zfs list -Ho name</userinput>
+tank
+tank/home
+tank/data
+tank/data/matrix
+tank/data/zion
+tank/data/zion/home</screen><para>If <filename>tank/data/zion</filename> is added to a zone, each dataset
+would have the following properties.</para><informaltable frame="topbot"><tgroup cols="4" colsep="0" rowsep="0"><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><colspec colwidth="25*"/><thead><row rowsep="1"><entry><para>Dataset</para>
+</entry><entry><para>Visible</para>
+</entry><entry><para>Writable</para>
+</entry><entry><para>Immutable Properties</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><filename>tank</filename></para>
+</entry><entry><para>Yes</para>
+</entry><entry><para>No</para>
+</entry><entry><para>-</para>
+</entry>
+</row><row><entry><para><filename>tank/home</filename></para>
+</entry><entry><para>No</para>
+</entry><entry><para>-</para>
+</entry><entry><para>-</para>
+</entry>
+</row><row><entry><para><filename>tank/data</filename></para>
+</entry><entry><para>Yes</para>
+</entry><entry><para>No</para>
+</entry><entry><para>-</para>
+</entry>
+</row><row><entry><para><filename>tank/data/matrix</filename></para>
+</entry><entry><para>No</para>
+</entry><entry><para>-</para>
+</entry><entry><para>-</para>
+</entry>
+</row><row><entry><para><filename>tank/data/zion</filename></para>
+</entry><entry><para>Yes</para>
+</entry><entry><para>Yes</para>
+</entry><entry><para><property>sharenfs</property>, <property>zoned</property>, <property>quota</property>, <property>reservation</property></para>
+</entry>
+</row><row><entry><para><filename>tank/data/zion/home</filename></para>
+</entry><entry><para>Yes</para>
+</entry><entry><para>Yes</para>
+</entry><entry><para><property>sharenfs</property>, <property>zoned</property></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>Note that every parent of <filename>tank/zone/zion</filename> is visible
+read-only, all children are writable, and datasets that are not part of the
+parent hierarchy are not visible at all. The zone administrator cannot change
+the <property>sharenfs</property> property, because non-global zones cannot
+act as NFS servers. Neither can the zone administrator change the <literal>zoned</literal> property,
+because doing so would expose a security risk as described in the next section. </para><para>Any other settable property can be changed, except for the <literal>quota</literal> property,
+and the dataset itself. This behavior allows the global zone administrator
+to control the space consumption of all datasets used by the non-global zone.</para><para>In addition, the <property>sharenfs</property> and <property>mountpoint</property> properties
+cannot be changed by the global zone administrator once a dataset has been
+added to a non-global zone.</para>
+</sect2><sect2 id="gbbre"><title>Understanding the <property>zoned</property> Property</title><para>When a dataset is added to a non-global zone, the dataset must be specially
+marked so that certain properties are not interpreted within the context of
+the global zone. After a dataset has been added to a non-global zone under
+the control of a zone administrator, its contents can no longer be trusted.
+As with any file system, there might be setuid binaries, symbolic links, or
+otherwise questionable contents that might adversely affect the security of
+the global zone. In addition, the <property>mountpoint</property> property
+cannot be interpreted in the context of the global zone. Otherwise, the zone
+administrator could affect the global zone's namespace. To address the latter,
+ZFS uses the <property>zoned</property> property to indicate that a dataset
+has been delegated to a non-global zone at one point in time.</para><para>The <property>zoned</property> property is a boolean value that is automatically
+turned on when a zone containing a ZFS dataset is first booted. A zone administrator
+will not need to manually turn on this property. If the <property>zoned</property> property
+is set, the dataset cannot be mounted or shared in the global zone, and is
+ignored when the <command>zfs share</command> <option>a</option> command or
+the <command>zfs mount</command> <option>a</option> command is executed. In
+the following example, <filename>tank/zone/zion</filename> has been added
+to a zone, while <filename>tank/zone/global</filename> has not:</para><screen># <userinput>zfs list -o name,zoned,mountpoint -r tank/zone</userinput>
+NAME                  ZONED  MOUNTPOINT
+tank/zone/global        off  /tank/zone/global
+tank/zone/zion           on  /tank/zone/zion
+# <userinput>zfs mount</userinput>
+tank/zone/global           /tank/zone/global
+tank/zone/zion             /export/zone/zion/root/tank/zone/zion</screen><para>Note the difference between the <property>mountpoint</property> property
+and the directory where the <filename>tank/zone/zion</filename> dataset is
+currently mounted. The <property>mountpoint</property> property reflects the
+property as stored on disk, not where the dataset is currently mounted on
+the system.</para><para>When a dataset is removed from a zone or a zone is destroyed, the <property>zoned</property> property is <emphasis role="strong">not</emphasis> automatically
+cleared. This behavior is due to the inherent security risks associated with
+these tasks. Because an untrusted user has had complete access to the dataset
+and its children, the <property>mountpoint</property> property might be set
+to bad values, or setuid binaries might exist on the file systems.</para><para>To prevent accidental security risks, the <property>zoned</property> property
+must be manually cleared by the global administrator if you want to reuse
+the dataset in any way. Before setting the <property>zoned</property> property
+to <literal>off</literal>, make sure that the <property>mountpoint</property> property
+for the dataset and all its children are set to reasonable values and that
+no setuid binaries exist, or turn off the <property>setuid</property> property.</para><para>After you have verified that no security vulnerabilities
+are left, the <property>zoned</property> property can be turned off by using
+the <command>zfs set</command> or <command>zfs inherit</command> commands.
+If the <property>zoned</property> property is turned off while a dataset is
+in use within a zone, the system might behave in unpredictable ways. Only
+change the property if you are sure the dataset is no longer in use by a non-global
+zone.</para>
+</sect2>
+</sect1><sect1 id="gbcgl"><title>Using ZFS Alternate Root Pools</title><para>When a pool is created, the pool is intrinsically tied to the host system.
+The host system maintains knowledge about the pool so that it can detect when
+the pool is otherwise unavailable. While useful for normal operation, this
+knowledge can prove a hindrance when booting from alternate media, or creating
+a pool on removable media. To solve this problem, ZFS provides an <emphasis>alternate
+root</emphasis> pool feature. An alternate root pool does not persist across
+system reboots, and all mount points are modified to be relative to the root
+of the pool.</para><sect2 id="gbdaw"><title>Creating ZFS Alternate Root Pools</title><para>The most common use for creating an alternate root pool is for use with
+removable media. In these circumstances, users typically want a single file
+system, and they want it to be mounted wherever they choose on the target
+system. When an alternate root pool is created by using the <option>R</option> option,
+the mount point of the root file system is automatically set to <filename>/</filename>,
+which is the equivalent of the alternate root itself.</para><para>In the following example, a pool called <literal>morpheus</literal> is
+created with <filename>/mnt</filename> as the alternate root path:</para><screen># <userinput>zpool create -R /mnt morpheus c0t0d0</userinput>
+# <userinput>zfs list morpheus</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+morpheus              32.5K  33.5G     8K  /mnt/</screen><para>Note the single file system, <literal>morpheus</literal>, whose mount
+point is the alternate root of the pool, <filename>/mnt</filename>. The mount
+point that is stored on disk is <filename>/</filename> and the full path to <filename>/mnt</filename> is interpreted only in the context of the alternate root pool.
+This file system can then be exported and imported under an arbitrary alternate
+root pool on a different system.</para>
+</sect2><sect2 id="gbdbj"><title>Importing Alternate Root Pools</title><para>Pools can also be imported using an alternate root. This feature allows
+for recovery situations, where the mount points should not be interpreted
+in context of the current root, but under some temporary directory where repairs
+can be performed. This feature also can be used when mounting removable media
+as described above.</para><para>In the following example, a pool called <literal>morpheus</literal> is
+imported with <filename>/mnt</filename> as the alternate root path. This example
+assumes that <literal>morpheus</literal> was previously exported.</para><screen># <userinput>zpool import -R /mnt morpheus</userinput>
+# <userinput>zpool list morpheus</userinput>
+NAME                    SIZE    USED   AVAIL    CAP  HEALTH     ALTROOT
+morpheus               33.8G   68.0K   33.7G     0%  ONLINE     /mnt
+# <userinput>zfs list morpheus</userinput>
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+morpheus              32.5K  33.5G     8K  /mnt/morpheus</screen>
+</sect2>
+</sect1><sect1 id="gbfvq"><title>ZFS Rights Profiles</title><para>If you want to perform ZFS management tasks without using the superuser
+(root) account, you can assume a role with either of the following profiles
+to perform ZFS administration tasks:</para><itemizedlist><listitem><para>ZFS Storage Management &ndash; Provides the ability to create,
+destroy, and manipulate devices within a ZFS storage pool</para>
+</listitem><listitem><para>ZFS File system Management &ndash; Provides the ability to
+create, destroy, and modify ZFS file systems</para>
+</listitem>
+</itemizedlist><para>For more information about creating or assigning roles, see <olink targetdoc="sysadv6" remap="external"><citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para><para>In addition to using RBAC roles for administering ZFS file systems,
+you might also consider using ZFS delegated administration for distributed
+ZFS administration tasks. For more information, see <olink targetptr="gbchv" remap="internal">Chapter&nbsp;8,
+ZFS Delegated Administration</olink>.</para>
+</sect1>
+</chapter>

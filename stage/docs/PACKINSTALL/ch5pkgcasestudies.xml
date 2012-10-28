@@ -1,0 +1,917 @@
+<?Pub UDT _bookmark _target?><?Pub EntList bull rArr sect?><chapter id="ch5pkgcasestudies-80583"><title>Case Studies of Package Creation</title><highlights><para>This chapter provides case studies to show packaging scenarios such
+as installing objects conditionally, determining at run time how many files
+to create, and modifying an existing data file during package installation
+and removal. </para><para>Each case study begins with a description, followed by a list of the
+packaging techniques used, a narrative description of the approach taken when
+using those techniques, and sample files and scripts associated with the case
+study. </para><para>This is a list of the case studies in this chapter:</para><itemizedlist><listitem><para><olink targetptr="ch5pkgcasestudies-52" remap="internal">Soliciting Input From
+the Administrator</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-56" remap="internal">Creating a File at
+Installation and Saving It During Removal</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-62" remap="internal">Defining Package Compatibilities
+and Dependencies</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-77" remap="internal">Modifying a File by
+Using Standard Classes and Class Action Scripts</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by
+Using the sed Class and a postinstall Script</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-82" remap="internal">Modifying a File by
+Using The build Class</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-87" remap="internal">Modifying crontab
+Files During Installation</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-79" remap="internal">Installing and Removing
+a Driver With Procedure Scripts</olink></para>
+</listitem><listitem><para><olink targetptr="ch5pkgcasestudies-64" remap="internal">Installing a Driver
+by Using the sed Class and Procedure Scripts</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="ch5pkgcasestudies-52"><title>Soliciting Input From the Administrator</title><para>The package in this case study has three types of objects. The administrator
+may choose which of the three types to install and where to locate the objects
+on the installation machine. </para><sect2 id="ch5pkgcasestudies-103"><title>Techniques</title><para>This case study demonstrates the following techniques:</para><itemizedlist><listitem><para><indexterm><primary>parametric path name</primary></indexterm>Using
+parametric path names (variables in object path names) that are used to establish
+multiple base directories</para><para><indexterm id="ch5pkgcasestudies-ix107"><primary><filename>request</filename> script</primary><secondary>soliciting input from administrator case study</secondary></indexterm>For information
+on parametric path names, see <olink targetptr="ch2buildpkg-55" remap="internal">Parametric
+Path Names</olink>.</para>
+</listitem><listitem><para>Using a <filename>request</filename> script to solicit input
+from the administrator  </para><para>For information on <filename>request</filename> scripts,
+see <olink targetptr="ch3enhancepkg-21209" remap="internal">Writing a request Script</olink>.</para>
+</listitem><listitem><para>Setting conditional values for an installation parameter </para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-54"><title>Approach</title><para>To set up the selective installation in this case study, you must complete
+the following tasks:</para><itemizedlist><listitem><para>Define a class for each type of object that can be installed.</para><para>In this case study, the three object types are the package executables,
+the man pages, and the <literal>emacs</literal> executables. Each type has
+its own class: <literal>bin</literal>, <literal>man</literal>, and <literal>emacs</literal>, respectively. Notice that in the <filename>prototype</filename> file
+all the object files belong to one of these three classes.</para>
+</listitem><listitem><para>Initialize the <envar>CLASSES</envar> parameter in the <filename>pkginfo</filename> file to null.</para><para>Normally when you define a class,
+you should list that class in the <envar>CLASSES</envar> parameter in the <filename>pkginfo</filename> file. Otherwise, no objects in that class are installed.
+For this case study, the parameter is initially set to null, which means no
+objects will get installed. The <envar>CLASSES</envar> parameter will be changed
+by the <filename>request</filename> script, based on the choices of the administrator.
+This way, the <envar>CLASSES</envar> parameter is set to only those object
+types that the administrator wants installed. </para><note><para>Usually it is a good idea to set parameters to a default value.
+If this package had components common to all three object types, you could
+assign them to the <literal>none</literal> class, and then set the <envar>CLASSES</envar> parameter equal to <literal>none</literal>.</para>
+</note>
+</listitem><listitem><para>Insert parametric path names into the <filename>prototype</filename> file.</para><para>The <filename>request</filename> script sets these environment
+variables to the value that the administrator provides. Then, the <command>pkgadd</command> command resolves these environment variables at installation time
+and knows where to install the package.</para><para>The three environment
+variables used in this example are set to their default in the <filename>pkginfo</filename> file
+and serve the following purposes:</para><itemizedlist><listitem><para><literal>$NCMPBIN</literal> defines the location for object
+executables</para>
+</listitem><listitem><para><literal>$NCMPMAN</literal> defines the location for man pages</para>
+</listitem><listitem><para><literal>$EMACS</literal> defines the location for <literal>emacs</literal> executables</para>
+</listitem>
+</itemizedlist><para>The example <filename>prototype</filename> file shows how to define
+the object path names with variables.</para>
+</listitem><listitem><para>Create a <filename>request</filename> script to ask the administrator
+which parts of the package should be installed and where they should be placed.</para><para>The <filename>request</filename> script for this package asks the administrator
+two questions:</para><itemizedlist><listitem><para>Should this part of the package be installed?</para><para>When
+the answer is yes, the appropriate class name is added to the <envar>CLASSES</envar> parameter.
+For example, when the administrator chooses to install the man pages associated
+with this package, the class <literal>man</literal> is added to the <envar>CLASSES</envar> parameter. </para>
+</listitem><listitem><para>If so, where should this part of the package be placed?</para><para>The appropriate environment variable is set to the response to this
+question. In the man page example, the variable <literal>$NCMPMAN</literal> is
+set to the response value.</para>
+</listitem>
+</itemizedlist><para>These two questions are repeated for each of the three object types. </para><para>At the end of the <filename>request</filename> script, the parameters
+are made available to the installation environment for the <command>pkgadd</command> command
+and any other packaging scripts. The <filename>request</filename> script does
+this by writing these definitions to the file provided by the calling utility.
+For this case study, no other scripts are provided. </para><para>When looking
+at the <filename>request</filename> script for this case study, notice that
+the questions are generated by the data validation tools <command>ckyorn</command> and <command>ckpath</command>. For more information on these tools, see <olink targetdoc="refman1" targetptr="ckyorn-1" remap="external"><citerefentry><refentrytitle>ckyorn</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> and <olink targetdoc="refman1" targetptr="ckpath-1" remap="external"><citerefentry><refentrytitle>ckpath</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink>.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-53"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-104"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>soliciting input from administrator case study</secondary>
+</indexterm><indexterm><primary>parametric path name</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">PKG=ncmp
+NAME=NCMP Utilities
+CATEGORY=application, tools
+BASEDIR=/
+ARCH=SPARC
+VERSION=RELEASE 1.0, Issue 1.0
+CLASSES=""
+NCMPBIN=/bin
+NCMPMAN=/usr/man
+EMACS=/usr/emacs</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-105"><title>The <filename>prototype</filename> File</title><indexterm><primary><filename>prototype</filename> file</primary><secondary>soliciting input from administrator case study</secondary>
+</indexterm><programlisting width="100" role="complete">i pkginfo
+i request
+x bin $NCMPBIN 0755 root other
+f bin $NCMPBIN/dired=/usr/ncmp/bin/dired 0755 root other
+f bin $NCMPBIN/less=/usr/ncmp/bin/less 0755 root other
+f bin $NCMPBIN/ttype=/usr/ncmp/bin/ttype 0755 root other
+f emacs $NCMPBIN/emacs=/usr/ncmp/bin/emacs 0755 root other
+x emacs $EMACS 0755 root other
+f emacs $EMACS/ansii=/usr/ncmp/lib/emacs/macros/ansii 0644 root other
+f emacs $EMACS/box=/usr/ncmp/lib/emacs/macros/box 0644 root other
+f emacs $EMACS/crypt=/usr/ncmp/lib/emacs/macros/crypt 0644 root other
+f emacs $EMACS/draw=/usr/ncmp/lib/emacs/macros/draw 0644 root other
+f emacs $EMACS/mail=/usr/ncmp/lib/emacs/macros/mail 0644 root other
+f emacs $NCMPMAN/man1/emacs.1=/usr/ncmp/man/man1/emacs.1 0644 root other
+d man $NCMPMAN 0755 root other
+d man $NCMPMAN/man1 0755 root other
+f man $NCMPMAN/man1/dired.1=/usr/ncmp/man/man1/dired.1 0644 root other
+f man $NCMPMAN/man1/ttype.1=/usr/ncmp/man/man1/ttype.1 0644 root other
+f man $NCMPMAN/man1/less.1=/usr/ncmp/man/man1/less.1 0644 inixmr other</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-107"><title>The <filename>request</filename> Script</title><programlisting role="complete">trap 'exit 3' 15
+# determine if and where general executables should be placed
+ans=`ckyorn -d y \
+-p "Should executables included in this package be installed"
+` || exit $?
+if [ "$ans" = y ]
+then
+   CLASSES="$CLASSES bin"
+   NCMPBIN=`ckpath -d /usr/ncmp/bin -aoy \
+   -p "Where should executables be installed"
+   ` || exit $?
+fi
+# determine if emacs editor should be installed, and if it should
+# where should the associated macros be placed
+ans=`ckyorn -d y \
+-p "Should emacs editor included in this package be installed"
+` || exit $?
+if [ "$ans" = y ]
+then
+   CLASSES="$CLASSES emacs"
+   EMACS=`ckpath -d /usr/ncmp/lib/emacs -aoy \
+   -p "Where should emacs macros be installed"
+   ` || exit $?
+fi</programlisting><para><indexterm><primary><filename>request</filename> script</primary><secondary>in a case study</secondary></indexterm>Note that a <filename>request</filename> script
+can exit without leaving any files on the file system. For installations on
+Solaris versions prior to 2.5 and compatible versions (where no <filename>checkinstall</filename> script may be used) the <filename>request</filename> script is
+the correct place to test the file system in any manner necessary to ensure
+that the installation will succeed. When the <filename>request</filename> script
+exits with code 1, the installation will quit cleanly.</para><para>These example files show the use of parametric paths to establish multiple
+base directories. However, the preferred method involves use of the <envar>BASEDIR</envar> parameter which is managed and validated by the <command>pkgadd</command> command.
+Whenever multiple base directories are used, take special care to provide
+for installation of multiple versions and architectures on the same platform.</para>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-56"><title>Creating a File at Installation and
+Saving It During Removal</title><para>This case study creates a database file at installation time and saves
+a copy of the database when the package is removed. </para><sect2 id="ch5pkgcasestudies-57"><title>Techniques</title><para>This case study demonstrates the following techniques: </para><itemizedlist><listitem><para>Using classes and class action scripts to perform special
+actions on different sets of objects </para><para>For more information, see <olink targetptr="ch3enhancepkg-37319" remap="internal">Writing Class Action Scripts</olink>.</para>
+</listitem><listitem><para>Using the <filename>space</filename> file to inform the <filename>pkgadd</filename> command that extra space is required to install this package
+properly</para><para>For more information on the <filename>space</filename> file,
+see <olink targetptr="ch3enhancepkg-10245" remap="internal">Reserving Additional Space on a
+Target System</olink>.</para>
+</listitem><listitem><para><indexterm><primary><filename>pkgmap</filename> file</primary><secondary>in a case study</secondary></indexterm>Using the <command>installf</command> command
+to install a file not defined in the <filename>prototype</filename> and <filename>pkgmap</filename> files</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-58"><title>Approach</title><para>To create a database file at installation and save a copy on removal
+for this case study, you must complete the following tasks:</para><itemizedlist><listitem><para>Define three classes. </para><para>The package in this case
+study requires the following three classes be defined in the <envar>CLASSES</envar> parameter: </para><itemizedlist><listitem><para>The standard class of <literal>none</literal>, which contains
+a set of processes belonging in the subdirectory <literal>bin</literal>.</para>
+</listitem><listitem><para>The <literal>admin</literal> class, which contains an executable
+file <literal>config</literal> and a directory containing data files.</para>
+</listitem><listitem><para>The <literal>cfgdata</literal> class, which contains a directory.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Make the package collectively relocatable. </para><para>Notice
+in the <filename>prototype</filename> file that none of the path names begins
+with a slash or an environment variable. This indicates that they are collectively
+relocatable. </para>
+</listitem><listitem><para>Calculate the amount of space the database file requires and
+create a <filename>space</filename> file to deliver with the package. This
+file notifies the <command>pkgadd</command> command that the package requires
+extra space and specifies how much.</para>
+</listitem><listitem><para>Create a class action script for the <literal>admin</literal> class
+(<literal>i.admin</literal>). </para><para>The sample script initializes a
+database using the data files belonging to the <literal>admin</literal> class.
+To perform this task, it does the following:</para><itemizedlist><listitem><para>Copies the source data file to its proper destination</para>
+</listitem><listitem><para>Creates an empty file named <literal>config.data</literal> and
+assigns it to a class of <literal>cfgdata</literal></para>
+</listitem><listitem><para>Executes the <literal>bin/config</literal> command (delivered
+with the package and already installed) to populate the database file <literal>config.data</literal> using the data files belonging to the <literal>admin</literal> class</para>
+</listitem><listitem><para>Executes the <command>installf -f</command> command to finalize
+installation of <literal>config.data</literal></para>
+</listitem>
+</itemizedlist><para>No special action is required for the <literal>admin</literal> class
+at removal time so no removal class action script is created. This means that
+all files and directories in the <literal>admin</literal> class are removed
+from the system. </para>
+</listitem><listitem><para>Create a removal class action script for the <literal>cfgdata</literal> class
+(<literal>r.cfgdata</literal>). </para><para>The removal script makes a copy
+of the database file before it is deleted. No special action is required for
+this class at installation time, so no installation class action script is
+needed. </para><para>Remember that the input to a removal script is a list
+of path names to remove. Path names always appear in reverse alphabetical
+order. This removal script copies files to the directory named <envar>$PKGSAV</envar>.
+When all the path names have been processed, the script then goes back and
+removes all directories and files associated with the <literal>cfgdata</literal> class. </para><para>The outcome of this removal script is to copy <literal>config.data</literal> to <envar>$PKGSAV</envar> and then remove the <filename>config.data</filename> file
+and the data directory.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-106"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-108"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>installation and removal case study</secondary>
+</indexterm><programlisting role="complete">PKG=krazy
+NAME=KrAzY Applications
+CATEGORY=applications
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 1
+CLASSES=none cfgdata admin</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-110"><title>The <filename>prototype</filename> File</title><indexterm><primary><filename>prototype</filename> file</primary><secondary>installation and removal case study</secondary>
+</indexterm><programlisting role="complete">i pkginfo
+i request
+i i.admin
+i r.cfgdata
+d none bin 555 root sys
+f none bin/process1 555 root other
+f none bin/process2 555 root other
+f none bin/process3 555 root other
+f admin bin/config 500 root sys
+d admin cfg 555 root sys
+f admin cfg/datafile1 444 root sys
+f admin cfg/datafile2 444 root sys
+f admin cfg/datafile3 444 root sys
+f admin cfg/datafile4 444 root sys
+d cfgdata data 555 root sys</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-60"><title>The <filename>space</filename> File</title><indexterm id="ch5pkgcasestudies-ix112"><primary><filename>space</filename> file</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># extra space required by config data which is
+# dynamically loaded onto the system
+data 500 1</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-109"><title>The <literal>i.admin</literal> Class
+Action Script</title><programlisting role="complete"># PKGINST parameter provided by installation service
+# BASEDIR parameter provided by installation service
+while read src dest
+do
+   cp $src $dest || exit 2
+done
+# if this is the last time this script will be executed
+# during the installation, do additional processing here.
+if [ "$1" = ENDOFCLASS ]
+then
+# our config process will create a data file based on any changes
+# made by installing files in this class; make sure the data file
+# is in class `cfgdata' so special rules can apply to it during
+# package removal.
+   installf -c cfgdata $PKGINST $BASEDIR/data/config.data f 444 root
+   sys || exit 2
+   $BASEDIR/bin/config &gt; $BASEDIR/data/config.data || exit 2
+   installf -f -c cfgdata $PKGINST || exit 2
+fi
+exit 0</programlisting><para><indexterm id="ch5pkgcasestudies-ix110"><primary>class action script</primary><secondary>in a case study</secondary></indexterm><indexterm id="ch5pkgcasestudies-ix113"><primary><command>installf</command> command</primary><secondary>in a case study</secondary></indexterm>This illustrates a rare
+instance in which <literal>installf</literal> is appropriate in a class action
+script. Because a <filename>space</filename> file has been used to reserve
+room on a specific file system, this new file may be safely added even though
+it is not included in the <filename>pkgmap</filename> file.</para>
+</sect3><sect3 id="ch5pkgcasestudies-128"><title>The <literal>r.cfgdata</literal> Removal
+Script</title><programlisting role="complete"># the product manager for this package has suggested that
+# the configuration data is so valuable that it should be
+# backed up to $PKGSAV before it is removed!
+while read path
+do
+# path names appear in reverse lexical order.
+   mv $path $PKGSAV || exit 2
+   rm -f $path || exit 2
+done
+exit 0</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-62"><title>Defining Package Compatibilities and
+Dependencies</title><para>The package in this case study uses optional information files to define
+package compatibilities and dependencies, and to present a copyright message
+during installation. </para><sect2 id="ch5pkgcasestudies-63"><title>Techniques</title><para>This case study demonstrates the following techniques: </para><itemizedlist><listitem><para>Using the <filename>copyright</filename> file</para>
+</listitem><listitem><para>Using the <filename>compver</filename> file </para>
+</listitem><listitem><para>Using the <filename>depend</filename> file</para>
+</listitem>
+</itemizedlist><para>For more information on these files, see <olink targetptr="ch3enhancepkg-31830" remap="internal">Creating Information Files</olink>.</para>
+</sect2><sect2 id="ch5pkgcasestudies-111"><title>Approach</title><para>To meet the requirements in the description, you must: </para><itemizedlist><listitem><para>Create a <filename>copyright</filename> file. </para><para>A <filename>copyright</filename> file contains the ASCII text of a copyright message.
+The message shown in the sample file is displayed on the screen during package
+installation. </para>
+</listitem><listitem><para>Create a <filename>compver</filename> file. </para><para>The <filename>pkginfo</filename> file shown in the next figure defines this package version
+as version 3.0. The <literal>compver</literal> file defines version 3.0 as
+being compatible with versions 2.3, 2.2, 2.1, 2.1.1, 2.1.3 and 1.7. </para>
+</listitem><listitem><para>Create a <filename>depend</filename> file. </para><para>Files
+listed in a <filename>depend</filename> file must already be installed on
+the system when a package is installed. The example file has 11 packages which
+must already be on the system at installation time. </para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-65"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-112"><title>The <filename>pkginfo</filename> File</title><indexterm id="ch5pkgcasestudies-ix114"><primary><filename>pkginfo</filename> file</primary><secondary>package compatibilities and dependencies case study</secondary>
+</indexterm><programlisting role="complete">PKG=case3
+NAME=Case Study #3
+CATEGORY=application
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 3.0
+CLASSES=none</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-113"><title>The <filename>copyright</filename> File</title><indexterm><primary><filename>copyright</filename> file</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">Copyright (c) 1999 company_name
+All Rights Reserved.
+THIS PACKAGE CONTAINS UNPUBLISHED PROPRIETARY SOURCE CODE OF
+company_name.
+The copyright notice above does not evidence any
+actual or intended publication of such source code</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-114"><title>The <filename>compver</filename> File</title><indexterm id="ch5pkgcasestudies-ix115"><primary><filename>compver</filename> file</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">Version 3.0
+Version 2.3
+Version 2.2
+Version 2.1
+Version 2.1.1
+Version 2.1.3
+Version 1.7</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-115"><title>The <filename>depend</filename> File</title><indexterm id="ch5pkgcasestudies-ix116"><primary><filename>depend</filename> file</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">P acu Advanced C Utilities
+Issue 4 Version 1
+P cc C Programming Language
+Issue 4 Version 1
+P dfm Directory and File Management Utilities
+P ed Editing Utilities
+P esg Extended Software Generation Utilities
+Issue 4 Version 1
+P graph Graphics Utilities
+P rfs Remote File Sharing Utilities
+Issue 1 Version 1
+P rx Remote Execution Utilities
+P sgs Software Generation Utilities
+Issue 4 Version 1
+P shell Shell Programming Utilities
+P sys System Header Files
+Release 3.1</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-77"><title>Modifying a File by Using Standard
+Classes and Class Action Scripts</title><para>This case study modifies an existing file during package installation
+using standard classes and class action scripts. It uses one of three modification
+methods. The other two methods are described in <olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by Using the sed Class and
+a postinstall Script</olink> and <olink targetptr="ch5pkgcasestudies-82" remap="internal">Modifying
+a File by Using The build Class</olink>. The file modified is <filename>/etc/inittab</filename>. </para><sect2 id="ch5pkgcasestudies-120"><title>Techniques</title><para>This case study demonstrates how to use installation and removal class
+action scripts. For more information, see <olink targetptr="ch3enhancepkg-37319" remap="internal">Writing Class Action Scripts</olink>.</para>
+</sect2><sect2 id="ch5pkgcasestudies-121"><title>Approach</title><para>To modify <filename>/etc/inittab</filename> during installation, using
+classes and class action scripts, you must complete the following tasks:</para><itemizedlist><listitem><para>Create a class. </para><para>Create a class called <literal>inittab</literal>. You must provide an installation and a removal class action script
+for this class. Define the <literal>inittab</literal> class in the <envar>CLASSES</envar> parameter in the <filename>pkginfo</filename> file. </para>
+</listitem><listitem><para>Create an <literal>inittab</literal> file. </para><para>This
+file contains the information for the entry that you will add to <filename>/etc/inittab</filename>. Notice in the <filename>prototype</filename> file figure that <literal>inittab</literal> is a member of the <literal>inittab</literal> class and
+has a file type of <literal>e</literal> for editable.</para>
+</listitem><listitem><para>Create an installation class action script (<literal>i.inittab</literal>). </para><para>Remember that class action scripts must produce the same results
+each time they are executed. The class action script performs the following
+procedures: </para><itemizedlist><listitem><para>Checks if this entry has been added before </para>
+</listitem><listitem><para>If it has, removes any previous versions of the entry </para>
+</listitem><listitem><para>Edits the <literal>inittab</literal> file and adds the comment
+lines so you know where the entry is from </para>
+</listitem><listitem><para>Moves the temporary file back into <filename>/etc/inittab</filename> </para>
+</listitem><listitem><para>Executes the <command>init q</command> command when it receives
+the <literal>ENDOFCLASS</literal> indicator </para>
+</listitem>
+</itemizedlist><para>Note that the <command>init q</command> command can be performed by
+this installation script. A one-line <filename>postinstall</filename> script
+is not needed by this approach. </para>
+</listitem><listitem><para>Create a removal class action script (<literal>r.inittab</literal>). </para><para>The removal script is very similar to the installation script.
+The information added by the installation script is removed and the <command>init
+q</command> command is executed. </para>
+</listitem>
+</itemizedlist><para>This case study is more complicated than the next one; see <olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by Using the sed Class and
+a postinstall Script</olink>. Instead of providing two files, three are needed
+and the delivered <filename>/etc/inittab</filename> file is actually just
+a place holder containing a fragment of the entry to be inserted. This could
+have been placed into the <literal>i.inittab</literal> file except that the <command>pkgadd</command> command must have a file to pass to the <literal>i.inittab</literal> file.
+Also, the removal procedure must be placed into a separate file (<literal>r.inittab</literal>). While this method works fine, it is best reserved for cases involving
+very complicated installations of multiple files. See <olink targetptr="ch5pkgcasestudies-87" remap="internal">Modifying crontab Files During Installation</olink>.</para><para>The <literal>sed</literal> program used in <olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by Using the sed Class and
+a postinstall Script</olink> supports multiple package instances since the
+comment at the end of the <literal>inittab</literal> entry is based on package
+instance. The case study in <olink targetptr="ch5pkgcasestudies-82" remap="internal">Modifying
+a File by Using The build Class</olink> shows a more streamlined approach
+to editing <filename>/etc/inittab</filename> during installation. </para>
+</sect2><sect2 id="ch5pkgcasestudies-122"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-81"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>standard classes and class action script case study</secondary>
+</indexterm><programlisting role="complete">PKG=case5
+NAME=Case Study #5
+CATEGORY=applications
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 1d05
+CLASSES=inittab</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-123"><title>The <filename>prototype</filename> File</title><indexterm><primary><filename>prototype</filename> file</primary><secondary>standard classes and class action script case study</secondary>
+</indexterm><programlisting role="complete">i pkginfo
+i i.inittab
+i r.inittab
+e inittab /etc/inittab ? ? ?</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-75"><title>The <literal>i.inittab</literal> Installation
+Class Action Script</title><indexterm id="ch5pkgcasestudies-ix122"><primary>i.inittab installation class action script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># PKGINST parameter provided by installation service
+while read src dest
+do
+# remove all entries from the table that
+# associated with this PKGINST
+sed -e "/^[^:]*:[^:]*:[^:]*:[^#]*#$PKGINST$/d" $dest &gt;
+/tmp/$$itab ||
+exit 2
+sed -e "s/$/#$PKGINST" $src &gt;&gt; /tmp/$$itab ||
+exit 2
+mv /tmp/$$itab $dest ||
+exit 2
+done
+if [ "$1" = ENDOFCLASS ]
+then
+/sbin/init q ||
+exit 2
+fi
+exit 0</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-76"><title>The <literal>r.inittab</literal> Removal
+Class Action Script</title><indexterm><primary>r.inittab class action script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># PKGINST parameter provided by installation service
+while read src dest
+do
+# remove all entries from the table that
+# are associated with this PKGINST
+sed -e "/^[^:]*:[^:]*:[^:]*:[^#]*#$PKGINST$/d" $dest &gt;
+/tmp/$$itab ||
+exit 2
+mv /tmp/$$itab $dest ||
+exit 2
+done
+/sbin/init q ||
+exit 2
+exit 0</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-124"><title>The <filename>inittab</filename> File</title><programlisting role="complete">rb:023456:wait:/usr/robot/bin/setup</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-69"><title>Modifying a File by Using the <literal>sed</literal> Class and a <filename>postinstall</filename> Script</title><para>This case study modifies a file which exists on the installation machine
+during package installation. It uses one of three modification methods. The
+other two methods are described in <olink targetptr="ch5pkgcasestudies-77" remap="internal">Modifying
+a File by Using Standard Classes and Class Action Scripts</olink> and <olink targetptr="ch5pkgcasestudies-82" remap="internal">Modifying a File by Using The build Class</olink>.
+The file modified is <filename>/etc/inittab</filename>. </para><sect2 id="ch5pkgcasestudies-70"><title>Techniques</title><para>This case study demonstrates the following techniques: </para><itemizedlist><listitem><para>Using the <literal>sed</literal> class </para><para>For more
+information on the <literal>sed</literal> class, see <olink targetptr="ch3enhancepkg-37" remap="internal">The sed Class Script</olink>.</para>
+</listitem><listitem><para>Using a <filename>postinstall</filename> script </para><para>For
+more information on this script, see <olink targetptr="ch3enhancepkg-14637" remap="internal">Writing
+Procedure Scripts</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-116"><title>Approach</title><para>To modify <filename>/etc/inittab</filename> at the time of installation,
+using the <literal>sed</literal> class, you must complete the following tasks:</para><itemizedlist><listitem><para>Add the <literal>sed</literal> class script to the <filename>prototype</filename> file. </para><para>The name of a script must be the name of the
+file that will be edited. In this case, the file to be edited is <filename>/etc/inittab</filename> and so the <literal>sed</literal> script is named <filename>/etc/inittab</filename>. There are no requirements for the mode, owner, and group of a <literal>sed</literal> script (represented in the sample <filename>prototype</filename> by
+question marks). The file type of the <literal>sed</literal> script must be <literal>e</literal> (indicating that it is editable). </para>
+</listitem><listitem><para>Set the <envar>CLASSES</envar> parameter to include the <literal>sed</literal> class. </para><para>As shown in the example file, <literal>sed</literal> is
+the only class being installed. However, it could be one of any number of
+classes. </para>
+</listitem><listitem><para>Create a <literal>sed</literal> class action script. </para><para>Your package cannot deliver a copy of <filename>/etc/inittab</filename> that
+looks the way you need it to, since <filename>/etc/inittab</filename> is a
+dynamic file and you have no way of knowing how it will look at the time of
+package installation. However, using a <literal>sed</literal> script allows
+you to modify the <filename>/etc/inittab</filename> file during package installation. </para>
+</listitem><listitem><para>Create a <filename>postinstall</filename> script. </para><para>You
+need to execute the <command>init q</command> command to inform the system
+that <filename>/etc/inittab</filename> has been modified. The only place you
+can perform that action in this example is in a <filename>postinstall</filename> script.
+Looking at the example <filename>postinstall</filename> script, you will see
+that its only purpose is to execute the <command>init q</command> command.</para>
+</listitem>
+</itemizedlist><para>This approach to editing <filename>/etc/inittab</filename> during installation
+has one drawback; you have to deliver a full script (the <command>postinstall</command> script)
+simply to perform the <command>init q</command> command.</para>
+</sect2><sect2 id="ch5pkgcasestudies-72"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-73"><title>The <filename>pkginfo</filename> File</title><indexterm id="ch5pkgcasestudies-ix117"><primary><filename>pkginfo</filename> file</primary><secondary><literal>sed</literal> class and <literal>postinstall</literal> script case study</secondary>
+</indexterm><programlisting role="complete">PKG=case4
+NAME=Case Study #4
+CATEGORY=applications
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 1d05
+CLASSES=sed</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-117"><title>The <filename>prototype</filename> File</title><indexterm><primary><filename>prototype</filename> file</primary><secondary><literal>sed</literal> class and <literal>postinstall</literal> script</secondary>
+</indexterm><programlisting role="complete">i pkginfo
+i postinstall
+e sed /etc/inittab ? ? ?</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-118"><title>The <literal>sed</literal> Class
+Action Script (<literal>/etc/inittab</literal>)</title><indexterm><primary><literal>sed</literal> class</primary><secondary>script</secondary><tertiary>in a case study</tertiary>
+</indexterm><programlisting role="complete">!remove
+# remove all entries from the table that are associated
+# with this package, though not necessarily just
+# with this package instance
+/^[^:]*:[^:]*:[^:]*:[^#]*#ROBOT$/d
+!install
+# remove any previous entry added to the table
+# for this particular change
+/^[^:]*:[^:]*:[^:]*:[^#]*#ROBOT$/d
+# add the needed entry at the end of the table;
+# sed(1) does not properly interpret the '$a'
+# construct if you previously deleted the last
+# line, so the command
+# $a\
+# rb:023456:wait:/usr/robot/bin/setup #ROBOT
+# will not work here if the file already contained
+# the modification. Instead, you will settle for
+# inserting the entry before the last line!
+$i\
+rb:023456:wait:/usr/robot/bin/setup #ROBOT</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-119"><title>The <filename>postinstall</filename> Script</title><indexterm id="ch5pkgcasestudies-ix119"><primary><filename>postinstall</filename> script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># make init re-read inittab
+/sbin/init q ||
+exit 2
+exit 0</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-82"><title>Modifying a File by Using The <literal>build</literal> Class</title><para>This case study modifies a file which exists on the installation machine
+during package installation. It uses one of three modification methods. The
+other two methods are described in <olink targetptr="ch5pkgcasestudies-77" remap="internal">Modifying
+a File by Using Standard Classes and Class Action Scripts</olink> and <olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by Using the sed Class and
+a postinstall Script</olink>. The file modified is <filename>/etc/inittab</filename>. </para><sect2 id="ch5pkgcasestudies-83"><title>Techniques</title><para>This case study demonstrates how to use the <literal>build</literal> class.
+For more information on the <literal>build</literal> class, see <olink targetptr="ch3enhancepkg-39" remap="internal">The build Class Script</olink>.</para>
+</sect2><sect2 id="ch5pkgcasestudies-84"><title>Approach</title><para>This approach to modifying <filename>/etc/inittab</filename> uses the <literal>build</literal> class. A <literal>build</literal> class script is executed
+as a shell script and its output becomes the new version of the file being
+executed. In other words, the data file <filename>/etc/inittab</filename> that
+is delivered with this package will be executed and the output of that execution
+will become <filename>/etc/inittab</filename>. </para><para>The <literal>build</literal> class script is executed during package
+installation and package removal. The argument <literal>install</literal> is
+passed to the file if it is being executed at installation time. Notice in
+the sample <literal>build</literal> class script that installation actions
+are defined by testing for this argument. </para><para>To edit <filename>/etc/inittab</filename> using the <literal>build</literal> class,
+you must complete the following tasks:</para><itemizedlist><listitem><para>Define the build file in the <filename>prototype</filename> file. </para><para>The entry for the build file in the <filename>prototype</filename> file
+should place it in the <literal>build</literal> class and define its file
+type as <literal>e</literal>. Be certain that the <envar>CLASSES</envar> parameter
+in the <filename>pkginfo</filename> file is defined as <literal>build</literal>.</para>
+</listitem><listitem><para>Create the <literal>build</literal> class script. </para><para>The
+sample <literal>build</literal> class script performs the following procedures: </para><itemizedlist><listitem><para>Edits the <filename>/etc/inittab</filename> file to remove
+any existing changes for this package. Notice that the file name <filename>/etc/inittab</filename> is hardcoded into the <literal>sed</literal> command. </para>
+</listitem><listitem><para>If the package is being installed, adds the new line to the
+end of <filename>/etc/inittab</filename>. A comment tag is included in this
+new entry to describe where that entry came from. </para>
+</listitem><listitem><para>Executes the <command>init q</command> command. </para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist><para>This solution addresses the drawbacks described in the case studies
+in <olink targetptr="ch5pkgcasestudies-77" remap="internal">Modifying a File by Using Standard
+Classes and Class Action Scripts</olink> and <olink targetptr="ch5pkgcasestudies-69" remap="internal">Modifying a File by Using the sed Class and
+a postinstall Script</olink>. Only one short file is needed (beyond the <filename>pkginfo</filename> and <filename>prototype</filename> files). The file works
+with multiple instances of a package since the <envar>PKGINST</envar> parameter
+is used, and no <filename>postinstall</filename> script is required since
+the <command>init q</command> command can be executed from the <literal>build</literal> class
+script.</para>
+</sect2><sect2 id="ch5pkgcasestudies-78"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-85"><title>The <filename>pkginfo</filename> File</title><indexterm id="ch5pkgcasestudies-ix127"><primary><filename>pkginfo</filename> file</primary><secondary>build class case study</secondary>
+</indexterm><programlisting role="complete">PKG=case6
+NAME=Case Study #6
+CATEGORY=applications
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 1d05
+CLASSES=build</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-80"><title>The <filename>prototype</filename> File</title><indexterm><primary><literal>build</literal> class</primary><secondary>in a case study</secondary>
+</indexterm><indexterm><primary><filename>prototype</filename> file</primary><secondary><literal>build</literal> class case study</secondary>
+</indexterm><programlisting role="complete">i pkginfo
+e build /etc/inittab ? ? ?</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-86"><title>The Build File</title><indexterm><primary><literal>build</literal> class</primary><secondary>script</secondary><tertiary>in a case study</tertiary>
+</indexterm><programlisting role="complete"># PKGINST parameter provided by installation service
+# remove all entries from the existing table that
+# are associated with this PKGINST
+sed -e "/^[^:]*:[^:]*:[^:]*:[^#]*#$PKGINST$/d" /etc/inittab ||
+exit 2
+if [ "$1" = install ]
+then
+# add the following entry to the table
+echo "rb:023456:wait:/usr/robot/bin/setup #$PKGINST" ||
+exit 2
+fi
+/sbin/init q ||
+exit 2
+exit 0</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-87"><title>Modifying <command>crontab</command> Files
+During Installation</title><para>This case study modifies <filename>crontab</filename> files during package
+installation. </para><sect2 id="ch5pkgcasestudies-88"><title>Techniques</title><para>This case study demonstrates the following techniques: </para><itemizedlist><listitem><para>Using classes and class action scripts  </para><para>For more
+information, see <olink targetptr="ch3enhancepkg-37319" remap="internal">Writing Class Action
+Scripts</olink>.</para>
+</listitem><listitem><para>Using the <command>crontab</command> command within a class
+action script </para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-89"><title>Approach</title><para>The most efficient way to edit more than one file during installation
+is to define a class and provide a class action script. If you used the <literal>build</literal> class approach, you would need to deliver one <literal>build</literal> class
+script for each <filename>crontab</filename> file edited. Defining a <literal>cron</literal> class provides a more general approach. To edit <filename>crontab</filename> files
+with this approach, you must:</para><itemizedlist><listitem><para>Define the <command>crontab</command> files that are to be
+edited in the <filename>prototype</filename> file. </para><para>Create an
+entry in the <filename>prototype</filename> file for each <command>crontab</command> file
+that will be edited. Define the class as <literal>cron</literal> and the file
+type as <literal>e</literal> for each file. Use the actual name of the file
+to be edited. </para>
+</listitem><listitem><para>Create the <command>crontab</command> files for the package. </para><para>These files contain the information you want added to the existing <command>crontab</command> files of the same name.</para>
+</listitem><listitem><para>Create an installation class action script for the <literal>cron</literal> class. </para><para>The sample <literal>i.cron</literal> script performs the following
+procedures: </para><itemizedlist><listitem><para>Determines the user ID (UID). </para><para>The <literal>i.cron</literal> script
+sets the variable <replaceable>user</replaceable> to the base name of the <literal>cron</literal> class script being processed. That name is the UID. For example,
+the base name of <literal>/var/spool/cron/crontabs/root</literal> is root,
+which is also the UID. </para>
+</listitem><listitem><para>Executes <command>crontab</command> using the UID and the <option>l</option> option. </para><para>Using the <option>l</option> option tells <command>crontab</command> to send the contents of the <command>crontab</command> file
+for the defined user to the standard output. </para>
+</listitem><listitem><para>Pipes the output of the <command>crontab</command> command
+to a <literal>sed</literal> script that removes any previous entries added
+with this installation technique. </para>
+</listitem><listitem><para>Puts the edited output into a temporary file. </para>
+</listitem><listitem><para>Adds the data file for the root UID (that was delivered with
+the package) to the temporary file and adds a tag so you will know where these
+entries came from. </para>
+</listitem><listitem><para>Executes <command>crontab</command> with the same UID and
+gives it the temporary file as input. </para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Create a removal class action script for the <literal>cron</literal> class. </para><para>The <literal>r.cron</literal> script is the same as the installation
+script except there is no procedure to add information to the <command>crontab</command> file. </para><para>These procedures are performed for every file in the <literal>cron</literal> class.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-90"><title>Case Study Files</title><para>The <filename>i.cron</filename> and <filename>r.cron</filename> scripts
+described below are executed by superuser. Editing another user's <filename>crontab</filename> file as superuser may have unpredictable results. If necessary,
+change the following entry in each script:</para><programlisting>crontab $user &lt; /tmp/$$crontab ||</programlisting><para>to</para><programlisting>su $user -c "crontab /tmp/$$crontab" ||</programlisting><sect3 id="ch5pkgcasestudies-91"><title>The <filename>pkginfo</filename> Command</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary><filename>crontab</filename> file case study</secondary>
+</indexterm><programlisting role="complete">PKG=case7
+NAME=Case Study #7
+CATEGORY=application
+BASEDIR=/opt
+ARCH=SPARC
+VERSION=Version 1.0
+CLASSES=cron</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-92"><title>The <filename>prototype</filename> File</title><indexterm><primary><filename>prototype</filename> file</primary><secondary><filename>crontab</filename> file case study</secondary>
+</indexterm><programlisting role="complete">i pkginfo
+i i.cron
+i r.cron
+e cron /var/spool/cron/crontabs/root ? ? ?
+e cron /var/spool/cron/crontabs/sys ? ? ?</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-55"><title>The <literal>i.cron</literal> Installation
+Class Action Script</title><indexterm id="ch5pkgcasestudies-ix128"><primary>i.cron installation class action script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># PKGINST parameter provided by installation service
+while read src dest
+do
+user=`basename $dest` ||
+exit 2
+(crontab -l $user |
+sed -e "/#$PKGINST$/d" &gt; /tmp/$$crontab) ||
+exit 2
+sed -e "s/$/#$PKGINST/" $src &gt;&gt; /tmp/$$crontab ||
+exit 2
+crontab $user &lt; /tmp/$$crontab ||
+exit 2
+rm -f /tmp/$$crontab
+done
+exit 0</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-93"><title>The <literal>r.cron</literal> Removal
+Class Action Script</title><indexterm><primary>r.cron removal class action script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># PKGINST parameter provided by installation service
+while read path
+do
+user=`basename $path` ||
+exit 2
+(crontab -l $user |
+sed -e "/#$PKGINST$/d" &gt; /tmp/$$crontab) ||
+exit 2
+crontab $user &lt; /tmp/$$crontab ||
+exit 2
+rm -f /tmp/$$crontab
+done
+exit </programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-94"><title><command>crontab</command> File #1</title><programlisting role="complete">41,1,21 * * * * /usr/lib/uucp/uudemon.hour &gt; /dev/null
+45 23 * * * ulimit 5000; /usr/bin/su uucp -c
+"/usr/lib/uucp/uudemon.cleanup" &gt;
+/dev/null 2&gt;&amp;1
+11,31,51 * * * * /usr/lib/uucp/uudemon.poll &gt; /dev/null</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-129"><title><command>crontab</command> File #2</title><programlisting role="complete">0 * * * 0-6 /usr/lib/sa/sa1
+20,40 8-17 * * 1-5 /usr/lib/sa/sa1
+5 18 * * 1-5 /usr/lib/sa/sa2 -s 8:00 -e 18:01 -i 1200 -A</programlisting><note><para>If editing of a group of files will increase total file size by
+more than 10K, supply a <filename>space</filename> file so the <command>pkgadd</command> command
+can allow for this increase. For more information on the <filename>space</filename> file,
+see <olink targetptr="ch3enhancepkg-10245" remap="internal">Reserving Additional Space on a
+Target System</olink>.</para>
+</note>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-79"><title>Installing and Removing a Driver With
+Procedure Scripts</title><para>This package installs a driver. </para><sect2 id="ch5pkgcasestudies-95"><title>Techniques</title><para>This case study demonstrates the following techniques: </para><itemizedlist><listitem><para>Installing and loading a driver with a <filename>postinstall</filename> script </para>
+</listitem><listitem><para>Unloading a driver with a <filename>preremove</filename> script </para>
+</listitem>
+</itemizedlist><para>For more information on these scripts, see <olink targetptr="ch3enhancepkg-14637" remap="internal">Writing Procedure Scripts</olink>.</para>
+</sect2><sect2 id="ch5pkgcasestudies-125"><title>Approach</title><itemizedlist><listitem><para>Create a <filename>request</filename> script. </para><para>The <filename>request</filename> script determines where the administrator wants the driver
+objects to be installed, by questioning the administrator and assigning the
+answer to the <literal>$KERNDIR</literal> parameter. </para><para>The script
+ends with a routine to make the two parameters <envar>CLASSES</envar> and <literal>KERNDIR</literal> available to the installation environment and the <filename>postinstall</filename> script. </para>
+</listitem><listitem><para>Create a <filename>postinstall</filename> script. </para><para>The <filename>postinstall</filename> script actually performs the driver installation. It
+is executed after the two files <filename>buffer</filename> and <filename>buffer.conf</filename> have been installed. The <filename>postinstall</filename> file
+shown for this example performs the following actions:</para><itemizedlist><listitem><para>Uses the <command>add_drv</command> command to load the driver
+into the system.</para>
+</listitem><listitem><para>Creates a link for the device using the <command>installf</command> command.</para>
+</listitem><listitem><para>Finalizes the installation using the <command>installf -f</command> command.</para>
+</listitem><listitem><para>Creates a <filename>preremove</filename> script.</para><para>The <filename>preremove</filename> script uses the <command>rem_drv</command> command to
+unload the driver from the system, and then removes the link <filename>/dev/buffer0</filename>.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-96"><title>Case Study Files</title><sect3 id="ch5pkgcasestudies-59"><title>The <filename>pkginfo</filename> File</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>installing and removing a driver with procedure scripts case study</secondary>
+</indexterm><programlisting role="complete">PKG=bufdev
+NAME=Buffer Device
+CATEGORY=system
+BASEDIR=/
+ARCH=INTEL
+VERSION=Software Issue #19
+CLASSES=none</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-97"><title>The <filename>prototype</filename> File</title><para>To install a driver at the time of installation, you must include the
+object and configuration files for the driver in the <filename>prototype</filename> file. </para><para><indexterm><primary><filename>prototype</filename> file</primary><secondary>installing and removing a driver with procedure scripts case study</secondary></indexterm>In this example, the executable module for the driver is named <literal>buffer</literal>; the <command>add_drv</command> command operates on this
+file. The kernel uses the configuration file, <filename>buffer.conf</filename>,
+to help configure the driver. </para><programlisting role="complete">i pkginfo
+i request
+i postinstall
+i preremove
+f none $KERNDIR/buffer 444 root root
+f none $KERNDIR/buffer.conf 444 root root</programlisting><para>Looking at the <filename>prototype</filename> file for this example,
+notice the following:</para><itemizedlist><listitem><para>Since no special treatment is required for the package objects,
+you can put them into the standard <literal>none</literal> class. The <envar>CLASSES</envar> parameter is set to <literal>none</literal> in the <filename>pkginfo</filename> file.</para>
+</listitem><listitem><para>The path names for <literal>buffer</literal> and <literal>buffer.conf</literal> begin with the variable <literal>$KERNDIR</literal>. This variable
+is set in the <filename>request</filename> script and allows the administrator
+to decide where the driver files should be installed. The default directory
+is <literal>/kernel/drv</literal>.</para>
+</listitem><listitem><para>There is an entry for the <filename>postinstall</filename> script
+(the script that will perform the driver installation). </para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="ch5pkgcasestudies-61"><title>The <filename>request</filename> Script</title><indexterm id="ch5pkgcasestudies-ix134"><primary><filename>request</filename> script</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">trap 'exit 3' 15
+# determine where driver object should be placed; location
+# must be an absolute path name that is an existing directory
+KERNDIR=`ckpath -aoy -d /kernel/drv -p \
+&ldquo;Where do you want the driver object installed&rdquo;` || exit $?
+
+# make parameters available to installation service, and
+# so to any other packaging scripts
+cat &gt;$1 &lt;&lt;!
+
+CLASSES='$CLASSES'
+KERNDIR='$KERNDIR'
+!
+exit 0</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-98"><title>The <filename>postinstall</filename> Script</title><indexterm id="ch5pkgcasestudies-ix132"><primary><filename>postinstall</filename> script</primary><secondary>in a case study</secondary>
+</indexterm><indexterm><primary><command>installf</command> command</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete"># KERNDIR parameter provided by `request' script
+err_code=1                    # an error is considered fatal
+# Load the module into the system
+cd $KERNDIR
+add_drv -m '* 0666 root sys' buffer || exit $err_code
+# Create a /dev entry for the character node
+installf $PKGINST /dev/buffer0=/devices/eisa/buffer*:0 s
+installf -f $PKGINST</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-99"><title>The <filename>preremove</filename> Script</title><indexterm id="ch5pkgcasestudies-ix133"><primary><filename>preremove</filename> script</primary><secondary>in a case study</secondary>
+</indexterm><indexterm><primary><command>removef</command> command</primary><secondary>in a case study</secondary>
+</indexterm><programlisting role="complete">err_code=1                    # an error is considered fatal
+# Unload the driver
+rem_drv buffer || exit $err_code
+# remove /dev file
+removef $PKGINST /dev/buffer0 ; rm /dev/buffer0
+removef -f $PKGINST</programlisting>
+</sect3>
+</sect2>
+</sect1><sect1 id="ch5pkgcasestudies-64"><title>Installing a Driver by Using the <literal>sed</literal> Class and Procedure Scripts</title><para>This case study describes how to install a driver using the <literal>sed</literal> class
+and procedure scripts. It is also different from the previous case study (see <olink targetptr="ch5pkgcasestudies-79" remap="internal">Installing and Removing a Driver With Procedure
+Scripts</olink>) because this package is made up of both absolute and relocatable
+objects.</para><sect2 id="ch5pkgcasestudies-71"><title>Techniques</title><para>This case study demonstrates the following techniques:</para><itemizedlist><listitem><para>Building a <filename>prototype</filename> file with both absolute
+and relocatable objects.</para><para>For more information on building a <filename>prototype</filename> file, see <olink targetptr="ch2buildpkg-16803" remap="internal">Creating
+a prototype File</olink>.</para>
+</listitem><listitem><para>Using a <filename>postinstall</filename> script</para><para>For
+more information on this script, see <olink targetptr="ch3enhancepkg-14637" remap="internal">Writing
+Procedure Scripts</olink>.</para>
+</listitem><listitem><para>Using a <filename>preremove</filename> script</para><para>For
+more information on this script, see <olink targetptr="ch3enhancepkg-14637" remap="internal">Writing
+Procedure Scripts</olink>.</para>
+</listitem><listitem><para>Using a <filename>copyright</filename> file</para><para>For
+more information on this file, see <olink targetptr="ch3enhancepkg-32564" remap="internal">Writing
+a Copyright Message</olink>.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-100"><title>Approach</title><itemizedlist><listitem><para>Create a <filename>prototype</filename> file containing both
+absolute and relocatable package objects.</para><para>This is discussed in
+detail in <olink targetptr="ch5pkgcasestudies-102" remap="internal">The prototype File</olink>.</para>
+</listitem><listitem><para>Add the <literal>sed</literal> class script to the <filename>prototype</filename> file.</para><para>The name of a script must be the name of the
+file that will be edited. In this case, the file to be edited is <literal>/etc/devlink.tab</literal> and so the <literal>sed</literal> script is named <literal>/etc/devlink.tab</literal>. There are no requirements for the mode, owner, and group of a <literal>sed</literal> script (represented in the sample <filename>prototype</filename> by
+question marks). The file type of the <literal>sed</literal> script must be <literal>e</literal> (indicating that it is editable). </para>
+</listitem><listitem><para>Set the <envar>CLASSES</envar> parameter to include the <literal>sed</literal> class. </para>
+</listitem><listitem><para>Create a <literal>sed</literal> class action script (<literal>/etc/devlink.tab</literal>). </para>
+</listitem><listitem><para>Create a <filename>postinstall</filename> script. </para><para>The <filename>postinstall</filename> script needs to execute the <command>add_drv</command> command
+to add the device driver to the system.</para>
+</listitem><listitem><para>Create a <filename>preremove</filename> script.</para><para>The <filename>preremove</filename> script needs to execute the <command>rem_drv</command> command
+to remove the device driver from the system, prior to the package being removed.</para>
+</listitem><listitem><para>Create a <filename>copyright</filename> file.</para><para>A <filename>copyright</filename> file contains the ASCII text of a copyright message.
+The message shown in the sample file is displayed on the screen during package
+installation. </para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="ch5pkgcasestudies-101"><title>Case Study Files</title><indexterm><primary><filename>pkginfo</filename> file</primary><secondary>installing a driver using the <filename>sed</filename> class and procedure scripts case study</secondary>
+</indexterm><sect3 id="ch5pkgcasestudies-66"><title>The <filename>pkginfo</filename> File</title><programlisting role="complete">PKG=SUNWsst
+NAME=Simple SCSI Target Driver
+VERSION=1
+CATEGORY=system
+ARCH=sparc
+VENDOR=Sun Microsystems
+BASEDIR=/opt
+CLASSES=sed</programlisting>
+</sect3><sect3 id="ch5pkgcasestudies-102"><title>The <filename>prototype</filename> File</title><para><indexterm><primary><filename>prototype</filename> file</primary><secondary>in a case studyinstalling a driver using the <filename>sed</filename> class and procedure scripts case study</secondary></indexterm>For example, this
+case study uses the hierarchical layout of the package objects shown in the
+figure below.</para><figure id="ch5pkgcasestudies-fig-42"><title>Hierarchical Package Directory
+Structure</title><mediaobject><imageobject><imagedata entityref="fig269.epsi" width="100"/>
+</imageobject><textobject><simpara>The following context describes the graphic.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The package objects are installed in the same places as they are in
+the <literal>pkg</literal> directory above. The driver modules (<literal>sst</literal> and <literal>sst.conf</literal>) are installed into <literal>/usr/kernel/drv</literal> and
+the include file is installed into <literal>/usr/include/sys/scsi/targets</literal>.
+The <literal>sst</literal>, <literal>sst.conf</literal>, and <literal>sst_def.h</literal> files
+are absolute objects. The test program, <literal>sstest.c</literal>, and its
+directory <literal>SUNWsst</literal> are relocatable; their installation location
+is set by the <envar>BASEDIR</envar> parameter.</para><para>The remaining components of the package (all the control files) go in
+the top directory of the package on the development machine, except the <literal>sed</literal> class script. This is called <literal>devlink.tab</literal> after
+the file it modifies, and goes into <literal>etc</literal>, the directory
+containing the real <literal>devlink.tab</literal> file.</para><para><indexterm><primary><command>pkgproto</command> command</primary><secondary>in a case study</secondary></indexterm>From the <literal>pkg</literal> directory,
+run the <literal>pkgproto</literal> command as follows:</para><screen><userinput>find usr SUNWsst -print | pkgproto &gt; prototype</userinput></screen><para>The output from the above command looks like this:</para><programlisting role="complete">d none usr 0775 pms mts
+d none usr/include 0775 pms mts
+d none usr/include/sys 0775 pms mts
+d none usr/include/sys/scsi 0775 pms mts
+d none usr/include/sys/scsi/targets 0775 pms mts
+f none usr/include/sys/scsi/targets/sst_def.h 0444 pms mts
+d none usr/kernel 0775 pms mts
+d none usr/kernel/drv 0775 pms mts
+f none usr/kernel/drv/sst 0664 pms mts
+f none usr/kernel/drv/sst.conf 0444 pms mts
+d none SUNWsst 0775 pms mts
+f none SUNWsst/sstest.c 0664 pms mts</programlisting><para>This <filename>prototype</filename> file is not yet complete. To complete
+this file, you need to make the following modifications:</para><itemizedlist><listitem><para>Insert the entries for the control files (file type <literal>i</literal>),
+because they have a different format than the other package objects.</para>
+</listitem><listitem><para>Remove entries for directories that already exist on the target
+system.</para>
+</listitem><listitem><para>Change the access permission and ownership for each entry.</para>
+</listitem><listitem><para>Prepend a slash to the absolute package objects.</para>
+</listitem>
+</itemizedlist><para>This is the final <literal>prototype</literal> file:</para><programlisting role="complete">i pkginfo
+i postinstall
+i preremove
+i copyright
+e sed /etc/devlink.tab ? ? ?
+f none /usr/include/sys/scsi/targets/sst_def.h 0644 bin bin
+f none /usr/kernel/drv/sst 0755 root sys
+f none /usr/kernel/drv/sst.conf 0644 root sys
+d none SUNWsst 0775 root sys
+f none SUNWsst/sstest.c 0664 root sys</programlisting><para>The questions marks in the entry for the <literal>sed</literal> script
+indicate that the access permissions and ownership of the existing file on
+the installation machine should not be changed.</para>
+</sect3><sect3 id="ch5pkgcasestudies-67"><title>The <literal>sed</literal> Class Action
+Script (<literal>/etc/devlink.tab</literal>)</title><para><indexterm><primary><literal>sed</literal> class</primary><secondary>script</secondary><tertiary>in a case study</tertiary></indexterm>In the driver
+example, a <literal>sed</literal> class script is used to add an entry for
+the driver to the file <literal>/etc/devlink.tab</literal>. This file is used
+by the <literal>devlinks</literal> command to create symbolic links from <filename>/dev</filename> into <filename>/devices</filename>. This is the <literal>sed</literal> script:</para><programlisting role="complete"># sed class script to modify /etc/devlink.tab
+!install
+/name=sst;/d
+$i\
+type=ddi_pseudo;name=sst;minor=character	rsst\\A1
+
+!remove
+/name=sst;/d</programlisting><para><indexterm><primary><command>pkgrm</command> command</primary></indexterm>The <command>pkgrm</command> command does not run the removal part of the script. You may
+need to add a line to the <filename>preremove</filename> script to run <literal>sed</literal> directly to remove the entry from the <filename>/etc/devlink.tab</filename> file.</para>
+</sect3><sect3 id="ch5pkgcasestudies-68"><title>The <filename>postinstall</filename> Installation
+Script</title><para><indexterm><primary><filename>postinstall</filename> script</primary><secondary>in a case study</secondary></indexterm>In this example, all the
+script needs to do is run the <command>add_drv</command> command.</para><programlisting role="complete"># Postinstallation script for SUNWsst
+# This does not apply to a client.
+if [$PKG_INSTALL_ROOT = "/" -o -z $PKG_INSTALL_ROOT]; then
+   SAVEBASE=$BASEDIR
+   BASEDIR=&rdquo;&rdquo;; export BASEDIR
+   /usr/sbin/add_drv sst
+   STATUS=$?
+   BASEDIR=$SAVEBASE; export BASEDIR
+   if [ $STATUS -eq 0 ]
+   then
+	     exit 20
+   else
+	     exit 2
+   fi
+else
+   echo "This cannot be installed onto a client."
+   exit 2
+fi</programlisting><para>The <command>add_drv</command> command uses the <envar>BASEDIR</envar> parameter,
+so the script has to unset <envar>BASEDIR</envar> before running the command,
+and restore it afterwards.</para><para>One of the actions of the <command>add_drv</command> command is to run <command>devlinks</command>, which uses the entry placed in <literal>/etc/devlink.tab</literal> by
+the <literal>sed</literal> class script to create the <filename>/dev</filename> entries
+for the driver.</para><para>The exit code from the <filename>postinstall</filename> script is significant.
+The exit code <literal>20</literal> tells the <command>pkgadd</command> command
+to tell the user to reboot the system (necessary after installing a driver),
+and the exit code <literal>2</literal> tells the <command>pkgadd</command> command
+to tell the user that the installation partially failed.</para>
+</sect3><sect3 id="ch5pkgcasestudies-126"><title>The <filename>preremove</filename> Removal
+Script</title><para><indexterm><primary><filename>preremove</filename> script</primary><secondary>in a case study</secondary></indexterm>In the case of this driver
+example, it removes the links in <filename>/dev</filename> and runs the <command>rem_drv</command> command on the driver.</para><programlisting role="complete"># Pre removal script for the sst driver
+echo &ldquo;Removing /dev entries&rdquo;
+/usr/bin/rm -f /dev/rsst*
+
+echo &ldquo;Deinstalling driver from the kernel&rdquo;
+SAVEBASE=$BASEDIR
+BASEDIR=&rdquo;&rdquo;; export BASEDIR
+/usr/sbin/rem_drv sst
+BASEDIR=$SAVEBASE; export BASEDIR
+
+exit </programlisting><para>The script removes the <filename>/dev</filename> entries itself; the <filename>/devices</filename> entries are removed by the <command>rem_drv</command> command.</para>
+</sect3><sect3 id="ch5pkgcasestudies-127"><title>The <filename>copyright</filename> File</title><para><indexterm><primary><filename>copyright</filename> file</primary><secondary>in a case study</secondary></indexterm>This is a simple ASCII file
+containing the text of a copyright notice. The notice is displayed at the
+beginning of package installation exactly as it appears in the file.</para><screen>	Copyright (c) 1999 Drivers-R-Us, Inc.
+	10 Device Drive, Thebus, IO 80586
+
+All rights reserved. This product and related documentation is
+protected by copyright and distributed under licenses 
+restricting its use, copying, distribution and decompilation. 
+No part of this product or related documentation may be 
+reproduced in any form by any means without prior written 
+authorization of Drivers-R-Us and its licensors, if any.</screen>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000069543 0?>

@@ -1,0 +1,248 @@
+<chapter id="smbservertasks"><title>Solaris CIFS Service Administration (Tasks)</title><highlights><para>This chapter provides instructions on how to configure the Solaris CIFS service to run as a standalone server (workgroup mode) or in an existing Windows environment (domain mode). This chapter also describes how to manage CIFS shares to be accessed by CIFS clients.</para><para>Currently, the Solaris CIFS service runs only in the global zone.</para><itemizedlist><para>This chapter covers the following topics:</para><listitem><para><olink targetptr="configuringservicestm" remap="internal">Configuring the WINS Service</olink></para>
+</listitem><listitem><para><olink targetptr="configuringoperationmodetm" remap="internal">Configuring the Solaris CIFS Service Operation Mode (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="managingsmbsharestm" remap="internal">Managing CIFS Shares (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="managingsmbgroupsuserstm" remap="internal">Managing CIFS Groups (Task Map)</olink></para>
+</listitem><listitem><para><olink targetptr="migratingfromsamba" remap="internal">Disabling the Samba Service</olink></para>
+</listitem>
+</itemizedlist><para>For a high-level overview of the Solaris CIFS service configuration process, see <olink targetptr="processoverview" remap="internal">Configuring the Solaris CIFS Service &ndash; Process Overview</olink>.</para><note><para>CIFS is an enhanced version of the SMB protocol, which allows CIFS clients to access files and resources from the CIFS service. The terms SMB and CIFS can be considered interchangeable.</para>
+</note>
+</highlights><sect1 id="configuringservicestm"><title>Configuring the WINS Service</title><para>This section provides information about configuring the Solaris CIFS service as a client to the WINS service. For information about configuring other applicable services, see <olink targetptr="processoverview" remap="internal">Configuring the Solaris CIFS Service &ndash; Process Overview</olink>.</para><task id="settingupwinstask"><title>How to Configure WINS</title><tasksummary><para>If you are integrating a Solaris CIFS service in an environment that has a WINS server, you can use Windows Internet Naming Service (WINS) for name resolution.</para><para>For information about excluding IP addresses from WINS resolution, see <olink targetptr="configurewinsclientexample" remap="internal">Excluding IP Addresses From WINS Name Resolution</olink>.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Specify the IP address of the primary WINS server.</para><para>The primary WINS server is the server consulted first for NetBIOS name resolution.</para><screen># <userinput>sharectl set -p wins_server_1=<replaceable>IP-address</replaceable> smb</userinput></screen>
+</step><step><para>(Optional) Specify the IP address of the secondary WINS server.</para><para>If the primary WINS server does not respond, the system consults the secondary WINS server to perform NetBIOS name resolution.</para><screen># <userinput>sharectl set -p wins_server_2=<replaceable>IP-address</replaceable> smb</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="configuringoperationmodetm"><title>Configuring the Solaris CIFS Service Operation Mode (Task Map)</title><para>The following table points to the tasks that you can use to configure the operation mode of the Solaris CIFS server.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Configure the Solaris CIFS service in domain mode.</para>
+</entry><entry><para>Use the <command>smbadm join -u <replaceable>username</replaceable> <replaceable>domain-name</replaceable></command> command to join the domain.</para>
+</entry><entry><para><olink targetptr="configuredomainmodetask" remap="internal">How to Configure the Solaris CIFS Service in Domain Mode</olink></para>
+</entry>
+</row><row><entry><para>Configure the Solaris CIFS service in workgroup mode.</para>
+</entry><entry><para>Use the <command>smbadm join -w <replaceable>workgroup-name</replaceable></command> command to join the workgroup.</para>
+</entry><entry><para><olink targetptr="configureworkgroupmodetask" remap="internal">How to Configure the Solaris CIFS Service in Workgroup Mode</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><task id="configuredomainmodetask"><title>How to Configure the Solaris CIFS Service in Domain Mode</title><tasksummary><para>After successfully joining an AD domain, you can enable the Solaris CIFS service to publish CIFS shares in the AD directory. To do so, create or update CIFS shares and specify the share container for each share that you want to publish. To create CIFS shares, see <olink targetptr="createstaticsmbsharezfstask" remap="internal">How to Create a CIFS Share (zfs)</olink> and <olink targetptr="createstaticsmbsharetask" remap="internal">How to Create a CIFS Share (sharemgr)</olink>.</para>
+</tasksummary><taskprerequisites><para>If the Samba service is running on the Solaris system, you must disable it. See <olink targetptr="disablesambatask" remap="internal">How to Disable the Samba Service</olink>.</para><para>If you change from workgroup mode to domain mode, or from domain mode to workgroup mode, you must restart the Solaris CIFS service. To restart the service, run the <command>svcadm restart smb/server</command> command.</para><para>The <olink type="custom-text" targetptr="glossaryad" remap="internal"><emphasis>Active Directory (AD)</emphasis></olink> service is a Windows 2000 namespace that is integrated with the Domain Name Service (DNS). AD runs only on domain controllers. In addition to storing and making data available, AD protects network objects from unauthorized access and replicates objects across a network so that data is not lost if one domain controller fails.</para><itemizedlist><para>For the Solaris CIFS service to integrate seamlessly into a Windows AD environment, the following must exist on the network:</para><listitem><para>A Windows AD domain controller</para>
+</listitem><listitem><para>An optional Active Directory DNS server that permits dynamic updates to use the dynamic DNS (DDNS) capability</para>
+</listitem>
+</itemizedlist><para>The AD and DDNS clients rely on the Kerberos protocol to acquire the Kerberos ticket-granting ticket (TGT) for the specified AD domain. The system must be configured to use DNS for host lookup.</para><para>In order to participate in an AD domain, the system must be configured to use DNS for host lookup. Ensure that the <filename>/etc/nsswitch.conf</filename> and <filename>/etc/resolv.conf</filename> files are configured correctly for the appropriate AD domain.</para><para>In the <filename>/etc/krb5/krb5.conf</filename> file, specify the fully qualified AD domain name, in uppercase characters, as the default realm. Also, specify the fully qualified host name of the domain controller as the value for the <literal>kdc</literal>, <literal>admin_server</literal>, and <literal>kpasswd_server</literal> parameters.</para><para>The following example <filename>/etc/krb5/krb5.conf</filename> file is for an AD domain called <literal>EXAMPLE.COM</literal>, and the AD domain controller system is called <literal>dc.example.com</literal>. The fully qualified names are used for the domain and the domain controller.</para><screen>[libdefaults]
+   default_realm = EXAMPLE.COM
+
+[realms]
+   EXAMPLE.COM = {
+       kdc = dc.example.com
+       admin_server = dc.example.com
+       kpasswd_server = dc.example.com
+       kpasswd_protocol = SET_CHANGE
+   }
+
+[domain_realm]
+   .example.com = EXAMPLE.COM</screen><para>For descriptions of the sections and parameters used in this sample file, see the <olink targetdoc="refman4" targetptr="krb5.conf-4" remap="external"><citerefentry><refentrytitle>krb5.conf</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page and <olink targetdoc="sysadv6" targetptr="seamtask-435" remap="external"><citetitle remap="section">Configuring Kerberos Clients (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para>
+</taskprerequisites><procedure>&rolestepsmb;<step><para>Enable the Solaris CIFS service.</para><screen># <userinput>svcadm enable -r smb/server</userinput></screen><para>When you specify the <option>r</option> option, all services on which <literal>smb/server</literal> depends are started if they are not already running.</para>
+</step><step><para>To successfully complete the join process, ensure that the system clock on the Solaris system is within five minutes of the system clock of the domain controller (DC).</para><para>You can accomplish this task in one of these ways:</para><stepalternatives><step><para>Manually adjust the system clock on either the Solaris system or the DC to match the other.</para>
+</step><step><para>Configure both the Solaris system and the DC to use the same time source (NTP server).</para>
+</step><step><para>Synchronize the system clock on the Solaris system with the system clock of the DC by running the following command on the Solaris system:</para><screen># <userinput>ntpdate <replaceable>DC-hostname</replaceable></userinput></screen><para>For example, to synchronize with the DC called <literal>dc.westsales.example.com</literal>, type:</para><screen># <userinput>ntpdate dc.westsales.example.com</userinput></screen>
+</step>
+</stepalternatives>
+</step><step><para>Join the Windows domain.</para><screen># <userinput>smbadm join -u <replaceable>username</replaceable> <replaceable>domain-name</replaceable></userinput></screen><para>where <replaceable>username</replaceable> is the domain administrator or a user with Domain Administrator privileges, and <replaceable>domain-name</replaceable> is a fully qualified domain name.</para>
+</step>
+</procedure><example id="configuredomainmodeexample"><title>Configuring the Solaris CIFS Service in Domain Mode</title><para>This example shows the steps taken to configure the Solaris CIFS service in domain mode. User <literal>dana</literal> has Domain Administrator privileges. The name of the domain being joined is <literal>westsales.example.com</literal>.</para><screen># <userinput>svcadm enable -r smb/server</userinput>
+# <userinput>smbadm join -u dana westsales.example.com</userinput>
+Enter domain password:
+Joining 'westsales.example.com' ... this may take a minute ...
+Successfully joined domain 'westsales.example.com'</screen>
+</example>
+</task><task id="configureworkgroupmodetask"><title>How to Configure the Solaris CIFS Service in Workgroup Mode</title><tasksummary><para>After you join a workgroup, you can access CIFS shares. To create CIFS shares, see <olink targetptr="createstaticsmbsharezfstask" remap="internal">How to Create a CIFS Share (zfs)</olink> and <olink targetptr="createstaticsmbsharetask" remap="internal">How to Create a CIFS Share (sharemgr)</olink>.</para><para>If you change from workgroup mode to domain mode, or from domain mode to workgroup mode, you must restart the Solaris CIFS service. To restart the service, run the <command>svcadm restart smb/server</command> command.</para>
+</tasksummary><taskprerequisites><para>If the Samba service is running on the Solaris system, you must disable it. See <olink targetptr="disablesambatask" remap="internal">How to Disable the Samba Service</olink>.</para>
+</taskprerequisites><procedure>&rolestepsmb;<step><para>Enable the Solaris CIFS service.</para><screen># <userinput>svcadm enable -r smb/server</userinput></screen><para>This command enables the Solaris CIFS service and any service on which it depends, such as the <command>idmap</command> service.</para>
+</step><step><para>(Optional) Change the Solaris CIFS service to operate in a different workgroup.</para><para>By default, the Solaris CIFS service operates in a workgroup called <literal>WORKGROUP</literal>.</para><screen># <userinput>smbadm join -w <replaceable>workgroup-name</replaceable></userinput></screen>
+</step><step><para>Edit the <filename>/etc/pam.conf</filename> file to support creation of an encrypted version of the user's password for CIFS.</para><para>Add the following line to the end of the file:</para><screen>other	password required	pam_smb_passwd.so.1	nowarn</screen><para>See the <olink targetdoc="refman5" targetptr="pam-smb-passwd-5" remap="external"><citerefentry><refentrytitle>pam_smb_passwd</refentrytitle><manvolnum>5</manvolnum></citerefentry></olink> man page.</para>
+</step><step><para>Specify the password for existing local users.</para><para>The Solaris CIFS service cannot use the Solaris encrypted version of the local user's password for authentication. Therefore, you must generate an encrypted version of the local user's password for the Solaris CIFS service to use. When the SMB PAM module is installed, the <command>passwd</command> command generates such an encrypted version of the password.</para><screen># <userinput>passwd <replaceable>username</replaceable></userinput></screen>
+</step>
+</procedure><example id="configureworkgroupmodeexample"><title>Configuring the Solaris CIFS Service in Workgroup Mode</title><para>This example shows how to configure the Solaris CIFS service in workgroup mode. The name of the workgroup being joined is <literal>myworkgroup</literal>.</para><screen># <userinput>svcadm enable -r smb/server</userinput>
+# <userinput>smbadm join -w myworkgroup</userinput></screen><para>Then, use the <literal>sharesmb</literal> property to configure CIFS sharing for an existing ZFS dataset called <literal>ztank/myfs</literal>.</para><screen># <userinput>zfs set sharesmb=on ztank/myfs</userinput></screen><para>Finally, install the PAM module and generate the password for user <literal>cal</literal>.</para><screen># <userinput>passwd cal</userinput></screen><para>Now, you are ready to have CIFS clients access the CIFS shares on your Solaris CIFS service.</para>
+</example>
+</task>
+</sect1><sect1 id="managingsmbsharestm"><title>Managing CIFS Shares (Task Map)</title><para>You can add, view, and update CIFS shares. A directory must exist before it can be shared. For more information about CIFS shares, see <olink targetptr="smbshares" remap="internal">CIFS Shares</olink>.</para><para>The following table points to the tasks that you can use to manage CIFS shares.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Configure cross-protocol locking.</para>
+</entry><entry><para>Use the <command>mount</command> or the <command>zfs create</command> command to configure cross-protocol locking. These commands enable this locking by setting the <literal>nbmand</literal> option.</para>
+</entry><entry><para><olink targetptr="configurecrossprotocollockingtask" remap="internal">How to Configure Cross-Protocol Locking</olink></para>
+</entry>
+</row><row><entry><para>Create a CIFS share by using the ZFS <literal>sharesmb</literal> property.</para>
+</entry><entry><para>Use this procedure if you want to make a file or directory available to clients. You might use this procedure if you are familiar with the ZFS <literal>sharenfs</literal> property.</para>
+</entry><entry><para><olink targetptr="createstaticsmbsharezfstask" remap="internal">How to Create a CIFS Share (zfs)</olink></para>
+</entry>
+</row><row><entry><para>Create a CIFS share by using the <command>sharemgr</command> command.</para>
+</entry><entry><para>Use this procedure if you want to make a file or directory available to clients. If you specify an AD container, <command>sharemgr</command> will attempt to publish those shares in AD.</para>
+</entry><entry><para><olink targetptr="createstaticsmbsharetask" remap="internal">How to Create a CIFS Share (sharemgr)</olink></para>
+</entry>
+</row><row><entry><para>Modify the properties of a CIFS share by using the <command>sharemgr</command> command.</para>
+</entry><entry><para>Use this procedure to change share property values.</para>
+</entry><entry><para><olink targetptr="modifysmbsharetask" remap="internal">How to Modify CIFS Share Properties (sharemgr)</olink></para>
+</entry>
+</row><row><entry><para>Remove a CIFS share by using the <command>sharemgr</command> command.</para>
+</entry><entry><para>When you remove a share, it can no longer be accessed by a system. If you are connected to the share when it is removed, the share is not removed until there are no more connections to that share. At that time, the share is removed.</para>
+</entry><entry><para><olink targetptr="removesmbsharetask" remap="internal">How to Remove a CIFS Share (sharemgr)</olink></para>
+</entry>
+</row><row><entry><para>Create an autohome share rule.</para>
+</entry><entry><para>Specify custom share rules for autohome shares.</para>
+</entry><entry><para><olink targetptr="createspecificautohomeshareruletask" remap="internal">How to Create a Specific Autohome Share Rule</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><task id="configurecrossprotocollockingtask"><title>How to Configure Cross-Protocol Locking</title><tasksummary><para>The CIFS protocol assumes mandatory locking, but UNIX traditionally uses advisory locking. The Solaris OS can be configured to use mandatory locking on a per mount basis by using the non-blocking mandatory locking (<literal>nbmand</literal>) mount option.</para><para>When set, the <literal>nbmand</literal> mount option enforces mandatory cross-protocol share reservations and byte-range locking.</para><para>When the <literal>nbmand</literal> mount option is not set, the Solaris CIFS service will enforce mandatory share reservations and byte-range locking internally for all CIFS clients. However, without <literal>nbmand</literal> set, there is only limited coordination with NFS and local processes.</para>
+</tasksummary><procedure>&rolestep;<step><para>Set the <literal>nbmand</literal> mount option for an existing file system by doing one of the following:</para><stepalternatives><step><para>Set the option by using the <command>mount</command> command.</para><screen># <userinput>mount -o nbmand=on <replaceable>fsname</replaceable></userinput></screen><para>For example, the following command sets the <literal>nbmand</literal> mount option for the <filename>ztank/myfs</filename> file system:</para><screen># <userinput>mount -o nbmand ztank/myfs</userinput></screen>
+</step><step><para>Set the option by using the <command>zfs create</command> command.</para><para>When using ZFS, you can also set the <literal>nbmand</literal> option when the file system is created, so that the file system uses <literal>nbmand</literal> automatically:</para><screen># <userinput>zfs create -o nbmand=on <replaceable>fsname</replaceable></userinput></screen><para>The following example combines the <literal>nbmand</literal> option with the mixed-case sensitivity option:</para><screen># <userinput>zfs create -o casesensitivity=mixed -o nbmand=on -o mountpoint=mntpt ztank/myfs</userinput></screen>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="createstaticsmbsharezfstask"><title>How to Create a CIFS Share (<command>zfs</command>)</title><tasksummary><para>This procedure describes how to use the ZFS <literal>sharesmb</literal> property to create shares on the Solaris CIFS service.</para><para>To create an autohome share, you must have defined autohome rules. For more information, see <olink targetptr="createspecificautohomeshareruletask" remap="internal">How to Create a Specific Autohome Share Rule</olink>.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Create a ZFS pool and a mixed-case ZFS file system that supports cross-protocol locking.</para><screen># <userinput>zpool create <replaceable>pool-name</replaceable> <replaceable>vdev</replaceable></userinput>
+# <userinput>zfs create -o casesensitivity=mixed -o nbmand=on <replaceable>fsname</replaceable></userinput></screen>
+</step><step><para>Enable SMB sharing for the ZFS file system.</para><screen># <userinput>zfs set sharesmb=on <replaceable>fsname</replaceable></userinput></screen><note><para>The resource name for the share is automatically constructed by the <command>zfs</command> command when the share is created. The resource name is based on the dataset name, unless you specify a resource name. Any characters that are illegal for resource names are replaced by an underscore character (<literal>_</literal>).</para>
+</note><para>To specify a resource name for the share, specify a name for the <literal>sharesmb</literal> property, <command>sharesmb=name=</command><replaceable>resource-name</replaceable>.</para>
+</step><step><para>Verify how the file system is shared.</para><screen># <userinput>sharemgr show -vp</userinput></screen>
+</step>
+</procedure><example id="zfssharesmbexample"><title>Using <literal>sharesmb</literal> to Manage CIFS Shares</title><itemizedlist><para>The following examples use the <literal>sharesmb</literal> property to enable SMB sharing for ZFS pools and file systems.</para><listitem><para><emphasis role="strong">Inherited SMB sharing for ZFS file systems in a pool.</emphasis> The following commands create a pool and enable SMB sharing for that pool. When you create the ZFS file systems in that pool, the file systems inherit the SMB sharing as well as the resource name.</para><screen># <userinput>zpool create sandbox c0t3d0</userinput>
+# <userinput>zfs set sharesmb=on sandbox</userinput>
+# <userinput>zfs create -o casesensitivity=mixed -o nbmand=on sandbox/fs1</userinput>
+# <userinput>zfs create -o casesensitivity=mixed -o nbmand=on sandbox/fs2</userinput></screen><para>The <command>sharemgr show -vp</command> command shows how the top level file system has a resource name of <filename>sandbox</filename>, but the children have the dataset name added to the resource name.</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+mygroup smb=()
+zfs nfs=() smb=()
+     zfs/sandbox smb=()
+           sandbox=/sandbox
+           sandbox_fs1=/sandbox/fs1       smb=()
+           sandbox_fs2=/sandbox/fs2       smb=()</screen>
+</listitem><listitem><para><emphasis role="strong">SMB sharing for a ZFS file system.</emphasis> The following commands create a ZFS pool and a mixed-case file system that supports cross-protocol locking:</para><screen># <userinput>zpool create sandbox c0t3d0</userinput>
+# <userinput>zfs create -o casesensitivity=mixed -o nbmand=on sandbox/fs1</userinput></screen><para>Next, you can enable SMB sharing for the <filename>sandbox/fs1</filename> file system and for any of its children by setting the <literal>sharesmb</literal> property to <literal>on</literal>.</para><screen># <userinput>zfs set sharesmb=on sandbox/fs1</userinput></screen><para>Because CIFS shares must have a resource name, ZFS constructs a resource name from the dataset name. Any characters in the dataset name that are illegal in resource names are replaced by the underscore character (<literal>_</literal>). In this example, the resource name <filename>sandbox_fs1</filename> is based on the dataset name <filename>sandbox/fs1</filename>.</para><para>You can use the <command>sharemgr show -vp</command> command to verify how the file system is shared.</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+mygroup smb=()
+zfs nfs=() smb=()
+     zfs/sandbox/fs1 smb=()
+           sandbox_fs1=/sandbox/fs1</screen><para>The following commands create another file system in the <filename>sandbox</filename> pool called <filename>fs2</filename> and associate that file system with the <filename>myshare</filename> resource name:</para><screen># <userinput>zfs create -o casesensitivity=mixed -o nbmand=on sandbox/fs2</userinput>
+# <userinput>zfs set sharesmb=name=myshare sandbox/fs2</userinput></screen><para>Use the <command>sharemgr show -vp</command> command to verify how the file systems are shared.</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+mygroup smb=()
+zfs nfs=() smb=()
+     zfs/sandbox/fs1 smb=()
+           sandbox_fs1=/sandbox/fs1
+     zfs/sandbox/fs2 smb=()
+           myshare=/sandbox/fs2</screen><para>The following command creates a sub file system of <filename>sandbox/fs2</filename> called <filename>sandbox/fs2/fs2_sub1</filename>:</para><screen># <userinput>zfs create -o casesensitivity=mixed -o nbmand=on sandbox/fs2/fs2_sub1</userinput></screen><para>This new file system inherits part of its resource name from its parent and also inherits sharing over SMB, if enabled. Because the resource name for <filename>sandbox/fs2</filename> is <filename>myshare</filename>, the resource name for <filename>sandbox/fs2/fs2_sub1</filename> is <filename>myshare_fs2_sub1</filename>.</para><screen># <userinput>sharemgr show -vp</userinput>
+default nfs=()
+mygroup smb=()
+zfs nfs=() smb=()
+     zfs/sandbox/fs1 smb=()
+           sandbox_fs1=/sandbox/fs1
+     zfs/sandbox/fs2 smb=()
+           myshare=/sandbox/fs2
+           myshare_fs2_sub1=/sandbox/fs2/fs2_sub1</screen><para>If you disable SMB sharing for <filename>sandbox/fs2</filename>, that file system and its children are affected.</para><screen># <userinput>zfs set sharesmb=off sandbox/fs2</userinput>
+# <userinput>sharemgr show -vp</userinput>
+default nfs=()
+mygroup smb=()
+zfs nfs=() smb=()
+     zfs/sandbox/fs1 smb=()
+           sandbox_fs1=/sandbox/fs1</screen><para>The <command>sharemgr show -vp</command> output shows that the <filename>sandbox/fs2</filename> file system and its children are no longer shared over SMB.</para>
+</listitem>
+</itemizedlist>
+</example>
+</task><task id="createstaticsmbsharetask"><title>How to Create a CIFS Share (<command>sharemgr</command>)</title><tasksummary><para>This procedure describes how to create a share definition on the Solaris CIFS service and make the share available to clients.</para><para>To create an autohome share, you must have defined autohome rules. For more information, see <olink targetptr="createspecificautohomeshareruletask" remap="internal">How to Create a Specific Autohome Share Rule</olink>.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Define a share in the default share group or in another share group.</para><para>A share name can include any alphanumeric characters, but not the characters listed here:</para><screen>" / \ [ ] : | + ; , ? * =</screen><para>Create a share group and add a share to that group.</para><screen># <userinput>sharemgr create -P smb <replaceable>group-name</replaceable></userinput>
+# <userinput>sharemgr add-share -r <replaceable>resource-name</replaceable> -s <replaceable>share-path</replaceable> <replaceable>group-name</replaceable></userinput></screen>
+</step><step><para>If AD is enabled, specify the AD container where the share will be published.</para><note><para>The container must already exist for the share to be published in that container. The system does not create container objects in the AD <olink type="custom-text" targetptr="glossarytree" remap="internal"><emphasis>tree</emphasis></olink>.</para>
+</note><screen># <userinput>sharemgr set [-hnv] -P smb [-S <replaceable>option-set</replaceable>] [-p <replaceable>property</replaceable>=<replaceable>value</replaceable> &hellip; \
+[-s <replaceable>share-path</replaceable>] <replaceable>group-name</replaceable></userinput></screen>
+</step>
+</procedure>
+</task><task id="modifysmbsharetask"><title>How to Modify CIFS Share Properties (<command>sharemgr</command>)</title><tasksummary><para>Use this procedure to change properties on a share.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Modify the CIFS share properties.</para><stepalternatives><step><para>Modify properties for a single share.</para><screen># <userinput>sharemgr set-share [-r <replaceable>resource-name</replaceable>] [-d "<replaceable>description</replaceable>"] -s <replaceable>share-path</replaceable> <replaceable>group-name</replaceable></userinput></screen><para>For example, the following command changes the description for the <filename>/files/acme.sales.logs</filename> share in the <literal>nw-sales</literal> group:</para><screen># <userinput>sharemgr set-share -d "Sales logs for Acme" -s /files/acme.sales.logs nw-sales</userinput></screen>
+</step><step><para>Modify properties for a share group.</para><screen># <userinput>sharemgr set [-hnv] -P smb [-S <replaceable>option-set</replaceable>] [-p <replaceable>property</replaceable>=<replaceable>value</replaceable>] &hellip; \
+[-s <replaceable>share-path</replaceable>] <replaceable>group-name</replaceable></userinput></screen><para>For example, in domain mode you can configure shares to be published in an AD container. The following command specifies that shares in the <literal>nw-sales</literal> share group will be published in the default container. Note that <literal>filesvr</literal> is the machine account of the system that is running the Solaris CIFS service.</para><screen># <userinput>sharemgr set -P smb -p ad-container=cn=filesvr,cn=Computers nw-sales</userinput></screen><para>If you want to publish shares to a non-default container, you must modify the ACLs of that container to give the Solaris CIFS service permission to publish and unpublish shares.</para>
+</step>
+</stepalternatives>
+</step>
+</procedure>
+</task><task id="removesmbsharetask"><title>How to Remove a CIFS Share (<command>sharemgr</command>)</title><tasksummary><para>This procedure describes how to remove a CIFS share. When you remove a CIFS share, the definition of the share is removed from the server. You can re-create such a share with the <command>sharemgr add-share</command> command.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Remove a CIFS share.</para><screen># <userinput>sharemgr remove-share -s <replaceable>share-path</replaceable> <replaceable>group-name</replaceable></userinput></screen><para>For example, to remove share <filename>/sales/share1</filename> from share group <filename>mysharegroup</filename>, type:</para><screen># <userinput>sharemgr remove-share -s /sales/share1 mysharegroup</userinput></screen>
+</step>
+</procedure>
+</task><task id="createspecificautohomeshareruletask"><title>How to Create a Specific Autohome Share Rule</title><tasksummary><para>The autohome share feature eliminates the administrative task of defining and maintaining home directory shares for each user that accesses the system through the SMB protocol. The system creates autohome shares when a user logs in, and removes them when the user logs out. This procedure describes how to configure autohome shares by adding rules to a configuration file.</para><para>For information about the <filename>smbautohome</filename> format, see <olink targetptr="autohomeentries" remap="internal">Autohome Entries</olink> and the <olink targetdoc="refman4" targetptr="smbautohome-4" remap="external"><citerefentry><refentrytitle>smbautohome</refentrytitle><manvolnum>4</manvolnum></citerefentry></olink> man page.</para>
+</tasksummary><procedure>&rolestepsmb;<step><para>Edit the <filename>/etc/smbautohome</filename> file.</para><para>An autohome entry must be on a single line in the following format:</para><programlisting><replaceable>key</replaceable>	<replaceable>location</replaceable>	[<replaceable>container</replaceable>]</programlisting><substeps><step><para>Specify the user name in the key field.</para><itemizedlist><para>Usually this field is a user name, but it can also be one of the following:</para><listitem><para><literal>+nsswitch</literal> <emphasis role="strong">&ndash;</emphasis> Uses the naming service to match users to home directories if no rule matches.</para>
+</listitem><listitem><para><emphasis role="strong">Asterisk (*) &ndash;</emphasis> Matches a user name to a home directory that uses the same name.</para>
+</listitem>
+</itemizedlist>
+</step><step><para>Specify the location of the user's home directory in the location field.</para><itemizedlist><para>Specify the absolute path excluding the user name, or use one of the following substitution characters:</para><listitem><para><emphasis role="strong">Question mark (?) &ndash;</emphasis> Substitutes for the first character of the user name.</para>
+</listitem><listitem><para><emphasis role="strong">Ampersand (&amp;) &ndash;</emphasis> Substitutes for a complete user name.</para>
+</listitem>
+</itemizedlist><para>For example, the following rule maps to <filename>/home/a/amy</filename>:</para><screen>amy             /home/?/&amp;</screen><para>For more information about the path, see <olink targetptr="autohomeshares" remap="internal">Autohome Shares</olink>.</para>
+</step>
+</substeps>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="managingsmbgroupsuserstm"><title>Managing CIFS Groups (Task Map)</title><para>This section describes how to manage CIFS groups and privileges for the Solaris CIFS service.</para><note><para>CIFS groups apply only to users that are connected through CIFS.</para>
+</note><para>For information about CIFS groups and local users, see <olink targetptr="localsmbgroupsusers" remap="internal">Local CIFS Groups</olink>.</para><para>The following table points to the tasks that you can use to manage CIFS groups through the Solaris CIFS service.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Create a CIFS group.</para>
+</entry><entry><para>Create a CIFS group to manage users.</para>
+</entry><entry><para><olink targetptr="createsmbgrouptask" remap="internal">How to Create a CIFS Group</olink></para>
+</entry>
+</row><row><entry><para>Add a member to a CIFS group.</para>
+</entry><entry><para>Add a member to a CIFS group by using the <command>smbadm</command> command.</para>
+</entry><entry><para><olink targetptr="addmembertosmbgrouptask" remap="internal">How to Add a Member to a CIFS Group</olink></para>
+</entry>
+</row><row><entry><para>Remove a member from a CIFS group.</para>
+</entry><entry><para>Remove a member from a CIFS group by using the <command>smbadm</command> command.</para>
+</entry><entry><para><olink targetptr="removememberfromsmbgrouptask" remap="internal">How to Remove a Member From a CIFS Group</olink></para>
+</entry>
+</row><row><entry><para>Modify CIFS group properties.</para>
+</entry><entry><itemizedlist><para>A CIFS group can grant the following privileges:</para><listitem><para><literal>backup</literal>. Permit group members to back up file system objects.</para>
+</listitem><listitem><para><literal>restore</literal>. Permit group members to restore file system objects.</para>
+</listitem><listitem><para><literal>take-ownership</literal>. Permit group members to take ownership of file system objects.</para>
+</listitem>
+</itemizedlist><para>You can specify a description of the CIFS group if you modify the value of the <literal>description</literal> property.</para>
+</entry><entry><para><olink targetptr="modifysmbgroupprivstask" remap="internal">How to Modify CIFS Group Properties</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>You use the <olink targetdoc="refman1m" targetptr="smbadm-1m" remap="external"><citerefentry><refentrytitle>smbadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> command to manage CIFS groups on the system that runs the Solaris CIFS service.</para><task id="createsmbgrouptask"><title>How to Create a CIFS Group</title><procedure>&rolestepsmb;<step><para>Choose the name of the group to create.</para><para>You might choose a name that reflects a common set of tasks that the group can perform or the organization to which the group members belong.</para>
+</step><step><para>Create the CIFS group.</para><screen># <userinput>smbadm create [-d <replaceable>description</replaceable>] <replaceable>group-name</replaceable></userinput></screen><para>The <option>d</option> option is used to specify a textual description of the CIFS group.</para><para>For example, to create a group called <literal>wsales</literal>, type:</para><screen># <userinput>smbadm create -d "Sales Force for the Western Region" wsales</userinput></screen><para>In order to provide proper identity mapping between CIFS groups and Solaris groups, a CIFS group must have a corresponding Solaris group. This requirement has two consequences. First, the group name must conform to the intersection of the Windows and Solaris group name rules. Thus, a CIFS group name can be up to eight (8) characters long and contain only lowercase characters and numbers. Second, a Solaris group has to be created before a CIFS group can be created. The Solaris group is created by using the <command>groupadd</command> command. See the <olink targetdoc="refman1m" targetptr="groupadd-1m" remap="external"><citerefentry><refentrytitle>groupadd</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page.</para>
+</step>
+</procedure>
+</task><task id="addmembertosmbgrouptask"><title>How to Add a Member to a CIFS Group</title><procedure>&rolestepsmb;<step><para>Add a user to the CIFS group.</para><screen># <userinput>smbadm add-member -m <replaceable>member-name</replaceable> [[-m <replaceable>member-name</replaceable>] &hellip;] <replaceable>group-name</replaceable></userinput></screen><para><replaceable>member-name</replaceable> can be specified as [<replaceable>domain-name</replaceable><literal>\\</literal>]<replaceable>username</replaceable> or [<replaceable>domain-name</replaceable><literal>/</literal>]<replaceable>username</replaceable>. The domain name is the domain in which the user can be authenticated. By default, the domain name is the name of the domain that you joined.</para><para>You must escape the backslash character (<literal>\</literal>) because it is a special character in the Solaris shells.</para><para>For example, to add user <literal>terry</literal> of the <literal>sales</literal> domain to the <literal>wsales</literal> group, type:</para><screen># <userinput>smbadm add-member -m sales\\terry wsales</userinput></screen><para>To add a local user to a CIFS group, specify the Solaris host name rather than the domain name. For example, to add local user <literal>terry</literal> of the <literal>solarsystem</literal> host to the <literal>wsales</literal> group, type:</para><screen># <userinput>smbadm add-member -m solarsystem\\terry wsales</userinput></screen>
+</step>
+</procedure>
+</task><task id="removememberfromsmbgrouptask"><title>How to Remove a Member From a CIFS Group</title><procedure>&rolestepsmb;<step><para>Remove a user from the CIFS group.</para><screen># <userinput>smbadm remove-member -m <replaceable>member-name</replaceable> [[-m <replaceable>member-name</replaceable>] &hellip;] <replaceable>group-name</replaceable></userinput></screen><para><replaceable>member-name</replaceable> can be specified as [<replaceable>domain-name</replaceable><literal>\\</literal>]<replaceable>username</replaceable> or [<replaceable>domain-name</replaceable><literal>/</literal>]<replaceable>username</replaceable>. The domain name is the domain in which the user can be authenticated. By default, the domain name is the name of the domain that you joined.</para><para>For example, to remove user <literal>terry</literal> of the <literal>sales</literal> domain from the <literal>wsales</literal> group, type:</para><screen># <userinput>smbadm remove-member -m sales\\terry wsales</userinput></screen><para>To remove a local user from a CIFS group, specify the Solaris host name rather than the domain name. For example, to remove local user <literal>terry</literal> of the <literal>solarsystem</literal> host from the <literal>wsales</literal> group, type:</para><screen># <userinput>smbadm remove-member -m solarsystem\\terry wsales</userinput></screen>
+</step>
+</procedure>
+</task><task id="modifysmbgroupprivstask"><title>How to Modify CIFS Group Properties</title><procedure>&rolestepsmb;<step><para>Modify one or more CIFS group properties.</para><screen># <userinput>smbadm set -p <replaceable>property</replaceable>=<replaceable>value</replaceable> [[-p <replaceable>property</replaceable>=<replaceable>value</replaceable>] &hellip;] <replaceable>group-name</replaceable></userinput></screen><para>You can specify one or more property-value pairs on the command line. Each property-value pair must be preceded by the <option>p</option> option. Valid values for privileges are <literal>on</literal> or <literal>off</literal>. The value of the <literal>description</literal> property is an arbitrary text string.</para><para>For example, to grant the <literal>backup</literal> privilege and to modify the description of the <literal>wsales</literal> group, type:</para><screen># <userinput>smbadm set -p backup=on \
+-p description="Sales force for the Western region" wsales</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="migratingfromsamba"><title>Disabling the Samba Service</title><para>The Samba and CIFS services cannot be used together on a single Solaris system. If you want to run the Solaris CIFS service, you must first ensure that a running Samba service is disabled.</para><para>If your Solaris system is running the Samba service, disable it before starting the Solaris CIFS service.</para><task id="disablesambatask"><title>How to Disable the Samba Service</title><procedure>&rolestep;<step><para>Verify that the Samba service is running.</para><screen># <userinput>svcs | grep samba</userinput></screen><para>For example, the following command shows that the Samba service is running:</para><screen># <userinput>svcs | grep samba</userinput>
+legacy_run     Aug_03   lrc:/etc/rc3_d/S90samba</screen>
+</step><step><para>Disable the Samba service.</para><screen># <userinput>svcadm disable svc:/network/samba</userinput>
+# <userinput>svcadm disable svc:/network/wins</userinput></screen>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>

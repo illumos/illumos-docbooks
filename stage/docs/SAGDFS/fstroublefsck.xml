@@ -1,0 +1,740 @@
+<chapter id="fstroublefsck-61446"><title>Checking UFS File System Consistency
+(Tasks)</title><highlights><para>This chapter provides overview information and step-by-step instructions
+about checking UFS file system consistency.</para><para>This is a list of step-by-step instructions in this chapter.</para><itemizedlist><listitem><para><olink targetptr="fstroublefsck-59" remap="internal">How to Check the root
+(/), /usr, or /var File Systems From an Alternate Boot Device</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-28" remap="internal">How to Check Other File
+Systems (Not root (/), /usr, or /var)</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-37" remap="internal">How to Preen a UFS File
+System</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-43" remap="internal">How to Restore a Bad Superblock
+(Solaris 8, 9, and 10 Releases)</olink></para>
+</listitem><listitem><para><olink targetptr="galyo" remap="internal">How to Restore a Bad Superblock ( Solaris Express Release)</olink></para>
+</listitem>
+</itemizedlist><para>This is a list of the overview information in this chapter.</para><itemizedlist><listitem><para><olink targetptr="fstroublefsck-52" remap="internal">File System Consistency</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-60228" remap="internal">How the File System
+State Is Recorded</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-51788" remap="internal">What the fsck Command
+Checks and Tries to Repair</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-62389" remap="internal">Interactively Checking
+and Repairing a UFS File System</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-59471" remap="internal">Restoring a Bad Superblock</olink></para>
+</listitem><listitem><para><olink targetptr="fstroublefsck-22051" remap="internal">Syntax and Options
+for the fsck Command</olink></para>
+</listitem>
+</itemizedlist><para>For new information about <command>fsck</command> in
+the Solaris Express release,
+see <olink targetptr="gagar" remap="internal">Enhancements to UFS File System Utilities (fsck,
+mkfs, and newfs)</olink>.</para><para>For information about <command>fsck</command> error messages, see <olink targetdoc="sysadv2" targetptr="tsfsck-26279" remap="external">Chapter 20, <citetitle remap="chapter">Resolving UFS File System Inconsistencies (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Advanced Administration</citetitle></olink>.</para><para>For background information on the UFS file system structures referred
+to in this chapter, see <olink targetptr="fsfilesysappx-94408" remap="internal">Chapter&nbsp;22,
+UFS File System (Reference)</olink>.</para>
+</highlights><sect1 id="fstroublefsck-52"><title>File System Consistency</title><para>The UFS file system relies on an internal set of tables to keep track
+of inodes used and available blocks. When these internal tables are not properly
+synchronized with data on a disk, inconsistencies result and file systems
+need to be repaired.</para><para>File systems can be inconsistent because of abrupt termination of the
+operating system from the following:</para><itemizedlist><listitem><para>Power failure</para>
+</listitem><listitem><para>Accidental unplugging of the system</para>
+</listitem><listitem><para>Turning off the system without proper shutdown procedure</para>
+</listitem><listitem><para>A software error in the kernel</para>
+</listitem>
+</itemizedlist><para>File system inconsistencies, while serious, are not common. When a system
+is booted, a check for file system consistency is automatically performed
+(with the <command>fsck</command> command). Often, this file system check
+repairs problems it encounters.</para><para>The <command>fsck</command> command places files and directories that
+are allocated but unreferenced in the <filename>lost+found</filename> directory.
+An inode number is assigned as the name of unreferenced file and directory.
+If the <filename>lost+found</filename> directory does not exist, the <command>fsck</command> command creates it. If there is not enough space in the <filename>lost+found</filename> directory, the <command>fsck</command> command increases its size.</para><para>For a description of inodes, see <olink targetptr="fsfilesysappx-4" remap="internal">Inodes</olink>.</para>
+</sect1><sect1 id="fstroublefsck-60228"><title>How the File System State Is Recorded</title><para>The <command>fsck</command> command
+uses a state flag, which is stored in the superblock, to record the condition
+of the file system. This flag is used by the <command>fsck</command> command
+to determine whether a file system needs to be checked for consistency. The
+flag is used by the <filename>/sbin/rcS</filename> script during booting and
+by the <command>fsck</command> <option>m</option> command. If you ignore the
+result from the <command>fsck</command> <option>m</option> command, all file
+systems can be checked regardless of the setting of the state flag. </para><para>For a description of the superblock, see <olink targetptr="fsfilesysappx-3" remap="internal">Superblock</olink>.</para><para>The
+possible state flag values are described in the following table.</para><table frame="topbot" id="fstroublefsck-56468"><title>Values of File System
+State Flags</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="79*"/><colspec colname="column2" colwidth="317*"/><thead><row rowsep="1"><entry><para>State Flag Value</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>FSACTIVE</literal> </para>
+</entry><entry><para>Indicates a mounted file system that has modified data in memory. A
+mounted file system with this state flag indicates that user data or metadata
+would be lost  if  power to the system is interrupted.</para>
+</entry>
+</row><row><entry><para><literal>FSBAD</literal> </para>
+</entry><entry><para>Indicates that the file system contains inconsistent file system data.</para>
+</entry>
+</row><row><entry><para><literal>FSCLEAN</literal> </para>
+</entry><entry><para>Indicates an undamaged, cleanly unmounted file system.</para>
+</entry>
+</row><row><entry><para><literal>FSLOG</literal> </para>
+</entry><entry><para>Indicates that the file system has logging enabled. A file system with
+this flag set is either mounted or unmounted. If a file system has logging
+enabled, the only  flags that it can have are <literal>FSLOG</literal> or <literal>FSBAD</literal>. A file system that has logging disable can have <literal>FSACTIVE</literal>,  <literal>FSSTABLE</literal>,  or <literal>FSCLEAN</literal>.</para>
+</entry>
+</row><row><entry><para><literal>FSSTABLE</literal> </para>
+</entry><entry><para>Indicates an idle mounted file system. A mounted  file system with this
+state  flag indicates that neither user data nor metadata would be lost if
+power to the system is interrupted.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="fstroublefsck-51788"><title>What the <command>fsck</command> Command
+Checks and Tries to Repair</title><para>This section
+describes what happens in the normal operation of a file system, what can
+go wrong, what problems the <command>fsck</command> command (the checking
+and repair utility) looks for, and how this command corrects the inconsistencies
+it finds.</para><sect2 id="fstroublefsck-1"><title>Why UFS File System Inconsistencies Might
+Occur</title><para>Every working day, hundreds of files might be created, modified, and
+removed. Each time a file is modified, the operating system performs a series
+of file system updates. These updates, when written to the disk reliably,
+yield a consistent file system.</para><para>When a user program does an operation to change the file system, such
+as a write, the data to be written is first copied into an in-core buffer
+in the kernel. Normally, the disk update is handled asynchronously. The user
+process is allowed to proceed even though the data write might not happen
+until long after the write system call has returned. Thus, at any given time,
+the file system, as it resides on the disk, lags behind the state of the file
+system that is represented by the in-core information.</para><para>The disk information is updated to reflect the in-core information
+when the buffer is required for another use or when the kernel automatically
+runs the <command>fsflush</command> daemon (at 30-second intervals).  If the
+system is halted without writing out the in-core information, the file system
+on the disk might be in an inconsistent state.</para><para>A file system can develop inconsistencies in several ways. The most
+common causes are operator error and hardware failures.</para><para>Problems might result from an <emphasis>unclean shutdown</emphasis>,
+if a system is shut down improperly, or when a mounted file system is taken
+offline improperly. To prevent unclean shutdowns, the current state of the
+file systems must be written to disk (that is, &ldquo;synchronized&rdquo;)
+before you shut down the system, physically take a disk pack out of a drive,
+or take a disk offline.</para><para>Inconsistencies can also result from defective hardware or problems
+with the disk or controller firmware. Blocks can become damaged on a disk
+drive at any time. Or, a disk controller can stop functioning correctly.</para>
+</sect2><sect2 id="fstroublefsck-24589"><title>UFS Components That Are Checked for
+Consistency</title><para>This section describes the kinds of consistency checks that the <command>fsck</command> command applies to these UFS file system components: superblock,
+cylinder group blocks, inodes, indirect blocks, and data blocks.</para><para>For information about UFS file system structures, see <olink targetptr="fsfilesysappx-23724" remap="internal">Structure of Cylinder Groups for UFS File
+Systems</olink>.</para><sect3 id="fstroublefsck-2"><title>Superblock Checks</title><para>The <emphasis>superblock</emphasis> stores summary information,
+which is the most commonly corrupted component in a UFS file system. Each
+change to file system inodes or data blocks also modifies the superblock.
+If the CPU is halted and the last command is not a <command>sync</command> command,
+the superblock almost certainly becomes corrupted.</para><para>The superblock is checked for inconsistencies in the following: </para><itemizedlist><listitem><para>File system size</para>
+</listitem><listitem><para>Number of inodes</para>
+</listitem><listitem><para>Free block count</para>
+</listitem><listitem><para>Free inode count</para>
+</listitem>
+</itemizedlist><sect4 id="fstroublefsck-3"><title>File System Size and Inode List Size Checks</title><para>The file system size must be larger
+than the number of blocks used by the superblock and the list of inodes. The
+number of inodes must be less than the maximum number allowed for the file
+system. An <emphasis>inode</emphasis> represents all the information about
+a file. The file system size and layout information are the most critical
+pieces of information for the <command>fsck</command> command. There is no
+way to actually check these sizes because they are statically determined when
+the file system is created. However, the <command>fsck</command> command can
+check that the sizes are within reasonable bounds. All other file system checks
+require that these sizes be correct. If the <command>fsck</command> command
+detects corruption in the static parameters of the primary superblock, it
+requests the operator to specify the location of an alternate superblock.</para><para>For more information about the structure of the UFS file system, see <olink targetptr="fsfilesysappx-23724" remap="internal">Structure of Cylinder Groups for UFS File
+Systems</olink>.</para>
+</sect4><sect4 id="fstroublefsck-4"><title>Free Block Checks</title><para>Free blocks are stored in the
+cylinder group block maps. The <command>fsck</command> command checks that
+all the blocks marked as free are not claimed by any files. When all the blocks
+have been accounted for, the <command>fsck</command> command checks if the
+number of free blocks plus the number of blocks that are claimed by the inodes
+equal the total number of blocks in the file system. If anything is wrong
+with the block maps, the <command>fsck</command> command rebuilds them, leaving
+out blocks already allocated.</para><para>The summary information in the superblock includes a count of the total
+number of free blocks within the file system. The <command>fsck</command> command
+compares this count to the number of free blocks it finds within the file
+system. If the counts do not agree, the <command>fsck</command> command replaces
+the count in the superblock with the actual free block count.</para>
+</sect4><sect4 id="fstroublefsck-5"><title>Free Inode Checks</title><para>Summary information in the superblock
+contains a count of the free inodes within the file system. The <command>fsck</command> command
+compares this count to the number of free inodes it finds within the file
+system. If the counts do not agree, <command>fsck</command> replaces the count
+in the superblock with the actual free inode count.</para>
+</sect4>
+</sect3><sect3 id="fstroublefsck-6"><title>Inodes</title><para>The list of inodes is checked sequentially starting with inode 2. (Inode
+0 and inode 1 are reserved). Each inode is checked for inconsistencies in
+the following:</para><itemizedlist><listitem><para>Format and type</para>
+</listitem><listitem><para>Link count</para>
+</listitem><listitem><para>Duplicate block</para>
+</listitem><listitem><para>Bad block numbers</para>
+</listitem><listitem><para>Inode size</para>
+</listitem>
+</itemizedlist><sect4 id="fstroublefsck-7"><title>Format and Type of Inodes</title><para>Each inode contains a <emphasis>mode word</emphasis>, which describes
+the type and state of the inode. Inodes might be one of nine types:</para><itemizedlist><listitem><para>Regular  </para>
+</listitem><listitem><para>Directory</para>
+</listitem><listitem><para>Block special</para>
+</listitem><listitem><para>Character special</para>
+</listitem><listitem><para>FIFO (named pipe) </para>
+</listitem><listitem><para>Symbolic
+link  </para>
+</listitem><listitem><para>Shadow (used for ACLs)</para>
+</listitem><listitem><para>Attribute directory</para>
+</listitem><listitem><para>Socket</para>
+</listitem>
+</itemizedlist><para>Inodes might be in one of three states:</para><itemizedlist><listitem><para>Allocated</para>
+</listitem><listitem><para>Unallocated</para>
+</listitem><listitem><para>Partially allocated </para>
+</listitem>
+</itemizedlist><para>When the file system is created, a fixed number of inodes are set aside.
+However, these inodes are not allocated until they are needed. An <emphasis>allocated
+inode</emphasis> is one that points to a file. An <emphasis>unallocated inode</emphasis> does
+not point to a file and, therefore, should be empty. The <emphasis>partially
+allocated</emphasis> state means that the inode is incorrectly formatted.
+An inode can get into this state if, for example, bad data is written into
+the inode list because of a hardware failure. The only corrective action the <command>fsck</command> command can take is to clear the inode.</para>
+</sect4><sect4 id="fstroublefsck-8"><title>Link Count Checks</title><para>Each inode contains a count of the number
+of directory entries linked to it. The <command>fsck</command> command verifies
+the link count of each inode by examining the entire directory structure,
+starting from the root (<filename>/</filename>) directory, and calculating
+an actual link count for each inode.</para><para>Discrepancies between the link count stored in the inode and the actual
+link count as determined by the <command>fsck</command> command might be one
+of three types:</para><itemizedlist><listitem><para>The stored count is <emphasis>not</emphasis> 0, and the actual
+count is 0.</para><para>This condition can occur if no directory entry exists
+for the inode. In this case, the <command>fsck</command> command puts the
+disconnected file in the <filename>lost+found</filename> directory.</para>
+</listitem><listitem><para>The stored count is <emphasis>not</emphasis> 0 and the actual
+count is <emphasis>not</emphasis> 0. However, the counts are <emphasis>unequal</emphasis>.</para><para>This condition can occur if a directory entry has been added
+or removed, but the inode has not been updated. In this case, the <command>fsck</command> command
+replaces the stored link count with the actual link count. </para>
+</listitem><listitem><para>The stored count is 0, and the actual count is not 0. </para><para>In this case, the <command>fsck</command> command changes the link count
+of the inode to the actual count.</para>
+</listitem>
+</itemizedlist>
+</sect4><sect4 id="fstroublefsck-9"><title>Duplicate Block Checks</title><para>Each inode contains a list, or pointers to lists (indirect blocks),
+of all the blocks claimed by the inode. Because indirect blocks are owned
+by an inode, inconsistencies in indirect blocks directly affect the inode
+that owns the indirect block.</para><para>The <command>fsck</command> command compares each block number claimed
+by an inode to a list of allocated blocks. If another inode already claims
+a block number, the block number is put on a list of duplicate blocks. Otherwise,
+the list of allocated blocks is updated to include the block number. </para><para>If duplicate blocks are found, the <command>fsck</command> command makes
+a second pass of the inode list to find the other inode that claims each duplicate
+block. The <command>fsck</command> command cannot determine with certainty
+which inode is in error. So, the <command>fsck</command> command prompts you
+to choose which inode should be kept and which inode should be cleared. Note
+that a large number of duplicate blocks in an inode might be caused by an
+indirect block not being written to the file system</para>
+</sect4><sect4 id="fstroublefsck-10"><title>Bad Block Number Checks</title><para>The <command>fsck</command> command
+checks each block number claimed by an inode to determine whether its value
+is higher than the value of the first data block and lower than that of the
+last data block in the file system. If the block number is outside this range,
+it is considered a bad block number. </para><para>Bad block numbers in an inode might be caused by an indirect block not
+being written to the file system. The <command>fsck</command> command prompts
+you to clear the inode.</para>
+</sect4><sect4 id="fstroublefsck-11"><title>Inode Size Checks</title><para>Each inode contains a count of the
+number of data blocks that it references. The number of actual data blocks
+is the sum of the allocated data blocks and the indirect blocks. The <command>fsck</command> command computes the number of data blocks and compares that block
+count against the number of blocks that the inode claims. If an inode contains
+an incorrect count, the <command>fsck</command> command prompts you to fix
+it.</para><para>Each inode contains a 64-bit size field. This field shows the number
+of characters (data bytes) in the file associated with the inode. A rough
+check of the consistency of the size field of an inode uses the number of
+characters shown in the size field to calculate how many blocks should be
+associated with the inode, and then compares that number to the actual number
+of blocks claimed by the inode.</para>
+</sect4>
+</sect3><sect3 id="fstroublefsck-12"><title>Indirect Blocks</title><para>Indirect blocks are owned by an inode. Therefore,
+inconsistencies in an indirect block affect the inode that owns it. Inconsistencies
+that can be checked are the following:</para><itemizedlist><listitem><para>Blocks already claimed by another inode</para>
+</listitem><listitem><para>Block numbers outside the range of the file system</para>
+</listitem>
+</itemizedlist><para>These consistency checks listed are also performed for direct blocks.</para>
+</sect3><sect3 id="fstroublefsck-13"><title>Data Blocks</title><para>An inode can directly or indirectly
+reference three kinds of data blocks. All referenced blocks must be of the
+same kind. The three types of data blocks are the following: </para><itemizedlist><listitem><para>Plain data blocks</para>
+</listitem><listitem><para>Symbolic-link data blocks</para>
+</listitem><listitem><para>Directory data blocks</para>
+</listitem>
+</itemizedlist><para><emphasis>Plain data blocks</emphasis> contain the information stored
+in a file. <emphasis>Symbolic-link data</emphasis> blocks contain the path
+name stored in a symbolic link. <emphasis>Directory data blocks</emphasis> contain
+directory entries. The <command>fsck</command> command can check only the
+validity of directory data blocks.</para><para>Directories are distinguished from regular files by an entry in the <literal>mode</literal> field of the inode. Data blocks associated with a directory
+contain the directory entries. Directory data blocks are checked for inconsistencies
+involving the following: </para><itemizedlist><listitem><para>Directory inode numbers that point to unallocated inodes</para>
+</listitem><listitem><para>Directory inode numbers that are greater than the number of
+inodes in the file system</para>
+</listitem><listitem><para>Incorrect directory inode numbers for &ldquo;<filename>.</filename>&rdquo;
+and &ldquo;<filename>..</filename>&rdquo; directories</para>
+</listitem><listitem><para>Directories that are disconnected from the file system</para>
+</listitem>
+</itemizedlist><sect4 id="fstroublefsck-14"><title>Directory Unallocated Checks</title><para>If the inode
+number in a directory data block points to an unallocated inode, the <command>fsck</command> command removes the directory entry. This condition can occur if
+the data blocks that contain a new directory entry are modified and written
+out, but the inode does not get written out. This condition can occur if the
+CPU is shut down abruptly.</para>
+</sect4><sect4 id="fstroublefsck-15"><title>Bad Inode Number Checks</title><para>If a directory entry inode number points
+beyond the end of the inode list, the <command>fsck</command> command removes
+the directory entry. This condition can occur when bad data is written into
+a directory data block.</para>
+</sect4><sect4 id="fstroublefsck-16"><title>Incorrect &ldquo;<filename>.</filename>&rdquo;
+and &ldquo;<filename>..</filename>&rdquo; Entry Checks</title><para>The directory inode number entry for &ldquo;<filename>.</filename>&rdquo;
+must be the first entry in the directory data block. The directory inode number
+must reference itself. That is, its value must be equal to the inode number
+for the directory data block.</para><para>The directory inode number entry for &ldquo;<filename>..</filename>&rdquo;
+must be the second entry in the directory data block. The directory inode
+number value must be equal to the inode number of the parent directory or
+the inode number of itself if the directory is the root (<filename>/</filename>)
+directory).</para><para>If the directory inode numbers for &ldquo;<filename>.</filename>&rdquo;
+and &ldquo;<filename>..</filename>&rdquo; are incorrect, the <command>fsck</command> command
+replaces them with the correct values. If there are multiple hard links to
+a directory, the first hard link found is considered the real parent to which &ldquo;<filename>..</filename>&rdquo; should point. In this case, the <command>fsck</command> command
+recommends that you have it delete the other names.</para>
+</sect4><sect4 id="fstroublefsck-17"><title>Disconnected Directories</title><para>The <command>fsck</command> command checks the general connectivity
+of the file system. If a directory that is not linked to the file system is
+found, the <command>fsck</command> command links the directory to the <filename>lost+found</filename> directory of the file system. This condition can occur when inodes
+are written to the file system. However, the corresponding directory data
+blocks are not.</para>
+</sect4>
+</sect3><sect3 id="fstroublefsck-18"><title>Regular Data Blocks</title><para>Data blocks associated with
+a regular file hold the contents of the file. The <command>fsck</command> command
+does not attempt to check the validity of the contents of a regular file's
+data blocks.</para>
+</sect3>
+</sect2><sect2 id="fstroublefsck-54"><title><command>fsck</command> Summary Message</title><para>When you run the <command>fsck</command> command interactively and it
+completes successfully, a message similar to the following is displayed:</para><screen># <userinput>fsck /dev/rdsk/c0t0d0s7</userinput>
+** /dev/rdsk/c0t0d0s7
+** Last Mounted on /export/home
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+** Phase 3a - Check Connectivity
+** Phase 3b - Verify Shadows/ACLs
+** Phase 4 - Check Reference Counts
+** Phase 5 - Check Cylinder Groups 
+2 files, 9 used, 2833540 free (20 frags, 354190 blocks, 0.0% fragmentation)
+# </screen><para>The last line of <command>fsck</command> output describes the following
+information about the file system:</para><variablelist><varlistentry><term><replaceable>#</replaceable> <literal>files</literal></term><listitem><para>Number of inodes in use</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>#</replaceable> <literal>used</literal></term><listitem><para>Number of fragments in use</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>#</replaceable> <literal>free</literal></term><listitem><para>Number of unused fragments</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>#</replaceable> <literal>frags</literal></term><listitem><para>Number of unused non-block fragments</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>#</replaceable> <literal>blocks</literal></term><listitem><para>Number of unused full blocks</para>
+</listitem>
+</varlistentry><varlistentry><term><replaceable>%</replaceable> <literal>fragmentation</literal></term><listitem><para>Percentage of fragmentation, where: free fragments x 100 /
+total fragments in the file system</para>
+</listitem>
+</varlistentry>
+</variablelist><para>For information about fragments, see <olink targetptr="fsfilesysappx-10" remap="internal">Fragment
+Size</olink>.</para>
+</sect2>
+</sect1><sect1 id="fstroublefsck-62389"><title>Interactively Checking and Repairing
+a UFS File System</title><para>You might need to interactively check file systems in the following
+instances:</para><itemizedlist><listitem><para>When they cannot be mounted</para>
+</listitem><listitem><para>When they develop inconsistencies while in use</para>
+</listitem>
+</itemizedlist><para>When an in-use file system develops inconsistencies, error messages
+might be displayed in the console window or the system messages file. Or,
+the system might crash. For example, the system messages file, <filename>/var/adm/messages</filename>, might include messages similar to the following:</para><screen>Sep  5 13:42:40 <replaceable>hostname</replaceable> ufs: [ID 879645 kern.notice] NOTICE: /: unexpected
+free inode 630916, run fsck(1M)</screen><para><replaceable>hostname</replaceable> is the system reporting the error.</para><para>Before using the <command>fsck</command> command, you might want to
+refer to these references for information on resolving <command>fsck</command> error
+messages:</para><itemizedlist><listitem><para><olink targetptr="fstroublefsck-22051" remap="internal">Syntax and Options
+for the fsck Command</olink></para>
+</listitem><listitem><para><olink targetdoc="sysadv2" targetptr="tsfsck-26279" remap="external">Chapter 20, <citetitle remap="chapter">Resolving UFS File System Inconsistencies (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Advanced Administration</citetitle></olink></para>
+</listitem>
+</itemizedlist><para>Keep the following points in mind when running the <command>fsck</command> command
+to check UFS file systems:</para><itemizedlist><listitem><para>A file system <emphasis>should</emphasis> be inactive when
+you use <command>fsck</command> to check a file system. File system changes
+waiting to be flushed to disk or file system changes that occur during the <command>fsck</command> checking process can be interpreted as file system corruption.
+These issues may not be a reliable indication of a problem.</para>
+</listitem><listitem><para>A file system <emphasis>must</emphasis> be inactive when you
+use <command>fsck</command> to repair that file system. File system changes
+waiting to be flushed to disk or file system changes that occur during the <command>fsck</command> repairing process might cause the file system to become corrupted.
+Or, they might cause the system to crash.</para>
+</listitem><listitem><para>Unmount a file system before you use <command>fsck</command> on
+that file system. Doing so ensures that the file system data structures are
+consistent as possible. The only exceptions are for the active root (<filename>/</filename>), <filename>/usr</filename>, and <filename>/var</filename> file systems because they must
+be mounted to run <command>fsck</command>.</para>
+</listitem><listitem><para>If you need to repair the root (<filename>/</filename>), <filename>/usr</filename>, and <filename>/var</filename> file systems, boot the system
+from an alternate device, if possible, so that these file systems are unmounted
+and inactive.</para><para>For step-by-step instructions on running <command>fsck</command> on
+the root (<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> file
+systems, see <olink targetptr="fstroublefsck-59" remap="internal">How to Check the root (/),
+/usr, or /var File Systems From an Alternate Boot Device</olink>.</para>
+</listitem>
+</itemizedlist><task id="fstroublefsck-59"><title>How to Check the root (<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> File Systems From an Alternate
+Boot Device</title><tasksummary><para>For new information about <command>fsck</command> in
+the  Solaris Express release,
+see <olink targetptr="gagar" remap="internal">Enhancements to UFS File System Utilities (fsck,
+mkfs, and newfs)</olink>. There is no need to rerun <command>fsck</command> if
+you see the following message:</para><screen>***** FILE SYSTEM WAS MODIFIED *****</screen><para>However, it doesn't harm the file system to rerun <command>fsck</command> after
+this message. This message is just informational about <command>fsck</command>'s
+corrective actions.</para><para>This procedure assumes that a local CD or network boot server is available
+so that you can boot the system from an alternate device.</para><para>For information on restoring a bad superblock, see <olink targetptr="galyo" remap="internal">How to Restore a Bad Superblock ( Solaris Express Release)</olink> or <olink targetptr="fstroublefsck-43" remap="internal">How to Restore a Bad Superblock (Solaris 8, 9,
+and 10 Releases)</olink>.</para>
+</tasksummary><procedure><step id="fstroublefsck-step-1"><para>Become superuser or assume an equivalent
+role.</para>
+</step><step id="fstroublefsck-step-65"><para><emphasis role="strong">For systems
+with mirrored root (/) file systems only:</emphasis> Detach the root (<filename>/</filename>) mirror before booting from the alternate device, or you risk
+corrupting the file system.</para><para>For information on detaching the root
+(<literal>/</literal>) mirror, see <olink targetdoc="logvolmgradmin" targetptr="tasks-mirrors-23" remap="external"><citetitle remap="section">Working With Submirrors</citetitle> in <citetitle remap="book">Solaris Volume Manager Administration Guide</citetitle></olink>.</para>
+</step><step id="fstroublefsck-step-68"><para>Identify the device, such as <filename>/dev/dsk/c0t0d0s0</filename>, of the root (<filename>/</filename>), <filename>/usr</filename>,
+or <filename>/var</filename> file system that needs to be checked.</para><para>You'll
+need to supply this device name when booted from an alternate device. Identifying
+this device when you are already booted from the alternate device is more
+difficult.</para>
+</step><step id="fstroublefsck-step-2"><para>Boot the system with the root (<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> file system that needs to be
+checked from an alternate device, such as a local CD or the network, in single-user
+mode.</para><para>Doing so ensures that there is no activity on these file
+systems.</para><para>For example:</para><screen># <userinput>init 0</userinput>
+ok <userinput>boot net -s</userinput>
+.
+.
+.
+#</screen>
+</step><step id="fstroublefsck-step-3"><para>Check the device that contains the root
+(<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> file
+system as identified in Step 3.</para><para>If the hardware for the file system
+to be checked or repaired has changed, the device names might have changed.
+ Check that the <command>fsck -n</command> message <literal>Last Mounted on
+...</literal> indicates the expected device for the file system.</para><para>In
+this example, the root (<filename>/</filename>) file system to be checked
+is <filename>/dev/dsk/c0t0d0s0</filename>. </para><screen># <userinput>fsck -n /dev/rdsk/c0t0d0s0</userinput>
+** /dev/rdsk/c0t0d0s0 (NO WRITE)
+** Last Mounted on /
+.
+.
+.
+<userinput>fsck /dev/rdsk/c0t0d0s0</userinput>
+** /dev/rdsk/c0t0d0s0
+** Last Mounted on /
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+.
+.
+.</screen>
+</step><step id="fstroublefsck-step-4"><para>Correct any reported <command>fsck</command> errors.</para><para>For information on how to respond to the error message prompts
+while you interactively check one or more UFS file systems, see <olink targetdoc="sysadv2" targetptr="tsfsck-26279" remap="external">Chapter 20, <citetitle remap="chapter">Resolving UFS File System Inconsistencies (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Advanced Administration</citetitle></olink>.</para>
+</step><step id="fstroublefsck-step-62"><para>If <command>fsck</command> cannot repair
+all of the problems after running it, see <olink targetptr="fstroublefsck-91276" remap="internal">Fixing a UFS File System That the fsck Command Cannot Repair</olink>.</para>
+</step><step id="fstroublefsck-step-5"><para>Mount the repaired file system to determine
+if any files exist in the <filename>lost+found</filename> directory.</para><para>Individual files put in the <filename>lost+found</filename> directory
+by the <command>fsck</command> command are renamed with their inode numbers.
+If possible, rename the files and move them where they belong. Try to use
+the <command>grep</command> command to match phrases within individual files
+and the <command>file</command> command to identify file types.</para><para>Eventually,
+remove unidentifiable files or directories left in the <filename>lost+found</filename> directory
+so that it doesn't fill up unnecessarily.</para>
+</step><step id="fstroublefsck-step-6"><para>Bring the system back to multiuser mode.</para><screen># <userinput>init 6</userinput></screen>
+</step><step id="fstroublefsck-step-67"><para><emphasis role="strong">For systems
+with mirrored root (/) file systems only:</emphasis> Reattach the root (<filename>/</filename>) mirror.</para>
+</step>
+</procedure>
+</task><task id="fstroublefsck-28"><title>How to Check Other File Systems (Not root
+(<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename>)</title><tasksummary><para>For new information about <command>fsck</command> in
+the Solaris Express release,
+see <olink targetptr="gagar" remap="internal">Enhancements to UFS File System Utilities (fsck,
+mkfs, and newfs)</olink>. There is no need to rerun <command>fsck</command> if
+you see the following message:</para><screen>***** FILE SYSTEM WAS MODIFIED *****</screen><para>However, it doesn't harm the file system to rerun <command>fsck</command> after
+this message. This message is just informational about <command>fsck</command>'s
+corrective actions.</para><para>This procedure assumes that the file system to be checked is unmounted.</para><para>For information on restoring a bad superblock, see <olink targetptr="galyo" remap="internal">How to Restore a Bad Superblock ( Solaris Express Release)</olink> or <olink targetptr="fstroublefsck-43" remap="internal">How to Restore a Bad Superblock (Solaris 8, 9,
+and 10 Releases)</olink>.</para>
+</tasksummary><procedure><step id="fstroublefsck-step-30"><para>Become superuser or assume an equivalent
+role.</para>
+</step><step id="fstroublefsck-step-58"><para>Unmount the local file system to ensure
+that there is no activity on the file system.</para><para>Specify the mount
+point directory or <filename>/dev/dsk/</filename><replaceable>device-name</replaceable> as
+arguments to the <command>fsck</command> command. Any inconsistency messages
+are displayed.</para><para>For example:</para><screen># <userinput>umount /export/home</userinput>
+# <userinput>fsck /dev/rdsk/c0t0d0s7</userinput>
+** /dev/dsk/c0t0d0s7
+** Last Mounted on /export/home
+.
+.
+.</screen>
+</step><step id="fstroublefsck-step-63"><para>Correct any reported <command>fsck</command> errors.</para><para>For information on how to respond to the error message prompts
+while you interactively check one or more UFS file systems, see <olink targetdoc="sysadv2" targetptr="tsfsck-26279" remap="external">Chapter 20, <citetitle remap="chapter">Resolving UFS File System Inconsistencies (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Advanced Administration</citetitle></olink>.</para>
+</step><step id="fstroublefsck-step-33"><para>If <command>fsck</command> cannot repair
+all of the problems after running it, see <olink targetptr="fstroublefsck-91276" remap="internal">Fixing a UFS File System That the fsck Command Cannot Repair</olink>.</para>
+</step><step id="fstroublefsck-step-7"><para>Mount the repaired file system to determine
+if there are any files in the <filename>lost+found</filename> directory.</para><para>Individual files put in the <filename>lost+found</filename> directory
+by the <command>fsck</command> command are renamed with their inode numbers.</para>
+</step><step id="fstroublefsck-step-34"><para>Rename and move any files put in the <filename>lost+found</filename> directory.</para><para>If possible, rename the files
+and move them where they belong. Try to use the <command>grep</command> command
+to match phrases within individual files and the <command>file</command> command
+to identify file types.</para><para>Eventually, remove unidentifiable files
+or directories left in the <filename>lost+found</filename> directory so that
+it doesn't fill up unnecessarily.</para>
+</step>
+</procedure><example id="fncsg"><title>Interactively Checking Non-root (<filename>/</filename>) or Non-<filename>/usr</filename> File Systems</title><para>The following example shows how to check the <filename>/dev/rdsk/c0t0d0s6</filename> file
+system and correct the incorrect block count. This example assumes that the
+file system is unmounted.</para><screen># <userinput>fsck /dev/rdsk/c0t0d0s6</userinput>
+** Phase 1 - Check Block and Sizes
+INCORRECT BLOCK COUNT I=2529 (6 should be 2)
+CORRECT? <userinput>y</userinput>
+
+** Phase 2 - Check Pathnames
+** Phase 3 - Check Connectivity
+** Phase 4 - Check Reference Counts
+** Phase 5 - Cylinder Groups
+929 files, 8928 used, 2851 free (75 frags, 347 blocks, 0.6%
+fragmentation)
+ 
+***** FILE SYSTEM WAS MODIFIED *****
+#</screen>
+</example>
+</task><sect2 id="fstroublefsck-36"><title>Preening UFS File Systems</title><para>The <command>fsck</command> <option>o
+p</option> command (p is for preen) checks UFS file systems and automatically
+fixes the problems that normally result from an unexpected system shutdown.
+This command exits immediately if it encounters a problem that requires operator
+intervention. This command also permits parallel checking of file systems.</para><para>You can run the <command>fsck</command> <option>o p</option> command
+to preen the file systems after an unclean shutdown. In this mode, the <command>fsck</command> command does not look at the clean flag and does a full check.
+These actions are a subset of the actions that the <command>fsck</command> command
+takes when it runs interactively.</para>
+</sect2><task id="fstroublefsck-37"><title>How to Preen a UFS File System</title><tasksummary><para>This procedure assumes that the file system is unmounted or inactive.</para>
+</tasksummary><procedure><step id="fstroublefsck-step-39"><para>Become
+superuser or assume an equivalent role.</para>
+</step><step id="fstroublefsck-step-40"><para>Unmount the UFS file system.</para><screen># <userinput>umount</userinput> <replaceable>/mount-point</replaceable></screen>
+</step><step id="fstroublefsck-step-41"><para>Check the UFS file system with the
+preen option.</para><screen># <userinput>fsck -o p /dev/rdsk/</userinput><replaceable>device-name</replaceable></screen><para>You can preen individual file systems by using <replaceable>/mount-point</replaceable> or <command>/dev/rdsk/</command><replaceable>device-name</replaceable> as arguments to
+the <command>fsck</command> command.</para>
+</step>
+</procedure><example id="fncsf"><title>Preening a UFS File System</title><para>The following example shows how to preen the <filename>/export/home</filename> file
+system.</para><screen># <userinput>fsck -o p /export/home</userinput></screen>
+</example>
+</task><sect2 id="fstroublefsck-91276"><title>Fixing a UFS File System That the <command>fsck</command> Command Cannot Repair</title><para>The <command>fsck</command> command
+operates in several passes, and a problem corrected in a later pass can expose
+other problems that are only detected by earlier passes. Therefore, it is
+sometimes necessary to run <command>fsck</command> until it no longer reports
+any problems. Doing so ensures that all errors have been found and repaired.</para><para>Pay attention to the information displayed by the <command>fsck</command> command.
+This information might help you fix the problem. For example, the messages
+might point to a damaged directory. If you delete the directory, you might
+find that the <command>fsck</command> command runs cleanly.</para><para>If the <command>fsck</command> command still cannot repair the file
+system, try to use the <command>ff</command>, <command>clri</command>, and <command>ncheck</command> commands to figure out and fix what is wrong. For information
+about how to use these commands, see the following references:</para><itemizedlist><listitem><para><olink targetdoc="refman1m" targetptr="fsdb-1m" remap="external"><citerefentry><refentrytitle>fsdb</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman1m" targetptr="ff-1m" remap="external"><citerefentry><refentrytitle>ff</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman1m" targetptr="clri-1m" remap="external"><citerefentry><refentrytitle>clri</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem><listitem><para><olink targetdoc="refman1m" targetptr="ncheck-1m" remap="external"><citerefentry><refentrytitle>ncheck</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink></para>
+</listitem>
+</itemizedlist><para>Ultimately, you might need to re-create the file system and restore
+its contents from backup media.</para><para>For information about restoring complete file systems, see <olink targetptr="bkuprestoretasks-38055" remap="internal">Chapter&nbsp;26, Restoring Files and File
+Systems (Tasks)</olink>.</para><para>If you cannot fully repair a file system but you can mount it read-only,
+try using the <command>cp</command>, <command>tar</command>, or <command>cpio</command> commands
+to retrieve all or part of the data from the file system.</para><para>If hardware disk errors are causing the problem, you might need to reformat
+and repartition the disk again before re-creating and restoring file systems.
+Check that the device cables and connectors are functional before replacing
+the disk device. Hardware errors usually display the same error again and
+again across different commands. The <command>format</command> command tries
+to work around bad blocks on the disk. However, if the disk is too severely
+damaged, the problems might persist, even after reformatting. For information
+about using the <command>format</command> command, see <olink targetdoc="refman1m" targetptr="format-1m" remap="external"><citerefentry><refentrytitle>format</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink>. For information about installing
+a new disk, see <olink targetptr="diskssadd-16103" remap="internal">Chapter&nbsp;12, SPARC:
+Adding a Disk (Tasks)</olink> or <olink targetptr="disksxadd-38159" remap="internal">Chapter&nbsp;13,
+x86: Adding a Disk (Tasks)</olink>.</para>
+</sect2>
+</sect1><sect1 id="fstroublefsck-59471"><title>Restoring a Bad Superblock</title><para>When the superblock of a file system becomes damaged,
+you must restore it. The <command>fsck</command> command tells you when a
+superblock is bad. Fortunately, copies of the superblock are stored within
+a file system.</para><para>You can use the <command>fsck</command> <option>o b</option> command
+to replace the superblock with one of these copies or use <command>fsck</command>'s automatic search for backup superblocks feature, which is
+new in the  Solaris Express release.
+For more information about this feature, see <olink targetptr="gagby" remap="internal">Automatic
+Search for Backup Superblocks</olink>.</para><para>For more information about the superblock, see <olink targetptr="fsfilesysappx-3" remap="internal">Superblock</olink>.</para><para>If the superblock in the root (<filename>/</filename>) file system becomes
+damaged and you cannot restore it, you have two choices:</para><itemizedlist><listitem><para>Reinstall the system.</para>
+</listitem><listitem><para>Boot from the network or local CD, and attempt the following
+steps. If these steps fail, recreate the root (<filename>/</filename>) file
+system by using the <command>newfs</command> command and restore it from a
+backup copy.</para>
+</listitem>
+</itemizedlist><task id="galyo"><title>How to Restore a Bad
+Superblock ( Solaris Express Release)</title><tasksummary><para>This procedure is new in the Solaris
+Express release. If your file system has a bad superblock, <command>fsck</command> automatically
+calculates an alternative superblock as seen in the following messages:</para><screen>BAD SUPERBLOCK AT ...
+
+LOOK FOR ALTERNATE SUPERBLOCKS WITH MKFS? 
+LOOK FOR ALTERNATE SUPERBLOCKS WITH NEWFS?</screen><caution><para>If a file system with a damaged superblock was created with <command>newfs</command> or <command>mkfs</command> customized parameters, such as <literal>ntrack</literal> or <literal>nsect</literal>, using <command>fsck</command>'s
+automatically calculated superblock for the repair process could irreparably
+damage your file system.</para><para>In the case of a file system that was
+created with customized parameters and it has a bad superblock, <command>fsck</command> provides
+the following prompt to cancel the <command>fsck</command> session:</para><screen>CANCEL FILESYSTEM CHECK?</screen><para>Canceling the <command>fsck</command> session would be an appropriate
+response if this file system was created with customized parameters or if
+there is some other concern about running <command>fsck</command> on this
+file system.</para>
+</caution>
+</tasksummary><procedure><step><para>Become superuser or assume an equivalent role.</para>
+</step><step><para>Check the file system with the suspected bad superblock.</para><screen># <userinput>fsck /dev/rdsk/c0t1d0s0</userinput>
+
+** /dev/rdsk/c0t1d0s0
+
+<replaceable>BAD SUPERBLOCK at ...</replaceable></screen>
+</step><step><para>Determine how the file system was created and select one of the
+following:</para><itemizedlist><listitem><para><emphasis role="strong">The file system was created with the
+newfs command</emphasis>. </para><itemizedlist><listitem><para><command>fsck</command> responds that all superblocks are
+corrupt and it must use a generic superblock. Answer the <command>fsck</command> prompts
+as described in the example below.</para><caution><para>Do not use this option if the file system was created
+with customized parameters. This option should only be used as a last resort.
+Be prepared to restore the file system from a backup copy.</para>
+</caution><screen># <userinput>fsck /dev/dsk/c1t2d0s0</userinput>
+** /dev/rdsk/c1t2d0s0
+BAD SUPERBLOCK AT BLOCK 16: BLOCK SIZE LARGER THAN MAXIMUM SUPPORTED
+
+LOOK FOR ALTERNATE SUPERBLOCKS WITH MKFS? <userinput>no</userinput>
+
+
+LOOK FOR ALTERNATE SUPERBLOCKS WITH NEWFS? <userinput>yes</userinput>
+
+SEARCH FOR ALTERNATE SUPERBLOCKS FAILED.
+
+USE GENERIC SUPERBLOCK FROM MKFS? <userinput>no</userinput>
+
+
+USE GENERIC SUPERBLOCK FROM NEWFS? <userinput>yes</userinput>
+
+CALCULATED GENERIC SUPERBLOCK WITH NEWFS
+If filesystem was created with manually-specified geometry, using
+auto-discovered superblock may result in irrecoverable damage to
+filesystem and user data.
+
+CANCEL FILESYSTEM CHECK? <userinput>no</userinput>
+
+** Last Mounted on
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+** Phase 3a - Check Connectivity
+** Phase 3b - Verify Shadows/ACLs
+** Phase 4 - Check Reference Counts
+** Phase 5 - Check Cylinder Groups
+CORRECT GLOBAL SUMMARY
+SALVAGE? <userinput>y</userinput>
+
+
+UPDATE STANDARD SUPERBLOCK? <userinput>y</userinput>
+
+81 files, 3609 used, 244678 free (6 frags, 30584 blocks, 0.0% fragmentation)
+
+***** FILE SYSTEM WAS MODIFIED *****</screen>
+</listitem><listitem><para><command>fsck</command> responds that it found an alternate
+superblock with a message similar to the following:</para><screen>FOUND ALTERNATE SUPERBLOCK 32 WITH NEWFS</screen><para>With this <command>fsck</command> scenario, follow the prompts as shown
+in <olink targetptr="gagby" remap="internal">Automatic Search for Backup Superblocks</olink>.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para><emphasis role="strong">The file system was created with the
+mkfs command.</emphasis></para><itemizedlist><listitem><para><command>fsck</command> responds that all superblocks are
+corrupt and must use a generic superblock. Answer the <command>fsck</command> prompts
+as described in the example below.</para><caution><para>Do not use this option if the file system was created with
+customized parameters. This option should only be used as a last resort. Be
+prepared to restore the file system from a backup copy.</para>
+</caution><screen># <userinput>fsck /dev/dsk/c1t2d0s0</userinput>
+** /dev/rdsk/c1t2d0s0
+BAD SUPERBLOCK AT BLOCK 16: BLOCK SIZE LARGER THAN MAXIMUM SUPPORTED
+
+LOOK FOR ALTERNATE SUPERBLOCKS WITH MKFS? <userinput>yes</userinput>
+
+
+LOOK FOR ALTERNATE SUPERBLOCKS WITH NEWFS? <userinput>no</userinput>
+
+SEARCH FOR ALTERNATE SUPERBLOCKS FAILED.
+
+USE GENERIC SUPERBLOCK FROM MKFS? <userinput>yes</userinput>
+
+CALCULATED GENERIC SUPERBLOCK WITH MKFS
+If filesystem was created with manually-specified geometry, using
+auto-discovered superblock may result in irrecoverable damage to
+filesystem and user data.
+
+CANCEL FILESYSTEM CHECK? <userinput>no</userinput>
+
+** Last Mounted on
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+** Phase 3a - Check Connectivity
+** Phase 3b - Verify Shadows/ACLs
+** Phase 4 - Check Reference Counts
+** Phase 5 - Check Cylinder Groups
+CORRECT GLOBAL SUMMARY
+SALVAGE? <userinput>y</userinput>
+
+
+UPDATE STANDARD SUPERBLOCK? <userinput>y</userinput>
+
+81 files, 3609 used, 243605 free (117 frags, 30436 blocks, 0.0% fragmentation)</screen>
+</listitem><listitem><para><command>fsck</command> responds that it found an alternate
+superblock with a message similar to the following:</para><screen>FOUND ALTERNATE SUPERBLOCK 32 WITH MKFS</screen><para>With this <command>fsck</command> scenario, follow the prompts as shown
+in <olink targetptr="gagby" remap="internal">Automatic Search for Backup Superblocks</olink>.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist>
+</step><step><para>Answer the prompts to salvage and restore the superblock.</para><para>There is no need to rerun <command>fsck</command> when you see the following
+message:</para><screen>***** FILE SYSTEM WAS MODIFIED *****</screen><para>However, it doesn't harm the file system to rerun <command>fsck</command> after
+this message. This message is just informational about <command>fsck</command>'s
+corrective actions.</para>
+</step>
+</procedure>
+</task><task id="fstroublefsck-43"><title>How to Restore a Bad Superblock (Solaris
+8, 9, and 10 Releases)</title><procedure><step id="fstroublefsck-step-57"><para>Become superuser or assume an equivalent
+role.</para>
+</step><step id="fstroublefsck-step-55"><para>Determine whether the bad superblock
+is in the root (<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> file system and select one of the following:</para><itemizedlist><listitem><para>If the bad superblock is in either the root (<filename>/</filename>), <filename>/usr</filename>, or <filename>/var</filename> file system, then boot from
+the network or a locally connected CD.</para><para>From a locally-connected
+CD, use the following command:</para><screen>ok <userinput>boot cdrom -s</userinput></screen><para>From the network where a boot or install server is already setup, use
+the following command:</para><screen>ok <userinput>boot net -s</userinput></screen><para>If you need help stopping the system, see <olink targetdoc="sysadv1" targetptr="hbsparcboot-79782" remap="external">Chapter 10, <citetitle remap="chapter">Booting a System (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink> or <olink targetdoc="sysadv1" targetptr="hbx86boot-68676" remap="external">Chapter 12, <citetitle remap="chapter">Booting a Solaris System With GRUB (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</listitem><listitem><para>If the bad superblock is not in either the root (<filename>/</filename>), <filename>/usr</filename>, <filename>/var</filename> file system, change to a directory
+outside the damaged file system and unmount the file system.</para><screen># <userinput>umount</userinput> <replaceable>/mount-point</replaceable></screen><caution><para>Be sure to use the <command>newfs -N</command> in the next
+step. If you omit the <option>N</option> option, you will destroy all of the
+data in the file system and replace it with an empty file system.</para>
+</caution>
+</listitem>
+</itemizedlist>
+</step><step id="fstroublefsck-step-48"><para>Display the superblock values by using
+the <command>newfs -N</command> command.</para><screen># <userinput>newfs -N /dev/rdsk/</userinput><replaceable>device-name</replaceable></screen><para>The command output displays the block numbers that were used for the
+superblock copies when the <command>newfs</command> command created the file
+system, unless the file system was created with special parameters. For information
+on creating a customized file system, see <olink targetptr="fsfilesysappx-20581" remap="internal">Customizing UFS File System Parameters</olink>.</para>
+</step><step id="fstroublefsck-step-49"><para>Provide an alternate superblock by
+using the <command>fsck</command> command.</para><screen># <userinput>fsck -F ufs -o b=</userinput><replaceable>block-number</replaceable> <userinput>/dev/rdsk/</userinput><replaceable>device-name</replaceable></screen><para>The <command>fsck</command> command uses the alternate superblock you
+specify to restore the primary superblock. You can always try <literal>32</literal> as
+an alternate block. Or, use any of the alternate blocks shown by the <command>newfs
+-N</command> command.</para>
+</step>
+</procedure><example id="fncsl"><title>Restoring a Bad Superblock (Solaris 8, 9, and 10 Releases)</title><para>The following example shows how to restore the superblock copy <literal>5264</literal>. </para><screen width="100"># <userinput>newfs -N /dev/rdsk/c0t3d0s7</userinput>
+/dev/rdsk/c0t3d0s7: 163944 sectors in 506 cylinders of 9 tracks, 36 sectors
+ 83.9MB in 32 cyl groups (16 c/g, 2.65MB/g, 1216 i/g)
+super-block backups (for fsck -b #) at:
+ 32, 5264, 10496, 15728, 20960, 26192, 31424, 36656, 41888,
+ 47120, 52352, 57584, 62816, 68048, 73280, 78512, 82976, 88208,
+ 93440, 98672, 103904, 109136, 114368, 119600, 124832, 130064, 135296,
+ 140528, 145760, 150992, 156224, 161456,
+# <userinput>fsck -F ufs -o b=5264 /dev/rdsk/c0t3d0s7</userinput>
+Alternate superblock location: 5264.
+** /dev/rdsk/c0t3d0s7
+** Last Mounted on
+** Phase 1 - Check Blocks and Sizes
+** Phase 2 - Check Pathnames
+** Phase 3 - Check Connectivity
+** Phase 4 - Check Reference Counts
+** Phase 5 - Check Cyl groups
+36 files, 867 used, 75712 free (16 frags, 9462 blocks, 0.0% fragmentation)
+
+***** FILE SYSTEM WAS MODIFIED *****
+# </screen>
+</example>
+</task>
+</sect1><sect1 id="fstroublefsck-22051"><title>Syntax and Options for the <command>fsck</command> Command</title><para>The <command>fsck</command> command
+checks and repairs inconsistencies in file systems. If you run the <command>fsck</command> command
+without any options, it interactively asks for confirmation before making
+repairs. This command has four options.</para><informaltable frame="topbot"><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="colspec0" colwidth="50*"/><colspec colname="colspec1" colwidth="50*"/><thead><row rowsep="1"><entry><para>Command and Option</para>
+</entry><entry><para>Description</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><command>fsck</command> <option>m</option></para>
+</entry><entry><para>Checks whether a file system can be mounted</para>
+</entry>
+</row><row><entry><para><command>fsck</command> <option>y</option></para>
+</entry><entry><para>Assumes a yes response for all repairs</para>
+</entry>
+</row><row><entry><para> <command>fsck</command>  <option>n</option></para>
+</entry><entry><para>Assumes a no response for all repairs</para>
+</entry>
+</row><row><entry><para><command>fsck</command> <option>o p</option></para>
+</entry><entry><para>Noninteractively preens the file system, fixing all expected (innocuous)
+inconsistencies, but exits when a serious problem is encountered</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1>
+</chapter>

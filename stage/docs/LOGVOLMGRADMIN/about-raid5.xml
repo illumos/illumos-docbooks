@@ -1,0 +1,239 @@
+<chapter id="about-raid5-1"><title>RAID-5
+Volumes (Overview)</title><highlights><para>This chapter provides conceptual information about Solaris Volume Manager's RAID-5
+volumes. For information about performing related tasks, see <olink targetptr="tasks-raid5-1" remap="internal">Chapter&nbsp;15, RAID-5 Volumes (Tasks)</olink>.</para><para>This chapter contains the following:</para><itemizedlist><listitem><para><olink targetptr="about-metadevices-18901" remap="internal">Overview of RAID-5
+Volumes</olink></para>
+</listitem><listitem><para><olink targetptr="addtasks-25668" remap="internal">Background Information for
+Creating RAID-5 Volumes</olink></para>
+</listitem><listitem><para><olink targetptr="egcls" remap="internal">Overview of Checking Status of RAID-5
+Volumes</olink></para>
+</listitem><listitem><para><olink targetptr="about-raid5-2" remap="internal">Overview of Replacing and
+Enabling Slices in RAID-5 Volumes</olink></para>
+</listitem><listitem><para><olink targetptr="about-raid5-9a" remap="internal">Scenario&mdash;RAID-5 Volumes</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="about-metadevices-18901"><title>Overview of RAID-5 Volumes</title><para>RAID level 5 is similar to striping, but with parity data distributed
+across all components (disk or logical volume). If a component fails, the
+data on the failed component can be rebuilt from the distributed data and
+parity information on the other components. In Solaris Volume Manager, a <emphasis>RAID-5
+volume</emphasis> is a volume that supports RAID level 5.</para><para>A RAID-5 volume uses storage capacity equivalent to one component in
+the volume to store redundant information (parity). This parity information
+contains information about user data stored on the remainder of the RAID-5
+volume's components. That is, if you have three components, the equivalent
+of one component is used for the parity information. If you have five components,
+then the equivalent of one component is used for parity information. The parity
+information is distributed across all components in the volume. Similar to
+a mirror, a RAID-5 volume increases data availability, but with
+a minimum of cost in terms of hardware and only a moderate penalty for write
+operations. However, you cannot use a RAID-5 volume for the root (<filename>/</filename>), <filename>/usr</filename>, and <filename>swap</filename> file systems, or for other
+existing file systems.</para><para>Solaris Volume Manager automatically resynchronizes a RAID-5 volume when
+you replace an existing component. Solaris Volume Manager also resynchronizes RAID-5
+volumes during rebooting if a system failure or panic took place.  </para><sect2 id="about-metadevices-23"><title>Example&mdash;RAID-5 Volume</title><para><olink targetptr="about-metadevices-fig-24" remap="internal">Figure 14&ndash;1</olink> illustrates
+a RAID-5 volume that consists of four disks (components).</para><para>The first three data segments are written to Component A (interlace
+1), Component B (interlace 2), and Component C (interlace 3). The next data
+segment that is written is a parity segment. This parity segment is written
+to Component D (P 1&ndash;3). This segment consists of an exclusive OR of
+the first three segments of data. The next three data segments are written
+to Component A (interlace 4), Component B (interlace 5), and Component D (interlace
+6). Then, another parity segment is written to Component C (P 4&ndash;6).</para><para>This pattern of writing data and parity segments results in both data
+and parity being spread across all disks in the RAID-5 volume. Each drive
+can be read independently. The parity protects against a single disk failure.
+If each disk in this example were 2 Gbytes, the total capacity of the RAID-5
+volume would be 6 Gbytes. One drive's worth of space is allocated to parity.</para><figure id="about-metadevices-fig-24"><title>RAID-5 Volume Example</title><mediaobject><imageobject><imagedata entityref="fig79.epsi"/>
+</imageobject><textobject><simpara>Diagram shows an example of a RAID-5 volume. Several
+components are used to write data segments in combination with a parity segment
+.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2><sect2 id="about-metadevices-14226"><title>Example&mdash;Concatenated (Expanded)
+RAID-5 Volume</title><para>The following figure shows an example of an RAID-5 volume that
+initially consisted of four disks (components). A fifth disk has been dynamically
+concatenated to the volume to expand the RAID-5 volume.</para><figure id="about-metadevices-fig-25"><title>Expanded RAID-5 Volume Example</title><mediaobject><imageobject><imagedata entityref="fig80.epsi"/>
+</imageobject><textobject><simpara>Diagram shows an additional component concatenated onto
+a RAID-5 volume to provide a larger volume with redundancy.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The parity areas are allocated when the initial RAID-5 volume
+is created. One component's worth of space is allocated to parity, although
+the actual parity blocks are distributed across all of the original components
+to distribute I/O. When additional components are concatenated to the RAID-5
+volume, the additional space is devoted entirely to data. No new parity blocks
+are allocated. The data on the concatenated component is, however, included
+in the parity calculations, so the data is protected against single device
+failures. </para><para>Concatenated RAID-5 volumes are not suited for long-term use. Use a
+concatenated RAID-5 volume until it is possible to reconfigure a larger RAID-5
+volume. Then, copy the data to the larger volume.</para><note><para>When you add a new component to a RAID-5 volume, Solaris Volume Manager &ldquo;zeros&rdquo;
+all the blocks in that component. This process ensures that the parity protects
+the new data. As data is written to the additional space, Solaris Volume Manager includes
+the data in the parity calculations.</para>
+</note>
+</sect2>
+</sect1><sect1 id="addtasks-25668"><title>Background Information for Creating RAID-5
+Volumes</title><para>When you work with RAID-5 volumes, consider the <olink targetptr="about-raid5-8" remap="internal">Requirements for RAID-5 Volumes</olink> and <olink targetptr="about-raid5-9" remap="internal">Guidelines for RAID-5 Volumes</olink>. Many striping
+guidelines also apply to RAID-5 volume configurations. See <olink targetptr="about-metadevices-40" remap="internal">RAID-0 Volume Requirements</olink>. </para><sect2 id="about-raid5-8"><title>Requirements for RAID-5 Volumes</title><itemizedlist><listitem><para>A RAID-5 volume must consist of at least three components.
+The more components a RAID-5 volume contains, however, the longer read and
+write operations take when a component fails.</para>
+</listitem><listitem><para>RAID-5 volumes cannot be striped, concatenated, or mirrored.</para>
+</listitem><listitem><para>Do not create a RAID-5 volume from a component that contains
+an existing file system. Doing so will erase the data during the RAID-5 initialization
+process.</para>
+</listitem><listitem><para>When you create a RAID-5 volume, you can define the interlace
+value. If not specified, the interlace value defaults to 512 Kbytes.
+This value is reasonable for most applications.</para>
+</listitem><listitem><para>A RAID-5 volume (with no hot spares) can only handle a single
+component failure.</para>
+</listitem><listitem><para>When you create RAID-5 volumes, use components across separate
+controllers. Controllers and associated cables tend to fail more often than
+disks.</para>
+</listitem><listitem><para>Use components of the same size. Creating a RAID-5 volume
+with components of different sizes results in unused disk space.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="about-raid5-9"><title>Guidelines for RAID-5 Volumes</title><itemizedlist><listitem><para>Because of the complexity of parity calculations, volumes with
+greater than about 20 percent writes should probably not be RAID-5 volumes.
+If data redundancy on a write-heavy volume is needed, consider mirroring.</para>
+</listitem><listitem><para>If the different components in a RAID-5 volume reside on different
+controllers and the accesses to the volume are primarily large sequential
+accesses, then setting the interlace value to 32 Kbytes might improve performance.</para>
+</listitem><listitem><para>You can expand a RAID-5 volume by concatenating additional
+components to the volume. Concatenating a new component to an existing RAID-5
+volume decreases the overall performance of the volume because the data on
+concatenations is sequential. Data is not striped across all components. The
+original components of the volume have data and parity striped across all
+components. This striping is lost for the concatenated component. However,
+the data is still recoverable from errors because the parity is used during
+the component I/O. The resulting RAID-5 volume continues to handle a single
+component failure.</para><para>Concatenated components also differ in the
+sense that they do not have parity striped on any of the regions. Thus, the
+entire contents of the component are available for data.</para><para>Any performance
+enhancements for large or sequential writes are lost when components are concatenated.</para>
+</listitem><listitem><para>You can create a RAID-5 volume without having to &ldquo;zero
+out&rdquo; the data blocks. To do so, do one of the following:</para><itemizedlist><listitem><para>Use the <command>metainit</command> command with the <option>k</option> option.
+The <option>k</option> option recreates the RAID-5 volume without initializing
+it, and sets the disk blocks to the &ldquo;Okay&rdquo; state. This option
+is potentially dangerous, as any errors that exist on disk blocks within the
+volume will cause unpredictable behavior from Solaris Volume Manager, including the
+possibility of fabricated data. </para>
+</listitem><listitem><para>Initialize the device and restore data from tape. See the <olink targetdoc="refman1m" targetptr="metainit-1m" remap="external"><citerefentry><refentrytitle>metainit</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page
+for more information.</para>
+</listitem>
+</itemizedlist>
+</listitem>
+</itemizedlist>
+</sect2>
+</sect1><sect1 id="egcls"><title>Overview of Checking Status of RAID-5 Volumes</title><para>You can check the status of RAID-5 volumes by looking at the volume
+states and the slice states for the volume. The slice state provides the most
+specific information when you are troubleshooting RAID-5 volume errors. The
+RAID-5 volume state only provides general status information, such as &ldquo;Okay&rdquo;
+or &ldquo;Maintenance.&rdquo;</para><para>If the RAID-5 volume state reports a &ldquo;Maintenance&rdquo; state,
+refer to the slice state. The slice state specifically reports if the slice
+is in the &ldquo;Maintenance&rdquo; state or the &ldquo;Last Erred&rdquo;
+state. You take a different recovery action depending on if the the slice
+is in the &ldquo;Maintenance&rdquo; state or the &ldquo;Last Erred&rdquo;
+state. If you only have a slice in the &ldquo;Maintenance&rdquo; state, it
+can be repaired without loss of data. If you have a slice in the &ldquo;Maintenance&rdquo;
+state and a slice in the &ldquo;Last Erred&rdquo; state, data has probably
+been corrupted. You must fix the slice in the &ldquo;Maintenance&rdquo; state
+first, then fix the &ldquo;Last Erred&rdquo; slice.</para><para>The following table explains RAID-5 volume states.</para><table frame="topbot" id="egclo"><title>RAID-5 Volume States</title><tgroup cols="2" colsep="0" rowsep="0"><colspec colname="column1" colwidth="88*"/><colspec colname="column2" colwidth="308*"/><thead><row rowsep="1"><entry><para>State</para>
+</entry><entry><para>Meaning</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Initializing</para>
+</entry><entry><para>Slices are in the process of having all disk blocks zeroed. This process
+is necessary due to the nature of RAID-5 volumes with respect to data and
+parity interlace striping. </para><para>Once the state changes to &ldquo;Okay,&rdquo; the initialization process
+is complete and you are able to open the device. Until then, applications
+receive error messages.</para>
+</entry>
+</row><row><entry><para>Okay</para>
+</entry><entry><para>The device is ready for use and is currently free from errors. </para>
+</entry>
+</row><row><entry><para>Maintenance</para>
+</entry><entry><para>A slice has been marked as failed due to I/O or open errors. These errors
+were encountered during a read or write operation.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table><para>The following table explains the slice states for a RAID-5 volume and
+possible actions to take.</para><table frame="topbot" id="egclk"><title>RAID-5 Slice States</title><tgroup cols="3" colsep="0" rowsep="0"><colspec colname="column1" colwidth="90*"/><colspec colname="column2" colwidth="123*"/><colspec colname="column3" colwidth="183*"/><thead><row rowsep="1"><entry><para>State</para>
+</entry><entry><para>Meaning</para>
+</entry><entry><para>Action</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Initializing</para>
+</entry><entry><para>Slices are in the process of having all disk blocks zeroed. This process
+is necessary due to the nature of RAID-5 volumes with respect to data and
+parity interlace striping. </para>
+</entry><entry><para>Normally, none. If an I/O error occurs during this process, the device
+goes into the &ldquo;Maintenance&rdquo; state. If the initialization fails,
+the volume is in the &ldquo;Initialization Failed&rdquo; state, and the slice
+is in the &ldquo;Maintenance&rdquo; state. If this happens, clear the volume
+and recreate it.</para>
+</entry>
+</row><row><entry><para>Okay</para>
+</entry><entry><para>The device is ready for use and is currently free from errors. </para>
+</entry><entry><para>None. Slices can be added or replaced, if necessary.</para>
+</entry>
+</row><row><entry><para>Resyncing</para>
+</entry><entry><para>The slice is actively being resynchronized. An error has occurred and
+been corrected, a slice has been enabled, or a slice has been added.</para>
+</entry><entry><para>If desired, monitor the RAID-5 volume status until the resynchronization
+is done.</para>
+</entry>
+</row><row><entry><para>Maintenance</para>
+</entry><entry><para>A single slice has been marked as failed due to I/O or open errors.
+These errors were encountered during a read or write operation.</para>
+</entry><entry><para>Enable or replace the failed slice. See <olink targetptr="maintaintasksnew-31120" remap="internal">How to Enable a Component in a RAID-5 Volume</olink>,
+or <olink targetptr="maintaintasksnew-14708" remap="internal">How to Replace a Component in
+a RAID-5 Volume</olink>. The <command>metastat</command> command will show
+an <literal>invoke</literal> recovery message with the appropriate action
+to take with the <command>metareplace</command> command.</para>
+</entry>
+</row><row><entry><para>Maintenance/Last Erred</para>
+</entry><entry><para>Multiple slices have encountered errors. The state of the failed slices
+is either &ldquo;Maintenance&rdquo; or &ldquo;Last Erred.&rdquo; In this state,
+no I/O is attempted on the slice that is in the &ldquo;Maintenance&rdquo;
+state. However, I/O is attempted on the slice marked &ldquo;Last Erred&rdquo;
+with the outcome being the overall status of the I/O request.</para>
+</entry><entry><para>Enable or replace the failed slices. See <olink targetptr="maintaintasksnew-31120" remap="internal">How to Enable a Component in a RAID-5 Volume</olink>,
+or <olink targetptr="maintaintasksnew-14708" remap="internal">How to Replace a Component in
+a RAID-5 Volume</olink>. The <command>metastat</command> command will show
+an <literal>invoke</literal> recovery message with the appropriate action
+to take with the <command>metareplace</command> command. This command must
+be run with the <option>f</option> flag. This state indicates that data might
+be fabricated due to multiple failed slices.</para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</table>
+</sect1><sect1 id="about-raid5-2"><title>Overview of Replacing and Enabling Slices
+in RAID-5 Volumes</title><para>Solaris Volume Manager has the capability to <emphasis>replace</emphasis> and <emphasis>enable</emphasis> components within mirrors and RAID-5 volumes. The issues
+and requirements for doing so are the same for mirrors and RAID-5 volumes.
+For more information, see <olink targetptr="replace-enable-1" remap="internal">Overview of
+Replacing and Enabling Components in RAID-1 and RAID-5 Volumes</olink>.</para>
+</sect1><sect1 id="about-raid5-9a"><title>Scenario&mdash;RAID-5 Volumes</title><para>RAID-5 volumes allow you to have redundant storage without the overhead
+of RAID-1 volumes, which require two times the total storage space to provide
+data redundancy. By setting up a RAID-5 volume, you can provide redundant
+storage of greater capacity than you could achieve with a RAID-1 volume on
+the same set of disk components. In addition, with the help of hot spares
+(see <olink targetptr="about-hotspares-40444" remap="internal">Chapter&nbsp;16, Hot Spare Pools
+(Overview)</olink> and specifically <olink targetptr="about-hotspares-8" remap="internal">How
+Hot Spares Work</olink>), you can achieve nearly the same level of safety.
+The drawbacks are increased write time and markedly impaired performance in
+the event of a component failure. However, those tradeoffs might be insignificant
+for many situations. The following example, drawing on the sample scenario
+explained in <olink targetptr="svm-scenario-1" remap="internal">Chapter&nbsp;5, Configuring
+and Using Solaris Volume Manager (Scenario)</olink>, describes how RAID-5
+volumes can provide extra storage capacity.</para><para>Other scenarios for RAID-0 and RAID-1 volumes used 6 slices (<literal>c1t1d0</literal>, <literal>c1t2d0</literal>, <literal>c1t3d0</literal>, <literal>c2t1d0</literal>, <literal>c2t2d0</literal>, <literal>c2t3d0</literal>) on 6 disks,
+spread over 2 controllers, to provide 27 Gbytes of redundant storage. By using
+the same slices in a RAID-5 configuration, 45 Gbytes of storage is available.
+Also, the configuration can withstand a single component failure without data
+loss or access interruption. By adding hot spares to the configuration, the
+RAID-5 volume can withstand additional component failures. The most significant
+drawback to this approach is that a controller failure would result in data
+loss to this RAID-5 volume, while it would not with the RAID-1 volume described
+in <olink targetptr="about-mirrors-8" remap="internal">Scenario&mdash;RAID-1 Volumes (Mirrors)</olink>. </para>
+</sect1>
+</chapter>

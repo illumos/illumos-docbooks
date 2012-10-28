@@ -1,0 +1,234 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Resource Control Code Examples - Solaris Containers: Resource Management and Solaris Zones Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-05-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris Containers: Resource Management and Solaris Zones Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-ctrls-13.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-ctrls-19.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="concepts-2.html">1.&nbsp;&nbsp;Resource Management in the Solaris Operating System</a></p>
+<p class="toc level1 tocsp"><a href="tasks-3.html">2.&nbsp;&nbsp;Projects and Tasks</a></p>
+<p class="toc level1 tocsp"><a href="ext-acctg-11.html">3.&nbsp;&nbsp;Using the C Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="extacctg-perl-1.html">4.&nbsp;&nbsp;Using the Perl Interface to Extended Accounting</a></p>
+<p class="toc level1 tocsp"><a href="resource-ctrls-8.html">5.&nbsp;&nbsp;Resource Controls</a></p>
+<p class="toc level2"><a href="resource-ctrls-9.html">Overview of Resource Controls</a></p>
+<p class="toc level2"><a href="resource-ctrls-1.html">Resource Controls Flags and Actions</a></p>
+<p class="toc level2"><a href="resource-ctrls-13.html">Resource Controls API Functions</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Resource Control Code Examples</a></p>
+</div>
+<p class="toc level2"><a href="resource-ctrls-19.html">Programming Issues Associated With Resource Controls</a></p>
+<p class="toc level1 tocsp"><a href="resource-pools-5.html">6.&nbsp;&nbsp;Resource Pools</a></p>
+<p class="toc level1 tocsp"><a href="fquzd.html">7.&nbsp;&nbsp;Design Considerations for Resource Management Applications in Solaris Zones</a></p>
+<p class="toc level1 tocsp"><a href="faate.html">8.&nbsp;&nbsp;Configuration Examples</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="resource-ctrls-12"></a><h3>Resource Control Code Examples</h3>
+
+
+<a name="resource-ctrls-20"></a><h4>Master Observing Process for Resource Controls</h4>
+<p><a name="indexterm-36"></a>The following example is the master observer process. <a href="#resource-ctrls-fig-26">Figure&nbsp;5-3</a> shows the resource controls for
+the master observing process.</p>
+<hr><p><b>Note - </b>The line break is not valid in an <tt>/etc/project</tt> file. The line break
+is shown here only to allow the example to display on a
+printed or displayed page. Each entry in the <tt>/etc/project</tt> file must be on a
+separate line.</p>
+<hr>
+<a name="resource-ctrls-fig-26"></a><h6>Figure&nbsp;5-3 Master Observing Process</h6><img src="figures/res-ctrls.master-proc.gif" alt="diagram showing resource controls for the master observing process"></img><p>The key points for the example include the following:</p>
+<ul><li><p>Because the task's limit is privileged, the application cannot change the limit, or specify an action, such as a signal. A master process solves this problem by establishing the same resource control as a basic resource control on the task. The master process uses the same value or a little less on the resource, but with a different action, signal = XRES. The master process creates a thread to wait for this signal.</p></li>
+<li><p>The <tt>rctlblk</tt> is opaque. The struct needs to be dynamically allocated.</p></li>
+<li><p>Note the blocking of all signals before creating the thread, as required by sigwait(2). </p></li>
+<li><p>The thread calls <tt>sigwait</tt>(2) to block for the signal. If <tt>sigwait()</tt> returns the SIGXRES signal, the thread notifies the master process' children, which adapts to reduce the number of LWPs being used. Each child should also be modelled similarly, with a thread in each child, waiting for this signal, and adapting its process' LWP usage appropriately.</p></li></ul>
+<pre>rctlblk_t *mlwprcb;
+sigset_t smask;
+
+/* Omit return value checking/error processing to keep code sample short */
+/* First, install a RCPRIV_BASIC, v=1000, signal=SIGXRES rctl */
+mlwprcb = calloc(1, rctlblk_size());     /* rctl blocks are opaque: */
+       rctlblk_set_value(mlwprcb, 1000);
+       rctlblk_set_privilege(mlwprcb, RCPRIV_BASIC);
+       rctlblk_set_local_action(mlwprcb, RCTL_LOCAL_SIGNAL, SIGXRES);
+       if (setrctl("task.max-lwps", NULL, mlwprcb, RCTL_INSERT) == -1) {
+           perror("setrctl");
+           exit (1);
+       }
+
+/* Now, create the thread which waits for the signal */
+        sigemptyset(&amp;smask);
+        sigaddset(&amp;smask, SIGXRES);
+        thr_sigsetmask(SIG_BLOCK, &amp;smask, NULL);
+thr_create(NULL, 0, sigthread, (void *)SIGXRES, THR_DETACHED, NULL));
+
+/* Omit return value checking/error processing to keep code sample short */
+
+void *sigthread(void *a)
+{
+        int sig = (int)a;
+        int rsig;
+        sigset_t sset;
+
+        sigemptyset(&amp;sset);
+        sigaddset(&amp;sset, sig);
+
+        while (1) {
+                 rsig = sigwait(&amp;sset);
+          if (rsig == SIGXRES) {
+              notify_all_children();
+              /* e.g. sigsend(P_PID, child_pid, SIGXRES); */
+             }
+        }
+}</pre>
+
+<a name="resource-ctrls-21"></a><h4>List all the Value-Action Pairs for a Specific Resource Control</h4>
+<p><a name="indexterm-37"></a>The following example lists all the value-action pairs for a specific resource control,
+<tt>task.max-lwps</tt>. The key point for the example is that <tt>getrctl</tt>(2) takes two resource control
+blocks, and returns the resource control block  for the RCTL_NEXT flag. To
+iterate through all resource control blocks, repeatedly swap the resource control block values,
+as shown here using the <tt>rcb_tmp</tt> <tt>rctl</tt> block.</p><pre>rctlblk_t *rcb1, *rcb2, *rcb_tmp;
+    ...
+/* Omit return value checking/error processing to keep code sample short */
+rcb1 = calloc(1, rctlblk_size()); /* rctl blocks are opaque: */
+                               /* "rctlblk_t rcb" does not work */
+rcb2 = calloc(1, rctlblk_size());
+getrctl("task.max-lwps", NULL, rcb1, RCTL_FIRST);
+while (1) {
+     print_rctl(rcb1);
+     rcb_tmp = rcb2;
+     rcb2 = rcb1;
+     rcb1 = rcb_tmp;        /* swap rcb1 with rcb2 */
+     if (getrctl("task.max-lwps", rcb2,  rcb1, RCTL_NEXT) == -1) {
+          if (errno == ENOENT) {
+               break;
+     } else {
+          perror("getrctl");
+          exit (1);
+     }
+     }
+}</pre>
+
+<a name="resource-pools-44"></a><h4>Set <tt>project.cpu-shares</tt> and Add a New Value</h4>
+<p><a name="indexterm-38"></a>The key points of the example include the following:</p>
+<ul><li><p>This example is similar to the example shown in <a href="resource-pools-14.html#resource-pools-33">Set <tt>pool.comment</tt> Property and Add New Property</a>.</p></li>
+<li><p>Use <tt>bcopy()</tt>, rather than buffer swapping as in <a href="#resource-ctrls-21">List all the Value-Action Pairs for a Specific Resource Control</a>.</p></li>
+<li><p>To change the resource control value, call <tt>setrctl()</tt> with the RCTL_REPLACE flag. The new resource control block is identical to the old resource control block except for the new control value.</p><pre>rctlblk_set_value(blk1, nshares);
+if (setrctl("project.cpu-shares", blk2, blk1, RCTL_REPLACE) != 0)</pre></li></ul>
+<p>The example gets the project's CPU share allocation, <tt>project.cpu-shares</tt>,  and changes
+its value to <i>nshares</i>.</p><pre>/* Omit return value checking/error processing to keep code sample short */
+blk1 = malloc(rctlblk_size());
+getrctl("project.cpu-shares", NULL, blk1, RCTL_FIRST);
+my_shares = rctlblk_get_value(blk1);
+printout_my_shares(my_shares);
+/* if privileged, do the following to */
+/* change project.cpu-shares to "nshares" */
+blk1 = malloc(rctlblk_size());
+blk2 = malloc(rctlblk_size());
+if (getrctl("project.cpu-shares", NULL, blk1, RCTL_FIRST) != 0) {
+     perror("getrctl failed");
+     exit(1);
+}
+bcopy(blk1, blk2, rctlblk_size());
+rctlblk_set_value(blk1, nshares);
+if (setrctl("project.cpu-shares", blk2, blk1, RCTL_REPLACE) != 0) {
+     perror("setrctl failed");
+     exit(1);
+}             </pre>
+
+<a name="resource-ctrls-29"></a><h4>Set LWP Limit Using Resource Control Blocks</h4>
+<p>In the following example, an application has set a privileged limit of 3000
+LWPs that may not be exceeded.  In addition, the application has
+set a basic limit of 2000 LWPs.  When this limit is exceeded,
+a SIGXRES is sent to the application. Upon receiving a SIGXRES, the application
+might send notification to its child processes that might in turn reduce the
+number of LWPs the processes use or need. </p><pre>/* Omit return value and error checking */
+
+#include &lt;rctl.h>
+
+rctlblk_t *rcb1, *rcb2;
+
+/*
+         * Resource control blocks are opaque
+         * and must be explicitly allocated.
+         */
+rcb1 = calloc(rctlblk_size());    
+
+rcb2 = calloc(rctlblk_size());    
+
+
+/* Install an RCPRIV_PRIVILEGED, v=3000: do not allow more than 3000 LWPs */
+rctlblk_set_value(rcb1, 3000);
+rctlblk_set_privilege(rcb1, RCPRIV_PRIVILEGED);
+rctlblk_set_local_action(rcb1, RCTL_LOCAL_DENY);
+setrctl("task.max-lwps", NULL, rcb1, RCTL_INSERT);
+
+
+/* Install an RCPRIV_BASIC, v=2000 to send SIGXRES when LWPs exceeds 2000 */
+rctlblk_set_value(rcb2, 2000);
+rctlblk_set_privilege(rcb2, RCPRIV_BASIC);
+rctlblk_set_local_action(rcb2, RCTL_LOCAL_SIGNAL, SIGXRES);
+setrctl("task.max-lwps", NULL, rcb2, RCTL_INSERT);</pre>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="resource-ctrls-13.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="resource-ctrls-19.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

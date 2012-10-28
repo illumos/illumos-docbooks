@@ -1,0 +1,241 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Repairing a Damaged Device - Solaris ZFS Administration Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2008-01-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Solaris ZFS Administration Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbvb.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbwl.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="preface-1.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="zfsover-1.html">1.&nbsp;&nbsp;Solaris ZFS File System (Introduction)</a></p>
+<p class="toc level1 tocsp"><a href="setup-1.html">2.&nbsp;&nbsp;Getting Started With ZFS</a></p>
+<p class="toc level1 tocsp"><a href="gbcik.html">3.&nbsp;&nbsp;ZFS and Traditional File System Differences</a></p>
+<p class="toc level1 tocsp"><a href="gavwn.html">4.&nbsp;&nbsp;Managing ZFS Storage Pools</a></p>
+<p class="toc level1 tocsp"><a href="gavwq.html">5.&nbsp;&nbsp;Managing ZFS File Systems</a></p>
+<p class="toc level1 tocsp"><a href="gavvx.html">6.&nbsp;&nbsp;Working With ZFS Snapshots and Clones</a></p>
+<p class="toc level1 tocsp"><a href="ftyxi.html">7.&nbsp;&nbsp;Using ACLs to Protect ZFS Files</a></p>
+<p class="toc level1 tocsp"><a href="gbchv.html">8.&nbsp;&nbsp;ZFS Delegated Administration</a></p>
+<p class="toc level1 tocsp"><a href="ftyxh.html">9.&nbsp;&nbsp;ZFS Advanced Topics</a></p>
+<p class="toc level1 tocsp"><a href="gavwg.html">10.&nbsp;&nbsp;ZFS Troubleshooting and Data Recovery</a></p>
+<p class="toc level2"><a href="gbbth.html">ZFS Failure Modes</a></p>
+<p class="toc level2"><a href="gbbwa.html">Checking ZFS Data Integrity</a></p>
+<p class="toc level2"><a href="gbbuw.html">Identifying Problems in ZFS</a></p>
+<p class="toc level2"><a href="gbbve.html">Repairing a Damaged ZFS Configuration</a></p>
+<p class="toc level2"><a href="gbbvb.html">Repairing a Missing Device</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Repairing a Damaged Device</a></p>
+</div>
+<p class="toc level2"><a href="gbbwl.html">Repairing Damaged Data</a></p>
+<p class="toc level2"><a href="gbbwc.html">Repairing an Unbootable System</a></p>
+<p class="toc level1 tocsp"><a href="idx-1.html">Index</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="gbbvf"></a><h3>Repairing a Damaged Device</h3>
+<p>This section describes how to determine device failure types, clear transient errors, and
+replace a device.</p>
+
+<a name="gbbzs"></a><h4>Determining the Type of Device Failure</h4>
+<p>The term <b>damaged device</b> is rather vague, and can describe a number of possible
+situations:<a name="indexterm-636"></a><a name="indexterm-637"></a><a name="indexterm-638"></a></p>
+<ul><li><p><b>Bit rot</b> &ndash; Over time, random events, such as magnetic influences and cosmic rays, can cause bits stored on disk to flip in unpredictable events. These events are relatively rare but common enough to cause potential data corruption in large or long-running systems. These errors are typically transient.</p></li>
+<li><p><b>Misdirected reads or writes</b> &ndash; Firmware bugs or hardware faults can cause reads or writes of entire blocks to reference the incorrect location on disk. These errors are typically transient, though a large number might indicate a faulty drive.</p></li>
+<li><p><b>Administrator error</b> &ndash; Administrators can unknowingly overwrite portions of the disk with bad data (such as copying <tt>/dev/zero</tt> over portions of the disk) that cause permanent corruption on disk. These errors are always transient.</p></li>
+<li><p><b>Temporary outage</b>&ndash; A disk might become unavailable for a period time, causing I/Os to fail. This situation is typically associated with network-attached devices, though local disks can experience temporary outages as well. These errors might or might not be transient.</p></li>
+<li><p><b>Bad or flaky hardware</b> &ndash; This situation is a catch-all for the various problems that bad hardware exhibits. This could be consistent I/O errors, faulty transports causing random corruption, or any number of failures. These errors are typically permanent.</p></li>
+<li><p><b>Offlined device</b> &ndash; If a device is offline, it is assumed that the administrator placed the device in this state because it is presumed faulty. The administrator who placed the device in this state can determine is this assumption is accurate.</p></li></ul>
+<p>Determining exactly what is wrong can be a difficult process. The first step
+is to examine the error counts in the <tt>zpool status</tt> output as follows:</p><pre># <tt><b>zpool status -v</b></tt> <i>pool</i></pre><p>The errors are divided into I/O errors and checksum errors, both of which
+might indicate the possible failure type. Typical operation predicts a very small number
+of errors (just a few over long periods of time). If you are
+seeing large numbers of errors, then this situation probably indicates impending or complete
+device failure. However, the pathology for administrator error can result in large error
+counts. The other source of information is the system log. If the log
+shows a large number of SCSI or fibre channel driver messages, then this
+situation probably indicates serious hardware problems. If no syslog messages are generated, then
+the damage is likely transient.</p><p>The goal is to answer the following question:</p><p><b>Is another error likely to occur on this device?</b></p><p>Errors that happen only once are considered <b>transient</b>, and do not indicate potential
+failure. Errors that are persistent or severe enough to indicate potential hardware failure
+are considered &ldquo;fatal.&rdquo; The act of determining the type of error is beyond
+the scope of any automated software currently available with ZFS, and so much
+must be done manually by you, the administrator. Once the determination is made,
+the appropriate action can be taken. Either clear the transient errors or replace
+the device due to fatal errors. These repair procedures are described in the
+next sections.</p><p>Even if the device errors are considered transient, it still may have caused
+uncorrectable data errors within the pool. These errors require special repair procedures, even
+if the underlying device is deemed healthy or otherwise repaired. For more information
+on repairing data errors, see <a href="gbbwl.html">Repairing Damaged Data</a>.</p>
+
+<a name="gbbzv"></a><h4>Clearing Transient Errors</h4>
+<p>If the device errors are deemed transient, in that they are unlikely to
+effect the future health of the device, then the device errors can
+be safely cleared to indicate that no fatal error occurred. To clear error
+counters for RAID-Z or mirrored devices, use the <tt>zpool clear</tt> command. For example:<a name="indexterm-639"></a><a name="indexterm-640"></a><a name="indexterm-641"></a></p><pre># <tt><b>zpool clear tank c1t0d0</b></tt></pre><p>This syntax clears any errors associated with the device and clears any data
+error counts associated with the device.</p><p>To clear all errors associated with the virtual devices in the pool, and
+clear any data error counts associated with the pool, use the following syntax:</p><pre># <tt><b>zpool clear tank</b></tt></pre><p>For more information about clearing pool errors, see <a href="gayrd.html#gazge">Clearing Storage Pool Devices</a>.</p>
+
+<a name="gbbzy"></a><h4>Replacing a Device in a ZFS Storage Pool</h4>
+<p>If device damage is permanent or future permanent damage is likely, the device
+must be replaced. Whether the device can be replaced depends on the configuration.</p>
+<ul><li><p><a href="#gbcfb">Determining if a Device Can Be Replaced</a></p></li>
+<li><p><a href="#gbcdv">Devices That Cannot be Replaced</a></p></li>
+<li><p><a href="#gbcet">Replacing a Device in a ZFS Storage Pool</a></p></li>
+<li><p><a href="#gbcus">Viewing Resilvering Status</a></p></li></ul>
+
+
+<a name="gbcfb"></a><h5>Determining if a Device Can Be Replaced</h5>
+<p>For a device to be replaced, the pool must be in the
+<tt>ONLINE</tt> state. The device must be part of a redundant configuration, or it
+must be healthy (in the <tt>ONLINE</tt> state). If the disk is part of
+a redundant configuration, sufficient replicas from which to retrieve good data must exist. If
+two disks in a four-way mirror are faulted, then either disk can
+be replaced because healthy replicas are available. However, if two disks in a
+four-way RAID-Z device are faulted, then neither disk can be replaced because not
+enough replicas from which to retrieve data exist. If the device is damaged
+but otherwise online, it can be replaced as long as the pool is
+not in the <tt>FAULTED</tt> state. However, any bad data on the device is
+copied to the new device unless there are sufficient replicas with good data.<a name="indexterm-642"></a><a name="indexterm-643"></a><a name="indexterm-644"></a></p><p>In the following configuration, the disk <tt>c1t1d0</tt> can be replaced, and any data
+in the pool is copied from the good replica, <tt>c1t0d0</tt>.</p><pre>mirror            DEGRADED
+    c1t0d0             ONLINE
+    c1t1d0             FAULTED</pre><p>The disk <tt>c1t0d0</tt> can also be replaced, though no self-healing of data can
+take place because no good replica is available.</p><p>In the following configuration, neither of the faulted disks can be replaced. The
+<tt>ONLINE</tt> disks cannot be replaced either, because the pool itself is faulted.</p><pre>raidz             FAULTED
+    c1t0d0             ONLINE
+    c2t0d0             FAULTED
+    c3t0d0             FAULTED
+    c3t0d0             ONLINE</pre><p>In the following configuration, either top-level disk can be replaced, though any bad
+data present on the disk is copied to the new disk.</p><pre>c1t0d0         ONLINE
+c1t1d0         ONLINE</pre><p>If either disk were faulted, then no replacement could be performed because the
+pool itself would be faulted.</p>
+
+<a name="gbcdv"></a><h5>Devices That Cannot be Replaced</h5>
+<p>If the loss of a device causes the pool to become faulted,
+or the device contains too many data errors in an non-redundant configuration, then
+the device cannot safely be replaced. Without sufficient redundancy, no good data with which
+to heal the damaged device exists. In this case, the only option is
+to destroy the pool and re-create the configuration, restoring your data in the
+process.</p><p>For more information about restoring an entire pool, see <a href="gbbwl.html#gbctt">Repairing ZFS Storage Pool-Wide Damage</a>.</p>
+
+<a name="gbcet"></a><h5>Replacing a Device in a ZFS Storage Pool</h5>
+<p>Once you have determined that a device can be replaced, use the
+<tt>zpool replace</tt> command to replace the device. If you are replacing the damaged device
+with another different device, use the following command:<a name="indexterm-645"></a><a name="indexterm-646"></a><a name="indexterm-647"></a></p><pre># <tt><b>zpool replace tank c1t0d0 c2t0d0</b></tt></pre><p>This command begins migrating data to the new device from the damaged device,
+or other devices in the pool if it is in a redundant
+configuration. When the command is finished, it detaches the damaged device from the
+configuration, at which point the device can be removed from the system. If
+you have already removed the device and replaced it with a new device
+in the same location, use the single device form of the command. For
+example:</p><pre># <tt><b>zpool replace tank c1t0d0</b></tt></pre><p>This command takes an unformatted disk, formats it appropriately, and then begins resilvering
+data from the rest of the configuration.</p><p>For more information about the <tt>zpool replace</tt> command, see <a href="gayrd.html#gazgd">Replacing Devices in a Storage Pool</a>.</p>
+
+<a name="gbcus"></a><h5>Viewing Resilvering Status</h5>
+<p>The process of replacing a drive can take an extended period of
+time, depending on the size of the drive and the amount of data
+in the pool. The process of moving data from one device to another
+device is known as <b>resilvering</b>, and can be monitored by using the
+<tt>zpool status</tt> command.</p><p>Traditional file systems resilver data at the block level. Because ZFS eliminates the
+artificial layering of the volume manager, it can perform resilvering in a much
+more powerful and controlled manner. The two main advantages of this feature are
+as follows:</p>
+<ul><li><p>ZFS only resilvers the minimum amount of necessary data. In the case of a short outage (as opposed to a complete device replacement), the entire disk can be resilvered in a matter of minutes or seconds, rather than resilvering the entire disk, or complicating matters with &ldquo;dirty region&rdquo; logging that some volume managers support. When an entire disk is replaced, the resilvering process takes time proportional to the amount of data used on disk. Replacing a 500-Gbyte disk can take seconds if only a few gigabytes of used space is in the pool.<a name="indexterm-648"></a><a name="indexterm-649"></a><a name="indexterm-650"></a></p></li>
+<li><p>Resilvering is interruptible and safe. If the system loses power or is rebooted, the resilvering process resumes exactly where it left off, without any need for manual intervention.</p></li></ul>
+<p>To view the resilvering process, use the <tt>zpool status</tt> command. For example:</p><pre># <tt><b>zpool status tank</b></tt>
+  pool: tank
+ state: DEGRADED
+reason: One or more devices is being resilvered.
+action: Wait for the resilvering process to complete.
+   see: http://www.sun.com/msg/ZFS-XXXX-08
+ scrub: none requested
+config:
+        NAME                  STATE     READ WRITE CKSUM 
+        tank                  DEGRADED     0     0     0
+          mirror              DEGRADED     0     0     0
+            replacing         DEGRADED     0     0     0  52% resilvered
+              c1t0d0          ONLINE       0     0     0
+              c2t0d0          ONLINE       0     0     0  
+            c1t1d0            ONLINE       0     0     0</pre><p>In this example, the disk <tt>c1t0d0</tt> is being replaced by <tt>c2t0d0</tt>. This event
+is observed in the status output by presence of the <b>replacing</b> virtual device
+in the configuration. This device is not real, nor is it possible for
+you to create a pool by using this virtual device type. The purpose
+of this device is solely to display the resilvering process, and to identify
+exactly which device is being replaced. </p><p>Note that any pool currently undergoing resilvering is placed in the <tt>DEGRADED</tt>
+state, because the pool cannot provide the desired level of redundancy until the
+resilvering process is complete. Resilvering proceeds as fast as possible, though the I/O
+is always scheduled with a lower priority than user-requested I/O, to minimize impact
+on the system. Once the resilvering is complete, the configuration reverts to the
+new, complete, configuration. For example:</p><pre># <tt><b>zpool status tank</b></tt>
+  pool: tank
+ state: ONLINE
+ scrub: scrub completed with 0 errors on Thu Aug 31 11:20:18 2006
+config:
+
+        NAME        STATE     READ WRITE CKSUM
+        tank        ONLINE       0     0     0
+          mirror    ONLINE       0     0     0
+            c2t0d0  ONLINE       0     0     0
+            c1t1d0  ONLINE       0     0     0
+
+errors: No known data errors</pre><p>The pool is once again <tt>ONLINE</tt>, and the original bad disk (<tt>c1t0d0</tt>) has
+been removed from the configuration.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="gbbvb.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="gbbwl.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

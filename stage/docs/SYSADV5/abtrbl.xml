@@ -1,0 +1,254 @@
+<?Pub UDT _bookmark _target?><chapter id="abtrbl-18694"><?Pub Tag atict:info tracking="on" ref="0"?><?Pub Tag
+atict:user user="sharonr" fullname="Sharon Veach"?><?Pub Tag atict:user
+user="mseif" fullname=""?><title>NIS Troubleshooting</title><highlights><para>This chapter explains how to resolve problems encountered on networks
+running NIS. It covers problems seen on an NIS client and those seen on an
+NIS server.</para><para>Before trying to debug an NIS server or client, review <olink targetptr="anis1-25461" remap="internal">Chapter&nbsp;4, Network Information Service (NIS)
+(Overview)</olink> which explains the NIS environment. Then look for the subheading
+in this section that best describes your problem.</para><note><para>The NIS service is managed by the Service Management Facility.
+Administrative actions on this service, such as enabling, disabling, or restarting,
+can be performed by using the <command>svcadm</command> command. See <olink targetptr="cnis1-55" remap="internal">NIS and the Service Management Facility</olink> for more
+information about using SMF with NIS. For an overview of SMF, refer to <olink targetdoc="sysadv1" targetptr="hbrunlevels-25516" remap="external">Chapter 16, <citetitle remap="chapter">Managing Services (Overview),</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.
+Also refer to the <olink targetdoc="group-refman" targetptr="svcadm-1m" remap="external"><citerefentry><refentrytitle>svcadm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="svcs-1" remap="external"><citerefentry><refentrytitle>svcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man pages for more details.</para><para>NIS services can also be started and stopped by using the <command>ypstart</command> and <command>ypstop</command> commands. See the <olink targetdoc="group-refman" targetptr="ypstart-1m" remap="external"><citerefentry><refentrytitle>ypstart</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> and <olink targetdoc="group-refman" targetptr="ypstop-1m" remap="external"><citerefentry><refentrytitle>ypstop</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man pages
+for more information.</para>
+</note>
+</highlights><sect1 id="abtrbl-30969"><title>NIS Binding Problems</title><indexterm><primary>NIS</primary><secondary>problems</secondary>
+</indexterm><sect2 id="abtrbl-54"><title>Symptoms</title><para>Common symptoms of NIS binding problems include the following.</para><itemizedlist><listitem><para><indexterm><primary>NIS</primary><secondary><command>ypbind</command> &ldquo;can't&rdquo; messages</secondary></indexterm><indexterm><primary><command>ypbind</command> daemon</primary><secondary> &ldquo;can't&rdquo; messages</secondary></indexterm>Messages
+saying that <command>ypbind</command> can't find or communicate with a server</para>
+</listitem><listitem><para><indexterm><primary>NIS</primary><secondary>&ldquo;not responding&rdquo; messages</secondary></indexterm><indexterm><primary> &ldquo;not responding&rdquo; messages (NIS)</primary></indexterm>Messages saying that server not responding</para>
+</listitem><listitem><para><indexterm><primary>NIS</primary><secondary>&ldquo;unavailable&rdquo; messages</secondary></indexterm><indexterm><primary> &ldquo;unavailable&rdquo; messages (NIS)</primary></indexterm>Messages saying that NIS is unavailable</para>
+</listitem><listitem><para>Commands on a client limp along in background mode or function
+much slower than normal</para>
+</listitem><listitem><para><indexterm><primary>NIS</primary><secondary>commands hang</secondary></indexterm>Commands on a client hang. Sometimes commands hang even though
+the system as a whole seems fine and you can run new commands</para>
+</listitem><listitem><para>Commands on a client crash with obscure messages, or no message
+at all</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="abtrbl-28251"><title>NIS Problems Affecting One Client</title><indexterm><primary>NIS</primary><secondary>client problems</secondary>
+</indexterm><para>If only one or two clients are experiencing symptoms that indicate NIS
+binding difficulty, the problems probably are on those clients. If many NIS
+clients are failing to bind properly, the problem probably exists on one or
+more of the NIS servers. See <olink targetptr="abtrbl-22854" remap="internal">NIS Problems
+Affecting Many Clients</olink>.</para><sect3 id="abtrbl-42724"><title><command>ypbind</command> Not Running on Client</title><para><indexterm><primary><command>ls</command></primary></indexterm>One client
+has problems, but other clients on the same subnet are operating normally.
+On the problem client, run <command>ls</command> <option>l</option> on a directory,
+such as <filename>/usr</filename>, that contains files owned by many users,
+including some not in the client <filename>/etc/passwd</filename> file. If
+the resulting display lists file owners who are not in the local <filename>/etc/passwd</filename> as numbers, rather than names, this indicates that NIS service
+is not working on the client.</para><para>These symptoms usually mean that the client <command>ypbind</command> process
+is not running. Verify whether the NIS client service is running.</para><screen>client# <userinput>svcs network/nis/client</userinput>
+STATE          STIME    FMRI
+disabled       Sep_01   svc:/network/nis/client:default</screen><para>If the client is disabled, log in as superuser, or assume an equivalent
+role, and start the NIS client service.</para><screen>client# <userinput>svcadm enable network/nis/client</userinput></screen>
+</sect3><sect3 id="abtrbl-28007"><title>Missing or Incorrect Domain Name</title><indexterm><primary>NIS domain names</primary><secondary>missing</secondary>
+</indexterm><indexterm><primary>NIS domain names</primary><secondary>incorrect</secondary>
+</indexterm><para>One client has problems, the other clients are operating normally, but <literal>ypbind</literal> is running on the problem client. The client might have an
+incorrectly set domain.</para><para>On the client, run the <command>domainname</command> command to see
+which domain name is set.</para><screen>client7# <userinput>domainname neverland.com</userinput></screen><para><indexterm><primary><filename>/var/yp</filename></primary></indexterm>Compare
+the output with the actual domain name in <filename>/var/yp</filename> on
+the NIS master server. The actual NIS domain is shown as a subdirectory in
+the <filename>/var/yp</filename> directory.</para><screen>Client7# <userinput>ls /var/yp...</userinput>
+-rwxr-xr-x 1 root Makefile
+drwxr-xr-x 2 root binding
+drwx------ 2 root doc.com ...</screen><para><indexterm><primary><filename>/etc/defaultdomain</filename> files</primary></indexterm>If the domain name returned by running <command>domainname</command> on
+a machine is not the same as the server domain name listed as a directory
+in <filename>/var/yp</filename>, the domain name specified in the machine's <filename>/etc/defaultdomain</filename> file is incorrect. Log in as superuser or assume
+an equivalent role, and correct the client's domain name in the machine's <filename>/etc/defaultdomain</filename>  file. This assures that the domain name is
+correct every time the machine boots. Now reboot the machine.</para><note><para>The domain name is case-sensitive.</para>
+</note>
+</sect3><sect3 id="abtrbl-55"><title>Client Not Bound to Server</title><indexterm><primary>NIS clients</primary><secondary> not bound to server</secondary>
+</indexterm><para><indexterm><primary><command>ypbind</command> daemon</primary><secondary>client not bound</secondary></indexterm>If your domain name is set correctly, <command>ypbind</command> is running, and commands still hang, then make sure that the client
+is bound to a server by running the <command>ypwhich</command> command. If
+you have just started <command>ypbind</command>, then run <command>ypwhich</command> several
+times (typically, the first one reports that the domain is not bound and the
+second succeeds normally).</para>
+</sect3><sect3 id="abtrbl-56"><title>No Server Available</title><indexterm><primary>NIS</primary><secondary>servers not available</secondary>
+</indexterm><indexterm><primary>servers</primary><secondary>not available (NIS)</secondary>
+</indexterm><para>If your domain name is set correctly, <command>ypbind</command> is running,
+and you get messages indicating that the client cannot communicate with a
+server, this might indicate a number of different problems:</para><itemizedlist><listitem><para><indexterm><primary><filename>/var/yp/binding/</filename> files</primary></indexterm>Does the client have a <filename>/var/yp/binding/</filename><replaceable>domainname</replaceable><filename>/ypservers</filename> file containing a
+list of servers to bind to? If not, run <command>ypinit</command> <option>c</option> and
+specify in order of preference the servers that this client should bind to.</para>
+</listitem><listitem><para>If the client does have a <filename>/var/yp/binding/</filename><replaceable>domainname</replaceable><filename>/ypservers</filename> file, are there enough
+servers listed in it if one or two become unavailable? If not, add additional
+servers to the list by running <command>ypinit</command> <option>c</option>.</para>
+</listitem>
+</itemizedlist><itemizedlist><listitem><para>Do the servers listed in a clients <filename>ypservers</filename> file
+have entries in the <filename>/etc/hosts</filename> file? If not, add the
+servers to the NIS maps hosts input file and rebuild your maps by running <command>yppinit</command> <option>c</option> or <command>ypinit</command> <option>s</option> as
+described <olink targetptr="anis2-11278" remap="internal">Working With NIS Maps</olink>.</para>
+</listitem><listitem><para>Is the <filename>/etc/nsswitch.conf</filename> file set up
+to consult the machine's local <filename>hosts</filename> file in addition
+to NIS? See <olink targetptr="a12swit-86415" remap="internal">Chapter&nbsp;2, The Name Service
+Switch (Overview)</olink> for more information on the switch.</para>
+</listitem><listitem><para>Is the <filename>/etc/nsswitch.conf</filename> file set up
+to consult <literal>files</literal> first for <literal>services</literal> and <command>rpc</command>? See <olink targetptr="a12swit-86415" remap="internal">Chapter&nbsp;2, The Name
+Service Switch (Overview)</olink> for more information on the switch.</para>
+</listitem>
+</itemizedlist>
+</sect3><sect3 id="abtrbl-57"><title><command>ypwhich</command> Displays
+Are Inconsistent</title><indexterm><primary><command>ypwhich</command></primary><secondary>display inconsistent</secondary>
+</indexterm><indexterm><primary>NIS</primary><secondary><command>ypwhich</command> inconsistent displays</secondary>
+</indexterm><para>When you use <command>ypwhich</command> several times on the same client,
+the resulting display varies because the NIS server changes. This is normal.
+The binding of the NIS client to the NIS server changes over time when the
+network or the NIS servers are busy. Whenever possible, the network becomes
+stable at a point where all clients get acceptable response time from the
+NIS servers. As long as your client machine gets NIS service, it does not
+matter where the service comes from. For example, an NIS server machine can
+get its own NIS services from another NIS server on the network.</para>
+</sect3><sect3 id="abtrbl-58"><title>When Server Binding is Not Possible</title><indexterm><primary>NIS</primary><secondary>server binding not possible</secondary>
+</indexterm><para>In extreme cases where local server binding is not possible, use of
+the <command>ypset</command> command can temporarily allow binding to another
+server, if available, on another network or subnet. However, in order to use
+the <option>ypset</option> option, <command>ypbind</command> must be started
+with either the <option>ypset</option> or <option>ypsetme</option> options.
+For more information, see the <olink targetdoc="refman" targetptr="ypbind-1m" remap="external"><citerefentry><refentrytitle>ypbind</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man
+page.</para><screen># /usr/lib/netsvc/yp/ypbind -ypset</screen><para>For another method, see <olink targetptr="anis2-manualbind-1" remap="internal">Binding
+to a Specific NIS Server</olink>.</para><note><para>For security reasons, the use of the <option>ypset</option> and <option>ypsetme</option> options should be limited to debugging purposes under controlled
+circumstances. Use of the <option>ypset</option> and <option>ypsetme</option> options
+can result in serious security breaches because while the daemons are running,
+anyone can alter server bindings causing trouble for others and permitting
+unauthorized access to sensitive data. If you must start <command>ypbind</command> with
+these options, once you have fixed the problem you should kill <command>ypbind</command> and
+restart it again without those options.</para><para>To restart <command>ypbind</command>,
+use the service management facility (SMF):</para><screen># svcadm enable -r svc:/network/nis/client:default</screen>
+</note>
+</sect3><sect3 id="abtrbl-10745"><title><command>ypbind</command> Crashes</title><indexterm><primary><command>ypbind</command> daemon</primary><secondary>fails</secondary>
+</indexterm><indexterm><primary>NIS</primary><secondary><command>ypbind</command> fails</secondary>
+</indexterm><para>If <command>ypbind</command> crashes almost immediately each time it
+is started, look for a problem in some other part of the system. Check for
+the presence of the <command>rpcbind</command> daemon by typing the following.</para><screen>% <userinput>ps</userinput> <option>e</option> <userinput>| grep rpcbind</userinput></screen><para>If <command>rpcbind</command> is not present or does not stay up or
+behaves strangely, consult your RPC documentation.</para><para>You might be able to communicate with <command>rpcbind</command> on
+the problematic client from a machine operating normally. From the functioning
+machine, type the following.</para><screen>% <userinput>rpcinfo <replaceable>client</replaceable></userinput></screen><para>If <command>rpcbind</command> on the problematic machine is fine, <command>rpcinfo</command> produces the following output.</para><screen>program	version	netid	address	service	owner
+...
+100007	2	udp	0.0.0.0.2.219	ypbind	superuser
+100007	1	udp	0.0.0.0.2.219	ypbind	superuser
+100007	1	tcp	0.0.0.0.2.220	ypbind	superuser
+100007	2	tcp	0.0.0.0.128.4	ypbind	superuser
+100007	2	ticotsord	\000\000\020H	ypbind	superuser
+100007	2	ticots	\000\000\020K	ypbind	superuser
+...</screen><para>Your machine will have different addresses. If the addresses are not
+displayed, <command>ypbind</command> has been unable to register its services.
+Reboot the machine and run <command>rpcinfo</command> again. If the <command>ypbind</command> processes are there and they change each time you try to restart
+the NIS service, reboot the system, even if the <command>rpcbind</command> daemon
+is running.</para>
+</sect3>
+</sect2><sect2 id="abtrbl-22854"><title>NIS Problems Affecting Many Clients</title><para>If only one or two clients are experiencing symptoms that indicate NIS
+binding difficulty, the problems probably are on those clients. See <olink targetptr="abtrbl-28251" remap="internal">NIS Problems Affecting One Client</olink>. If many
+NIS clients are failing to bind properly, the problem probably exists on one
+or more of the NIS servers.</para><sect3 id="abtrbl-6555"><title><literal>rpc.yppasswdd</literal> Considers
+a Non-Restricted Shell That Begins With <literal>r</literal> to be Restricted</title><orderedlist><listitem><para>Create <filename>/etc/default/yppasswdd</filename> that contains
+a special string:  <literal>"check_restricted_shell_name=1"</literal>.</para>
+</listitem><listitem><para>If the <literal>"check_restricted_shell_name=1"</literal> string
+is commented out, the 'r' check will no occur.</para>
+</listitem>
+</orderedlist>
+</sect3><sect3 id="abtrbl-59"><title>Network or Servers Are Overloaded</title><indexterm><primary>NIS</primary><secondary>overloaded servers and</secondary>
+</indexterm><para><indexterm><primary><command>ypserv</command> daemon</primary><secondary>overloaded servers and</secondary></indexterm><indexterm><primary><command>ypbind</command> daemon</primary><secondary>overloaded servers and</secondary></indexterm>NIS can
+hang if the network or NIS servers are so overloaded that <command>ypserv</command> cannot
+get a response back to the client <command>ypbind</command> process within
+the time-out period.</para><para>Under these circumstances, every client on the network experiences the
+same or similar problems. In most cases, the condition is temporary. The messages
+usually go away when the NIS server reboots and restarts <command>ypserv</command>,
+or when the load on the NIS servers or network itself decreases.</para>
+</sect3><sect3 id="abtrbl-60"><title>Server Malfunction</title><indexterm><primary>NIS</primary><secondary>servers, malfunction</secondary>
+</indexterm><para><indexterm><primary><command>ping</command></primary></indexterm>Make
+sure the servers are up and running. If you are not physically near the servers,
+use the <command>ping</command> command. </para>
+</sect3><sect3 id="abtrbl-61"><title>NIS Daemons Not Running</title><indexterm><primary>NIS</primary><secondary>daemons, not running</secondary>
+</indexterm><indexterm><primary>daemons</primary><secondary>NIS, not running</secondary>
+</indexterm><para>If the servers are up and running, try to find a client machine behaving
+normally, and run the <command>ypwhich</command> command. If <command>ypwhich</command> does
+not respond, kill it. Then log in as <literal>root</literal> on the NIS server
+and check if the NIS process is running by entering the following.</para><screen># <userinput>ps</userinput> <option>e</option> <userinput>| grep yp</userinput></screen><note><para>Do not use the <option>f</option> option with <command>ps</command> because
+this option attempts to translate user IDs to names, which causes more naming
+service lookups that might not succeed.</para>
+</note><para>If neither the NIS server (ypserv) nor the NIS client (ypbind) daemons
+are running, restart them by typing one of the following.</para><screen># <userinput>svcadm restart network/nis/server</userinput>
+or
+# <userinput>/usr/lib/netsvc/yp/ypstop</userinput>
+# <userinput>/usr/lib/netsvc/yp/ypstart</userinput></screen><para>If both the <command>ypserv</command> and <command>ypbind</command> processes
+are running on the NIS server, then run <command>ypwhich</command>. If <command>ypwhich</command> does not respond, <command>ypserv</command> has probably hung and
+should be restarted. While logged in as <literal>root</literal> on the server,
+restart the NIS service by typing one of the following.</para><screen># <userinput>svcadm restart network/nis/server</userinput>
+or
+# <userinput>/usr/lib/netsvc/yp/ypstop</userinput>
+# <userinput>/usr/lib/netsvc/yp/ypstart</userinput></screen>
+</sect3><sect3 id="abtrbl-62"><title>Servers Have Different Versions of
+an NIS Map</title><indexterm><primary>NIS</primary><secondary>servers, maps different versions</secondary>
+</indexterm><para>Because NIS propagates maps among servers, occasionally you might find
+different versions of the same map on various NIS servers on the network.
+This version discrepancy is normal add acceptable if the differences do not
+last for more than a short time.</para><para>The most common cause of map discrepancy is that something is preventing
+normal map propagation. For example, an NIS server or router between NIS servers
+is down. When all NIS servers and the routers between them are running, <command>ypxfr</command> should succeed.</para><para>If the servers and routers are functioning properly, check the following:</para><itemizedlist><listitem><para>Log <command>ypxfr</command> output (see <olink targetptr="abtrbl-10102" remap="internal">Logging ypxfr Output</olink>).</para>
+</listitem><listitem><para>Check the control files (see <olink targetptr="abtrbl-22313" remap="internal">Check
+the crontab File and ypxfr Shell Script</olink>).</para>
+</listitem><listitem><para>Check the <filename>ypservers</filename> map on the master.
+See <olink targetptr="abtrbl-15678" remap="internal">Check the ypservers Map</olink>.</para>
+</listitem>
+</itemizedlist><sect4 id="abtrbl-10102"><title>Logging <command>ypxfr</command> Output</title><indexterm><primary><command>ypxfr</command> command</primary><secondary>logging output</secondary>
+</indexterm><para>If a particular slave server has problems updating maps, log in to that
+server and run <command>ypxfr</command> interactively. If <command>ypxfr</command> fails,
+it tells you why it failed, and you can fix the problem. If <command>ypxfr</command> succeeds,
+but you suspect it has occasionally failed, create a log file to enable logging
+of messages. To create a log file, enter the following on the slave.</para><screen>ypslave# <userinput>cd /var/yp</userinput>
+ypslave# <userinput>touch ypxfr.log</userinput></screen><para>This creates a <filename>ypxfr.log</filename> file that saves all output
+from <command>ypxfr</command>.</para><para>The output resembles the output <command>ypxfr</command> displays when
+run interactively, but each line in the log file is time stamped. (You might
+see unusual ordering in the time-stamps. That is okay &ndash; the time-stamp
+tells you when <command>ypxfr</command> started to run. If copies of <command>ypxfr</command> ran simultaneously but their work took differing amounts of time,
+they might actually write their summary status line to the log files in an
+order different from that which they were invoked.) Any pattern of intermittent
+failure shows up in the log.</para><note><para>When you have fixed the problem, turn off logging by removing
+the log file. If you forget to remove it, it continues to grow without limit.</para>
+</note>
+</sect4><sect4 id="abtrbl-22313"><title>Check the <filename>crontab</filename> File
+and <command>ypxfr</command> Shell Script</title><indexterm><primary><command>ypxfr</command> command</primary><secondary>shell script</secondary>
+</indexterm><indexterm><primary><filename>crontab</filename></primary><secondary>NIS, problems</secondary>
+</indexterm><para><indexterm><primary><filename>crontab</filename> files</primary><secondary>NIS, problems</secondary></indexterm><indexterm><primary><filename>/var/spool/cron/crontabs/root</filename> files</primary><secondary>NIS, problems</secondary></indexterm>Inspect
+the root <filename>crontab</filename>  file, and check the <command>ypxfr</command> shell
+script it invokes. Typographical errors in these files can cause propagation
+problems. Failures to refer to a shell script within the <filename>/var/spool/cron/crontabs/root</filename> file, or failures to refer to a map within any shell script can
+also cause errors.</para>
+</sect4><sect4 id="abtrbl-15678"><title>Check the <filename>ypservers</filename> Map</title><para><indexterm><primary><filename>ypservers</filename> maps</primary><secondary>NIS problems</secondary></indexterm><indexterm><primary><filename>yppush</filename> command</primary><secondary>NIS problems</secondary></indexterm>Also,
+make sure that the NIS slave server is listed in the <filename>ypservers</filename> map
+on the master server for the domain. If it is not, the slave server still
+operates perfectly as a server, but <filename>yppush</filename> does not propagate
+map changes to the slave server.</para>
+</sect4><sect4 id="abtrbl-63"><title>Work Around</title><para><indexterm><primary><command>rcp</command></primary></indexterm><indexterm><primary><command>ftp</command></primary></indexterm>If the NIS slave server
+problem is not obvious, you can work around it while you debug using <command>rcp</command> or <command>ftp</command> to copy a recent version of the inconsistent
+map from any healthy NIS server. The following shows how to transfer the problem
+map.</para><screen>ypslave# <userinput>rcp ypmaster:/var/yp/<replaceable>mydomain</replaceable>/<replaceable>map</replaceable>.\* /var/yp/<replaceable>mydomain</replaceable></userinput></screen><para>The * character has been escaped in the command line, so that it will
+be expanded on ypmaster, instead of locally on ypslave.</para>
+</sect4>
+</sect3><sect3 id="abtrbl-64"><title><command>ypserv</command> Crashes</title><indexterm><primary><command>ypserv</command></primary><secondary>failure of</secondary>
+</indexterm><para>When the <command>ypserv</command> process crashes almost immediately,
+and does not stay up even with repeated activations, the debug process is
+virtually identical to that described in <olink targetptr="abtrbl-10745" remap="internal">ypbind
+Crashes</olink>. Check for the existence of the <command>rpcbind</command> daemon
+as follows.</para><screen>ypserver% <userinput>ps</userinput> <option>e</option> <userinput>| grep rpcbind</userinput></screen><para>Reboot the server if you do not find the daemon. Otherwise, if the daemon
+is running, type the following and look for similar output.</para><screen>% <userinput>rpcinfo</userinput> <option>p</option> <userinput>ypserver</userinput></screen><screen>% program 	vers 	proto 	port 	service
+100000	4	tcp	111	portmapper
+100000	3	tcp	111	portmapper
+100068	2	udp	32813	cmsd
+...
+100007	1	tcp	34900	ypbind
+100004	2	udp	731	ypserv
+100004	1	udp	731	ypserv
+100004	1	tcp	732	ypserv
+100004	2	tcp	32772	ypserv</screen><para>Your machine might have different port numbers. The four entries representing
+the <command>ypserv</command> process are the following.</para><screen>100004 	2 	udp 	731 	ypserv
+100004 	1 	udp 	731 	ypserv
+100004 	1 	tcp 	732 	ypserv
+100004 	2 	tcp 	32772 	ypserv</screen><para>If there are no entries, and <command>ypserv</command> is unable to
+register its services with <command>rpcbind</command>, reboot the machine.
+If there are entries, de-register the service from <command>rpcbind</command> before
+restarting <command>ypserv</command>. To de-register the service from <command>rpcbind</command>, on the server type the following.</para><screen># <userinput>rpcinfo</userinput> <option>d</option> <userinput><replaceable>number</replaceable> 1</userinput>
+# <userinput>rpcinfo</userinput> <option>d</option> <userinput><replaceable>number</replaceable> 2</userinput></screen><para>where <replaceable>number</replaceable> is the ID number reported by <literal>rpcinfo</literal> (<literal>100004</literal>, in the example above).</para>
+</sect3>
+</sect2>
+</sect1>
+</chapter><?Pub *0000026836 0?>

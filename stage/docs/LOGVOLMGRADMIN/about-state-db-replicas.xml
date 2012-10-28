@@ -1,0 +1,187 @@
+<chapter id="about-state-db-replicas-1"><title>State Database (Overview)</title><highlights><para>This chapter provides conceptual information about state database replicas.
+For information about performing related tasks, see <olink targetptr="tasks-state-db-replicas-1" remap="internal">Chapter&nbsp;7, State Database (Tasks)</olink>.</para><para>This chapter contains the following information:</para><itemizedlist><listitem><para><olink targetptr="about-state-db-replicas-8" remap="internal">About the Solaris
+Volume Manager State Database and Replicas</olink></para>
+</listitem><listitem><para><olink targetptr="config-guide-29115" remap="internal">Understanding the Majority
+Consensus Algorithm</olink></para>
+</listitem><listitem><para><olink targetptr="about-state-db-replicas-8a" remap="internal">Handling State
+Database Replica Errors</olink></para>
+</listitem><listitem><para><olink targetptr="about-state-db-replicas-11" remap="internal">Scenario&mdash;State
+Database Replicas</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="about-state-db-replicas-8"><title>About the Solaris Volume Manager State
+Database and Replicas</title><para>The Solaris Volume Manager state database contains
+configuration and status information for all volumes, hot spares, and disk
+sets. Solaris Volume Manager maintains multiple copies (replicas) of the state database
+to provide redundancy and to prevent the database from being corrupted during
+a system crash (at most, only one database copy will be corrupted).</para><para>The state database replicas ensure that the data in the state database
+is always valid. When the state database is updated, each state database replica
+is also updated. The updates occur one at a time (to protect against corrupting
+all updates if the system crashes).</para><para>If your system loses a state
+database replica, Solaris Volume Manager must figure out which state database replicas
+still contain valid data. Solaris Volume Manager determines this information by using
+a <emphasis>majority consensus algorithm</emphasis>. This algorithm requires
+that a majority (half + 1) of the state database replicas be available and
+in agreement before any of them are considered valid. Because of the requirements
+of the majority consensus algorithm, you must create at least three state
+database replicas when you set up your disk configuration. A consensus can
+be reached as long as at least two of the three state database replicas are
+available.  </para><para>During booting, Solaris Volume Manager ignores corrupted
+state database replicas. In some cases, Solaris Volume Manager tries to rewrite state
+database replicas that are corrupted. Otherwise, they are ignored until you
+repair them. If a state database replica becomes corrupted because its underlying
+slice encountered an error, you need to repair or replace the slice and then
+enable the replica. </para><caution><para>Do not place state database replicas on fabric-attached storage,
+SANs, or other storage that is not directly attached to the system. You might
+not be able to boot Solaris Volume Manager. Replicas must be on storage devices that
+are available at the same point in the boot process as traditional SCSI or
+IDE drives.</para>
+</caution><para>If all state database replicas are lost, you could, in theory, lose
+all data that is stored on your Solaris Volume Manager volumes. For this reason,
+it is good practice to create enough state database replicas on separate drives
+and across controllers to prevent catastrophic failure. It is also wise to
+save your initial Solaris Volume Manager configuration information, as well as your
+disk partition information.</para><para>See <olink targetptr="tasks-state-db-replicas-1" remap="internal">Chapter&nbsp;7, State Database (Tasks)</olink> for information on adding additional
+state database replicas to the system. See <olink targetptr="tasks-state-db-replicas-11" remap="internal">Recovering From State Database Replica Failures</olink> for information on
+recovering when state database replicas are lost. </para><para>State database replicas are also used for RAID-1 volume resynchronization
+regions. Too few state database replicas relative to the number of mirrors
+might cause replica I/O to impact RAID-1 volume performance. That is, if you
+have a large number of mirrors, make sure that you have at least two state
+database replicas per RAID-1 volume, up to the maximum of 50 replicas per
+disk set.</para><para>By default each state database replica for volumes, the local set and
+for disk sets occupies 4 Mbytes (8192 disk sectors) of disk storage. The default
+size of a state database replica for a multi-owner disk set is 16 Mbytes.</para><para>Replicas can be stored on the following devices:</para><itemizedlist><listitem><para>A dedicated local disk partition </para>
+</listitem><listitem><para>A local partition that will be part of a volume</para>
+</listitem><listitem><para>A local partition that will be part of a UFS logging device</para>
+</listitem>
+</itemizedlist><para>Replicas cannot be stored on the root (<filename>/</filename>), <filename>swap</filename>, or <filename>/usr</filename> slices. Nor can replicas be
+stored on slices that contain existing file systems or data. After the replicas
+have been stored, volumes or file systems can be placed on the same slice.</para>
+</sect1><sect1 id="config-guide-29115"><title>Understanding the Majority Consensus
+Algorithm</title><para>An inherent problem with replicated databases is that it can be difficult
+to determine which database has valid and correct data. To solve this problem, Solaris Volume Manager uses
+a majority consensus algorithm. This algorithm requires that a majority of
+the database replicas agree with each other before any of them are declared
+valid. This algorithm requires the presence of at least three initial replicas,
+which you create. A consensus can then be reached as long as at least two
+of the three replicas are available. If only one replica exists and the system
+crashes, it is possible that all volume configuration data will be lost.</para><para>To protect data, Solaris Volume Manager does not function unless half of all
+state database replicas are available. The algorithm, therefore, ensures against
+corrupt data.</para><para>The majority consensus algorithm provides the following:</para><itemizedlist><listitem><para>The system continues to run if at least half of the state
+database replicas are available.</para>
+</listitem><listitem><para>The system panics if fewer than half of the state database
+replicas are available.</para>
+</listitem><listitem><para>The system cannot reboot into multiuser mode unless a majority
+(half + 1) of the total number of state database replicas is available.</para>
+</listitem>
+</itemizedlist><para>If insufficient state database replicas are available, you must boot
+into single-user mode and delete enough of the corrupted or missing replicas
+to achieve a quorum. See <olink targetptr="troubleshoottasks-31036" remap="internal">How to
+Recover From Insufficient State Database Replicas</olink>.</para><note><para>When the total number of state database replicas is an odd number, Solaris Volume Manager computes
+the majority by dividing the number in half, rounding down to the nearest
+integer, then adding 1 (one). For example, on a system with seven replicas,
+the majority would be four (seven divided by two is three and one-half, rounded
+down is three, plus one is four).</para>
+</note>
+</sect1><sect1 id="extcz"><title>Administering State Database Replicas</title><itemizedlist><listitem><para>By default, the size of a state database replica is 4 Mbytes
+or 8192 blocks. You should create state database replicas on a dedicated slice
+with at least 4 Mbytes per replica. Because your disk slices might not be
+that small, you might want to resize a slice to hold the state database replica.
+For information about resizing a slice, see <olink targetdoc="sagdfs" targetptr="disksprep-31030" remap="external">Chapter 12, <citetitle remap="chapter">Administering Disks (Tasks),</citetitle> in <citetitle remap="book">System Administration Guide: Devices and File Systems</citetitle></olink>.</para>
+</listitem><listitem><para>To avoid single points-of-failure, distribute state database
+replicas across slices, drives, and controllers. You want a majority of replicas
+to survive a single component failure. If you lose a replica (for example,
+due to a device failure), problems might occur with running Solaris Volume Manager or
+when rebooting the system. Solaris Volume Manager requires at least half of the replicas
+to be available to run, but a majority (half + 1) to reboot into multiuser
+mode.</para><para>A minimum of 3 state database replicas are recommended,
+up to a maximum of 50 replicas per Solaris Volume Manager disk set. The following
+guidelines are recommended:</para><itemizedlist><listitem><para>For a system with only a single drive: put all three replicas
+on one slice.</para>
+</listitem><listitem><para>For a system with two to four drives: put two replicas on
+each drive.</para>
+</listitem><listitem><para>For a system with five or more drives: put one replica on
+each drive.</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>If multiple controllers exist, replicas should be distributed
+as evenly as possible across all controllers. This strategy provides redundancy
+in case a controller fails and also helps balance the load. If multiple disks
+exist on a controller, at least two of the disks on each controller should
+store a replica.</para>
+</listitem><listitem><para>If necessary, you could create state database replicas on
+a slice that will be used as part of a RAID-0, RAID-1, or RAID-5 volume, .
+You must create the replicas before you add the slice to the volume.  Solaris Volume Manager reserves
+the beginning of the slice for the state database replica.</para><para>When
+a state database replica is placed on a slice that becomes part of a volume,
+the capacity of the volume is reduced by the space that is occupied by the
+replica. The space used by a replica is rounded up to the next cylinder boundary.
+This space is skipped by the volume.</para>
+</listitem><listitem><para>RAID-1 volumes are used for small-sized random I/O (as in
+for a database). For best performance, have at least two extra replicas per
+RAID-1 volume on slices (and preferably on separate disks and controllers)
+that are unconnected to the RAID-1 volume. </para>
+</listitem><listitem><para>You cannot create state database replicas on existing file
+systems, or the root (<filename>/</filename>), <filename>/usr</filename>,
+and <filename>swap</filename> file systems. If necessary, you can create a
+new slice (provided a slice name is available) by allocating space from <filename>swap</filename>. Then, put the state database replicas on that new slice. </para>
+</listitem><listitem><para>You can create state database replicas on slices that are
+not in use.</para>
+</listitem><listitem><para>You can add additional state database replicas to the system
+at any time. The additional state database replicas help ensure Solaris Volume Manager availability. </para><caution><para>If you upgraded from the Solstice DiskSuite product to Solaris Volume Manager and
+you have state database replicas sharing slices with file systems or logical
+volumes (as opposed to on separate slices), do not delete the existing replicas
+and replace them with new replicas in the same location.</para><para>The default
+state database replica size in Solaris Volume Manager is 8192 blocks, while the default
+size in the Solstice DiskSuite product is 1034 blocks. Use caution if you
+delete a default-sized state database replica created in the Solstice DiskSuite
+product, and then add a new default-sized replica with Solaris Volume Manager. You
+will overwrite the first 7158 blocks of any file system that occupies the
+rest of the shared slice, thus destroying the data. </para>
+</caution>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="about-state-db-replicas-8a"><title>Handling State Database Replica
+Errors</title><para>If a state database replica fails, the system continues to run if at
+least half of the remaining replicas are available. The system panics when
+fewer than half of the replicas are available.</para><para>The system can into reboot multiuser mode when at least one more than
+half of the replicas are available. If fewer than a majority of replicas are
+available, you must reboot into single-user mode and delete the unavailable
+replicas (by using the <command>metadb</command> command).</para><para>For example, assume you have four replicas. The system continues to
+run as long as two replicas (half the total number) are available. However,
+to reboot the system, three replicas (half the total + 1) must be available.</para><para>In a two-disk configuration, you should always create at least two replicas
+on each disk. For example, assume you have a configuration with two disks,
+and you only create three replicas (two replicas on the first disk and one
+replica on the second disk). If the disk with two replicas fails, the system
+panics because the remaining disk only has one replica. This is less than
+half the total number of replicas.</para><note><para>If you create two replicas on each
+disk in a two-disk configuration, Solaris Volume Manager still functions if one disk
+fails. But because you must have one more than half of the total replicas
+available for the system to reboot, you cannot reboot.</para>
+</note><para>If a slice that contains a state database replica fails, the rest of
+your configuration should remain in operation. Solaris Volume Manager finds a valid
+state database during boot (as long as at least half +1 valid state database
+replicas are available).</para><para>When you manually repair or enable state database replicas, Solaris Volume Manager updates
+them with valid data.</para>
+</sect1><sect1 id="about-state-db-replicas-11"><title>Scenario&mdash;State Database
+Replicas</title><para>State database replicas provide redundant data about the overall Solaris Volume Manager configuration.
+The following example, is based on the sample system in the scenario provided
+in <olink targetptr="svm-scenario-1" remap="internal">Chapter&nbsp;5, Configuring and Using
+Solaris Volume Manager (Scenario)</olink>. This example describes how state
+database replicas can be distributed to provide adequate redundancy.</para><para>The sample system has one internal IDE controller and drive, plus two
+SCSI controllers. Each SCSI controller has six disks attached. With three
+controllers, the system can be configured to avoid any single point-of-failure.
+Any system with only two controllers cannot avoid a single point-of-failure
+relative to Solaris Volume Manager. By distributing replicas evenly across all three
+controllers and across at least one disk on each controller (across two disks,
+if possible), the system can withstand any single hardware failure. </para><para>In a minimal configuration, you could put a single state database replica
+on slice 7 of the root disk, then an additional replica on slice 7 of one
+disk on each of the other two controllers. To help protect against the admittedly
+remote possibility of media failure, add another replica to the root disk
+and then two replicas on two different disks on each controller, for a total
+of six replicas, provides more than adequate security.</para><para>To provide even more security, add 12 additional replicas spread evenly
+across the 6 disks on each side of the two mirrors. This configuration results
+in a total of 18 replicas with 2 on the root disk and 8 on each of the SCSI
+controllers, distributed across the disks on each controller.</para>
+</sect1>
+</chapter>

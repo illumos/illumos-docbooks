@@ -1,0 +1,426 @@
+<chapter id="gbchv"><title>ZFS
+Delegated Administration</title><highlights><para>This chapter describes how to use delegated administration to allow
+non-privileged users to perform ZFS administration tasks.</para><itemizedlist><listitem><para><olink targetptr="gdtfl" remap="internal">Overview of ZFS Delegated Administration</olink></para>
+</listitem><listitem><para><olink targetptr="gfkco" remap="internal">Delegating ZFS Permissions</olink></para>
+</listitem><listitem><para><olink targetptr="gebww" remap="internal">Displaying ZFS Delegated Permissions
+(Examples)</olink></para>
+</listitem><listitem><para><olink targetptr="gebxb" remap="internal">Delegating ZFS Permissions (Examples)</olink></para>
+</listitem><listitem><para><olink targetptr="gebxt" remap="internal">Removing ZFS Permission (Examples)</olink></para>
+</listitem>
+</itemizedlist>
+</highlights><sect1 id="gdtfl"><title>Overview of ZFS Delegated Administration</title><para>This feature enables you to distribute fine-grained permissions to specific
+users, groups, or everyone.  Two styles of delegated permissions are supported:</para><itemizedlist><listitem><para>Individual permissions can be explicitly specified such a
+create, destroy, mount and snapshot, and so on.</para>
+</listitem><listitem><para>Groups of permissions called <emphasis>permission sets</emphasis> can
+be defined. A permission set can later be updated and all of the consumers
+of the set automatically pick up the change. Permission sets begin with the <literal>@</literal> letter and are limited to 64 characters in length. After the <literal>@</literal> character, the remaining characters in the set name have the same
+restrictions as normal ZFS file system names.</para>
+</listitem>
+</itemizedlist><para>ZFS delegated administration provides similar features to the RBAC security.
+However, ZFS delegated administration provides the following advantages for
+administering ZFS storage pools and file systems:</para><itemizedlist><listitem><para>Permissions follow the ZFS storage pool when the pool is migrated.</para>
+</listitem><listitem><para>Provides dynamic inheritance and you can control how the permissions
+propagate through the file systems.</para>
+</listitem><listitem><para>Can be configured so that only the creator of a file system
+can destroy the file systems they create. </para>
+</listitem><listitem><para>Permissions can be distributed to specific file systems. Newly
+created file systems can automatically pick up permissions.</para>
+</listitem><listitem><para>Provides simple NFS administration. For example, a user with
+explicit permissions could create a snapshot over  NFS in the appropriate <literal>.zfs/snapshot</literal> directory.</para>
+</listitem>
+</itemizedlist><para>Consider using delegated administration for distributing ZFS tasks.
+For information about using RBAC to manage general Solaris administration
+tasks, see <olink targetdoc="sysadv6" targetptr="prbactm-1" remap="external">Part&nbsp;III, <citetitle remap="chapter">Roles, Rights Profiles, and Privileges,</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle></olink>.</para><sect2 id="gfkct"><title>Disabling ZFS Delegated Permissions</title><para>You can modify the ability to use delegated administration with the
+pool's <literal>delegation</literal> property. For example:</para><screen># zpool get delegation users
+NAME  PROPERTY    VALUE       SOURCE
+users  delegation  on          default
+# zpool set delegation=off users
+# zpool get delegation users
+NAME  PROPERTY    VALUE       SOURCE
+users  delegation  off         local</screen><para>By default, the <literal>delegation</literal> property is enabled.</para>
+</sect2>
+</sect1><sect1 id="gfkco"><title>Delegating ZFS Permissions</title><para>You can use the <command>zfs allow</command> command to grant permissions
+on ZFS datasets to non-root users in the following ways:</para><itemizedlist><listitem><para>Individual permissions can be granted to a user, group, or
+everyone.</para>
+</listitem><listitem><para>Groups of individual permissions can be granted as a <emphasis>permission
+set</emphasis> to a user, group, or everyone.</para>
+</listitem><listitem><para>Permissions can be granted either locally, which is to the
+current dataset only, or granted to all descendents of the current dataset.</para>
+</listitem>
+</itemizedlist><para>The following table describes the operations that can be delegated and
+any dependent permissions that are required to do the delegated operations.</para><informaltable frame="topbot"><tgroup cols="3" colsep="0" rowsep="0"><colspec colwidth="34.16*"/><colspec colwidth="61.91*"/><colspec colname="colspec0" colwidth="64.28*"/><thead><row rowsep="1"><entry><para>Permission (Subcommand)</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>Dependencies</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para><literal>allow</literal></para>
+</entry><entry><para>The ability to grant permissions that you have to another user.</para>
+</entry><entry><para>Must also have the permission that is being allowed.</para>
+</entry>
+</row><row><entry><para><literal>clone</literal></para>
+</entry><entry><para>The ability to clone any of the dataset's snapshots. </para>
+</entry><entry><para>Must also have the <literal>create</literal> ability and the <literal>mount</literal> ability in the origin file system.</para>
+</entry>
+</row><row><entry><para><literal>create</literal></para>
+</entry><entry><para>The ability to create descendent datasets.</para>
+</entry><entry><para>Must also have the <literal>mount</literal> ability.</para>
+</entry>
+</row><row><entry><para><literal>destroy</literal></para>
+</entry><entry><para>The ability to destroy a dataset.</para>
+</entry><entry><para>Must also have the <literal>mount</literal> ability.</para>
+</entry>
+</row><row><entry><para><literal>mount</literal></para>
+</entry><entry><para>The ability to mount and unmount a dataset and create and destroy volume
+device links.</para>
+</entry><entry>
+</entry>
+</row><row><entry><para><literal>promote</literal></para>
+</entry><entry><para>The ability to promote a clone to a dataset.</para>
+</entry><entry><para>Must also have the <literal>mount</literal> ability and  <literal>promote</literal> ability
+in the origin file system.</para>
+</entry>
+</row><row><entry><para><literal>receive</literal></para>
+</entry><entry><para>The ability to create descendent file system with the <command>zfs receive</command>command.</para>
+</entry><entry><para>Must also have the <command>mount</command> ability and the <command>create</command> ability.</para>
+</entry>
+</row><row><entry><para><literal>rename</literal></para>
+</entry><entry><para>The ability to rename a dataset.</para>
+</entry><entry><para>Must also have the <literal>mount</literal> ability and    the <literal>create</literal> ability in the new parent.</para>
+</entry>
+</row><row><entry><para><literal>rollback</literal></para>
+</entry><entry><para>The ability to rollback a snapshot.</para>
+</entry><entry><para>Must also have the <literal>mount</literal> ability.</para>
+</entry>
+</row><row><entry><para><literal>send</literal></para>
+</entry><entry><para>The ability to send a snapshot stream.</para>
+</entry><entry>
+</entry>
+</row><row><entry><para><literal>share</literal></para>
+</entry><entry><para>The ability to share and unshare a dataset.</para>
+</entry><entry>
+</entry>
+</row><row><entry><para><literal>snapshot</literal></para>
+</entry><entry><para>The ability to take a snapshot of a dataset.</para>
+</entry><entry>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable><para>In addition, you can delegate the following ZFS properties to non-root
+users:</para><itemizedlist><listitem><para><literal>aclinherit</literal></para>
+</listitem><listitem><para><literal>aclmode</literal></para>
+</listitem><listitem><para><literal>atime</literal></para>
+</listitem><listitem><para><literal>canmount</literal></para>
+</listitem><listitem><para><literal>casesensitivity</literal></para>
+</listitem><listitem><para><literal>checksum</literal></para>
+</listitem><listitem><para><literal>compression</literal></para>
+</listitem><listitem><para><literal>copies</literal></para>
+</listitem><listitem><para><literal>exec</literal></para>
+</listitem><listitem><para><literal>devices</literal></para>
+</listitem><listitem><para><literal>mountpoint</literal></para>
+</listitem><listitem><para><literal>nbmand</literal></para>
+</listitem><listitem><para><literal>normalization</literal></para>
+</listitem><listitem><para><literal>quota</literal></para>
+</listitem><listitem><para><literal>readonly</literal></para>
+</listitem><listitem><para><literal>recordsize</literal></para>
+</listitem><listitem><para><literal>reservation</literal></para>
+</listitem><listitem><para><literal>setuid</literal></para>
+</listitem><listitem><para><literal>shareiscsi</literal></para>
+</listitem><listitem><para><literal>sharenfs</literal></para>
+</listitem><listitem><para><literal>sharesmb</literal></para>
+</listitem><listitem><para><literal>snapdir</literal></para>
+</listitem><listitem><para><literal>userprop</literal></para>
+</listitem><listitem><para><literal>utf8only</literal></para>
+</listitem><listitem><para><literal>version</literal></para>
+</listitem><listitem><para><literal>volsize</literal></para>
+</listitem><listitem><para><literal>vscan</literal></para>
+</listitem><listitem><para><literal>xattr</literal></para>
+</listitem><listitem><para><literal>zoned</literal></para>
+</listitem>
+</itemizedlist><para>Some of the properties
+listed above can only set at dataset creation time. For a
+description of these properties, see <olink targetptr="gazss" remap="internal">Introducing
+ZFS Properties</olink>.</para><sect2 id="gfkbi"><title>Syntax Descriptions for Delegating Permissions</title><para>The <command>zfs allow</command> syntax is as follows:</para><screen remap="wide"># zfs allow -[l d u g e c s] everyone|user|group[,,...] perm|@setname ,...] filesystem| volume</screen><para>The following <command>zfs allow</command> syntax (in bold) identifies
+to whom the permissions are delegated:</para><screen><emphasis role="strong">zfs allow [-uge] | user | group | everyone</emphasis> [,...] <replaceable>filesystem</replaceable> | <replaceable>volume</replaceable></screen><para>Multiple entities can be specified as a comma-separated list. If none
+of  the  <option>uge</option> options are specified,  then the argument is
+interpreted preferentially as the keyword <literal>everyone</literal>,  then
+as a user  name, and lastly, as a group name. To specify a  user or group
+named &ldquo;everyone,&rdquo;  use the  <option>u</option>  or  <option>g</option> options.
+To specify a group with the same name as a user, use the <option>g</option> option.</para><para>The following <command>zfs allow</command> syntax (in bold) identifies
+how permissions and permission sets are specified:</para><screen><emphasis role="strong">zfs allow [-s] ... perm | @setname [,...]</emphasis> <replaceable>filesystem</replaceable> | <replaceable>volume</replaceable></screen><para>Multiple  permissions can be specified as a comma-separated  list. Permission
+names are the same as ZFS subcommands and properties. For more information,
+see the section above.</para><para>Permissions can be aggregated into <emphasis>permissions sets</emphasis> and
+are identified by the <option>s</option> option. Permission sets can be used
+by other <command>zfs allow</command> commands for the specified file system
+and its descendents. Sets are evaluated dynamically, so changes to a set are
+immediately updated. Permission sets follow the same naming conventions as
+ZFS file systems, but the name must begin with an at sign (<literal>@</literal>),
+and can be no more than  64 characters long.</para><para>The following <command>zfs allow</command> syntax (in bold) identifies
+how the permissions are delegated:</para><screen><emphasis role="strong">zfs allow [-ld]</emphasis> ... ... <replaceable>filesystem</replaceable> | <replaceable>volume</replaceable></screen><para>The <option>l</option> option identifies if whether the permission is
+allowed for the specified dataset and not its descendents, unless the <option>d</option> option
+is also specified. The <option>d</option> option indicates that the permission
+is allowed for the descendent datasets and not for this dataset, unless the <option>l</option> option is also specified. If  neither  of  the <option>ld</option> options
+are specified, then the permissions are allowed for the file system or volume
+and all of its descendents.</para>
+</sect2><sect2 id="gfkcw"><title>Removing ZFS Delegated Permissions (<command>zfs
+unallow</command>)</title><para>You can remove previously granted permissions with the <command>zfs
+unallow</command> command.</para><para>For example, if you delegated create, destroy, mount, and snapshot permissions
+as follows:</para><screen># zfs allow cindys, create,destroy,mount,snapshot tank/cindys
+# zfs allow tank/cindys
+-------------------------------------------------------------
+Local+Descendent permissions on (tank/cindys)
+        user cindys create,destroy,mount,snapshot
+-------------------------------------------------------------</screen><para>You would need to use syntax similar to the following to remove these
+permissions:</para><screen># zfs unallow cindys tank/cindys
+# zfs allow tank/cindys</screen>
+</sect2>
+</sect1><sect1 id="gebwa"><title>Using ZFS Delegated Administration</title><para>This section provides examples of displaying and delegating permissions.</para><sect2 id="gebww"><title>Displaying ZFS Delegated Permissions (Examples)</title><para>You can use the following command to display permissions:</para><screen># zfs allow <replaceable>dataset</replaceable></screen><para>The above command prints permissions that are set or allowed on this
+dataset.  The output contains the following components:</para><itemizedlist><listitem><para>Permissions sets</para>
+</listitem><listitem><para>Specific permissions or create time permissions</para>
+</listitem><listitem><para>Local</para>
+</listitem><listitem><para>Local and descendent</para>
+</listitem><listitem><para>Descendent only</para>
+</listitem>
+</itemizedlist><example id="gfthg"><title>Displaying Simple Delegated Administration Permissions</title><para>The following example output indicates that user <literal>cindys</literal> has
+permission to create, destroy, mount, snapshot in the <filename>tank/cindys</filename> file
+system.</para><screen># zfs allow tank/cindys
+       -------------------------------------------------------------
+       Local+Descendent permissions on (tank/cindys)
+               user cindys create,destroy,mount,snapshot</screen>
+</example><example id="gftex"><title>Displaying Complex Delegated Administration Permissions</title><para>The following example output indicates the following permissions on
+the <filename>pool</filename> and <filename>pool/fred</filename> file systems.</para><para>For the <filename>pool/fred</filename> file system:</para><itemizedlist><listitem><para>Two permission sets are defined:</para><itemizedlist><listitem><para><literal>@eng</literal> (create, destroy, snapshot, mount,
+clone, promote, rename)</para>
+</listitem><listitem><para><literal>@simple</literal> (create, mount)</para>
+</listitem>
+</itemizedlist>
+</listitem><listitem><para>Create time permissions are set for the <literal>@eng</literal> permission
+set and the <literal>mountpoint</literal> property. Create time means that
+after a dataset set is created, the <literal>@eng</literal> permission set
+and the <literal>mountpoint</literal> property are granted.</para>
+</listitem><listitem><para>User <literal>tom</literal> is granted the <literal>@eng</literal> permission
+set and the user <literal>joe</literal> is granted create, destroy, mount
+permissions for local file systems.</para>
+</listitem><listitem><para>User <literal>fred</literal> is granted the <literal>@basic</literal> permission
+set and share and rename permissions for the local and descendent file systems.</para>
+</listitem><listitem><para>User <literal>barney</literal> is granted the <literal>@basic</literal> permission
+set for descendent file systems only.</para>
+</listitem>
+</itemizedlist><para>For the pool file system:</para><itemizedlist><listitem><para>The permission set <literal>@simple</literal> (create, destroy,
+mount) is defined.</para>
+</listitem><listitem><para>The group <literal>staff</literal> is granted the <literal>@simple</literal> permission set on the local file system.</para>
+</listitem>
+</itemizedlist><screen>$ zfs allow pool/fred
+------------------------------------------------------------------------------
+Permission sets on (pool/fred)
+        @eng create,destroy,snapshot,mount,clone,promote,rename
+        @simple create,mount
+Create time permissions on (pool/fred)
+        @eng,mountpoint
+Local permissions on (pool/fred)
+        user tom @eng
+        user joe create,destroy,mount
+Local+Descendent permissions on (pool/fred)
+        user fred @basic,share,rename
+Descendent permissions on (pool/fred)
+        user barney @basic
+        group staff @basic
+------------------------------------------------------------------------------
+Permission sets on (pool)
+        @simple create,destroy,mount
+Local permissions on (pool)
+        group staff @simple
+------------------------------------------------------------------------------</screen>
+</example>
+</sect2><sect2 id="gebxb"><title>Delegating ZFS Permissions (Examples)</title><example id="gftfg"><title>Delegating Permissions to an Individual User</title><para>When you provide create and mount permissions, you need to make sure
+that the user has permissions on the underlying mount point.</para><para>For example, to give <literal>marks</literal> create and mount permissions
+on <filename>tank</filename>, set the permissions first:</para><screen># chmod A+user:marks:add_subdirectory:fd:allow /tank</screen><para>Then, use the <command>zfs allow</command> to grant create, destroy,
+and mount permissions. For example:</para><screen># zfs allow marks create,destroy,mount tank</screen><para>This means that <literal>marks</literal> can create his own file systems
+in the <filename>tank</filename> file system. For example:</para><screen># su marks
+marks$ zfs create tank/marks
+marks$ ^D
+# su lp
+$ zfs create tank/lp
+cannot create 'tank/lp': permission denied</screen>
+</example><example id="gftft"><title>Delegating Create and Destroy Permissions to a
+Group</title><para>The following example shows how to set up a file system so that anyone
+in the <literal>staff</literal> group can create and mount file systems in
+the <filename>tank</filename> file system, and also allows them to destroy
+their own file systems. However, <literal>staff</literal> group members cannot
+destroy anyone else's file systems.</para><screen># zfs allow staff create,mount tank
+# zfs allow -c create,destroy tank
+# zfs allow tank
+-------------------------------------------------------------
+Create time permissions on (tank)
+        create,destroy
+Local+Descendent permissions on (tank)
+        group staff create,mount
+-------------------------------------------------------------
+# su cindys
+cindys% zfs create tank/cindys
+cindys% exit
+# su marks
+marks% zfs create tank/marks/data
+marks% exit
+cindys% zfs destroy tank/marks/data
+cannot destroy 'tank/mark': permission denied</screen>
+</example><example id="gftfk"><title>Delegating Permissions at the Right File System
+Level</title><para>Make sure to grant users permission at the right file system level.
+User <literal>marks</literal> is granted create, destroy, and mount permissions
+for the local and descendent file systems. User <literal>marks</literal> is
+granted local permission to snapshot the <filename>tank</filename> file system,
+but this does not allow him to snapshot his own file system. </para><screen># zfs allow -l marks snapshot tank
+# zfs allow tank
+-------------------------------------------------------------
+Local permissions on (tank)
+        user marks snapshot
+Local+Descendent permissions on (tank)
+        user marks create,destroy,mount
+-------------------------------------------------------------
+# su marks
+marks$ zfs snapshot tank/@snap1
+marks$ zfs snapshot tank/marks@snap1
+cannot create snapshot 'mark/marks@snap1': permission denied</screen><para>Use the <command>zfs allow</command> <option>d</option> option to grant
+marks permission at the descendent level. For example:</para><screen># zfs unallow -l marks snapshot tank
+# zfs allow -d marks snapshot tank
+# zfs allow tank
+-------------------------------------------------------------
+Descendent permissions on (tank)
+        user marks snapshot
+Local+Descendent permissions on (tank)
+        user marks create,destroy,mount
+-------------------------------------------------------------
+# su marks
+$ zfs snapshot tank@snap2
+cannot create snapshot 'sandbox@snap2': permission denied
+$ zfs snapshot tank/marks@snappy</screen><para>User <literal>marks</literal> can only create a snapshot below the <filename>tank</filename> level.</para>
+</example><example id="gfteu"><title>Defining and Using Complex Delegated Permissions</title><para>You can grant specific permissions to users or groups. For example,
+the following <command>zfs allow</command> command grants specific permissions
+to the <literal>staff</literal> group. In addition, destroy and snapshot permissions
+are granted after tank file systems are created.</para><screen># zfs allow staff create,mount tank
+# zfs allow tank
+-------------------------------------------------------------
+Create time permissions on (tank)
+        destroy,snapshot
+Local+Descendent permissions on (tank)
+        group staff create
+-------------------------------------------------------------</screen><para>Because <literal>marks</literal> is a member of the <literal>staff</literal> group,
+he can create file systems in <filename>tank</filename>. In addition, user <literal>marks</literal> can create a snapshot of <filename>tank/marks2</filename> because
+he has specific permissions. For example:</para><screen># su marks
+$ zfs create tank/marks2
+$ zfs allow tank/marks2
+-------------------------------------------------------------
+Local permissions on (tank/marks2)
+        user marks destroy,snapshot
+-------------------------------------------------------------
+Create time permissions on (tank)
+        destroy,snapshot
+Local+Descendent permissions on (tank)
+        group staff create
+        everyone mount
+-------------------------------------------------------------</screen><para>But, he can't create a snapshot in <literal>tank/marks</literal> because
+he doesn't have specific permissions. See the listing above. For example:</para><screen>$ zfs snapshot tank/marks2@snap1
+$ zfs snapshot tank/marks@snappp
+cannot create snapshot 'tank/marks@snappp': permission denied</screen><para>You can create snapshot directories if you have create permission in
+your home directory, for example. This is helpful when your file system is
+NFS mounted. For example:</para><screen>$ cd /tank/marks2
+$ ls
+$ cd .zfs
+$ ls
+snapshot
+$ cd snapshot
+$ ls -l
+total 3
+drwxr-xr-x   2 marks    staff          2 Dec 15 13:53 snap1
+$ pwd
+/tank/marks2/.zfs/snapshot
+$ mkdir snap2
+$ zfs list
+NAME                   USED  AVAIL  REFER  MOUNTPOINT
+tank                   264K  33.2G  33.5K  /tank
+tank/marks            24.5K  33.2G  24.5K  /tank/marks
+tank/marks2             46K  33.2G  24.5K  /tank/marks2
+tank/marks2@snap1     21.5K      -  24.5K  -
+tank/marks2@snap2         0      -  24.5K  -
+$ ls
+snap1  snap2
+$ rmdir snap2
+$ ls
+snap1</screen>
+</example><example id="gfkcq"><title>Defining and Using a ZFS Delegated Permission Set</title><para>The following example creates a permission set <literal>@myset</literal> and
+grants the permission set and the rename permission to the group <literal>staff</literal> for
+the <filename>tank</filename> file system. User <literal>cindys</literal>,
+a group <literal>staff</literal> member, has the ability to create a file
+system in <filename>tank</filename> but user <literal>lp</literal> has no
+permission to create a file system in <filename>tank</filename>.</para><screen># zfs allow -s @myset create,destroy,mount,snapshot,promote,clone,readonly tank
+# zfs allow tank
+-------------------------------------------------------------
+Permission sets on (tank)
+        @myset clone,create,destroy,mount,promote,readonly,snapshot
+-------------------------------------------------------------
+# zfs allow staff @myset,rename tank
+# zfs allow tank
+-------------------------------------------------------------
+Permission sets on (tank)
+        @myset clone,create,destroy,mount,promote,readonly,snapshot
+Local+Descendent permissions on (tank)
+        group staff @myset,rename
+# chmod A+group:staff:add_subdirectory:fd:allow tank
+# su cindys
+cindys% zfs create tank/data
+Cindys% zfs allow tank
+-------------------------------------------------------------
+Permission sets on (tank)
+        @myset clone,create,destroy,mount,promote,readonly,snapshot
+Local+Descendent permissions on (tank)
+        group staff @myset,rename
+-------------------------------------------------------------
+cindys% ls -l /tank
+total 15
+drwxr-xr-x   2 cindys   staff          2 Aug  8 14:10 data
+cindys% exit
+# su lp
+$ zfs create tank/lp
+cannot create 'tank/lp': permission denied</screen>
+</example>
+</sect2><sect2 id="gebxt"><title>Removing ZFS Permission (Examples)</title><para>You can use the following command to remove granted permissions. For
+example, user <literal>cindys</literal> has permission to create, mount, destroy,
+and snapshot in the <filename>tank/cindys</filename> file system.</para><screen># zfs allow cindys create,destroy,mount,snapshot tank/cindys
+       # zfs allow tank/cindys
+       -------------------------------------------------------------
+       Local+Descendent permissions on (tank/cindys)
+               user cindys create,destroy,mount,snapshot
+       -------------------------------------------------------------</screen><para>This <command>zfs unallow</command> syntax removes user <literal>cindys</literal>'s
+snapshot permission from the <filename>tank/cindys</filename> file system.</para><screen># zfs unallow cindys snapshot tank/cindys
+# zfs allow tank/cindys
+-------------------------------------------------------------
+Local+Descendent permissions on (tank/cindys)
+        user cindys create,destroy,mount
+-------------------------------------------------------------
+cindys% zfs create tank/cindys/data
+cindys% zfs snapshot tank/cindys@today
+cannot create snapshot 'tank/cindys@today': permission denied</screen><para>User <literal>marks</literal> has the following permissions in <filename>tank/marks</filename>.</para><screen># zfs allow tank/marks
+-------------------------------------------------------------
+Local+Descendent permissions on (tank/marks)
+        user marks create,destroy,mount
+-------------------------------------------------------------</screen><para>The following <command>zfs unallow</command> syntax removes all permissions
+for user <literal>marks</literal> from <filename>tank/marks</filename>.</para><screen># zfs unallow marks tank/marks</screen><para>The following <command>zfs unallow</command> syntax removes a permission
+set on the <filename>tank</filename> file system.</para><screen># zfs allow tank
+-------------------------------------------------------------
+Permission sets on (tank)
+        @myset clone,create,destroy,mount,promote,readonly,snapshot
+Create time permissions on (tank)
+        create,destroy,mount
+Local+Descendent permissions on (tank)
+        group staff create,mount
+-------------------------------------------------------------
+# zfs unallow -s @myset tank
+$ zfs allow tank
+-------------------------------------------------------------
+Create time permissions on (tank)
+        create,destroy,mount
+Local+Descendent permissions on (tank)
+        group staff create,mount
+-------------------------------------------------------------</screen>
+</sect2>
+</sect1>
+</chapter>

@@ -1,0 +1,481 @@
+<chapter id="mipoverview-1"><title>Mobile IP (Overview)</title><highlights><para>Mobile Internet Protocol (IP) enables the transfer of information between mobile
+computers. <emphasis>Mobile computers</emphasis> include lap tops and wireless communications.
+The mobile computer can change its location to a foreign network. At the foreign network,
+the mobile computer can still communicate through the home network of the mobile computer.
+The Solaris implementation of Mobile IP supports only IPv4.</para><para>This chapter contains the following information:</para><itemizedlist><listitem><para><olink targetptr="mipoverview-25" remap="internal">Introduction to Mobile IP</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-29" remap="internal">Mobile IP Functional Entities</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-2" remap="internal">How Mobile IP Works</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-5" remap="internal">Agent Discovery</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-30" remap="internal">Care-of Addresses</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-45" remap="internal">Mobile IP With Reverse Tunneling</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-12" remap="internal">Mobile IP Registration</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-18" remap="internal">Routing Datagrams to and From Mobile
+Nodes</olink></para>
+</listitem><listitem><para><olink targetptr="mipoverview-23" remap="internal">Security Considerations for Mobile
+IP</olink></para>
+</listitem>
+</itemizedlist><para>For Mobile IP-related tasks, refer to <olink targetptr="mipimplementing-1" remap="internal">Chapter&nbsp;28, Administering Mobile IP (Tasks)</olink>. For Mobile IP reference
+materials, refer to <olink targetptr="mipmanaging-22" remap="internal">Chapter&nbsp;29, Mobile IP Files and Commands (Reference)</olink>.</para>
+</highlights><sect1 id="mipoverview-25"><title>Introduction to Mobile IP</title><para>Current versions of the Internet Protocol (IP) assume that the point at
+which a computer attaches to the Internet or a network is fixed. IP also assumes that
+the IP address of the computer identifies the network to which the computer is attached.
+Datagrams that are sent to a computer are based on the location information that is
+contained in the IP address. Many Internet Protocols require that a node's IP address
+remain unchanged. If any of these protocols are active on a Mobile IP computing device,
+their applications fail. Even HTTP would fail if not for the short-lived nature of
+its TCP connections. Updating an IP address and refreshing the web page is not a burden.</para><para>If a mobile computer, or <emphasis>mobile node</emphasis>, moves to a
+new network while its IP address is unchanged, the mobile node address does not reflect
+the new point of attachment. Consequently, routing protocols that exist cannot route
+datagrams to the mobile node correctly. You must reconfigure the mobile node with
+a different IP address that represents the new location. Assigning a different IP
+address is cumbersome. Thus, under the current Internet Protocol, if the mobile node
+moves without changing its address, it loses routing. If the mobile node does change
+its address, it loses connections.</para><para>Mobile IP solves this problem by allowing the mobile node to use two IP
+addresses. The first address is a fixed <emphasis>home address</emphasis>. The second
+address is a <emphasis>care-of address</emphasis> that changes at each new point of
+attachment. Mobile IP enables a computer to roam freely on the Internet. Mobile IP
+also enables a computer to roam freely on an organization's network while still maintaining
+the same home address. Consequently, communication activities are not disrupted when
+the user changes the computer's point of attachment. Instead, the network is updated
+with the new location of the mobile node. See the <olink targetptr="glossary-1" remap="internal">Glossary</olink> for definitions of terms that are associated with Mobile IP.</para><para>The following figure illustrates the general Mobile IP topology. </para><figure id="mipoverview-fig-26"><title>Mobile IP Topology</title><mediaobject><imageobject><imagedata entityref="MIPtopology"/>
+</imageobject><textobject><simpara>Shows a mobile node's relationship between it's home agent's
+home network and a foreign agent's foreign network.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>By using this figure's Mobile IP topology, the following scenario shows
+how a datagram moves from one point to another point within the Mobile IP framework:</para><orderedlist><listitem><para>The Internet host sends a datagram to the mobile node by using the mobile
+node's home address (normal IP routing process).</para>
+</listitem><listitem><para>If the mobile node is on its home network, the datagram is delivered through
+the normal IP process to the mobile node. Otherwise, the home agent receives the datagram.</para>
+</listitem><listitem><para>If the  mobile node is on a foreign network, the home agent forwards the
+datagram to the foreign agent. The home agent must encapsulate the datagram in an
+outer datagram so that the foreign agent's IP address appears in the outer IP header. </para>
+</listitem><listitem><para>The foreign agent delivers the datagram to the mobile node.</para>
+</listitem><listitem><para>Datagrams from the mobile node to the Internet host are sent by using
+normal IP routing procedures. If the mobile node is on a foreign network, the packets
+are delivered to the foreign agent. The foreign agent forwards the datagram to the
+Internet host.</para>
+</listitem><listitem><para>In situations with ingress filtering present, the source address must
+be topologically correct for the subnet that the datagram is coming from, or a router
+cannot forward the datagram. If this scenario exists on links between the mobile node
+and the correspondent node, the foreign agent needs to provide reverse tunneling support.
+Then, the foreign agent can deliver every datagram that the mobile node sends to its
+home agent. The home agent then forwards the datagram through the path that the datagram
+would have taken had the mobile node resided on the home network. This process guarantees
+that the source address is correct for all links that the datagram must traverse.</para>
+</listitem>
+</orderedlist><para>Regarding wireless communications, <olink targetptr="mipoverview-fig-26" remap="internal">Figure 27&ndash;1</olink> depicts the use of wireless transceivers to transmit the
+datagrams to the mobile node. Also, all datagrams between the Internet host and the
+mobile node use the home address of the mobile node. The home address is used even
+when the mobile node is located on the foreign network. The care-of address is used
+only for communication with mobility agents. The care-of address is invisible to the
+Internet host.</para>
+</sect1><sect1 id="mipoverview-29"><title>Mobile IP Functional Entities</title><para>Mobile IP introduces the following new functional entities:</para><itemizedlist><listitem><para><emphasis role="strong">Mobile node (MN)</emphasis> &ndash; Host or router
+that changes its point of attachment from one network to another network while maintaining
+all existing communications by using its IP home address.</para>
+</listitem><listitem><para><emphasis role="strong">Home agent (HA)</emphasis> &ndash; Router
+or server on the home network of a mobile node. The router intercepts datagrams that
+are destined for the mobile node. The router then delivers the datagrams through the
+care-of address. The home agent also maintains current information on the location
+of the mobile node. </para>
+</listitem><listitem><para><emphasis role="strong">Foreign agent (FA)</emphasis> &ndash; Router or
+server on the foreign network that the mobile node visits. Provides host routing services
+to the mobile node. The foreign agent might also provide a care-of address to the
+mobile node while the mobile node is registered.</para>
+</listitem>
+</itemizedlist>
+</sect1><sect1 id="mipoverview-2"><title>How Mobile IP Works</title><para>Mobile IP enables routing of IP datagrams to mobile nodes. The home address
+of the mobile node always identifies the mobile node regardless of where the mobile
+node is attached. When away from home, a care-of address is associated with the mobile
+node's home address. The care-of address provides information about the current point
+of attachment of the mobile node. Mobile IP uses a registration mechanism to register
+the care-of address with a home agent.</para><para>The home agent redirects datagrams from the home network to the care-of
+address. The home agent constructs a new IP header that contains the care-of address
+of the mobile node as the destination IP address. This new header encapsulates the
+original IP datagram. Consequently, the home address of the mobile node has no effect
+on the routing of the encapsulated datagram until the datagram arrives at the care-of
+address. This type of encapsulation is called <emphasis>tunneling</emphasis>. After
+the datagram arrives at the care-of address, the datagram is de-encapsulated. Then
+the datagram is delivered to the mobile node.</para><para>The following figure shows a mobile node that resides on its home network,
+Network A, before the mobile node moves to a foreign network, Network B. Both networks
+support Mobile IP. The mobile node is always associated with the home address of the
+mobile node, <literal>128.226.3.30</literal>.</para><figure id="mipoverview-fig-27"><title>Mobile Node Residing on Home Network</title><mediaobject><imageobject><imagedata entityref="MNatHome"/>
+</imageobject><textobject><simpara>Illustrates a mobile node that resides on its home network and
+its connection to the home agent and the relationship to the foreign agent.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The following figure shows a mobile node that has moved to a foreign network,
+Network B. Datagrams that are destined for the mobile node are intercepted by the
+home agent on the home network, Network A. The datagrams are encapsulated. Then, the
+datagrams are sent to the foreign agent on Network B. The foreign agent strips off
+the outer header. Then the foreign agent delivers the datagram to the mobile node
+that is located on Network B.</para><figure id="mipoverview-fig-28"><title>Mobile Node Moving to a Foreign Network</title><mediaobject><imageobject><imagedata entityref="MNaway"/>
+</imageobject><textobject><simpara>Illustrates a mobile node that currently resides on a foreign
+network and its connection to the foreign agent and the relationship to the home agent.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The care-of address might belong to a foreign agent. The care-of address
+might be acquired by the mobile node through the Dynamic Host Configuration Protocol
+(DHCP) or the Point-to-Point Protocol (PPP). In the latter situation, a mobile node
+has a colocated care-of address.</para><para>Mobility agents (home agents and foreign agents) advertise their presence
+by using <emphasis>agent advertisement</emphasis> messages. Optionally, a mobile node
+can solicit an agent advertisement message. The mobile node uses any mobility agent
+that is attached locally through an <emphasis>agent solicitation</emphasis> message.
+A mobile node uses the agent advertisements to determine whether the mobile node is
+on the home network or a foreign network.</para><para>The mobile node uses a special registration process to inform the home
+agent about the current location of the mobile node. The mobile node is always &ldquo;listening&rdquo;
+for mobility agents advertising their presence. The mobile node uses these advertisements
+to help determine when the mobile node moves to another subnet. When a mobile node
+determines that the mobile node has moved its  location, the mobile node uses the
+new foreign agent to forward a registration message to the home agent. The mobile
+node uses the same process when the mobile node moves from one foreign network to
+another foreign network.</para><para>When the mobile node detects that it is located on the home network, the
+mobile node does not use mobility services. When the mobile node returns to the home
+network, the mobile node <emphasis>deregisters</emphasis> with the home agent.</para>
+</sect1><sect1 id="mipoverview-5"><title>Agent Discovery</title><para>A mobile node uses a method that is known as <emphasis>agent discovery</emphasis> to
+determine the following information:</para><itemizedlist><listitem><para>When the node has moved from one network to another network</para>
+</listitem><listitem><para>Whether the network is the home network or a foreign network</para>
+</listitem><listitem><para>The foreign agent care-of address that is offered by each foreign
+agent on that network</para>
+</listitem><listitem><para>Mobility services that are provided by the mobility agent, advertised
+as flags, and additional extensions in the agent advertisement</para>
+</listitem>
+</itemizedlist><para>Mobility agents transmit <emphasis>agent advertisements</emphasis> to
+advertise services on a network. In the absence of agent advertisements, a mobile
+node can solicit advertisements. This capability is known as <emphasis>agent solicitation</emphasis>. If a mobile node is capable of supporting its own colocated care-of address,
+the mobile node can use regular router advertisements for the same purposes. </para><sect2 id="mipoverview-10"><title>Agent Advertisement</title><para>Mobile nodes use agent advertisements to determine the current point of attachment
+to the Internet or to an organization's network. An agent advertisement is an Internet
+Control Message Protocol (ICMP) router advertisement that has been extended to also
+carry a mobility agent advertisement extension.</para><para>A foreign agent (FA) can be too busy to serve additional mobile nodes.
+However, a foreign agent must continue to send agent advertisements. Then, the mobile
+node, which is already registered with a foreign agent, knows that the mobile node
+has not moved out of range of the foreign agent. The mobile node also knows that the
+foreign agent has not failed. A mobile node that is registered with a foreign agent
+from which it no longer receives agent advertisements probably knows that the mobile
+node can no longer contact that foreign agent.</para><sect3 id="mipoverview-43"><title>Agent Advertisement Over Dynamic Interfaces</title><para>You can configure the implementation of the foreign agent to send advertisements
+over dynamically created interfaces. You have options to enable or disable limited
+unsolicited advertisements over the advertising interfaces. Dynamically created interfaces
+are defined as only those interfaces that are configured after the <command>mipagent</command> daemon starts. Advertisement over dynamic interfaces is useful for applications
+that support transient mobility interfaces. Moreover, by limiting unsolicited advertisement,
+network bandwidth might be saved.</para>
+</sect3>
+</sect2><sect2 id="mipoverview-11"><title>Agent Solicitation</title><para>Every mobile node should implement agent solicitation. The mobile node uses
+the same procedures, defaults, and constants for agent solicitation that are specified
+for solicitation messages of ICMP routers.</para><para>The rate that a mobile node sends solicitations is limited by the mobile node.
+The mobile node can send three initial solicitations at a maximum rate of one solicitation
+per second while the mobile node searches for an agent. After the mobile node registers
+with an agent, the rate that solicitations are sent is reduced to limit the overhead
+on the local network. </para>
+</sect2>
+</sect1><sect1 id="mipoverview-30"><title>Care-of Addresses</title><para>Mobile IP provides the following alternative modes for the acquisition of a
+care-of address:</para><itemizedlist><listitem><para>A foreign agent provides a <emphasis>foreign agent care-of address</emphasis>,
+which is advertised to the mobile node through agent advertisement messages. The care-of
+address is usually the IP address of the foreign agent that sends the advertisements.
+The foreign agent is the endpoint of the tunnel. When the foreign agent receives datagrams
+through a tunnel, the foreign agent de-encapsulates the datagrams. Then, the foreign
+agent delivers the inner datagram to the mobile node. Consequently, many mobile nodes
+can share the same care-of address. Bandwidth is important on wireless links. Wireless
+links are good candidates from which foreign agents can provide Mobile IP services
+to higher bandwidth-wired links.</para>
+</listitem><listitem><para>A mobile node acquires a <emphasis>colocated care-of address</emphasis> as
+a local IP address through some external means. The mobile node then associates with
+one of its own network interfaces. The mobile node might acquire the address through
+DHCP as a temporary address. The address might also be owned by the mobile node as
+a long-term address. However, the mobile node can only use the address while visiting
+the subnet to which this care-of address belongs. When using a colocated care-of address,
+the mobile node serves as the endpoint of the tunnel. The mobile node performs de-encapsulation
+of the datagrams that are tunneled to the mobile node.</para>
+</listitem>
+</itemizedlist><para>A colocated care-of address enables a mobile node to function without
+a foreign agent. Consequently, a mobile node can use a colocated care-of address in
+networks that have not deployed a foreign agent.</para><para>If a mobile node is using a colocated care-of address, the mobile node must
+be located on the link that is identified by the network prefix of the care-of address.
+Otherwise, datagrams that are destined to the care-of address cannot be delivered.</para>
+</sect1><sect1 id="mipoverview-45"><title>Mobile IP With Reverse Tunneling</title><para>The section <olink targetptr="mipoverview-2" remap="internal">How Mobile IP Works</olink> assumes
+that the routing within the Internet is independent of the source address of the datagram.
+However, intermediate routers might check for a topologically correct source address.
+If an intermediate router does check, the mobile node needs to set up a reverse tunnel.
+By setting up a reverse tunnel from the care-of address to the home agent, you ensure
+a topologically correct source address for the IP data packet. Reverse tunnel support
+is advertised by foreign agents and home agents. A mobile node can request a reverse
+tunnel between the foreign agent and the home agent when the mobile node registers.
+A reverse tunnel is a tunnel that starts at the care-of address of the mobile node
+and terminates at the home agent. The following figure shows the Mobile IP topology
+that uses a reverse tunnel.</para><figure id="mipoverview-fig-36"><title>Mobile IP With a Reverse Tunnel</title><mediaobject><imageobject><imagedata entityref="ReverseTunnel"/>
+</imageobject><textobject><simpara>Illustrates how a mobile node communicates through a reverse
+tunnel to a correspondent node.</simpara>
+</textobject>
+</mediaobject>
+</figure><sect2 id="mipoverview-46"><title>Limited Private Addresses Support</title><para>Mobile nodes that have private addresses that are not globally routeable through
+the Internet require reverse tunnels. Solaris Mobile IP supports mobile nodes that
+are privately addressed. See <olink targetptr="mipmanaging-23" remap="internal">Overview of the Solaris
+Mobile IP Implementation</olink> for the functions that Solaris Mobile IP does not
+support.</para><para>Enterprises employ private addresses when external connectivity is not required.
+Private addresses are not routeable through the Internet. When a mobile node has a
+private address, the mobile node can only communicate with a correspondent node by
+having its datagrams reverse-tunneled to its home agent. The home agent then delivers
+the datagram to the correspondent node in whatever manner the datagram is normally
+delivered when the mobile node is at home. The following figure shows a network topology
+with two mobile nodes that are privately addressed. The two mobile nodes use the same
+care-of address when they are registered to the same foreign agent.</para><figure id="mipoverview-fig-38"><title>Privately Addressed Mobile Nodes Residing on
+the Same Foreign Network</title><mediaobject><imageobject><imagedata entityref="PrivateAddr1"/>
+</imageobject><textobject><simpara>Illustrates the network topology of two privately addressed mobile
+nodes that use the same care-of address when registered to the same foreign agent.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>The care-of address and the home agent address must be globally routeable addresses
+if these addresses belong to different domains that are connected by a public Internet.</para><para>The same foreign network can include two mobile nodes that are privately addressed
+with the same IP address. However, each mobile node must have a different home agent.
+Also, each mobile node must be on different advertising subnets of a single foreign
+agent. The following figure shows a network topology that depicts this situation.</para><figure id="mipoverview-fig-39"><title>Privately Addressed Mobile Nodes Residing on
+Different Foreign Networks</title><mediaobject><imageobject><imagedata entityref="PrivateAddr2"/>
+</imageobject><textobject><simpara>Illustrates the network topology of two privately addressed mobile
+nodes that reside on different foreign networks.</simpara>
+</textobject>
+</mediaobject>
+</figure>
+</sect2>
+</sect1><sect1 id="mipoverview-12"><title>Mobile IP Registration</title><para>Mobile nodes detect when they have moved from one subnet to another subnet
+through the use of agent advertisements. When the mobile node receives an agent advertisement
+that indicates that the mobile node has changed locations, the mobile node registers
+through a foreign agent. Even though the mobile node might have acquired its own colocated
+care-of address, this feature is provided to enable sites to restrict access to mobility
+services.</para><para>Mobile IP registration provides a flexible mechanism for mobile nodes to communicate
+the current reachability information to the home agent. The registration process enables
+mobile nodes to perform the following tasks:</para><itemizedlist><listitem><para>Request forwarding services when visiting a foreign network</para>
+</listitem><listitem><para>Inform the home agent of the current care-of address</para>
+</listitem><listitem><para>Renew a registration that is about to expire</para>
+</listitem><listitem><para>Deregister when the mobile node returns home</para>
+</listitem><listitem><para>Request a reverse tunnel</para>
+</listitem>
+</itemizedlist><para>Registration messages exchange information between a mobile node, a foreign
+agent, and the home agent. Registration creates or modifies a mobility binding at
+the home agent. Registration associates the home address of the mobile node with the
+care-of address of the mobile node for the specified lifetime.</para><para>The registration process also enables mobile nodes to do the following functions:</para><itemizedlist><listitem><para>Register with multiple foreign agents</para>
+</listitem><listitem><para>Deregister specific care-of addresses while retaining other mobility
+bindings</para>
+</listitem><listitem><para>Discover the address of a home agent if the mobile node is not configured
+with this information</para>
+</listitem>
+</itemizedlist><para>Mobile IP defines the following registration processes for a mobile node: </para><itemizedlist><listitem><para>If a mobile node registers a foreign agent care-of address, the mobile
+node is informing the home agent that it is reachable through that foreign agent.</para>
+</listitem><listitem><para>If a mobile node receives an agent advertisement that requires the
+mobile node to register through a foreign agent, the mobile node can still attempt
+to obtain a colocated care-of address. The mobile node can also register with that
+foreign agent or any other foreign agent on that link.</para>
+</listitem><listitem><para>If a mobile node uses a colocated care-of address, the mobile node
+registers directly with the home agent.</para>
+</listitem><listitem><para>If a mobile node returns to the home network, the mobile node deregisters
+with the home agent.</para>
+</listitem>
+</itemizedlist><para>These registration processes involve the exchange of registration requests
+and registration reply messages. When the mobile node registers by using a foreign
+agent, the registration process takes the following steps, which the subsequent figure
+shows:</para><orderedlist><listitem><para>The mobile node sends a registration request to the prospective foreign
+agent to begin the registration process.</para>
+</listitem><listitem><para>The foreign agent processes the registration request and then relays
+the request to the home agent.</para>
+</listitem><listitem><para>The home agent sends a registration reply to the foreign agent to
+grant or deny the request.</para>
+</listitem><listitem><para>The foreign agent processes the registration reply and then relays
+the reply to the mobile node to inform the mobile node of the disposition of the request.</para>
+</listitem>
+</orderedlist><figure id="mipoverview-fig-31"><title>Mobile IP Registration Process</title><mediaobject><imageobject><imagedata entityref="registration"/>
+</imageobject><textobject><simpara>Illustrates a mobile node registering with the home agent through
+the foreign agent.</simpara>
+</textobject>
+</mediaobject>
+</figure><para>When the mobile node registers directly with the home agent, the registration
+process requires only the following steps:</para><itemizedlist><listitem><para>The mobile node sends a registration request to the home agent.</para>
+</listitem><listitem><para>The home agent sends a registration reply to the mobile node that grants
+or denies the request.</para>
+</listitem>
+</itemizedlist><para>Also, either the foreign agent or the home agent might require a reverse
+tunnel. If the foreign agent supports reverse tunneling, the mobile node uses the
+registration process to request a reverse tunnel. The mobile node sets the reverse
+tunnel flag in the registration request to request a reverse tunnel.</para><sect2 id="mipoverview-33"><title>Network Access Identifier (NAI)</title><para>Authentication, authorization, and accounting (AAA) servers, in use within the
+Internet, provide authentication and authorization services for dialup computers.
+These services are likely to be equally valuable for mobile nodes that use Mobile
+IP when the nodes attempt to connect to foreign domains with AAA servers. AAA servers
+use the Network Access Identifier (NAI) to identify clients. A mobile node can identify
+itself by including the NAI in the Mobile IP registration request.</para><para>Because the NAI is typically used to uniquely identify the mobile node, the
+home address of the mobile node is not always necessary to provide that function.
+Thus, a mobile node can authenticate itself. Consequently, a mobile node can be authorized
+for connection to the foreign domain without even having a home address. To request
+that a home address be assigned, a message that contains the mobile node NAI extension
+can set the home address field to zero in the registration request.</para>
+</sect2><sect2 id="mipoverview-13"><title>Mobile IP Message Authentication</title><para>Each mobile node, foreign agent, and home agent supports a mobility security
+association between the various Mobile IP components. The security association is
+indexed by the security parameter index (SPI) and IP address. In the instance of the
+mobile node, this address is the home address of the mobile node. Registration messages
+between a mobile node and the home agent are authenticated with the mobile-home authentication
+extension. In addition to mobile-home authentication, which is mandatory, you can
+use the optional mobile-foreign agent and home-foreign agent authentications.</para>
+</sect2><sect2 id="mipoverview-14"><title>Mobile Node Registration Request</title><para>A mobile node uses a <emphasis>registration request</emphasis> message
+to register with the home agent. Thus, the home agent can create or modify a mobility
+binding for that mobile node (for example, with a new lifetime). The foreign agent
+can relay the registration request to the home agent. However, if the mobile node
+is registering a colocated care-of address, then the mobile node can send the registration
+request directly to the home agent. If the foreign agent advertises that registration
+messages must be sent to the foreign agent, then the mobile node must send the registration
+request to the foreign agent.</para>
+</sect2><sect2 id="mipoverview-15"><title>Registration Reply Message</title><para>A mobility agent returns a <emphasis>registration reply</emphasis> message
+to a mobile node that has sent a registration request message. If the mobile node
+requests service from a foreign agent, that foreign agent receives the reply from
+the home agent. Subsequently, the foreign agent relays the reply to the mobile node.
+The reply message contains the necessary codes to inform the mobile node and the foreign
+agent about the status of the registration request. The message also contains the
+lifetime that is granted by the home agent. The lifetime can be smaller than the original
+request. The registration reply can also contain a dynamic home address assignment.</para>
+</sect2><sect2 id="mipoverview-16"><title>Foreign Agent Considerations</title><para>The foreign agent plays a mostly passive role in Mobile IP registration.
+The foreign agent adds all mobile nodes that are registered to the visitor table.
+The foreign agent relays registration requests between mobile nodes and home agents.
+Also, when the foreign agent provides the care-of address, the foreign agent de-encapsulates
+datagrams for delivery to the mobile node. The foreign agent also sends periodic agent
+advertisement messages to advertise the presence of the foreign agent.</para><para>If home agents and foreign agents support reverse tunnels, and the mobile node
+requests a reverse tunnel, the foreign agent then tunnels all the packets from the
+mobile node to the home agent. The home agent then sends the packets to the correspondent
+node. This process is the reverse of the home agent tunneling all of the mobile node's
+packets to the foreign agent for delivery to the mobile node. A foreign agent that
+supports reverse tunnels advertises that the reverse tunnel is supported for registration.
+Because of the local policy, the foreign agent can deny a registration request when
+the reverse tunnel flag is not set. The foreign agent can only distinguish multiple
+mobile nodes with the same (private) IP address when these mobile nodes are visiting
+different interfaces on the foreign agent. In the forward tunnel situation, the foreign
+agent distinguishes between multiple mobile nodes that share the same private addresses
+by looking at the incoming tunnel interface. The incoming tunnel interface maps to
+a unique home agent address.</para>
+</sect2><sect2 id="mipoverview-17"><title>Home Agent Considerations</title><para>Home agents play an active role in the registration process. The home
+agent receives registration requests from the mobile node. The registration request
+might be relayed by the foreign agent. The home agent updates its record of the mobility
+bindings for this mobile node. The home agent issues a suitable registration reply
+in response to each registration request. The home agent also forwards packets to
+the mobile node when the mobile node is away from the home network.</para><para>A home agent might not have to have a physical subnet configured for mobile
+nodes. However, the home agent must recognize the home address of the mobile node
+through the <filename>mipagent.conf</filename> file or some other mechanism when the
+home agent grants registration. For more information about <filename>mipagent.conf</filename>, refer to <olink targetptr="mipimplementing-2" remap="internal">Creating the Mobile IP
+Configuration File</olink>.</para><para>A home agent can support private addressed mobile nodes by configuring the private
+addressed mobile nodes in the <filename>mipagent.conf</filename> file. The home addresses
+that are used by the home agent must be unique.</para>
+</sect2><sect2 id="mipoverview-32"><title>Dynamic Home Agent Discovery</title><para>In some situations, the mobile node might not know the home agent address when
+the mobile node attempts to register. If the mobile node does not know the home agent
+address, the mobile node can use dynamic home agent address resolution to learn the
+address. In this situation, the mobile node sets the home agent field of the registration
+request to the subnet-directed broadcast address of its home network. Each home agent
+that receives a registration request with a broadcast destination address rejects
+the mobile node's registration by returning a rejection registration reply. By doing
+so, the mobile node can use the home agent's unicast IP address that is indicated
+in the rejection reply when the mobile node next attempts registration.</para>
+</sect2>
+</sect1><sect1 id="mipoverview-18"><title>Routing Datagrams to and From Mobile Nodes</title><para>This section describes how mobile nodes, home agents, and foreign agents cooperate
+to route datagrams for mobile nodes that are connected to a foreign network. See <olink targetptr="mipmanaging-23" remap="internal">Overview of the Solaris Mobile IP Implementation</olink> for
+Mobile IP functions that are supported in the Solaris OS.</para><sect2 id="mipoverview-19"><title>Encapsulation Methods</title><para>Home agents and foreign agents use one of the available encapsulation
+methods to support datagrams that use a tunnel. Defined encapsulation methods are
+IP-in-IP Encapsulation, Minimal Encapsulation, and Generic Routing Encapsulation.
+Foreign agent and home agent cases, or indirect colocated mobile node and home agent
+cases, must support the same encapsulation method. All Mobile IP entities are required
+to support IP-in-IP Encapsulation.</para>
+</sect2><sect2 id="mipoverview-20"><title>Unicast Datagram Routing</title><para>When registered on a foreign network, the mobile node uses the following
+rules to choose a default router:</para><itemizedlist><listitem><para>If the mobile node is registered and uses a foreign agent care-of
+address, the process is straightforward. The mobile node chooses its default router
+from among the router addresses that are advertised in the ICMP router advertisement
+portion of that  agent advertisement. The mobile node can also consider the IP source
+address of the agent advertisement as another possible choice for the IP address of
+a default router.</para>
+</listitem><listitem><para>The mobile node might be registered directly with the home agent by using
+a colocated care-of address. Then, the mobile node chooses its default router from
+among those routers that are advertised in any ICMP router advertisement message that
+it receives. The network prefix of the chosen default router must match the network
+prefix of the care-of address of the mobile node that is externally obtained. The
+address might match the IP source address of the agent advertisement under the network
+prefix. Then, the mobile node can also consider that IP source address as another
+possible choice for the IP address of a default router.</para>
+</listitem><listitem><para>If the mobile node is registered, a foreign agent that supports reverse
+tunnels routes unicast datagrams from the mobile node to the home agent through the
+reverse tunnel. If the mobile node is registered with a foreign agent that provides
+reverse tunnel support, the mobile node must use that foreign agent as its default
+router.</para>
+</listitem>
+</itemizedlist>
+</sect2><sect2 id="mipoverview-21"><title>Broadcast Datagrams</title><para>When a home agent receives a broadcast datagram or multicast datagram, the home
+agent only forwards the datagram to mobile nodes that have specifically requested
+that they receive them. How the home agent forwards broadcast and multicast datagrams
+to mobile nodes depends primarily on two factors. Either that mobile node is using
+a foreign-agent provided care-of address, or the mobile node is using its own colocated
+care-of address. The former means that the datagram must be double encapsulated. The
+first IP header identifies the mobile node for which the datagram is to be delivered.
+This first IP header is not present in the broadcast or multicast datagram. The second
+IP header identifies the care-of address, and is the usual tunnel header. In the latter
+instance, the mobile node is decapsulating its own datagrams, and the datagram needs
+only to be sent through the regular tunnel.</para>
+</sect2><sect2 id="mipoverview-22"><title>Multicast Datagram Routing</title><para>To begin receiving multicast traffic when a mobile node is visiting a foreign
+subnet, a mobile node can join a multicast group in any of the following ways:</para><itemizedlist><listitem><para>If the mobile node is using a colocated care-of address, the mobile node
+can use this address as the source IP address of any Internet Group Management Protocol
+(IGMP) join messages. However, a multicast router must be present on the visited subnet.</para>
+</listitem><listitem><para>If the mobile node wants to join the ICMP group from its home subnet,
+the mobile node must use a reverse tunnel to send IGMP join messages to the home agent.
+However, the mobile node's home agent must be a multicast router. The home agent then
+forwards multicast datagrams through the tunnel to the mobile node.</para>
+</listitem><listitem><para>If the mobile node is using a colocated care-of address, the mobile
+node can use this address as the source IP address of any IGMP join messages.  However,
+a multicast router must be present on the visited subnet. After the mobile node has
+joined the group, the mobile node can participate by sending its own multicast packets
+directly on the visited network.</para>
+</listitem>
+</itemizedlist><itemizedlist><listitem><para>Send directly on the visited network.</para>
+</listitem><listitem><para>Send through a tunnel to the home agent.</para>
+</listitem>
+</itemizedlist><para>Multicast routing depends on the IP source address.  A mobile node that is sending
+a multicast datagram must send the datagram from a valid source address on that link.
+ So a mobile node that is sending multicast datagrams directly on the visited network
+must use a colocated care-of address as the IP source address. Also, the mobile node
+must have joined the multicast group that is associated with the address.  Similarly,
+a mobile node that joined a multicast group while on its home subnet before roaming,
+or joined the multicast group while roaming through a reverse tunnel to its home agent,
+must use its home address as the IP source address of the multicast datagram. Thus,
+the mobile node must have these datagrams reverse-tunneled to its home subnet as well,
+either through itself by using its colocated care-of address, or through a foreign
+agent reverse tunnel.</para><para>While it seems more efficient for a mobile node to always join from the
+subnet that the mobile node is visiting, it is still a mobile node. Consequently,
+the mobile node would have to repeat the join every time the mobile node switches
+subnets. The more efficient way is for the mobile node to join through its home agent,
+and not have to carry this overhead. Also, multicast sessions might be present that
+are only available from the home subnet. Other considerations might also force the
+ mobile node to participate in a specific way.</para>
+</sect2>
+</sect1><sect1 id="mipoverview-23"><title>Security Considerations for Mobile IP</title><para>In many situations, mobile computers use wireless links to connect to
+the network. Wireless links are particularly vulnerable to passive eavesdropping,
+active replay attacks, and other active attacks.</para><para>Because Mobile IP recognizes its inability to reduce or eliminate this vulnerability,
+Mobile IP uses a form of authentication to protect Mobile IP registration messages
+from these types of attack. The default algorithm that is used is MD5, with a key
+size of 128 bits. The default operational mode requires that this 128-bit key precede
+and succeed the data to be hashed. The foreign agent uses MD5 to support authentication.
+The foreign agent also uses key sizes of 128 bits or greater, with manual key distribution.
+Mobile IP can support more authentication algorithms, algorithm modes, key distribution
+methods, and key sizes.</para><para>These methods do prevent Mobile IP registration messages from being altered.
+However, Mobile IP also uses a form of replay protection to alert Mobile IP entities
+when they receive duplicates of previous Mobile IP registration messages. If this
+protection method were not used, the mobile node and its home agent might become unsynchronized
+when either of them receives a registration message. Hence, Mobile IP updates its
+state. For example, a home agent receives a duplicate deregistration message while
+the mobile node is registered through a foreign agent. </para><para>Replay protection is ensured either by a method known as <emphasis>nonces,</emphasis> or <emphasis>timestamps</emphasis>. Nonces and timestamps are exchanged by home agents and mobile
+nodes within the Mobile IP registration messages. Nonces and timestamps are protected
+from change by an authentication mechanism. Consequently, if a home agent or mobile
+node receives a duplicate message, the duplicate message can be thrown away.</para><para>The use of tunnels can be a significant vulnerability, especially if registration
+is not authenticated. Also, the Address Resolution Protocol (ARP)  is not authenticated,
+and can potentially be used to steal another host's traffic.</para><sect2 id="mipoverview-44"><title>Use of IPsec With Mobile IP</title><para>In general, because home agents and foreign agents are fixed entities, they
+can use IPsec authentication or encryption to protect both Mobile IP registration
+messages and forward and reverse tunnel traffic.  This process works completely independently
+of Mobile IP, and only depends on the workstation's ability to perform IPsec functions.
+Mobile nodes can also use IPsec authentication to protect their registration traffic.
+If the mobile node registers through a foreign agent, in general the mobile node cannot
+use IPsec encryption. The reason that the mobile node cannot use IPsec encryption
+is because the foreign agent must be able to check the information in the registration
+packet. While IPsec encryption could be used when a foreign agent is not needed, the
+issue of colocation makes this difficult to achieve. IPsec is an IP-level security
+relationship. Consequently, a home agent would have to know the mobile node's colocated
+address without prior information or registration messages.  For more information
+about IPsec, see <olink targetptr="ipsec-ov-1" remap="internal">Chapter&nbsp;19, IP Security Architecture (Overview)</olink> or <olink targetptr="ipsec-mgtasks-1" remap="internal">Chapter&nbsp;20, Configuring IPsec (Tasks)</olink>.</para>
+</sect2>
+</sect1>
+</chapter>

@@ -1,0 +1,349 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<html>
+<head>
+<meta http-equiv="Content-type" content="text/html; charset=iso-8859-1">
+<title>Locality Groups and Thread and Memory Placement - Memory and Thread Placement Optimization Developer's Guide</title>
+<meta name="robots" content="index,follow">
+<meta name="robots" content="index,follow">
+<meta name="date" content="2007-06-01">
+<meta name="collection" content="reference">
+<link rel="stylesheet" type="text/css" href="css/elements.css">
+<link rel="stylesheet" type="text/css" href="css/indiana.css">
+</head>
+
+<body>
+
+
+<div class="Masthead">
+   <div class="MastheadLogo"></div>
+   <div class="Title">Memory and Thread Placement Optimization Developer's Guide</div>
+</div>
+
+<table class="Layout" border="0" cellspacing="0" width="100%">
+<tbody>
+
+   <tr valign="top" class="PageControls">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-31.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="lgroups-33.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+   
+   <tr valign="top">
+      <td class="Navigation" width="200px"><p class="toc level1"><a href="docinfo.html">Document Information</a></p>
+<p class="toc level1 tocsp"><a href="geshf.html">Preface</a></p>
+<p class="toc level1 tocsp"><a href="lgroups-1.html">1.&nbsp;&nbsp;Locality Group APIs</a></p>
+<p class="toc level2"><a href="lgroups-2.html">Locality Groups Overview</a></p>
+<p class="toc level2"><a href="lgroups-27.html">Verifying the Interface Version</a></p>
+<p class="toc level2"><a href="lgroups-4.html">Initializing the Locality Group Interface</a></p>
+<p class="toc level2"><a href="lgroups-29.html">Locality Group Hierarchy</a></p>
+<p class="toc level2"><a href="lgroups-30.html">Locality Group Contents</a></p>
+<p class="toc level2"><a href="lgroups-31.html">Locality Group Characteristics</a></p>
+<div class="onpage">
+<p class="toc level2"><a href="">Locality Groups and Thread and Memory Placement</a></p>
+</div>
+<p class="toc level2"><a href="lgroups-33.html">Examples of API Usage</a></p>
+<p class="toc level1 tocsp"><a href="gevrx.html">2.&nbsp;&nbsp;MPO Observability Tools</a></p>
+</td>
+      <td class="ContentPane" width="705px">
+
+	 <div class="MainContent">      	 
+             
+
+<a name="lgroups-32"></a><h3>Locality Groups and Thread and Memory Placement</h3>
+<p>This section discusses the APIs used to discover and affect thread and memory
+placement with respect to lgroups.</p>
+<ul><li><p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-home-3lgrp?a=view"><tt>lgrp_home</tt>(3LGRP)</a> function is used to discover thread placement.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/816-5167/meminfo-2?a=view"><tt>meminfo</tt>(2)</a> system call is used to discover memory placement.</p></li>
+<li><p>The <tt>MADV_ACCESS</tt> flags to the <a href="http://docs.sun.com/doc/816-5168/madvise-3c?a=view"><tt>madvise</tt>(3C)</a> function are used to affect memory allocation among lgroups.</p></li>
+<li><p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-affinity-set-3lgrp?a=view"><tt>lgrp_affinity_set</tt>(3LGRP)</a> function can affect thread and memory placement by setting a thread's affinity for a given lgroup.</p></li>
+<li><p>The affinities of an lgroup may specify an order of preference for lgroups from which to allocate resources.</p></li>
+<li><p>The kernel needs information about the likely pattern of an application's memory use in order to allocate memory resources efficiently.</p></li>
+<li><p>The <tt>madvise()</tt> function and its shared object analogue <tt>madv.so.1</tt> provide this information to the kernel.</p></li>
+<li><p>A running process can gather memory usage information about itself by using the <tt>meminfo()</tt> system call.</p></li></ul>
+
+
+<a name="lgroups-19"></a><h4>Using <tt>lgrp_home()</tt></h4>
+<p>The <tt>lgrp_home()</tt> function returns the home lgroup for the specified process or thread.</p><pre>#include &lt;sys/lgrp_user.h>
+lgrp_id_t lgrp_home(idtype_t idtype, id_t id);</pre><p>The <tt>lgrp_home()</tt> function returns <tt>EINVAL</tt> when the ID type is not valid. The
+<tt>lgrp_home()</tt> function returns <tt>EPERM</tt> when the effective user of the calling process
+is not the superuser and the real or effective user ID of the
+calling process does not match the real or effective user ID of one
+of the threads. The <tt>lgrp_home()</tt> function returns <tt>ESRCH</tt> when the specified process or
+thread is not found.</p>
+
+<a name="lgroups-23"></a><h4>Using <tt>madvise()</tt></h4>
+<p>The <tt>madvise()</tt> function advises the kernel that a region of user virtual memory
+in the range starting at the address specified in <i>addr</i> and with length
+equal to the value of the <i>len</i> parameter is expected to follow
+a particular pattern of use. The kernel uses this information to optimize the
+procedure for manipulating and maintaining the resources associated with the specified range. Use
+of the <tt>madvise()</tt> function can increase system performance when used by programs that have
+specific knowledge of their access patterns over memory.</p><pre>#include &lt;sys/types.h>
+#include &lt;sys/mman.h>
+int madvise(caddr_t addr, size_t len, int advice);</pre><p>The <tt>madvise()</tt> function provides the following flags to affect how a thread's memory
+is allocated among lgroups:</p><dl><dt><tt>MADV_ACCESS_DEFAULT</tt></dt>
+<dd><p>This flag resets the kernel's expected access pattern for the specified range to the default.</p></dd>
+<dt><tt>MADV_ACCESS_LWP</tt></dt>
+<dd><p>This flag advises the kernel that the next LWP to touch the specified address range is the LWP that will access that range the most. The kernel allocates the memory and other resources for this range and the LWP accordingly.</p></dd>
+<dt><tt>MADV_ACCESS_MANY</tt></dt>
+<dd><p>This flag advises the kernel that many processes or LWPs will access the specified address range randomly across the system. The kernel allocates the memory and other resources for this range accordingly.</p></dd>
+</dl>
+<p>The <tt>madvise()</tt> function can return the following values:</p><dl><dt><tt>EAGAIN</tt></dt>
+<dd><p>Some or all of the mappings in the specified address range, from <i>addr</i> to <i>addr</i>+<i>len</i>, are locked for I/O.</p></dd>
+<dt><tt>EINVAL</tt></dt>
+<dd><p>The value of the <i>addr</i> parameter is not a multiple of the page size as returned by <a href="http://docs.sun.com/doc/816-5168/sysconf-3c?a=view"><tt>sysconf</tt>(3C)</a>, the length of the specified address range is less than or equal to zero, or the advice is invalid.</p></dd>
+<dt><tt>EIO</tt></dt>
+<dd><p>An I/O error occurs while reading from or writing to the file system.</p></dd>
+<dt><tt>ENOMEM</tt></dt>
+<dd><p>Addresses in the specified address range are outside the valid range for the address space of a process or the addresses in the specified address range specify one or more pages that are not mapped.</p></dd>
+<dt><tt>ESTALE</tt></dt>
+<dd><p>The NFS file handle is stale.</p></dd>
+</dl>
+
+
+<a name="lgroups-24"></a><h4>Using <tt>madv.so.1</tt></h4>
+<p>The <tt>madv.so.1</tt> shared object enables the selective configuration of virtual memory advice for
+launched processes and their descendants. To use the shared object, the following string
+must be present in the environment:</p><pre>LD_PRELOAD=$LD_PRELOAD:madv.so.1</pre><p>The <tt>madv.so.1</tt> shared object applies memory advice as specified by the value of
+the <tt>MADV</tt> environment variable. The <tt>MADV</tt> environment variable specifies the virtual memory advice to
+use for all heap, shared memory, and mmap regions in the process address
+space. This advice is applied to all created processes. The following values of
+the <tt>MADV</tt> environment variable affect resource allocation among lgroups:</p><dl><dt><tt>access_default</tt></dt>
+<dd><p>This value resets the kernel's expected access pattern to the default.</p></dd>
+<dt><tt>access_lwp</tt></dt>
+<dd><p>This value advises the kernel that the next LWP to touch an address range is the LWP that will access that range the most. The kernel allocates the memory and other resources for this range and the LWP accordingly.</p></dd>
+<dt><tt>access_many</tt></dt>
+<dd><p>This value advises the kernel that many processes or LWPs will access memory randomly across the system. The kernel allocates the memory and other resources accordingly.</p></dd>
+</dl>
+<p>The value of the <tt>MADVCFGFILE</tt> environment variable is the name of a text
+file that contains one or more memory advice configuration entries in the form
+<i>exec-name</i>:<i>advice-opts</i>.</p><p>The value of <i>exec-name</i> is the name of an application or executable. The
+value of <i>exec-name</i> can be a full pathname, a base name, or a
+pattern string.</p><p>The value of <i>advice-opts</i> is of the form <i>region</i>=<i>advice</i>. The values of
+<i>advice</i> are the same as the values for the <tt>MADV</tt> environment variable. Replace
+<i>region</i> with any of the following legal values:</p><dl><dt><tt>madv</tt></dt>
+<dd><p>Advice applies to all heap, shared memory, and <a href="http://docs.sun.com/doc/816-5167/mmap-2?a=view"><tt>mmap</tt>(2)</a> regions in the process address space.</p></dd>
+<dt><tt>heap</tt></dt>
+<dd><p>The heap is defined to be the <a href="http://docs.sun.com/doc/816-5167/brk-2?a=view"><tt>brk</tt>(2)</a> area. Advice applies to the existing heap and to any additional heap memory allocated in the future.</p></dd>
+<dt><tt>shm</tt></dt>
+<dd><p>Advice applies to shared memory segments. See <a href="http://docs.sun.com/doc/816-5167/shmat-2?a=view"><tt>shmat</tt>(2)</a> for more information on shared memory operations.</p></dd>
+<dt><tt>ism</tt></dt>
+<dd><p>Advice applies to shared memory segments that are using the <tt>SHM_SHARE_MMU</tt> flag. The <tt>ism</tt> option takes precedence over <tt>shm</tt>.</p></dd>
+<dt><tt>dsm</tt></dt>
+<dd><p>Advice applies to shared memory segments that are using the <tt>SHM_PAGEABLE</tt> flag. The <tt>dsm</tt> option takes precedence over <tt>shm</tt>.</p></dd>
+<dt><tt>mapshared</tt></dt>
+<dd><p>Advice applies to mappings established by the <tt>mmap()</tt> system call using the <tt>MAP_SHARED</tt> flag.</p></dd>
+<dt><tt>mapprivate</tt></dt>
+<dd><p>Advice applies to mappings established by the <tt>mmap()</tt> system call using the <tt>MAP_PRIVATE</tt> flag.</p></dd>
+<dt><tt>mapanon</tt></dt>
+<dd><p>Advice applies to mappings established by the <tt>mmap()</tt> system call using the <tt>MAP_ANON</tt> flag. The <tt>mapanon</tt> option takes precedence when multiple options apply.</p></dd>
+</dl>
+<p>The value of the <tt>MADVERRFILE</tt> environment variable is the name of the path
+where error messages are logged. In the absence of a <tt>MADVERRFILE</tt> location,
+the <tt>madv.so.1</tt> shared object logs errors by using <a href="http://docs.sun.com/doc/816-5168/syslog-3c?a=view"><tt>syslog</tt>(3C)</a> with a <tt>LOG_ERR</tt> as the
+severity level and <tt>LOG_USER</tt> as the facility descriptor.</p><p>Memory advice is inherited. A child process has the same advice as
+its parent. The advice is set back to the system default advice after
+a call to <a href="http://docs.sun.com/doc/816-5167/exec-2?a=view"><tt>exec</tt>(2)</a> unless a different level of advice is configured using
+the <tt>madv.so.1</tt> shared object. Advice is only applied to <tt>mmap()</tt> regions explicitly created by
+the user program. Regions established by the run-time linker or by system libraries
+that make direct system calls are not affected.</p>
+
+<a name="lgroups-42"></a><h5><tt>madv.so.1</tt> Usage Examples</h5>
+<p>The following examples illustrate specific aspects of the <tt>madv.so.1</tt> shared object.</p><a name="lgroups-ex-43"></a>Example&nbsp;1-2 Setting Advice for a Set of Applications<p>This configuration applies advice to all ISM segments for applications with exec names
+that begin with <tt>foo</tt>.</p><pre>$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+$ MADVCFGFILE=madvcfg
+$ export LD_PRELOAD MADVCFGFILE
+$ cat $MADVCFGFILE
+        foo*:ism=access_lwp</pre><a name="lgroups-ex-44"></a>Example&nbsp;1-3 Excluding a Set of Applications From Advice<p>This configuration sets advice for all applications with the exception of <tt>ls</tt>.</p><pre>$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+$ MADV=access_many
+$ MADVCFGFILE=madvcfg
+$ export LD_PRELOAD MADV MADVCFGFILE
+$ cat $MADVCFGFILE
+        ls:</pre><a name="lgroups-ex-45"></a>Example&nbsp;1-4 Pattern Matching in a Configuration File<p>Because the configuration specified in <tt>MADVCFGFILE</tt> takes precedence over the value set in
+<tt>MADV</tt>, specifying <tt>*</tt> as the <i>exec-name</i> of the last configuration entry is equivalent to
+setting <tt>MADV</tt>. This example is equivalent to the previous example.</p><pre>$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+$ MADVCFGFILE=madvcfg
+$ export LD_PRELOAD MADVCFGFILE
+$ cat $MADVCFGFILE
+        ls:
+        *:madv=access_many</pre><a name="lgroups-ex-46"></a>Example&nbsp;1-5 Advice for Multiple Regions<p>This configuration applies one type of advice for <tt>mmap()</tt> regions and different advice
+for heap and shared memory regions for applications whose <tt>exec()</tt> names begin
+with <tt>foo</tt>.</p><pre>$ LD_PRELOAD=$LD_PRELOAD:madv.so.1
+$ MADVCFGFILE=madvcfg
+$ export LD_PRELOAD MADVCFGFILE
+$ cat $MADVCFGFILE
+        foo*:madv=access_many,heap=sequential,shm=access_lwp</pre>
+
+<a name="lgroups-25"></a><h4>Using <tt>meminfo()</tt></h4>
+<p>The <tt>meminfo()</tt> function gives the calling process information about the virtual memory and
+physical memory that the system has allocated to that process.</p><pre>#include &lt;sys/types.h>
+#include &lt;sys/mman.h>
+int meminfo(const uint64_t inaddr[], int addr_count,
+    const uint_t info_req[], int info_count, uint64_t outdata[],
+    uint_t validity[]);</pre><p>The <tt>meminfo()</tt> function can return the following types of information:</p><dl><dt><tt>MEMINFO_VPHYSICAL</tt></dt>
+<dd><p>The physical memory address corresponding to the given virtual address</p></dd>
+<dt><tt>MEMINFO_VLGRP</tt></dt>
+<dd><p>The lgroup to which the physical page corresponding to the given virtual address belongs</p></dd>
+<dt><tt>MEMINFO_VPAGESIZE</tt></dt>
+<dd><p>The size of the physical page corresponding to the given virtual address</p></dd>
+<dt><tt>MEMINFO_VREPLCNT</tt></dt>
+<dd><p>The number of replicated physical pages that correspond to the given virtual address</p></dd>
+<dt><tt>MEMINFO_VREPL|n</tt></dt>
+<dd><p>The <b>n</b>th physical replica of the given virtual address</p></dd>
+<dt><tt>MEMINFO_VREPL_LGRP|n</tt></dt>
+<dd><p>The lgroup to which the <b>n</b>th physical replica of the given virtual address belongs</p></dd>
+<dt><tt>MEMINFO_PLGRP</tt></dt>
+<dd><p>The lgroup to which the given physical address belongs</p></dd>
+</dl>
+<p>The <tt>meminfo()</tt> function takes the following parameters:</p><dl><dt><i>inaddr</i></dt>
+<dd><p>An array of input addresses.</p></dd>
+<dt><i>addr_count</i></dt>
+<dd><p>The number of addresses that are passed to <tt>meminfo()</tt>.</p></dd>
+<dt><i>info_req</i></dt>
+<dd><p>An array that lists the types of information that are being requested.</p></dd>
+<dt><i>info_count</i></dt>
+<dd><p>The number of pieces of information that are requested for each address in the <i>inaddr</i> array.</p></dd>
+<dt><i>outdata</i></dt>
+<dd><p>An array where the <tt>meminfo()</tt> function places the results. The array's size is equal to the product of the values of the <i>info_req</i> and <i>addr_count</i> parameters.</p></dd>
+<dt><i>validity</i></dt>
+<dd><p>An array of size equal to the value of the <i>addr_count</i> parameter. The <i>validity</i> array contains bitwise result codes. The <b>0</b>th bit of the result code evaluates the validity of the corresponding input address. Each successive bit in the result code evaluates the validity of the response to the members of the <i>info_req</i> array in turn.</p></dd>
+</dl>
+<p>The <tt>meminfo()</tt> function returns <tt>EFAULT</tt> when the area of memory to which the
+<i>outdata</i> or <i>validity</i> arrays point cannot be written to. The <tt>meminfo()</tt> function returns
+<tt>EFAULT</tt> when the area of memory to which the <i>info_req</i> or <i>inaddr</i>
+arrays point cannot be read from. The <tt>meminfo()</tt> function returns <tt>EINVAL</tt> when the
+value of <i>info_count</i> exceeds 31 or is less than 1. The <tt>meminfo()</tt> function
+returns <tt>EINVAL</tt> when the value of <i>addr_count</i> is less than zero.</p><a name="lgroups-ex-41"></a>Example&nbsp;1-6 Use of <tt>meminfo()</tt> to Print Out Physical Pages and Page Sizes Corresponding to a Set of Virtual Addresses<pre>void
+print_info(void **addrvec, int how_many)
+{
+        static const int info[] = {
+                MEMINFO_VPHYSICAL,
+                MEMINFO_VPAGESIZE};
+        uint64_t * inaddr = alloca(sizeof(uint64_t) * how_many);
+        uint64_t * outdata = alloca(sizeof(uint64_t) * how_many * 2;
+        uint_t * validity = alloca(sizeof(uint_t) * how_many);
+
+        int i;
+
+        for (i = 0; i &lt; how_many; i++)
+                inaddr[i] = (uint64_t *)addr[i];
+
+        if (meminfo(inaddr, how_many,  info,
+                    sizeof (info)/ sizeof(info[0]),
+                    outdata, validity) &lt; 0)
+                ...
+
+        for (i = 0; i &lt; how_many; i++) {
+                if (validity[i] &amp; 1 == 0)
+                        printf("address 0x%llx not part of address
+                                        space\n",
+                                inaddr[i]);
+
+                else if (validity[i] &amp; 2 == 0)
+                        printf("address 0x%llx has no physical page
+                                        associated with it\n",
+                                inaddr[i]);
+
+                else {
+                        char buff[80];
+                        if (validity[i] &amp; 4 == 0)
+                                strcpy(buff, "&lt;Unknown>");
+                        else
+                                sprintf(buff, "%lld", outdata[i * 2 +
+                                                1]);
+                        printf("address 0x%llx is backed by physical
+                                        page 0x%llx of size %s\n",
+                                        inaddr[i], outdata[i * 2], buff);
+                }
+        }
+}</pre>
+
+<a name="lgroups-20"></a><h4>Locality Group Affinity</h4>
+<p>The kernel assigns a thread to a locality group when the lightweight process
+(LWP) for that thread is created. That lgroup is called the thread's
+<b>home lgroup</b>. The kernel runs the thread on the CPUs in the thread's home
+lgroup and allocates memory from that lgroup whenever possible. If resources from the
+home lgroup are unavailable, the kernel allocates resources from other lgroups. When a
+thread has affinity for more than one lgroup, the operating system allocates resources
+from lgroups chosen in order of affinity strength. Lgroups can have one of
+three distinct affinity levels:</p>
+<ol><li><p><tt>LGRP_AFF_STRONG</tt> indicates strong affinity. If this lgroup is the thread's home lgroup, the operating system avoids rehoming the thread to another lgroup if possible. Events such as dynamic reconfiguration, processor, offlining, processor binding, and processor set binding and manipulation might still result in thread rehoming.</p></li>
+<li><p><tt>LGRP_AFF_WEAK</tt> indicates weak affinity. If this lgroup is the thread's home lgroup, the operating system rehomes the thread if necessary for load balancing purposes.</p></li>
+<li><p><tt>LGRP_AFF_NONE</tt> indicates no affinity. If a thread has no affinity to any lgroup, the operating system assigns a home lgroup to the thread .</p></li></ol>
+<p>The operating system uses lgroup affinities as advice when allocating resources for a
+given thread. The advice is factored in with the other system constraints. Processor
+binding and processor sets do not change lgroup affinities, but might restrict the
+lgroups on which a thread can run.</p>
+
+<a name="lgroups-192"></a><h5>Using <tt>lgrp_affinity_get()</tt></h5>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-affinity-get-3lgrp?a=view"><tt>lgrp_affinity_get</tt>(3LGRP)</a> function returns the affinity that a LWP has for a given
+lgroup.</p><pre>#include &lt;sys/lgrp_user.h>
+lgrp_affinity_t lgrp_affinity_get(idtype_t idtype, id_t id, lgrp_id_t lgrp);</pre><p>The <i>idtype</i> and <i>id</i> arguments specify the LWP that the <tt>lgrp_affinity_get()</tt> function examines. If
+the value of <i>idtype</i> is <tt>P_PID</tt>, the <tt>lgrp_affinity_get()</tt> function gets the lgroup affinity for
+one of the LWPs in the process whose process ID matches the
+value of the <i>id</i> argument. If the value of <i>idtype</i> is <tt>P_LWPID</tt>,
+the <tt>lgrp_affinity_get()</tt> function gets the lgroup affinity for the LWP of the current
+process whose LWP ID matches the value of the <i>id</i> argument. If the
+value of <i>idtype</i> is <tt>P_MYID</tt>, the <tt>lgrp_affinity_get()</tt> function gets the lgroup affinity for
+the current LWP.</p><p>The <tt>lgrp_affinity_get()</tt> function returns <tt>EINVAL</tt> when the given lgroup or ID type
+is not valid. The <tt>lgrp_affinity_get()</tt> function returns <tt>EPERM</tt> when the effective user of
+the calling process is not the superuser and the ID of the
+calling process does not match the real or effective user ID of one
+of the LWPs. The <tt>lgrp_affinity_get()</tt> function returns <tt>ESRCH</tt> when a given lgroup or
+LWP is not found.</p>
+
+<a name="lgroups-193"></a><h5>Using <tt>lgrp_affinity_set()</tt></h5>
+<p>The <a href="http://docs.sun.com/doc/816-5172/lgrp-affinity-set-3lgrp?a=view"><tt>lgrp_affinity_set</tt>(3LGRP)</a> function sets the affinity that a LWP or set of
+LWPs have for a given lgroup.</p><pre>#include &lt;sys/lgrp_user.h>
+int lgrp_affinity_set(idtype_t idtype, id_t id, lgrp_id_t lgrp,
+                      lgrp_affinity_t affinity);</pre><p>The <i>idtype</i> and <i>id</i> arguments specify the LWP or set of LWPs the
+<tt>lgrp_affinity_set()</tt> function examines. If the value of <i>idtype</i> is <tt>P_PID</tt>, the <tt>lgrp_affinity_set()</tt> function sets
+the lgroup affinity for all of the LWPs in the process whose process
+ID matches the value of the <i>id</i> argument to the affinity level
+specified in the <i>affinity</i> argument. If the value of <i>idtype</i> is <tt>P_LWPID</tt>,
+the <tt>lgrp_affinity_set()</tt> function sets the lgroup affinity for the LWP of the current
+process whose LWP ID matches the value of the <i>id</i> argument to the
+affinity level specified in the <i>affinity</i> argument. If the value of <i>idtype</i> is
+<tt>P_MYID</tt>, the <tt>lgrp_affinity_set()</tt> function sets the lgroup affinity for the current LWP or
+process to the affinity level specified in the <i>affinity</i> argument.</p><p>The <tt>lgrp_affinity_set()</tt> function returns <tt>EINVAL</tt> when the given lgroup, affinity, or ID
+type is not valid. The <tt>lgrp_affinity_set()</tt> function returns <tt>EPERM</tt> when the effective user
+of the calling process is not the superuser and the ID of the
+calling process does not match the real or effective user ID of
+one of the LWPs. The <tt>lgrp_affinity_set()</tt> function returns <tt>ESRCH</tt> when a given lgroup
+or LWP is not found.</p>
+         </div>
+      </td>
+   </tr>
+
+   <tr class="PageControls" valign="top">
+      <td></td>
+      <td>
+         <table width="100%">
+      	   <tr>
+      	     <td>
+                 <a href="lgroups-31.html">Previous</a>
+             </td>
+             <td align="right">
+                 <a href="lgroups-33.html">Next</a>
+             </td>
+           </tr>
+         </table>
+      </td>
+   </tr>
+</tbody>
+</table>
+
+
+</body>
+</html>
+

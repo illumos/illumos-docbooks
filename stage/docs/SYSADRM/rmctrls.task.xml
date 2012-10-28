@@ -1,0 +1,348 @@
+<chapter id="rmctrls.task-1"><title>Administering
+Resource Controls (Tasks)</title><highlights><para>This chapter describes how to administer the resource controls facility.</para><para>For an overview of the resource controls facility, see <olink targetptr="rmctrls-1" remap="internal">Chapter&nbsp;6, Resource Controls (Overview)</olink>.</para>
+</highlights><sect1 id="rmctrls.task-50"><title>Administering Resource Controls (Task Map)</title><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+</entry><entry><para>Description</para>
+</entry><entry><para>For Instructions</para>
+</entry>
+</row>
+</thead><tbody><row><entry><para>Set resource controls.</para>
+</entry><entry><para>Set resource controls for a project in the <filename>/etc/project</filename> file.</para>
+</entry><entry><para><olink targetptr="rmctrls.task-2" remap="internal">Setting Resource Controls</olink></para>
+</entry>
+</row><row><entry><para>Get or revise the resource control values for active processes, tasks, or projects,
+with local scope.</para>
+</entry><entry><para>Make runtime interrogations of and modifications to the resource controls associated
+with an active process, task, or project on the system.</para>
+</entry><entry><para><olink targetptr="rmctrls.task-33" remap="internal">Using the prctl Command</olink></para>
+</entry>
+</row><row><entry><para>On a running system, view or update the global state of resource controls.</para>
+</entry><entry><para>View the global logging state of each resource control on a system-wide basis.
+Also set up the level of <literal>syslog</literal> logging when controls are exceeded.</para>
+</entry><entry><para><olink targetptr="rmctrls.task-34" remap="internal">Using rctladm</olink></para>
+</entry>
+</row><row><entry><para>Report status of active interprocess communication (IPC) facilities.</para>
+</entry><entry><para>Display information about active interprocess communication (IPC) facilities.
+Observe which IPC objects are contributing to a project's usage. </para>
+</entry><entry><para><olink targetptr="rmctrls.task-35" remap="internal">Using ipcs</olink></para>
+</entry>
+</row><row><entry><para>Determine whether a web server is allocated sufficient CPU capacity.</para>
+</entry><entry><para>Set a global action on a resource control. This action enables you to receive
+notice of any entity that has a resource control value that is set too low.</para>
+</entry><entry><para><olink targetptr="rmctrls.task-8" remap="internal">How to Determine Whether a Web Server Is Allocated
+Enough CPU Capacity</olink></para>
+</entry>
+</row>
+</tbody>
+</tgroup>
+</informaltable>
+</sect1><sect1 id="rmctrls.task-2"><title>Setting Resource Controls</title><task id="rmctrls.task-3"><title>How to Set the Maximum Number of LWPs for Each Task
+in a Project</title><tasksummary><para>This procedure adds a project named <literal>x-files</literal> to the <filename>/etc/project</filename> file and sets a maximum number of LWPs for a task created
+in the project.</para>
+</tasksummary><procedure><step id="rmctrls.task-step-26"><para>Become superuser or assume an equivalent role.</para><para>Roles contain authorizations and privileged commands. For more information
+about roles, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step id="rmctrls.task-step-25"><para>Use the <command>projadd</command> command with
+the <option>K</option> option to create a project called <literal>x-files</literal>.
+Set the maximum number of LWPs for each task created in the project to <literal>3</literal>.</para><screen># <userinput>projadd -K 'task.max-lwps=(privileged,3,deny)' x-files</userinput></screen>
+</step><step id="rmctrls.task-step-27"><para>View the entry in the <filename>/etc/project</filename> file by using one of the following methods:</para><itemizedlist><listitem><para>Type:</para><screen># projects -l
+system
+        projid : 0
+        comment: ""
+        users  : (none)
+        groups : (none)
+        attribs: 
+.
+.
+.
+x-files
+        projid : 100
+        comment: ""
+        users  : (none)
+        groups : (none)
+        attribs: task.max-lwps=(privileged,3,deny)</screen>
+</listitem><listitem><para>Type:</para><screen># <userinput>cat /etc/project</userinput>
+system:0:System:::
+.
+.
+.
+x-files:100::::task.max-lwps=(privileged,3,deny)</screen>
+</listitem>
+</itemizedlist>
+</step>
+</procedure><example id="fcpej"><title>Sample Session</title><para>After implementing the steps in this procedure, when superuser creates a new
+task in project <literal>x-files</literal> by joining the project with <command>newtask</command>, superuser will not be able to create more than three LWPs while running
+in this task. This is shown in the following annotated sample session.</para><screen># <userinput>newtask -p x-files csh</userinput>
+
+# <userinput>prctl -n task.max-lwps $$</userinput>
+process: 111107: csh
+NAME    PRIVILEGE    VALUE    FLAG   ACTION            RECIPIENT
+task.max-lwps
+        privileged       3       -   deny                      -
+        system       2.15G     max   deny                      -
+# <userinput>id -p</userinput>
+uid=0(root) gid=1(other) projid=100(x-files)
+
+# <userinput>ps -o project,taskid -p $$</userinput>
+ PROJECT TASKID
+ x-files    73
+
+# <userinput>csh</userinput>        /* creates second LWP */
+
+# <userinput>csh</userinput>        /* creates third LWP */
+
+# <userinput>csh</userinput>        /* cannot create more LWPs */
+Vfork failed
+#</screen>
+</example>
+</task><task id="rmctrls.task-4"><title>How to Set Multiple Controls on a Project</title><tasksummary><para>The <filename>/etc/project</filename> file can contain settings for multiple
+resource controls for each project as well as multiple threshold values for each control.
+Threshold values are defined in action clauses, which are comma-separated for multiple
+values.</para>
+</tasksummary><procedure><step id="rmctrls.task-step-29"><para>Become superuser or assume an equivalent role.</para><para>Roles contain authorizations and privileged commands. For more information
+about roles, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step id="rmctrls.task-step-30"><para>Use the <command>projmod</command> command with
+the <option>s</option> and <option>K</option> options to set resource controls on
+project <literal>x-files</literal>:</para><screen># <userinput>projmod -s -K 'task.max-lwps=(basic,10,none),(privileged,500,deny);
+process.max-file-descriptor=(basic,128,deny)' x-files</userinput><lineannotation>one line in file</lineannotation></screen><para>The following controls are set:</para><itemizedlist><listitem><para>A <literal>basic</literal> control with no action on the maximum LWPs
+per task.</para>
+</listitem><listitem><para>A privileged <literal>deny</literal> control on the maximum LWPs per
+task. This control causes any LWP creation that exceeds the maximum to fail, as shown
+in the previous example <olink targetptr="rmctrls.task-3" remap="internal">How to Set the Maximum Number
+of LWPs for Each Task in a Project</olink>.</para>
+</listitem><listitem><para>A limit on the maximum file descriptors per process at the <literal>basic</literal> level, which forces the failure of any <literal>open</literal> call
+that exceeds the maximum.</para>
+</listitem>
+</itemizedlist>
+</step><step id="rmctrls.task-step-31"><para>View the entry in the file by using one of the
+following methods:</para><itemizedlist><listitem><para>Type:</para><screen># <userinput>projects -l</userinput>
+.
+.
+.
+x-files
+        projid : 100
+        comment: ""
+        users  : (none)
+        groups : (none)
+        attribs: process.max-file-descriptor=(basic,128,deny)
+                 task.max-lwps=(basic,10,none),(privileged,500,deny) <lineannotation>one line in file</lineannotation></screen>
+</listitem><listitem><para>Type:</para><screen># <userinput>cat etc/project</userinput>
+.
+.
+.
+x-files:100::::process.max-file-descriptor=(basic,128,deny);
+task.max-lwps=(basic,10,none),(privileged,500,deny) <lineannotation>one line in file</lineannotation></screen>
+</listitem>
+</itemizedlist>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="rmctrls.task-33"><title>Using the <command>prctl</command> Command</title><para>Use the <command>prctl</command> command to make runtime interrogations of and
+modifications to the resource controls associated with an active process, task, or
+project on the system. See the <olink targetdoc="group-refman" targetptr="prctl-1" remap="external"><citerefentry><refentrytitle>prctl</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para><task id="fcpje"><title>How to Use the <command>prctl</command> Command to Display
+Default Resource Control Values</title><tasksummary><para>This procedure must be used on a system on which no resource controls have been
+set or changed. There can be only non-default entries in the <filename>/etc/system</filename> file or in the <literal>project</literal>  database.</para>
+</tasksummary><procedure remap="single-step"><step><para>Use the <command>prctl</command> command on any process, such as the current
+shell that is running.</para><screen><userinput># prctl $$</userinput>
+process: 100337: -sh
+NAME    PRIVILEGE       VALUE    FLAG   ACTION                   RECIPIENT
+process.max-port-events
+        privileged      65.5K       -   deny                             -
+        system          2.15G     max   deny                             -
+process.crypto-buffer-limit
+        system          16.0EB    max   deny                             -
+process.max-crypto-sessions
+        system          18.4E     max   deny                             -
+process.add-crypto-sessions
+        privileged        100       -   deny                             -
+        system          18.4E     max   deny                             -
+process.min-crypto-sessions
+        privileged         20       -   deny                             -
+        system          18.4E     max   deny                             -
+process.max-msg-messages
+        privileged      8.19K       -   deny                             -
+        system          4.29G     max   deny                             -
+process.max-msg-qbytes
+        privileged      64.0KB      -   deny                             -
+        system          16.0EB    max   deny                             -
+process.max-sem-ops
+        privileged        512       -   deny                             -
+        system          2.15G     max   deny                             -
+process.max-sem-nsems
+        privileged        512       -   deny                             -
+        system          32.8K     max   deny                             -
+process.max-address-space
+        privileged      16.0EB    max   deny                             -
+        system          16.0EB    max   deny                             -
+process.max-file-descriptor
+        basic             256       -   deny                        100337
+        privileged      65.5K       -   deny                             -
+        system          2.15G     max   deny                             -
+process.max-core-size
+        privileged      8.00EB    max   deny                             -
+        system          8.00EB    max   deny                             -
+process.max-stack-size
+        basic           8.00MB      -   deny                        100337
+        privileged      8.00EB      -   deny                             -
+        system          8.00EB    max   deny                             -
+process.max-data-size
+        privileged      16.0EB    max   deny                             -
+        system          16.0EB    max   deny                             -
+process.max-file-size
+        privileged      8.00EB    max   deny,signal=XFSZ                 -
+        system          8.00EB    max   deny                             -
+process.max-cpu-time
+        privileged      18.4Es    inf   signal=XCPU                      -
+        system          18.4Es    inf   none                             -
+task.max-cpu-time
+        system          18.4Es    inf   none                             -
+task.max-lwps
+        system          2.15G     max   deny                             -
+project.max-contracts
+        privileged      10.0K       -   deny                             -
+        system          2.15G     max   deny                             -
+project.max-device-locked-memory
+        privileged       499MB      -   deny                             -
+        system          16.0EB    max   deny                             -
+project.max-port-ids
+        privileged      8.19K       -   deny                             -
+        system          65.5K     max   deny                             -
+project.max-shm-memory
+        privileged      1.95GB      -   deny                             -
+        system          16.0EB    max   deny                             -
+project.max-shm-ids
+        privileged        128       -   deny                             -
+        system          16.8M     max   deny                             -
+project.max-msg-ids
+        privileged        128       -   deny                             -
+        system          16.8M     max   deny                             -
+project.max-sem-ids
+        privileged        128       -   deny                             -
+        system          16.8M     max   deny                             -
+project.max-tasks
+        system          2.15G     max   deny                             -
+project.max-lwps
+        system          2.15G     max   deny                             -
+project.cpu-shares
+        privileged          1       -   none                             -
+        system          65.5K     max   none                             -
+zone.max-lwps
+        system          2.15G     max   deny                             -
+zone.cpu-shares
+        privileged          1       -   none                             -
+        system          65.5K     max   none                             -</screen>
+</step>
+</procedure>
+</task><task id="fcpjm"><title>How to Use the <command>prctl</command> Command to Display
+Information for a Given Resource Control</title><procedure remap="single-step"><step><para>Display the maximum file descriptor for the current shell that is running.</para><screen># <userinput>prctl -n process.max-file-descriptor $$</userinput>
+process: 110453: -sh
+NAME    PRIVILEGE       VALUE    FLAG   ACTION       RECIPIENT
+process.max-file-descriptor
+        basic             256       -   deny            110453
+        privileged      65.5K       -   deny                 -
+        system          2.15G     max   deny     </screen>
+</step>
+</procedure>
+</task><task id="rmctrls.task-39"><title>How to Use <command>prctl</command> to Temporarily
+Change a Value</title><tasksummary><para>This example procedure uses the <command>prctl</command> command to temporarily
+add a new privileged value to deny the use of more than three LWPs per project for
+the <literal>x-files</literal> project. The result is comparable to the result in <olink targetptr="rmctrls.task-3" remap="internal">How to Set the Maximum Number of LWPs for Each Task in
+a Project</olink>.</para>
+</tasksummary><procedure><step id="rmctrls.task-step-41"><para>Become superuser or assume an equivalent role.</para><para>Roles contain authorizations and privileged commands. For more information
+about roles, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step id="rmctrls.task-step-42"><para>Use <command>newtask</command> to join the <literal>x-files</literal> project.</para><screen># <userinput>newtask -p x-files</userinput></screen>
+</step><step id="rmctrls.task-step-43"><para>Use the <command>id</command> command with the <option>p</option> option to verify that the correct project has been joined.</para><screen># <userinput>id -p</userinput>
+uid=0(root) gid=1(other) projid=101(x-files)</screen>
+</step><step id="rmctrls.task-step-44"><para>Add a new privileged value for <literal>project.max-lwps</literal> that  limits the number of LWPs to three.</para><screen width="100"># <userinput>prctl -n project.max-lwps -t privileged -v 3 -e deny -i project x-files</userinput></screen>
+</step><step id="rmctrls.task-step-46"><para>Verify the result.</para><screen># <userinput>prctl -n project.max-lwps -i project x-files</userinput>
+process: 111108: csh
+NAME    PRIVILEGE    VALUE    FLAG   ACTION            RECIPIENT
+project.max-lwps
+        privileged       3       -   deny                      -
+        system       2.15G     max   deny                      -</screen>
+</step>
+</procedure>
+</task><task id="rmctrls.task-45"><title>How to Use <command>prctl</command> to Lower a Resource
+Control Value</title><procedure><step id="rmctrls.task-step-48"><para>Become superuser or assume an equivalent role.</para><para>Roles contain authorizations and privileged commands. For more information
+about roles, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step id="rmctrls.task-step-49"><para>Use the <command>prctl</command> command with
+the <option>r</option> option to change the lowest value of the <literal>process.max-file-descriptor</literal> resource control.</para><screen># <userinput>prctl -n process.max-file-descriptor -r -v 128 $$</userinput></screen>
+</step>
+</procedure>
+</task><task id="rmctrls.task-18"><title>How to Use <command>prctl</command> to Display,
+Replace, and Verify the Value of a Control on a Project</title><procedure><step id="rmctrls.task-step-32"><para>Become superuser or assume an equivalent role.</para><para>Roles contain authorizations and privileged commands. For more information
+about roles, see <olink targetdoc="sysadv1" targetptr="smcover-95" remap="external"><citetitle remap="section">Using the Solaris Management Tools With RBAC (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Basic Administration</citetitle></olink>.</para>
+</step><step id="rmctrls.task-step-21"><para>Display the value of <literal>project.cpu-shares</literal> in the project <replaceable>group.staff</replaceable>.</para><screen># <userinput>prctl -n project.cpu-shares -i project group.staff</userinput>
+project: 2: group.staff
+NAME    PRIVILEGE       VALUE    FLAG   ACTION     RECIPIENT
+project.cpu-shares
+        privileged          1       -   none               -
+        system          65.5K     max   none </screen>
+</step><step id="rmctrls.task-step-22"><para>Replace the current <literal>project.cpu-shares</literal> value <literal>1</literal> with the value <literal>10</literal>.</para><screen># <userinput>prctl -n project.cpu-shares -v 10 -r -i project group.staff</userinput></screen>
+</step><step id="rmctrls.task-step-23"><para>Display the value of <literal>project.cpu-shares</literal> in the project <literal>group.staff</literal>.</para><screen># <userinput>prctl -n project.cpu-shares -i project group.staff</userinput>
+project: 2: group.staff
+NAME    PRIVILEGE       VALUE    FLAG   ACTION     RECIPIENT
+project.cpu-shares
+        privileged         10       -   none               -
+        system          65.5K     max   none </screen>
+</step>
+</procedure>
+</task>
+</sect1><sect1 id="rmctrls.task-34"><title>Using <command>rctladm</command></title><sect2 id="rmctrls.task-6"><title>How to Use <command>rctladm</command></title><para>Use the <command>rctladm</command> command to make runtime interrogations of
+and modifications to the global state of the resource controls facility. See the <olink targetdoc="group-refman" targetptr="rctladm-1m" remap="external"><citerefentry><refentrytitle>rctladm</refentrytitle><manvolnum>1M</manvolnum></citerefentry></olink> man page for more information.</para><para>For example, you can use <command>rctladm</command> with the <option>e</option> option
+to enable the global <literal>syslog</literal> attribute of a resource control. When
+the control is exceeded, notification is logged at the specified <literal>syslog</literal> level.
+To enable the global <literal>syslog</literal> attribute of <literal>process.max-file-descriptor</literal>, type the following:</para><screen># <userinput>rctladm -e syslog process.max-file-descriptor</userinput></screen><para>When used without arguments, the <command>rctladm</command> command displays
+the global flags, including the global type flag, for each resource control.</para><screen># <userinput>rctladm</userinput>
+process.max-port-events     syslog=off  [ deny count ]
+process.max-msg-messages    syslog=off  [ deny count ]
+process.max-msg-qbytes      syslog=off  [ deny bytes ]
+process.max-sem-ops         syslog=off  [ deny count ]
+process.max-sem-nsems       syslog=off  [ deny count ]
+process.max-address-space   syslog=off  [ lowerable deny no-signal bytes ]
+process.max-file-descriptor syslog=off  [ lowerable deny count ]
+process.max-core-size       syslog=off  [ lowerable deny no-signal bytes ]
+process.max-stack-size      syslog=off  [ lowerable deny no-signal bytes ]
+.
+.
+.</screen>
+</sect2>
+</sect1><sect1 id="rmctrls.task-35"><title>Using <command>ipcs</command></title><sect2 id="rmctrls.task-13"><title>How to Use <command>ipcs</command></title><para>Use the <command>ipcs</command> utility to display information about active
+interprocess communication (IPC) facilities. See the <olink targetdoc="group-refman" targetptr="ipcs-1" remap="external"><citerefentry><refentrytitle>ipcs</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man
+page for more information.</para><para>You can use <command>ipcs</command> with the <option>J</option> option to see
+which project's limit an IPC object is allocated against.</para><screen># <userinput>ipcs -J</userinput>
+    IPC status from &lt;running system> as of Wed Mar 26 18:53:15 PDT 2003
+T         ID      KEY        MODE       OWNER    GROUP    PROJECT
+Message Queues:
+Shared Memory:
+m       3600      0       --rw-rw-rw-   uname    staff    x-files
+m        201      0       --rw-rw-rw-   uname    staff    x-files
+m       1802      0       --rw-rw-rw-   uname    staff    x-files
+m        503      0       --rw-rw-rw-   uname    staff    x-files
+m        304      0       --rw-rw-rw-   uname    staff    x-files
+m        605      0       --rw-rw-rw-   uname    staff    x-files
+m          6      0       --rw-rw-rw-   uname    staff    x-files
+m        107      0       --rw-rw-rw-   uname    staff    x-files
+Semaphores:
+s          0      0       --rw-rw-rw-   uname    staff    x-files</screen>
+</sect2>
+</sect1><sect1 id="rmctrls.task-7"><title>Capacity Warnings</title><para>A global action on a resource control enables you to receive notice of any entity
+that is tripping over a resource control value that is set too low.</para><para>For example, assume you want to determine whether a web server possesses sufficient
+CPUs for its typical workload. You could analyze <command>sar</command> data for idle
+CPU time and load average. You could also examine extended accounting data to determine
+the number of simultaneous processes that are running for the web server process.</para><para>However, an easier approach is to place the web server in a task. You can then
+set a global action, using <command>syslog</command>, to notify you whenever a task
+exceeds a scheduled number of LWPs appropriate for the machine's capabilities.</para><para>See the <olink targetdoc="group-refman" targetptr="sar-1" remap="external"><citerefentry><refentrytitle>sar</refentrytitle><manvolnum>1</manvolnum></citerefentry></olink> man page for more
+information.</para><task id="rmctrls.task-8"><title>How to Determine Whether a Web Server Is Allocated
+Enough CPU Capacity</title><procedure><step id="rmctrls.task-step-10"><para>Use the <command>prctl</command> command to
+place a privileged (superuser-owned) resource control on the tasks that contain an <command>httpd</command> process. Limit each task's total number of LWPs to 40, and disable
+all local actions.</para><screen># <userinput>prctl -n task.max-lwps -v 40 -t privileged -d all `pgrep httpd`</userinput></screen>
+</step><step id="rmctrls.task-step-11"><para>Enable a system log global action on the <literal>task.max-lwps</literal> resource control.</para><screen># <userinput>rctladm -e syslog task.max-lwps</userinput></screen>
+</step><step id="rmctrls.task-step-12"><para>Observe whether the workload trips the resource
+control.</para><para>If it does, you will see <filename>/var/adm/messages</filename> such
+as:</para><screen>Jan  8 10:15:15 testmachine unix: [ID 859581 kern.notice] 
+NOTICE: privileged rctl task.max-lwps exceeded by task 19</screen>
+</step>
+</procedure>
+</task>
+</sect1>
+</chapter>
