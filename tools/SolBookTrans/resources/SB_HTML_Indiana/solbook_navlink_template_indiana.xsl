@@ -26,12 +26,16 @@
        <xsl:when test="local-name() = 'title'">
            <!-- do nothing -->
        </xsl:when>
-	<xsl:when test="local-name() = 'preface'">
-	    <xsl:value-of select="local-name()" />
+	<xsl:when test="local-name() = 'bookinfo'">
+	    <xsl:text><xsl:value-of select="local-name()" /></xsl:text>
 	    <xsl:text>.html</xsl:text>
 	</xsl:when>
+	<xsl:when test="local-name() = 'preface'">
+            <xsl:text><xsl:value-of select="local-name()" /></xsl:text>
+            <xsl:text>.html</xsl:text>
+	</xsl:when>
         <xsl:otherwise>
-            <xsl:value-of select="@id" />
+            <xsl:text><xsl:value-of select="@id" /></xsl:text>
             <xsl:text>.html</xsl:text>
         </xsl:otherwise>
     </xsl:choose>
