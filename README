@@ -4,18 +4,30 @@ for illumos. Currently only a subset of the docbooks that once existed
 are here. Others will be added once someone cares enough about them and
 we make the process for working on them not quite so terrible.
 
-To build them into something useful, first expect pain and then take a
-look at http://hub.opensolaris.org/bin/view/Community+Group+documentation/tools.
-In case that too disappears (like the docbooks), I've included the
-source to the Java build tool which is licensed (according to the
-source) under a combo GPL/CDDL.
+To build them into something useful, you will need to install:
+
+- GNU make (gmake in pkgsrc)
+- Maven (apache-maven in pkgsrc)
+- dblatex (dblatex in pkgsrc)
+- epstopdf conversion tool (tex-epstopdf in pkgsrc)
+- texlive packages (texlive-collection-fontsrecommended,
+  texlive-collection-latexrecommended,
+  texlive-collection-latexextra in pkgsrc)
+- cyrillic fonts (tex-cyrillic in pkgsrc)
+
+The build tools are based on the old Solbook build tools, which were
+licensed under a combo GPL/CDDL.
 
 Building:
 
-To build the currently existing docbooks, use the provided script. The
-quick and easy way to build everything is to use:
+The quick and easy way to build everything is to run:
 
-./tools/build.sh -a
+make all
+
+If you're on a system that doesn't have LaTeX packages available, you can
+build just the HTML files with:
+
+make html
 
 Layout:
 
@@ -24,21 +36,21 @@ Layout:
   The currently maintained and updated docbooks. Each book is in its own
   top level directory.
 
+  - ./src
+
+  The source files for generating websites and PDFs from the DocBook
+  sources.
+
   - ./stage
 
   Original docbooks from Sun that have not been updated.
-
-  - ./tools
-
-  The tools to build the docbooks. This include scripts, the original
-  Java build tools, and the xslt transformations.
 
 Adding new books:
 
 As a part of adding a new book, it should be moved from stage to raw.
 Also, when you move it, please change the name to something that is a
-bit more obvious.  dtrace is much better then DYNMCTRCGGD or MODDEBUG.
-Once it is there, you must do the following things:
+bit more obvious.  dtrace is much better than DYNMCTRCGGD, and mdb
+than MODDEBUG. Once it is there, you must do the following things:
 
   o  Add a license appendix that clearly states that this is under the
      PDL. Look at what the mdb or DTrace guides do.
@@ -52,6 +64,57 @@ Once it is there, you must do the following things:
 
   o  Before you are done, add it as a check target in the Makefile.
 
+And convert the sources from SolBook to Docbook 5:
+
+  o  Remove <highlights> tags, but leave their inner content
+  o  Convert all id's to xml:id's
+  o  Convert <olink> tags where remap="internal" to <xref> tags
+  o  Remove the <olink> tags around <citerefentry> tags
+  o  Convert <ulink> tags to <link> tags
+  o  Convert <chapterinfo> and <bookinfo> to just <info>
+  o  Add a <bibliorelation> tag that can be used when creating canonical links
+  o  Move <option> tags out of <command> tags/restructure
+  o  Along the way, as lines are touched, try to reformat
+  o  Assign <partintro> tags IDs, and update any references to the parent
+     <part> to point at the <partintro> instead.
+  o  There are some other minor things that were not specific to SolBook, but
+     were part of DocBook 4 and are gone in DocBook 5. Running the validator
+     will find them for you. Consult the DocBook guide for tips on what to do:
+
+     http://www.docbook.org/tdg5/en/html/ch01.html#introduction-whats-new
+
+
+This should be enough to get the HTML5 version of the book built. To build the
+PDFs though, there are some other things that need to be fixed:
+
+  o  Convert all colspecs' colwidth attributes from inches to proportional
+     measurements. For example, if there are two columns of widths "1.00in"
+     and "4.00in", they should become "1*" and "4*" respectively, which says
+     that the second column should be four times the width of the first
+     column. If there are multiple tables next to each that are similar in
+     number of columns and width, try to make them the same, so that they look
+     better in the PDF.
+  o  On <colspec> tags for columns that contain paragraphs, add an
+     align="justify" attribute.
+  o  On <tbody> tags for tables that contain multi-line text, add
+     valign="top" to ensure that things don't get vertically center-aligned,
+     which can make reading the table more confusing.
+  o  Make sure that the text inside <programlisting> and <screen> tags wrap
+     before 75 characters since monospaced text will be wider in the PDF, and
+     the only two options are the listings environment's poor wrapping with
+     breaklines, or overflowing into (or past) the margins.
+  o  Check for long <example> contents, which get placed inside a float and will
+     therefore overflow the bottom margin if too long.
+
+Additional cleanup worth performing:
+
+  o  Remove the processing instructions (things like <?PubTbl ...?>) left over
+     from the XML editors initially used to write the books (they don't get
+     used for anything).
+
+Adding the document to the check target should help you track many of these
+issues down.
+
 Contributing:
 
 Treat this like you would ON with respect to bugs and the like.
@@ -59,6 +122,10 @@ Currently the minor bug tracker is based on the github repository.
 Before you put back, you should run make check. Furthermore, if you
 change the xslt style, you must check most of the docbooks for
 regressions.
+
+You can check your DocBook changes by running:
+
+make check
 
 Licensing:
 
