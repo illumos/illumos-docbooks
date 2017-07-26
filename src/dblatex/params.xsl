@@ -131,6 +131,7 @@
 	keywordstyle=\color{colKeys}, %
 	stringstyle=\color{colString}, %
 	commentstyle=\color{colComments}, %
+	literate={&#239;}{{\"i}}1 {&#191;}{{?`}}1 {&#189;}{{$\frac{1}{2}$}}1, %
 	tabsize=4, %
 	frame=single, %
 	framerule=0pt, %
