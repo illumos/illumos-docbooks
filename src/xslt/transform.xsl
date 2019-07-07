@@ -18,6 +18,8 @@
 	indent="yes"
 	omit-xml-declaration="yes" />
 
+<xsl:param name="outdir"/>
+
 <!-- <xsl:param name="href-prefix" tunnel="yes">foobar</xsl:param> -->
 
 <xsl:include href="doctool_html_nav.xsl" />
@@ -68,7 +70,7 @@
 
 	<xsl:result-document
 		format="html-page"
-		href="build/{$output-prefix}/index.html">
+		href="{$outdir}/{$output-prefix}/index.html">
 		<html lang="{ancestor-or-self::book/@xml:lang}">
 			<head>
 				<title>
@@ -286,7 +288,7 @@
 	</xsl:variable>
 	<xsl:result-document
 	    format="html-page"
-	    href="build/{$output-prefix}/{$filename}">
+	    href="{$outdir}/{$output-prefix}/{$filename}">
 		<html lang="{ancestor-or-self::book/@xml:lang}">
 			<head>
 				<link rel="canonical" href="{$canonical-base}/{$filename}" />

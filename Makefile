@@ -10,63 +10,77 @@
 #
 
 #
-# Copyright 2016, Joyent, Inc.
+# Copyright 2019, Joyent, Inc.
 #
 
-BUILD_FILES=$(shell find src/xslt src/dblatex)
-WDD_FILES=$(shell find raw/wdd/ -name \*.xml -o -name \*.eps)
-ZFS_FILES=$(shell find raw/zfs-admin/ -name \*.xml)
-MDB_FILES=$(shell find raw/mdb/ -name \*.xml -o -name \*.eps)
-DTRACE_FILES=$(shell find raw/dtrace/ -name \*.xml -o -name \*.eps)
-LGRPS_FILES=$(shell find raw/lgrps/ -name \*.xml -o -name \*.eps)
+BOOKS =			lgrps dtrace mdb zfs-admin wdd
+PDF_TYPES =		print ebook
 
-DBLATEX=dblatex
-DBLATEX_OPTS=-p src/dblatex/params.xsl
-DBLATEX_PRINT_OPTS=${DBLATEX_OPTS} -P latex.page.size=letter
-DBLATEX_EBOOK_OPTS=${DBLATEX_OPTS} -P latex.page.size=ebook
+BUILD_FILES =		$(shell find src/xslt src/dblatex -type f)
 
-MOGRIFY=mogrify
-MOGRIFY_OPTS=-density 150 -format png
+#
+# For each book, generate the list of input files in a variable based on the
+# book name; e.g., $(FILES_dtrace).
+#
+$(foreach b,$(BOOKS), \
+    $(eval FILES_$(b) = $$(shell find raw/$(b)/ -name \*.xml -o -name \*.eps)))
 
-.PHONY:
-all: build/lgrps build/zfs-admin build/wdd build/dtrace build/mdb
+DBLATEX =		dblatex
+DBLATEX_OPTS =		-p src/dblatex/params.xsl
+DBLATEX_OPTS_print =	-P latex.page.size=letter
+DBLATEX_OPTS_ebook =	-P latex.page.size=ebook
 
-.PHONY:
-html: build/lgrps/index.html build/zfs-admin/index.html build/wdd/index.html \
-	build/dtrace/index.html build/mdb/index.html
+MOGRIFY =		mogrify
+MOGRIFY_OPTS =		-density 150 -format png
 
-build/%/index.html:
-	rm -rf build/$*
-	mvn -q -Dtarget.book=$* xml:transform
-	cp src/xslt/style.css build/$*
-	mkdir build/$*/figures; \
-	cp src/xslt/phoenix.svg build/$*/figures
+OUTDIR =		build
+
+TARGETS_HTML =		$(foreach b,$(BOOKS), \
+			    $(OUTDIR)/$(b)/index.html)
+TARGETS_PDF =		$(foreach b,$(BOOKS), \
+			    $(foreach t,$(PDF_TYPES), \
+			    $(OUTDIR)/$(b)/$(b)-$(t).pdf))
+
+.PHONY: all
+all: $(TARGETS_HTML) $(TARGETS_PDF)
+
+.PHONY: html
+html: $(TARGETS_HTML)
+
+.PHONY: pdf
+pdf: $(TARGETS_PDF)
+
+$(OUTDIR)/%/index.html:
+	rm -rf $(OUTDIR)/$*
+	mkdir -p $(OUTDIR)/$*
+	mvn -Dtarget.outdir=$(OUTDIR) -Dtarget.book=$* xml:transform
+	cp src/xslt/style.css $(OUTDIR)/$*
+	mkdir $(OUTDIR)/$*/figures; \
+	cp src/xslt/phoenix.svg $(OUTDIR)/$*/figures
 	if [[ -d raw/$*/figures ]]; then \
-		${MOGRIFY} ${MOGRIFY_OPTS} -path build/$*/figures raw/$*/figures/*.eps; \
+		$(MOGRIFY) $(MOGRIFY_OPTS) -path $(OUTDIR)/$*/figures \
+		    raw/$*/figures/*.eps; \
 	fi
 
-build/lgrps: ${LGRPS_FILES} ${BUILD_FILES} | build/lgrps/index.html
-	${DBLATEX} ${DBLATEX_PRINT_OPTS} -o build/lgrps/lgrps-print.pdf raw/lgrps/MTPODG.book
-	${DBLATEX} ${DBLATEX_EBOOK_OPTS} -o build/lgrps/lgrps-ebook.pdf raw/lgrps/MTPODG.book
+#
+# pdf_template(book, pdf_type): emits a rule and recipe to generate the
+# selected book (e.g., "lgrps") PDF of the selected type (e.g., "print").
+#
+define pdf_template
+$$(OUTDIR)/$(1)/$(1)-$(2).pdf: raw/$(1)/$(1).book $$(FILES_$(1)) \
+    $$(BUILD_FILES) | $$(OUTDIR)/$(1)/index.html
+	$$(DBLATEX) $$(DBLATEX_OPTS) $$(DBLATEX_OPTS_$(2)) -o $$@ $$<
+endef
 
-build/zfs-admin: ${ZFS_FILES} ${BUILD_FILES} | build/zfs-admin/index.html
-	${DBLATEX} ${DBLATEX_PRINT_OPTS} -o build/zfs-admin/zfs-admin-print.pdf raw/zfs-admin/ZFSADMIN.book
-	${DBLATEX} ${DBLATEX_EBOOK_OPTS} -o build/zfs-admin/zfs-admin-ebook.pdf raw/zfs-admin/ZFSADMIN.book
-
-build/wdd: ${WDD_FILES} ${BUILD_FILES} | build/wdd/index.html
-	${DBLATEX} ${DBLATEX_PRINT_OPTS} -o build/wdd/wdd-print.pdf raw/wdd/DRIVER.book
-	${DBLATEX} ${DBLATEX_EBOOK_OPTS} -o build/wdd/wdd-ebook.pdf raw/wdd/DRIVER.book
-
-build/dtrace: ${DTRACE_FILES} ${BUILD_FILES} | build/dtrace/index.html
-	${DBLATEX} ${DBLATEX_PRINT_OPTS} -o build/dtrace/dtrace-print.pdf raw/dtrace/DYNMCTRCGGD.book
-	${DBLATEX} ${DBLATEX_EBOOK_OPTS} -o build/dtrace/dtrace-ebook.pdf raw/dtrace/DYNMCTRCGGD.book
-
-build/mdb: ${MDB_FILES} ${BUILD_FILES} | build/mdb/index.html
-	${DBLATEX} ${DBLATEX_PRINT_OPTS} -o build/mdb/mdb-print.pdf raw/mdb/MODDEBUG.book
-	${DBLATEX} ${DBLATEX_EBOOK_OPTS} -o build/mdb/mdb-ebook.pdf raw/mdb/MODDEBUG.book
+#
+# Construct a target for each of the cartesian product of all books and types:
+#
+$(foreach b,$(BOOKS), \
+    $(foreach t,$(PDF_TYPES), \
+    $(eval $(call pdf_template,$(b),$(t)))))
 
 clean:
-	rm -rf build/
+	rm -rf $(OUTDIR)/
 
 check:
 	mvn exec:java
