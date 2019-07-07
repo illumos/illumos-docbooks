@@ -42,13 +42,17 @@ TARGETS_PDF =		$(foreach b,$(BOOKS), \
 			    $(OUTDIR)/$(b)/$(b)-$(t).pdf))
 
 .PHONY: all
-all: $(TARGETS_HTML) $(TARGETS_PDF)
+all: $(TARGETS_HTML) $(TARGETS_PDF) $(OUTDIR)/index.html
 
 .PHONY: html
 html: $(TARGETS_HTML)
 
 .PHONY: pdf
 pdf: $(TARGETS_PDF)
+
+$(OUTDIR)/index.html:
+	rm -f $@
+	cp index.html $@
 
 $(OUTDIR)/%/index.html:
 	rm -rf $(OUTDIR)/$*
