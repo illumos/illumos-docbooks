@@ -11,13 +11,20 @@
 <para>&roleinfo;</para>
 <sect1 xml:id="configuringservicestm"><title>Configuring the SMB Service</title><para>This section provides information about configuring the illumos SMB service. Depending on the "operation mode" you plan to use ("domain mode" or "workgroup mode") there are different configuration requirements.
 For information about configuring other applicable services, see <xref linkend="processoverview"/>.</para>
-<task xml:id="settingupwinstask"><title>How to Configure WINS</title><tasksummary><para>If you are integrating an illumos SMB service in an environment that has a WINS server, you can use Windows Internet Naming Service (WINS) for name resolution.</para><para>For information about excluding IP addresses from WINS resolution, see <xref linkend="configurewinsclientexample"/>.</para>
-</tasksummary><procedure>&rolestepsmb;<step><para>Specify the IP address of the primary WINS server.</para><para>The primary WINS server is the server consulted first for NetBIOS name resolution.</para><screen># <userinput>sharectl set -p wins_server_1=<replaceable>IP-address</replaceable> smb</userinput></screen>
-</step><step><para>(Optional) Specify the IP address of the secondary WINS server.</para><para>If the primary WINS server does not respond, the system consults the secondary WINS server to perform NetBIOS name resolution.</para><screen># <userinput>sharectl set -p wins_server_2=<replaceable>IP-address</replaceable> smb</userinput></screen>
+
+<step><para>If the Samba service is running on the illumos system, you must disable it. Only one SMB service may run in a given zone. See <xref linkend="disablesambatask"/>.</para></step>
+
+<step><para>Enable the illumos SMB service.</para><screen># <userinput>svcadm enable -r smb/server</userinput></screen><para>This command enables the illumos SMB service and any service on which it depends, such as the <command>idmap</command> service.</para></step>
+
+<step><para>Edit the <filename>/etc/pam.conf</filename> file to support creation of an encrypted version of local user passwords for SMB.</para><para>Add the following line after the other "password" lines:</para><screen>other	password required	pam_smb_passwd.so.1	nowarn</screen><para>See the <citerefentry><refentrytitle>pam_smb_passwd</refentrytitle><manvolnum>7</manvolnum></citerefentry> man page.</para>
 </step>
-</procedure>
-</task>
-</sect1><sect1 xml:id="configuringoperationmodetm"><title>Configuring the SMB Service Operation Mode (Task Map)</title><para>The following table points to the tasks that you can use to configure the operation mode of the illumos SMB server.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+<step><para>Set the password for any local users who will connect via SMB.</para>
+<screen># <userinput>passwd <replaceable>username</replaceable></userinput></screen>
+<para>The illumos SMB service cannot use the Unix version of the local user's encrypted password for authentication. Therefore, you must generate an SMB version of the local user's password for the SMB service to use. When the SMB PAM module is installed, the <command>passwd</command> command generates such an encrypted version of the password.</para>
+</step>
+
+</sect1>
+<sect1 xml:id="configuringoperationmodetm"><title>Joining a Domain or Workgroup (Task Map)</title><para>The following table points to the tasks that you can use to configure the operation mode of the illumos SMB server.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
 </entry><entry><para>Description</para>
 </entry><entry><para>For Instructions</para>
 </entry>
@@ -33,30 +40,23 @@ For information about configuring other applicable services, see <xref linkend="
 </row>
 </tbody>
 </tgroup>
-</informaltable><task xml:id="configuredomainmodetask"><title>How to Configure the illumos SMB Service in Domain Mode</title><tasksummary><para>After successfully joining an AD domain, you can enable the illumos SMB service to publish SMB shares in the AD directory. To do so, create or update SMB shares and specify the share container for each share that you want to publish. To create SMB shares, see <xref linkend="createstaticsmbsharezfstask"/> and <xref linkend="createstaticsmbsharetask"/>.</para>
-</tasksummary><taskprerequisites><para>If the Samba service is running on the illumos system, you must disable it. See <xref linkend="disablesambatask"/>.</para><para>If you change from workgroup mode to domain mode, or from domain mode to workgroup mode, you must restart the illumos SMB service. To restart the service, run the <command>svcadm restart smb/server</command> command.</para><para>The <firstterm>Active Directory (AD)</firstterm> service is a Windows 2000 namespace that is integrated with the Domain Name Service (DNS). AD runs only on domain controllers. In addition to storing and making data available, AD protects network objects from unauthorized access and replicates objects across a network so that data is not lost if one domain controller fails.</para><itemizedlist><para>For the illumos SMB service to integrate seamlessly into a Windows AD environment, the following must exist on the network:</para><listitem><para>A Windows AD domain controller</para>
+</informaltable>
+<sect2 xml:id="configuredomainmodetask"><title>How to Configure the illumos SMB Service in Domain Mode</title>
+<task><tasksummary><para>This section describes how to join a domain.
+An Active Directory (AD) environment is required for this task.</para>
+</tasksummary><taskprerequisites><para>The <firstterm>Active Directory (AD)</firstterm> service is a Windows namespace that is integrated with the Domain Name Service (DNS). AD runs only on domain controllers. In addition to storing and making data available, AD protects network objects from unauthorized access and replicates objects across a network so that data is not lost if one domain controller fails.</para><para>For the illumos SMB service to integrate seamlessly into a Windows AD environment, the following must exist on the network:</para>
+<itemizedlist><listitem><para>A Windows AD domain controller</para>
 </listitem><listitem><para>An optional Active Directory DNS server that permits dynamic updates to use the dynamic DNS (DDNS) capability</para>
 </listitem>
-</itemizedlist><para>The AD and DDNS clients rely on the Kerberos protocol to acquire the Kerberos ticket-granting ticket (TGT) for the specified AD domain. The system must be configured to use DNS for host lookup.</para><para>In order to participate in an AD domain, the system must be configured to use DNS for host lookup. Ensure that the <filename>/etc/nsswitch.conf</filename> and <filename>/etc/resolv.conf</filename> files are configured correctly for the appropriate AD domain.</para><para>In the <filename>/etc/krb5/krb5.conf</filename> file, specify the fully qualified AD domain name, in uppercase characters, as the default realm. Also, specify the fully qualified host name of the domain controller as the value for the <literal>kdc</literal>, <literal>admin_server</literal>, and <literal>kpasswd_server</literal> parameters.</para><para>The following example <filename>/etc/krb5/krb5.conf</filename> file is for an AD domain called <literal>EXAMPLE.COM</literal>, and the AD domain controller system is called <literal>dc.example.com</literal>. The fully qualified names are used for the domain and the domain controller.</para><screen>[libdefaults]
-   default_realm = EXAMPLE.COM
-
-[realms]
-   EXAMPLE.COM = {
-       kdc = dc.example.com
-       admin_server = dc.example.com
-       kpasswd_server = dc.example.com
-       kpasswd_protocol = SET_CHANGE
-   }
-
-[domain_realm]
-   .example.com = EXAMPLE.COM</screen><para>For descriptions of the sections and parameters used in this sample file, see the <citerefentry><refentrytitle>krb5.conf</refentrytitle><manvolnum>5</manvolnum></citerefentry> man page and <citetitle remap="section">Configuring Kerberos Clients (Task Map)</citetitle> in <citetitle remap="book">System Administration Guide: Security Services</citetitle>.</para>
-</taskprerequisites><procedure>&rolestepsmb;<step><para>Enable the illumos SMB service.</para><screen># <userinput>svcadm enable -r smb/server</userinput></screen><para>When you specify the <option>r</option> option, all services on which <literal>smb/server</literal> depends are started if they are not already running.</para>
-</step><step><para>To successfully complete the join process, ensure that the system clock on the illumos system is within five minutes of the system clock of the domain controller (DC).</para><para>You can accomplish this task in one of these ways:</para><stepalternatives><step><para>Manually adjust the system clock on either the illumos system or the DC to match the other.</para>
+</itemizedlist><para>In order to participate in an AD domain, the system must be configured to use DNS for host lookup. Ensure that the <filename>/etc/nsswitch.conf</filename> and <filename>/etc/resolv.conf</filename> files are configured correctly for the appropriate AD domain.</para>
+</taskprerequisites><procedure>&rolestepsmb;<step><para>To successfully complete the join process, ensure that the system clock on the illumos system is within five minutes of the system clock of the domain controller (DC).</para><para>You can accomplish this task in one of these ways:</para><stepalternatives><step><para>Manually adjust the system clock on either the illumos system or the DC to match the other.</para>
 </step><step><para>Configure both the illumos system and the DC to use the same time source (NTP server).</para>
 </step><step><para>Synchronize the system clock on the illumos system with the system clock of the DC by running the following command on the illumos system:</para><screen># <userinput>ntpdate <replaceable>DC-hostname</replaceable></userinput></screen><para>For example, to synchronize with the DC called <literal>dc.westsales.example.com</literal>, type:</para><screen># <userinput>ntpdate dc.westsales.example.com</userinput></screen>
 </step>
 </stepalternatives>
-</step><step><para>Join the Windows domain.</para><screen># <userinput>smbadm join -u <replaceable>username</replaceable> <replaceable>domain-name</replaceable></userinput></screen><para>where <replaceable>username</replaceable> is the domain administrator or a user with Domain Administrator privileges, and <replaceable>domain-name</replaceable> is a fully qualified domain name.</para>
+</step><step><para>Join the Windows domain.</para><screen># <userinput>smbadm join -u <replaceable>username</replaceable> <replaceable>domain-name</replaceable></userinput></screen><para>where <replaceable>username</replaceable> is an AD user with sufficient rights to create and/or update the machine account.
+The <replaceable>domain-name</replaceable> is a fully qualified domain name of the AD domain in which this server will become a member.</para>
+<!-- Need to document the -c container option, here and smbadm(8) -->
 </step>
 </procedure><example xml:id="configuredomainmodeexample"><title>Configuring the illumos SMB Service in Domain Mode</title><para>This example shows the steps taken to configure the illumos SMB service in domain mode. User <literal>dana</literal> has Domain Administrator privileges. The name of the domain being joined is <literal>westsales.example.com</literal>.</para><screen># <userinput>svcadm enable -r smb/server</userinput>
 # <userinput>smbadm join -u dana westsales.example.com</userinput>
@@ -64,18 +64,24 @@ Enter domain password:
 Joining 'westsales.example.com' ... this may take a minute ...
 Successfully joined domain 'westsales.example.com'</screen>
 </example>
-</task><task xml:id="configureworkgroupmodetask"><title>How to Configure the illumos SMB Service in Workgroup Mode</title><tasksummary><para>After you join a workgroup, you can access SMB shares. To create SMB shares, see <xref linkend="createstaticsmbsharezfstask"/> and <xref linkend="createstaticsmbsharetask"/>.</para><para>If you change from workgroup mode to domain mode, or from domain mode to workgroup mode, you must restart the illumos SMB service. To restart the service, run the <command>svcadm restart smb/server</command> command.</para>
-</tasksummary><taskprerequisites><para>If the Samba service is running on the illumos system, you must disable it. See <xref linkend="disablesambatask"/>.</para>
-</taskprerequisites><procedure>&rolestepsmb;<step><para>Enable the illumos SMB service.</para><screen># <userinput>svcadm enable -r smb/server</userinput></screen><para>This command enables the illumos SMB service and any service on which it depends, such as the <command>idmap</command> service.</para>
-</step><step><para>(Optional) Change the illumos SMB service to operate in a different workgroup.</para><para>By default, the illumos SMB service operates in a workgroup called <literal>WORKGROUP</literal>.</para><screen># <userinput>smbadm join -w <replaceable>workgroup-name</replaceable></userinput></screen>
-</step><step><para>Edit the <filename>/etc/pam.conf</filename> file to support creation of an encrypted version of the user's password for SMB.</para><para>Add the following line to the end of the file:</para><screen>other	password required	pam_smb_passwd.so.1	nowarn</screen><para>See the <citerefentry><refentrytitle>pam_smb_passwd</refentrytitle><manvolnum>7</manvolnum></citerefentry> man page.</para>
-</step><step><para>Specify the password for existing local users.</para><para>The illumos SMB service cannot use the encrypted version of the local user's Unix password for authentication. Therefore, you must generate an encrypted version of the local user's password for the illumos SMB service to use. When the SMB PAM module is installed, the <command>passwd</command> command generates such an encrypted version of the password.</para><screen># <userinput>passwd <replaceable>username</replaceable></userinput></screen>
+<para>After successfully joining an AD domain, you can enable the illumos SMB service to publish SMB shares in the AD directory. To do so, create or update SMB shares and specify the share container for each share that you want to publish. To create SMB shares, see <xref linkend="createstaticsmbsharezfstask"/> and <xref linkend="createstaticsmbsharetask"/>.</para>
+<note><para>Note that many old copies of this document that can be found via web searches, and most of those instruct you to edit the <filename>krb5.conf</filename> file as part of joining a domain.  The illumos SMB server no longer needs that customization after
+<link xl:href="http://illumos.org/issues/6352">illumos issue 6352</link>
+was resolved in late 2015.</para></note>
+</task>
+</sect2>
+<sect2 xml:id="configureworkgroupmodetask"><title>How to Configure the illumos SMB Service in Workgroup Mode</title> 
+<task><tasksummary>
+</tasksummary><procedure>&rolestepsmb;<step><para>(Optional) Change the illumos SMB service to operate in a different workgroup.</para><para>By default, the illumos SMB service operates in a workgroup called <literal>WORKGROUP</literal>.</para><screen># <userinput>smbadm join -w <replaceable>workgroup-name</replaceable></userinput></screen>
 </step>
 </procedure><example xml:id="configureworkgroupmodeexample"><title>Configuring the illumos SMB Service in Workgroup Mode</title><para>This example shows how to configure the illumos SMB service in workgroup mode. The name of the workgroup being joined is <literal>myworkgroup</literal>.</para><screen># <userinput>svcadm enable -r smb/server</userinput>
-# <userinput>smbadm join -w myworkgroup</userinput></screen><para>Then, use the <literal>sharesmb</literal> property to configure SMB sharing for an existing ZFS dataset called <literal>ztank/myfs</literal>.</para><screen># <userinput>zfs set sharesmb=on ztank/myfs</userinput></screen><para>Finally, install the PAM module and generate the password for user <literal>cal</literal>.</para><screen># <userinput>passwd cal</userinput></screen><para>Now, you are ready to have SMB clients access the SMB shares on your illumos SMB service.</para>
+# <userinput>smbadm join -w myworkgroup</userinput></screen><para>Then, use the <literal>sharesmb</literal> property to configure SMB sharing for an existing ZFS dataset called <literal>ztank/myfs</literal>.</para><screen># <userinput>zfs set sharesmb=on ztank/myfs</userinput></screen><para>Finally, generate the SMB password for user <literal>cal</literal>.</para><screen># <userinput>passwd cal</userinput></screen><para>Now, you are ready to have SMB clients access the SMB shares on your illumos SMB service.</para>
 </example>
 </task>
-</sect1><sect1 xml:id="managingsmbsharestm"><title>Managing SMB Shares (Task Map)</title><para>You can add, view, and update SMB shares. A directory must exist before it can be shared. For more information about SMB shares, see <xref linkend="smbshares"/>.</para><para>The following table points to the tasks that you can use to manage SMB shares.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
+<para>After you join a workgroup, you can access SMB shares. To create SMB shares, see <xref linkend="createstaticsmbsharezfstask"/> and <xref linkend="createstaticsmbsharetask"/>.</para>
+</sect2>
+</sect1>
+<sect1 xml:id="managingsmbsharestm"><title>Managing SMB Shares (Task Map)</title><para>You can add, view, and update SMB shares. A directory must exist before it can be shared. For more information about SMB shares, see <xref linkend="smbshares"/>.</para><para>The following table points to the tasks that you can use to manage SMB shares.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
 </entry><entry><para>Description</para>
 </entry><entry><para>For Instructions</para>
 </entry>
@@ -198,7 +204,8 @@ zfs nfs=() smb=()
 </step>
 </procedure>
 </task>
-</sect1><sect1 xml:id="managingsmbgroupsuserstm"><title>Managing SMB Groups (Task Map)</title><para>This section describes how to manage SMB groups and privileges for the illumos SMB service.</para><note><para>SMB groups apply only to users that are connected through SMB.</para>
+</sect1>
+<sect1 xml:id="managingsmbgroupsuserstm"><title>Managing SMB Groups (Task Map)</title><para>This section describes how to manage SMB groups and privileges for the illumos SMB service.</para><note><para>SMB groups apply only to users that are connected through SMB.</para>
 </note><para>For information about SMB groups and local users, see <xref linkend="localsmbgroupsusers"/>.</para><para>The following table points to the tasks that you can use to manage SMB groups through the illumos SMB service.</para><informaltable frame="all"><tgroup cols="3" colsep="1" rowsep="1"><colspec colwidth="33*"/><colspec colwidth="33*"/><colspec colwidth="33*"/><thead><row><entry><para>Task</para>
 </entry><entry><para>Description</para>
 </entry><entry><para>For Instructions</para>
@@ -242,7 +249,8 @@ zfs nfs=() smb=()
 </step>
 </procedure>
 </task>
-</sect1><sect1 xml:id="migratingfromsamba"><title>Disabling the Samba Service</title><para>The Samba and SMB services cannot be used together on a single illumos system. If you want to run the illumos SMB service, you must first ensure that a running Samba service is disabled.</para><para>If your illumos system is running the Samba service, disable it before starting the illumos SMB service.</para><task xml:id="disablesambatask"><title>How to Disable the Samba Service</title><procedure>&rolestep;<step><para>Verify that the Samba service is running.</para><screen># <userinput>svcs | grep samba</userinput></screen><para>For example, the following command shows that the Samba service is running:</para><screen># <userinput>svcs | grep samba</userinput>
+</sect1>
+<sect1 xml:id="migratingfromsamba"><title>Disabling the Samba Service</title><para>The Samba and SMB services cannot be used simultaneously on a single illumos system. If you want to run the illumos SMB service, you must first ensure that any running Samba service is disabled.</para><para>If your illumos system is running the Samba service, disable it before starting the illumos SMB service.</para><task xml:id="disablesambatask"><title>How to Disable the Samba Service</title><procedure>&rolestep;<step><para>Verify that the Samba service is running.</para><screen># <userinput>svcs | grep samba</userinput></screen><para>For example, the following command shows that the Samba service is running:</para><screen># <userinput>svcs | grep samba</userinput>
 legacy_run     Aug_03   lrc:/etc/rc3_d/S90samba</screen>
 </step><step><para>Disable the Samba service.</para><screen># <userinput>svcadm disable svc:/network/samba</userinput>
 # <userinput>svcadm disable svc:/network/wins</userinput></screen>
