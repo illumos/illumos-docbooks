@@ -13,7 +13,7 @@
 # Copyright 2019, Joyent, Inc.
 #
 
-BOOKS =			lgrps dtrace mdb zfs-admin wdd
+BOOKS =			lgrps dtrace mdb zfs-admin wdd smb-admin
 PDF_TYPES =		print ebook
 
 BUILD_FILES =		$(shell find src/xslt src/dblatex -type f)
