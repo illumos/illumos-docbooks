@@ -117,7 +117,7 @@
 
 <xsl:template name="head">
 	<xsl:comment>WARNING: THIS FILE IS AUTO-GENERATED FROM DOCBOOK</xsl:comment>
-	<xsl:comment>Sources at https://github.com/rmustacc/illumos-docbooks/</xsl:comment>
+	<xsl:comment>Sources at https://github.com/illumos/illumos-docbooks/</xsl:comment>
 	<xsl:variable name="bookinfo" select="ancestor-or-self::book/info" />
 	<meta charset="utf-8" />
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -197,7 +197,7 @@
 	<footer role="contentinfo">
 		<small>
 			Bugs or requests for improvement? Visit
-			<a href="https://github.com/rmustacc/illumos-docbooks">illumos-docbooks</a>
+			<a href="https://github.com/illumos/illumos-docbooks">illumos-docbooks</a>
 			on Github.
 		</small>
 	</footer>
