@@ -8,7 +8,7 @@ pointers, operators that can be applied to create or access pointers, and the
 relationship between pointers and fixed-size scalar arrays. Also discussed are
 issues relating to the use of pointers in different address spaces.</para>
 <note><para>If you are an experienced C or C++ programmer, you can skim most
-of this chapter as the D pointer syntax is the same as the corresponding ANSI-C
+of this chapter, as the D pointer syntax is the same as the corresponding ANSI-C
 syntax. You should read <xref linkend="chp-pointers-8" /> and <xref linkend="chp-pointers-9" />
 as they describe features and issues specific to DTrace.</para></note>
 <sect1 xml:id="chp-pointers-1">
@@ -31,7 +31,9 @@ trace(`kmem_flags);
 <title>Pointer Safety</title>
 <para><indexterm><primary>pointers</primary><secondary>safe use of</secondary></indexterm>If you are a C or C++ programmer, you may be a bit frightened after reading the previous section because you know that misuse of pointers in your programs can cause your programs to crash. DTrace is a robust, safe environment for executing your D programs where these mistakes cannot cause program crashes. You may indeed write a buggy D program, but invalid D pointer accesses will not cause DTrace or the operating system kernel to fail or crash in any way. Instead, the DTrace software will detect any invalid pointer accesses, disable your instrumentation, and report the problem back to you for debugging.</para>
 <para>If you have programmed in the Java programming language, you probably know that the Java language does not support pointers for precisely the same reasons of safety. Pointers are needed in D because they are an intrinsic part of the operating system's implementation in C, but DTrace implements the same kind of safety mechanisms found in the Java programming language that prevent buggy programs from damaging themselves or each other. DTrace's error reporting is similar to the run-time environment for the Java programming language that detects a programming error and reports an exception back to you.</para>
-<para>To see DTrace's error handling and reporting, write a deliberately bad D program using pointers. In an editor, type the following D program and save it in a file named <filename>badptr.d</filename>:</para>
+<para>To see DTrace's error handling and reporting, write a deliberately bad D
+program using pointers. In an editor, type the following D program, and save it
+in a file named <filename>badptr.d</filename>:</para>
 <example xml:id="ex-badptr.d">
 <title><filename>badptr.d</filename>: Demonstration of DTrace Error Handling</title>
 <programlisting>BEGIN
@@ -41,7 +43,18 @@ trace(`kmem_flags);
 	trace(y);
 }</programlisting>
 </example>
-<para>The <filename>badptr.d</filename> program creates a D pointer named <literal>x</literal> that is a pointer to <literal>int</literal>. The program assigns this pointer the special invalid pointer value <literal>NULL</literal>, which is a built-in alias for address 0. By convention, address 0 is always defined to be invalid so that <literal>NULL</literal> can be used as a sentinel value in C and D programs. The program uses a cast expression to convert <literal>NULL</literal> to be a pointer to an integer. The program then dereferences the pointer using the expression <literal>*x</literal>, and assigns the result to another variable <literal>y</literal>, and then attempts to trace <literal>y</literal>. When the D program is executed, DTrace detects an invalid pointer access when the statement <literal>y = *x</literal> is executed and reports the error:</para>
+<para>The <filename>badptr.d</filename> program creates a D pointer named
+<literal>x</literal> that is a pointer to <literal>int</literal>. The program
+assigns this pointer the special invalid pointer value <literal>NULL</literal>,
+which is a built-in alias for address 0. By convention, address 0 is always
+defined to be invalid so that <literal>NULL</literal> can be used as a sentinel
+value in C and D programs. The program uses a cast expression to convert
+<literal>NULL</literal> to be a pointer to an integer. The program then
+dereferences the pointer using the expression <literal>*x</literal>,
+assigns the result to another variable <literal>y</literal>, and then attempts
+to trace <literal>y</literal>. When the D program is executed, DTrace detects
+an invalid pointer access when the statement <literal>y = *x</literal> is
+executed, and DTrace reports the error:</para>
 <screen><userinput># dtrace -s badptr.d</userinput>
 dtrace: script '/dev/stdin' matched 1 probe
 CPU     ID                    FUNCTION:NAME
@@ -55,7 +68,17 @@ dtrace: 1 error on CPU 0
 </sect1>
 <sect1 xml:id="chp-pointers-3">
 <title>Array Declarations and Storage</title>
-<para><indexterm><primary>scalar arrays</primary></indexterm>D provides support for <firstterm>scalar arrays</firstterm> in addition to the dynamic associative arrays described in Chapter 3. Scalar arrays are a fixed-length group of consecutive memory locations that each store a value of the same type. Scalar arrays are accessed by referring to each location with an integer starting from zero. Scalar arrays correspond directly in concept and syntax with arrays in C and C++. Scalar arrays are not used as frequently in D as associative arrays and their more advanced counterparts <firstterm>aggregations</firstterm>, but these are sometimes needed when accessing existing operating system array data structures declared in C. Aggregations are described in <xref linkend="chp-aggs" />.</para>
+<para><indexterm><primary>scalar arrays</primary></indexterm>D provides support
+for <firstterm>scalar arrays</firstterm> in addition to the dynamic associative
+arrays described in Chapter 3. Scalar arrays are a fixed-length group of
+consecutive memory locations that each store a value of the same type. Scalar
+arrays are accessed by referring to each location with an integer starting from
+zero. Scalar arrays correspond directly in concept and syntax with arrays in C
+and C++. Scalar arrays are not used as frequently in D as associative arrays
+and their more advanced counterparts, <firstterm>aggregations</firstterm>, but
+scalar arrays are sometimes needed when accessing existing operating system
+array data structures declared in C. Aggregations are described in <xref
+linkend="chp-aggs" />.</para>
 <para>A D scalar array of 5 integers would be declared by using the type <literal>int</literal> and suffixing the declaration with the number of elements in square brackets as follows:</para>
 <programlisting>int a[5];</programlisting>
 <para>The following diagram shows a visual representation of the array storage:</para>
@@ -71,19 +94,20 @@ dtrace: 1 error on CPU 0
 <para>and also reference this array using the expression
 <literal>a[0]</literal>. But from a storage and implementation perspective, the
 two arrays are very different. The static array <literal>a</literal> consists of
-five consecutive memory locations numbered from zero and the index refers to an
+five consecutive memory locations numbered from zero, and the index refers to an
 offset in the storage allocated for the array. An associative array, on the
 other hand, has no predefined size and does not store elements in consecutive
 memory locations. In addition, associative array keys have no relationship to
 the corresponding value storage location. You can access associative array
-elements <literal>a[0]</literal> and <literal>a[-5]</literal> and only two words
-of storage will be allocated by DTrace which may or may not be consecutive.
+elements <literal>a[0]</literal> and <literal>a[-5]</literal>, and only two
+words of storage will be allocated by DTrace which may or may not be
+consecutive.
 Associative array keys are abstract names for the corresponding value that have
 no relationship to the value storage locations.</para>
 <para>If you create an array using an initial assignment and use a single
 integer expression as the array index (for example, <literal>a[0] = 2</literal>),
 the D compiler will always create a new associative array, even
-though in this expression <literal>a</literal> could also be interpreted as an
+though in this expression, <literal>a</literal> could also be interpreted as an
 assignment to a scalar array. Scalar arrays must be predeclared in this
 situation so that the D compiler can see the definition of the array size and
 infer that the array is a scalar array.</para>
@@ -114,7 +138,7 @@ with <literal>a</literal>, this expression yields the same value as
 this equivalence is that C and D permit you to access any index of any pointer
 or array. Array bounds checking is not performed for you by the compiler or
 DTrace runtime environment. If you access memory beyond the end of an array's
-predefined value, you will either get an unexpected result or DTrace will report
+predefined value, you will either get an unexpected result, or DTrace will report
 an invalid address error, as shown in the previous example. As always, you can't
 damage DTrace itself or your operating system, but you will need to debug your D
 program.</para>
@@ -185,15 +209,39 @@ BEGIN
 <sect1 xml:id="chp-pointers-6">
 <title>Generic Pointers</title>
 <para>Sometimes it is useful to represent or manipulate a generic pointer address in a D program without specifying the type of data referred to by the pointer. Generic pointers can be specified using the type <literal>void *</literal>, where the keyword <literal>void</literal> represents the absence of specific type information, or using the built-in type alias <literal>uintptr_t</literal> which is aliased to an unsigned integer type of size appropriate for a pointer in the current data model. You may not apply pointer arithmetic to an object of type <literal>void *</literal>, and these pointers cannot be dereferenced without casting them to another type first. You can cast a pointer to the <literal>uintptr_t</literal> type when you need to perform integer arithmetic on the pointer value.</para>
-<para><indexterm><primary>pointers</primary><secondary>and type conversion</secondary></indexterm><indexterm><primary>pointers</primary><secondary>and explicit casts</secondary></indexterm>Pointers to <literal>void</literal> may be used in any context where a pointer to another data type is required, such as an associative array tuple expression or the right-hand side of an assignment statement. Similarly, a pointer to any data type may be used in a context where a pointer to <literal>void</literal> is required. To use a pointer to a non-<literal>void</literal> type in place of another non-<literal>void</literal> pointer type, an explicit cast is required. You must always use explicit casts to convert pointers to integer types such as <literal>uintptr_t</literal>, or to convert these integers back to the appropriate pointer type.</para>
+<para><indexterm><primary>pointers</primary><secondary>and type
+conversion</secondary></indexterm><indexterm><primary>pointers</primary><secondary>and
+explicit casts</secondary></indexterm>Pointers to <literal>void</literal> may
+be used in any context where a pointer to another data type is required, such
+as an associative array tuple expression or the right-hand side of an
+assignment statement. Similarly, a pointer to any data type may be used in a
+context where a pointer to <literal>void</literal> is required. To use a
+pointer to a non-<literal>void</literal> type in place of another
+non-<literal>void</literal> pointer type, an explicit cast is required. You
+must always use explicit casts to convert pointers to integer types such as
+<literal>uintptr_t</literal> or to convert these integers back to the
+appropriate pointer type.</para>
 </sect1>
 <sect1 xml:id="chp-pointers-7">
 <title>Multi-Dimensional Arrays</title>
-<para>Multi-dimensional scalar arrays are used infrequently in D, but are provided for compatibility with ANSI-C and for observing and accessing operating system data structures created using this capability in C. A multi-dimensional array is declared as a consecutive series of scalar array sizes enclosed in square brackets <literal>[ ]</literal> following the base type. For example, to declare a fixed-size two-dimensional rectangular array of integers of dimensions 12 rows by 34 columns, you would write the declaration:</para>
+<para>Multi-dimensional scalar arrays are used infrequently in D but are
+provided for compatibility with ANSI-C and for observing and accessing
+operating system data structures created using this capability in C. A
+multi-dimensional array is declared as a consecutive series of scalar array
+sizes enclosed in square brackets <literal>[ ]</literal> following the base
+type. For example, to declare a fixed-size two-dimensional rectangular array of
+integers of dimensions 12 rows by 34 columns, you would write the
+declaration:</para>
 <programlisting>int a[12][34];</programlisting>
-<para><indexterm><primary>multi-dimensional scalar arrays</primary></indexterm><indexterm><primary>arrays</primary><secondary>multi-dimensional scalar</secondary></indexterm>A multi-dimensional scalar array is accessed using similar notation. For example, to access the value stored at row 0 column 1 you would write the D expression:</para>
+<para><indexterm><primary>multi-dimensional scalar
+arrays</primary></indexterm><indexterm><primary>arrays</primary>
+<secondary>multi-dimensional scalar</secondary></indexterm>A multi-dimensional
+scalar array is accessed using similar notation. For example, to access the
+value stored at row 0 column 1, you would write the D expression:</para>
 <programlisting>a[0][1]</programlisting>
-<para>Storage locations for multi-dimensional scalar array values are computed by multiplying the row number by the total number of columns declared, and then adding the column number.</para>
+<para>Storage locations for multi-dimensional scalar array values are computed
+by multiplying the row number by the total number of columns declared and then
+adding the column number.</para>
 <para>You should be careful not to confuse the multi-dimensional array syntax with the D syntax for associative array accesses (that is, <literal>a[0][1]</literal> is not the same as <literal>a[0, 1]</literal>). If you use an incompatible tuple with an associative array or attempt an associative array access of a scalar array, the D compiler will report an appropriate error message and refuse to compile your program.</para>
 </sect1>
 <sect1 xml:id="chp-pointers-8">
@@ -203,7 +251,16 @@ BEGIN
 </sect1>
 <sect1 xml:id="chp-pointers-9">
 <title>Pointers and Address Spaces</title>
-<para>A pointer is an address that provides a translation within some <firstterm>virtual address space</firstterm> to a piece of physical memory. DTrace executes your D programs within the address space of the operating system kernel itself. Your entire illumos system manages many address spaces: one for the operating system kernel, and one for each user process. Since each address space provides the illusion that it can access all of the memory on the system, the same virtual address pointer value can be reused across address spaces but translate to different physical memory. Therefore, when writing D programs that use pointers, you must be aware of the address space corresponding to the pointers you intend to use.</para>
+<para>A pointer is an address that provides a translation within some
+<firstterm>virtual address space</firstterm> to a piece of physical memory.
+DTrace executes your D programs within the address space of the operating
+system kernel itself. Your entire illumos system manages many address spaces:
+one for the operating system kernel and one for each user process. Since each
+address space provides the illusion that it can access all of the memory on the
+system, the same virtual address pointer value can be reused across address
+spaces but translate to different physical memory. Therefore, when writing D
+programs that use pointers, you must be aware of the address space
+corresponding to the pointers you intend to use.</para>
 <para>For example, if you use the <literal>syscall</literal> provider to instrument entry to a system call that takes a pointer to an integer or array of integers as an argument (for example, <citerefentry><refentrytitle>pipe</refentrytitle><manvolnum>2</manvolnum></citerefentry>), it would not be valid to dereference that pointer or array using the <literal>*</literal> or <literal>[]</literal> operators because the address in question is an address in the address space of the user process that performed the system call. Applying the <literal>*</literal> or <literal>[]</literal> operators to this address in D would result in a kernel address space access, which would result in an invalid address error or in returning unexpected data to your D program depending upon whether the address happened to match a valid kernel address.</para>
 <para><indexterm><primary>user process memory</primary></indexterm>To access user process memory from a DTrace probe, you must apply one of the <function>copyin</function>, <function>copyinstr</function>, or <function>copyinto</function> functions described in <xref linkend="chp-actsub" /> to the user address space pointer. Take care when writing your D programs to name and comment variables storing user addresses appropriately to avoid confusion. You can also store user addresses as <literal>uintptr_t</literal> so you don't accidentally compile D code that dereferences them. Techniques for using DTrace on user processes are described in <xref linkend="chp-user" />.</para>
 </sect1>
