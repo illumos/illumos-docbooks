@@ -28,6 +28,7 @@
 <xsl:include href="doctool_html_inlines.xsl" />
 <xsl:include href="doctool_html_tables.xsl" />
 <xsl:include href="doctool_html_index.xsl" />
+<xsl:include href="doctool_html_admonitions.xsl" />
 
 <!-- We don't want to print the title tag except explicitly -->
 <xsl:template match="title" />
