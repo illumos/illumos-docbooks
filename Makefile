@@ -14,12 +14,7 @@
 # Copyright 2024 Oxide Computer Company
 #
 
-BOOKS =			$(BOOKS_WITH_PDF) $(BOOKS_HTML_ONLY)
-BOOKS_WITH_PDF =	lgrps dtrace mdb zfs-admin wdd
-#
-# We are having some temporary issues building the PDF for these books:
-#
-BOOKS_HTML_ONLY =	smb-admin
+BOOKS =			lgrps dtrace mdb zfs-admin wdd smb-admin
 PDF_TYPES =		print ebook
 
 BUILD_FILES =		$(shell find src/xslt src/dblatex -type f)
@@ -43,7 +38,7 @@ OUTDIR =		build
 
 TARGETS_HTML =		$(foreach b,$(BOOKS), \
 			    $(OUTDIR)/$(b)/index.html)
-TARGETS_PDF =		$(foreach b,$(BOOKS_WITH_PDF), \
+TARGETS_PDF =		$(foreach b,$(BOOKS), \
 			    $(foreach t,$(PDF_TYPES), \
 			    $(OUTDIR)/$(b)/$(b)-$(t).pdf))
 
@@ -85,7 +80,7 @@ endef
 #
 # Construct a target for each of the cartesian product of all books and types:
 #
-$(foreach b,$(BOOKS_WITH_PDF), \
+$(foreach b,$(BOOKS), \
     $(foreach t,$(PDF_TYPES), \
     $(eval $(call pdf_template,$(b),$(t)))))
 
